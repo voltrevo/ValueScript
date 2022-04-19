@@ -1,8 +1,9 @@
 [package]
-name = "ValueScript"
+name = "value_script"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+swc_ecma_parser = "0.102.2"
