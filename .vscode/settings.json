@@ -1,0 +1,12 @@
+{
+  "editor.rulers": [80],
+  "editor.codeActionsOnSave": {
+    "source.fixAll": false
+  },
+  "editor.tabSize": 2,
+  "deno.enable": true,
+  "deno.lint": true,
+  "deno.unstable": true,
+  "editor.formatOnSave": false,
+  "editor.defaultFormatter": "denoland.vscode-deno"
+}
