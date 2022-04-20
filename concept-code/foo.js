@@ -128,3 +128,15 @@ function eg7() {
 
   console.log(f); // 3
 }
+
+function eg8() {
+  let x = {};
+
+  function addFoo() {
+    this.foo = 'bar';
+  }
+
+  addFoo.call(x);
+
+  console.log(x.foo); // 'bar'
+}
