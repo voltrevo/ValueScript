@@ -1,5 +1,5 @@
 use std::{path::Path, sync::Arc};
-use swc::config::JscTarget;
+use swc_ecma_ast::{EsVersion};
 use swc_common::{
     errors::{ColorConfig, Handler},
     SourceMap, FileName,
@@ -33,7 +33,7 @@ fn main() {
     let result = c.parse_js(
         fm,
         &handler,
-        JscTarget::Es2020,
+        EsVersion::Es2020,
         Syntax::Es(EsConfig::default()),
         swc::config::IsModule::Bool(true),
         None,
