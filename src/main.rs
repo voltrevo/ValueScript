@@ -1,44 +1,42 @@
+use std::{path::Path, sync::Arc};
+use swc::config::JscTarget;
 use swc_common::{
-    self,
     errors::{ColorConfig, Handler},
-    sync::Lrc,
-    FileName, SourceMap,
+    SourceMap, FileName,
 };
-use swc_ecma_parser::{lexer::Lexer, Capturing, Parser, StringInput, Syntax};
+use swc_ecma_parser::{EsConfig, Syntax};
 
 fn main() {
-    let cm: Lrc<SourceMap> = Default::default();
-    let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(cm.clone()));
-
-    // Real usage
+    let cm = Arc::<SourceMap>::default();
+    let handler = Handler::with_tty_emitter(
+        ColorConfig::Auto,
+        true,
+        false,
+        Some(cm.clone()),
+    );
+    let c = swc::Compiler::new(cm.clone());
     // let fm = cm
-    //     .load_file(Path::new("test.js"))
-    //     .expect("failed to load test.js");
-
+    //     .load_file(Path::new("foo.js"))
+    //     .expect("failed to load file");
     let fm = cm.new_source_file(
         FileName::Custom("test.js".into()),
-        "interface Foo {}".into(),
-    );
+        "
+        function foo(x) {
+            if (x < 3) {
+                return 'lt3';
+            }
 
-    let lexer = Lexer::new(
-        Syntax::Typescript(Default::default()),
-        Default::default(),
-        StringInput::from(&*fm),
+            return 'nlt3';
+        }
+        ".into(),
+    );
+    let result = c.parse_js(
+        fm,
+        &handler,
+        JscTarget::Es2020,
+        Syntax::Es(EsConfig::default()),
+        swc::config::IsModule::Bool(true),
         None,
     );
-
-    let capturing = Capturing::new(lexer);
-
-    let mut parser = Parser::new_from(capturing);
-
-    for e in parser.take_errors() {
-        e.into_diagnostic(&handler).emit();
-    }
-
-    let _module = parser
-        .parse_typescript_module()
-        .map_err(|e| e.into_diagnostic(&handler).emit())
-        .expect("Failed to parse module.");
-
-    println!("Tokens: {:?}", parser.input().take());
+    dbg!(result);
 }

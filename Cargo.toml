@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 swc_common = { version = "0.17.22", features=["tty-emitter"] }
 swc_ecma_parser = "0.102.2"
+swc = "0.168.3"
