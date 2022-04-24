@@ -1,0 +1,20 @@
+function @main() {
+  new @Counter [] %counter
+  subcall %counter "inc" [] %ignore
+  subcall %counter "inc" [] %ignore
+  mov %counter %counter2
+  subcall %counter "inc" [] %ignore
+  sub %counter "value" %_tmp0
+  sub %counter2 "value" %_tmp1
+  mov [%_tmp0 %_tmp1] %return
+}
+function @Counter() {
+  submov "value" 0 %this
+} prototype {
+  "inc": @Counter_inc,
+}
+function @Counter_inc() {
+  sub %this "value" %_tmp0
+  inc %_tmp0
+  submov "value" %_tmp0 %this
+}
