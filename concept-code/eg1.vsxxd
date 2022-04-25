@@ -1,0 +1,63 @@
+00: 0b03 0021 0d1c 0706 0106 0206 0300 0222
+10: 0d2c 0e02 0700 0301 0e02 0000 0b07 0306
+20: 0e03 0e04 0504 0e02 0e05 0000 0b03 0002
+30: 0100
+
+---
+
+// Pointers occupy a single byte in this example because it is so small. The
+// length of the bytecode implicitly indicates the byte width needed for
+// pointers (1, 2, 4, or 8, whichever is smallest and sufficient).
+
+    // @main = function() {
+00:            0b  03  00 // function with 4 registers and 0 parameters
+                          // 0: %return
+                          // 1: %this
+                          // 2: %x
+                          // 3: %ignore (so only actually allocate 3 registers)
+                          // declaring the number of registers implicitly indicates
+                          // the byte width for representing registers in this
+                          // function
+
+    //   call @f1  [  1,   2,   3    ]  %x
+03:      21   0d1c 07 0601 0602 0603 00 02
+
+    //   apply @f2                %x   [  ]  %ignore
+0f:      22    0d2c 0e02 07 00 03
+
+    //   mov %x   %return
+17:      01  0e02 00
+
+    // }
+1b:    00
+
+    // @f1 = function(%a, %b, %c) {
+1c:          0b  07  03 // function with 7 registers and 3 parameters
+                        // 0: %return
+                        // 1: %this
+                        // 2: %a
+                        // 3: %b
+                        // 4: %c
+                        // 5: %_tmp0
+                        // 6: %ignore
+
+    //   op* %b   %c   %_tmp0
+1f:      06  0e03 0e04 05
+
+    //   op+ %a   %_tmp0 %return
+25:      04  0e02 0e05   00
+
+    // }
+2b:    00
+
+    // @f2 = function() {
+2c:          0b  03  00 // function with 3 registers and 0 parameters
+                        // 0: %return
+                        // 1: %this
+                        // 2: %ignore
+
+    //   op++ %this
+2f:      02   01
+
+    // }
+31:    00
