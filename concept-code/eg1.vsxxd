@@ -1,4 +1,4 @@
-00: 0b03 0021 0d1c 0706 0106 0206 0300 0222
+00: 0b04 0021 0d1c 0706 0106 0206 0300 0222
 10: 0d2c 0e02 0700 0301 0e02 0000 0b07 0306
 20: 0e03 0e04 0504 0e02 0e05 0000 0b03 0002
 30: 0100
@@ -10,7 +10,7 @@
 // pointers (1, 2, 4, or 8, whichever is smallest and sufficient).
 
     // @main = function() {
-00:            0b  03  00 // function with 4 registers and 0 parameters
+00:            0b  04  00 // function with 4 registers and 0 parameters
                           // 0: %return
                           // 1: %this
                           // 2: %x
