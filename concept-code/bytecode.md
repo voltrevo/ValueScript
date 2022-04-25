@@ -102,3 +102,37 @@ decoding values until encountering `end`, but it would not be valid to have
 27 jmp
 28 jmpif
 ```
+
+## Examples
+
+`undefined` is serialized as the single byte `0x02`. Deserialization begins at
+the start of the file and `0x02` means `undefined` so it just ends there.
+
+Usually bytecode will represent a function, so the first byte will usually be
+`0x0b`. For example:
+
+```typescript
+function(a: number, b: number) {
+  return a + b;
+}
+```
+
+is serialized as:
+
+```
+00: 0b05 0204 0e02 0e03 0000
+```
+
+with comments:
+
+```
+00: 0b   // function
+01: 05   // 5 registers
+02: 02   // 2 parameters
+03: 04   // op+
+04: 0e02 // read register %a
+06: 0e03 // read register %b
+08: 00   // write the op+ output to register %return (0e is not needed in this
+         // context)
+09: 00   // end
+```
