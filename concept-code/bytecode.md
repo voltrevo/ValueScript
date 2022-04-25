@@ -136,3 +136,54 @@ with comments:
          // context)
 09: 00   // end
 ```
+
+## Pointers
+
+Pointers allow referencing other values. Pointers aren't exposed to the program
+though, they're just an implementation detail.
+
+For example, the following two assemblies are equivalent:
+
+```
+@main = [1, 2]
+```
+
+```
+@main = [1, @two]
+@two = 2
+```
+
+In ValueScript, it is impossible to construct a circular object. However, if
+the following assembly was allowed, it would represent a circular object:
+
+```
+@main = [@other]
+@other = [@main]
+```
+
+In fact, the following assembly might cause the runtime to loop infinitely when
+trying to load it:
+
+```
+@main = @main
+```
+
+To avoid these problems, non-function pointers must point to a location greater
+than the current location. This forces pointer chains to always progress through
+the bytecode and never form loops.
+
+Function pointers are an important exception here to allow for recursion. For
+example, here's an assembly for the factorial function:
+
+```
+@factorial = function(%n) {
+  op!== %n 0 %notZero
+  jmpif %notZero :recurse
+  mov 1 %return
+  end
+:recurse
+  op- %n 1 %nMinus1
+  call @factorial [%nMinus1] %previousFactorial
+  op* %n %previousFactorial %return
+}
+```
