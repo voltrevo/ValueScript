@@ -181,7 +181,7 @@ example, here's an assembly for the factorial function:
   jmpif %notZero :recurse
   mov 1 %return
   end
-:recurse
+recurse:
   op- %n 1 %nMinus1
   call @factorial [%nMinus1] %previousFactorial
   op* %n %previousFactorial %return
