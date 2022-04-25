@@ -15,6 +15,6 @@
 }
 @Counter_inc = function() {
   sub %this "value" %_tmp0
-  inc %_tmp0
+  op++ %_tmp0
   submov "value" %_tmp0 %this
 }

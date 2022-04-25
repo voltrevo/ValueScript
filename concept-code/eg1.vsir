@@ -4,9 +4,9 @@
   mov %x %return
 }
 @f1 = function(%a, %b, %c) {
-  mul %b %c %_tmp0
-  add %a %_tmp0 %return
+  op* %b %c %_tmp0
+  op+ %a %_tmp0 %return
 }
 @f2 = function() {
-  inc %this
+  op++ %this
 }

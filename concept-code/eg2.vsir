@@ -4,5 +4,5 @@
   call %foo [] %return
 }
 @foo = function(%x) {
-  add %x 5 %return
+  op+ %x 5 %return
 }
