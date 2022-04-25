@@ -1,4 +1,4 @@
-function @main() {
+@main = function() {
   mov @Counter %Counter
   sub %Counter "prototype" %_tmp0
   submov "inc" @_anon0 %_tmp0
@@ -12,10 +12,10 @@ function @main() {
   sub %counter2 "value" %_tmp1
   mov [%_tmp0 %_tmp1] %return
 }
-function @Counter() {
+@Counter = function() {
   submov "value" 0 %this
 }
-function @_anon0() {
+@_anon0 = function() {
   sub %this "value" %_tmp0
   inc %_tmp0
   submov "value" %_tmp0 %this

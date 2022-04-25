@@ -1,8 +1,8 @@
-function @main() {
+@main = function() {
   mov 37 %x
   bind @foo [%x] %foo
-  call %foo [] %ignore %return
+  call %foo [] %return
 }
-function @foo(%x) {
+@foo = function(%x) {
   add %x 5 %return
 }

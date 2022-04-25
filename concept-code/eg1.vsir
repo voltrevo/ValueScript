@@ -1,12 +1,12 @@
-function @main() {
-  call @f1 [1, 2, 3] %ignore %x
-  call @f2 [] %x %ignore
+@main = function() {
+  call @f1 [1, 2, 3] %x
+  apply @f2 %x [] %ignore
   mov %x %return
 }
-function @f1(%a, %b, %c) {
+@f1 = function(%a, %b, %c) {
   mul %b %c %_tmp0
   add %a %_tmp0 %return
 }
-function @f2() {
+@f2 = function() {
   inc %this
 }
