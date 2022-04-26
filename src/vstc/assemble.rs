@@ -316,6 +316,8 @@ impl Assembler for AssemblerData {
 
   fn assemble_instruction(&mut self) {
     let instr = self.parse_instruction_word();
+
+    self.output.push(instr.clone() as u8);
     
     for arg in get_instruction_layout(instr) {
       match arg {
@@ -475,6 +477,7 @@ fn assemble(content: &str) -> Vec<u8> {
 }
 
 #[derive(Debug)]
+#[derive(Clone)]
 enum Instruction {
   End = 0x00,
   Mov = 0x01,
