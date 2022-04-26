@@ -1,4 +1,7 @@
+mod assemble;
+
 use std::env;
+use std::process::exit;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -11,6 +14,15 @@ fn main() {
         show_help();
         return;
     }
+
+    if args.len() >= 2 && args[1] == "assemble" {
+        assemble::command(&args);
+        return;
+    }
+
+    println!("ERROR: Unrecognized command\n");
+    show_help();
+    exit(1);
 }
 
 fn show_help() {
