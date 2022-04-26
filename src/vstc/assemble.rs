@@ -1,6 +1,5 @@
 use std::process::exit;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::str::FromStr;
 
 pub fn command(args: &Vec<String>) {
@@ -47,6 +46,8 @@ struct AssemblerData {
   output: Vec<u8>,
   register_map: HashMap<String, u8>,
   register_count_pos: usize,
+  definitions_unresolved: HashMap<String, Vec<usize>>,
+  definition_map: HashMap<String, u8>,
 }
 
 trait Assembler {
@@ -68,6 +69,7 @@ trait Assembler {
   fn assemble_register(&mut self);
   fn assemble_number(&mut self);
   fn get_register_index(&mut self, register_name: &str) -> u8;
+  fn write_unresolved_definition(&mut self, definition_name: &str);
 }
 
 impl Assembler for AssemblerData {
@@ -80,6 +82,24 @@ impl Assembler for AssemblerData {
       }
 
       self.assemble_definition();
+    }
+
+    for (def_name, locations) in &self.definitions_unresolved {
+      let def_location_optional = self.definition_map.get(def_name);
+
+      if def_location_optional.is_none() {
+        std::panic!(
+          "Unresolved reference to @{} at {}",
+          def_name,
+          locations[0],
+        );
+      }
+
+      let def_location = def_location_optional.unwrap();
+
+      for location in locations {
+        self.output[*location] = *def_location;
+      }
     }
   }
 
@@ -116,6 +136,7 @@ impl Assembler for AssemblerData {
   fn assemble_definition(&mut self) {
     self.parse_exact("@");
     let def_name = self.parse_identifier();
+    self.definition_map.insert(def_name, self.output.len() as u8); // TODO: Support >255
     self.parse_optional_whitespace();
     self.parse_exact("=");
     self.parse_optional_whitespace();
@@ -351,10 +372,8 @@ impl Assembler for AssemblerData {
     } else if c == '@' {
       self.parse_exact("@");
       self.output.push(ValueType::Pointer as u8);
-      self.parse_identifier();
-
-      // TODO: Definition location based on identifier needs to be written here
-      self.output.push(0xff);
+      let definition_name = self.parse_identifier();
+      self.write_unresolved_definition(definition_name.as_str());
     } else if c == '[' {
       self.assemble_array();
     } else if c == '-' || c == '.' || ('0' <= c && c <= '9') {
@@ -485,6 +504,20 @@ impl Assembler for AssemblerData {
 
     return result;
   }
+
+  fn write_unresolved_definition(&mut self, definition_name: &str) {
+    if !self.definitions_unresolved.contains_key(definition_name) {
+      self.definitions_unresolved.insert(
+        definition_name.to_string(),
+        Vec::new(),
+      );
+    }
+
+    self.definitions_unresolved.get_mut(definition_name).unwrap()
+      .push(self.output.len());
+    
+    self.output.push(0xff);
+  }
 }
 
 fn assemble(content: &str) -> Vec<u8> {
@@ -494,6 +527,8 @@ fn assemble(content: &str) -> Vec<u8> {
     output: Vec::new(),
     register_map: HashMap::new(),
     register_count_pos: 0,
+    definitions_unresolved: HashMap::new(),
+    definition_map: HashMap::new(),
   };
 
   assembler.run();
