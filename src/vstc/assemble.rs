@@ -113,7 +113,6 @@ impl Assembler for AssemblerData {
   fn assemble_definition(&mut self) {
     self.parse_exact("@");
     let def_name = self.parse_identifier();
-    println!("assembling {}", def_name);
     self.parse_optional_whitespace();
     self.parse_exact("=");
     self.parse_optional_whitespace();
