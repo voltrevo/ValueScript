@@ -387,6 +387,60 @@ enum Instruction {
   JmpIf = 0x28,
 }
 
+enum InstructionArg {
+  Value,
+  Register,
+}
+
+fn get_instruction_layout(instruction: Instruction) -> Vec<InstructionArg> {
+  use Instruction::*;
+  use InstructionArg::*;
+
+  return match instruction {
+    End => Vec::from([]),
+    Mov => Vec::from([Value, Register]),
+    OpInc => Vec::from([Register]),
+    OpDec => Vec::from([Register]),
+    OpPlus => Vec::from([Value, Value, Register]),
+    OpMinus => Vec::from([Value, Value, Register]),
+    OpMul => Vec::from([Value, Value, Register]),
+    OpDiv => Vec::from([Value, Value, Register]),
+    OpMod => Vec::from([Value, Value, Register]),
+    OpExp => Vec::from([Value, Value, Register]),
+    OpEq => Vec::from([Value, Value, Register]),
+    OpNe => Vec::from([Value, Value, Register]),
+    OpTripleEq => Vec::from([Value, Value, Register]),
+    OpTripleNe => Vec::from([Value, Value, Register]),
+    OpAnd => Vec::from([Value, Value, Register]),
+    OpOr => Vec::from([Value, Value, Register]),
+    OpNot => Vec::from([Value, Register]),
+    OpLess => Vec::from([Value, Value, Register]),
+    OpLessEq => Vec::from([Value, Value, Register]),
+    OpGreater => Vec::from([Value, Value, Register]),
+    OpGreaterEq => Vec::from([Value, Value, Register]),
+    OpNullishCoalesce => Vec::from([Value, Value, Register]),
+    OpOptionalChain => Vec::from([Value, Value, Register]),
+    OpBitAnd => Vec::from([Value, Value, Register]),
+    OpBitOr => Vec::from([Value, Value, Register]),
+    OpBitNot => Vec::from([Value, Value, Register]),
+    OpBitXor => Vec::from([Value, Value, Register]),
+    OpLeftShift => Vec::from([Value, Value, Register]),
+    OpRightShift => Vec::from([Value, Value, Register]),
+    OpRightShiftUnsigned => Vec::from([Value, Value, Register]),
+    TypeOf => Vec::from([Value, Register]),
+    InstanceOf => Vec::from([Value, Register]),
+    In => Vec::from([Value, Value, Register]),
+    Call => Vec::from([Value, Value, Register]),
+    Apply => Vec::from([Value, Value, Value, Register]),
+    Bind => Vec::from([Value, Value, Register]),
+    Sub => Vec::from([Value, Value, Register]),
+    SubMov => Vec::from([Value, Value, Register]),
+    SubCall => Vec::from([Value, Value, Value, Register]),
+    Jmp => Vec::from([Value]),
+    JmpIf => Vec::from([Value, Value]),
+  };
+}
+
 fn is_leading_identifier_char(c: char) -> bool {
   return
     c == '_' ||
