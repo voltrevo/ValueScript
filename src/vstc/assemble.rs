@@ -45,6 +45,8 @@ struct AssemblerData {
   content: String, // TODO: Avoid copying this in
   pos: usize,
   output: Vec<u8>,
+  register_map: HashMap<String, u8>,
+  register_count_pos: usize,
 }
 
 trait Assembler {
@@ -65,6 +67,7 @@ trait Assembler {
   fn assemble_array(&mut self);
   fn assemble_register(&mut self);
   fn assemble_number(&mut self);
+  fn get_register_index(&mut self, register_name: &str) -> u8;
 }
 
 impl Assembler for AssemblerData {
@@ -256,20 +259,19 @@ impl Assembler for AssemblerData {
     self.parse_exact("function(");
     self.output.push(ValueType::Function as u8);
 
-    let mut register_names: Vec<String> = Vec::from([
-      "return".to_string(),
-      "this".to_string(),
-    ]);
-
-    let mut param_names: HashSet<String> = HashSet::new();
+    self.register_map.clear();
+    self.register_map.insert("return".to_string(), 0);
+    self.register_map.insert("this".to_string(), 1);
+    self.register_map.insert("ignore".to_string(), 0xff);
 
     loop {
       self.parse_optional_whitespace();
       let mut next = self.parse_one_of(&["%", ")"]);
 
       if next == ")" {
-        self.output.push(0xff); // TODO: This byte should be the number of registers
-        self.output.push(param_names.len() as u8); // TODO: Handle >255 params
+        self.register_count_pos = self.output.len();
+        self.output.push(0xff);
+        self.output.push((self.register_map.len() - 3) as u8); // TODO: Handle >255
         break;
       }
 
@@ -278,15 +280,20 @@ impl Assembler for AssemblerData {
       }
 
       let param_name = self.parse_identifier();
-      param_names.insert(param_name.clone());
-      register_names.push(param_name);
+
+      if self.register_map.contains_key(param_name.as_str()) {
+        std::panic!("Unexpected duplicate parameter name at {}", self.pos);
+      }
+
+      self.get_register_index(param_name.as_str());
       self.parse_optional_whitespace();
 
       next = self.parse_one_of(&[",", ")"]);
 
       if next == ")" {
-        self.output.push(0xff); // TODO: This byte should be the number of registers
-        self.output.push(param_names.len() as u8); // TODO: Handle >255 params
+        self.register_count_pos = self.output.len();
+        self.output.push(0xff);
+        self.output.push((self.register_map.len() - 3) as u8); // TODO: Handle >255
         break;
       }
     }
@@ -311,6 +318,9 @@ impl Assembler for AssemblerData {
 
       self.assemble_instruction();
     }
+
+    // TODO: Handle >255 registers
+    self.output[self.register_count_pos] = self.register_map.len() as u8;
   }
 
   fn assemble_instruction(&mut self) {
@@ -420,10 +430,9 @@ impl Assembler for AssemblerData {
   fn assemble_register(&mut self) {
     self.parse_optional_whitespace();
     self.parse_exact("%");
-    self.parse_identifier();
-
-    // TODO: Register number based on identifier needs to be written here
-    self.output.push(0xff);
+    let register_name = self.parse_identifier();
+    let register_index = self.get_register_index(register_name.as_str());
+    self.output.push(register_index);
   }
 
   fn assemble_number(&mut self) {
@@ -461,6 +470,21 @@ impl Assembler for AssemblerData {
       }
     }
   }
+
+  fn get_register_index(&mut self, register_name: &str) -> u8 {
+    let get_result = self.register_map.get(&register_name.to_string());
+    let result: u8;
+
+    if get_result.is_none() {
+      // TODO: Support >255 registers
+      result = (self.register_map.len() - 1) as u8;
+      self.register_map.insert(register_name.to_string(), result);
+    } else {
+      result = *get_result.unwrap();
+    }
+
+    return result;
+  }
 }
 
 fn assemble(content: &str) -> Vec<u8> {
@@ -468,6 +492,8 @@ fn assemble(content: &str) -> Vec<u8> {
     content: content.to_string(),
     pos: 0,
     output: Vec::new(),
+    register_map: HashMap::new(),
+    register_count_pos: 0,
   };
 
   assembler.run();
