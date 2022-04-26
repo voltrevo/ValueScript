@@ -1,6 +1,7 @@
 use std::process::exit;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::str::FromStr;
 
 pub fn command(args: &Vec<String>) {
   if args.len() != 3 {
@@ -63,6 +64,7 @@ trait Assembler {
   fn assemble_value(&mut self);
   fn assemble_array(&mut self);
   fn assemble_register(&mut self);
+  fn assemble_number(&mut self);
 }
 
 impl Assembler for AssemblerData {
@@ -344,8 +346,32 @@ impl Assembler for AssemblerData {
       self.output.push(0xff);
     } else if c == '[' {
       self.assemble_array();
+    } else if c == '-' || c == '.' || ('0' <= c && c <= '9') {
+      self.assemble_number();
     } else {
-      std::panic!("Unexpected character {} at {}", c, self.pos);
+      let parsed = self.parse_one_of(&[
+        "void",
+        "undefined",
+        "null",
+        "false",
+        "true",
+        "",
+      ]);
+
+      match parsed.as_str() {
+        "void" => self.output.push(ValueType::Void as u8),
+        "undefined" => self.output.push(ValueType::Undefined as u8),
+        "null" => self.output.push(ValueType::Null as u8),
+        "false" => self.output.push(ValueType::False as u8),
+        "true" => self.output.push(ValueType::True as u8),
+
+        // TODO: Finish implementing the different values
+        _ => std::panic!(
+          "Unimplemented value type or unexpected character {} at {}",
+          c,
+          self.pos
+        ),
+      }
     }
   }
 
@@ -397,6 +423,42 @@ impl Assembler for AssemblerData {
 
     // TODO: Register number based on identifier needs to be written here
     self.output.push(0xff);
+  }
+
+  fn assemble_number(&mut self) {
+    let start = self.pos;
+
+    while self.pos < self.content.len() {
+      let c = self.content_at(self.pos);
+
+      if c == '-' || c == '.' || c == 'e' || ('0' <= c && c <= '9') {
+        self.pos += 1;
+      } else {
+        break;
+      }
+    }
+
+    let value_result = f64::from_str(self.content.get(start..self.pos).unwrap());
+
+    if value_result.is_err() {
+      std::panic!("Expected valid number at {}", start);
+    }
+
+    let value = value_result.unwrap();
+
+    if value == (value as i8) as f64 {
+      self.output.push(ValueType::SignedByte as u8);
+
+      for b in (value as i8).to_le_bytes() {
+        self.output.push(b);
+      }
+    } else {
+      self.output.push(ValueType::Number as u8);
+
+      for b in value.to_le_bytes() {
+        self.output.push(b);
+      }
+    }
   }
 }
 
