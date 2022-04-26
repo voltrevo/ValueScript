@@ -1,5 +1,5 @@
 00: 0b04 0021 0d1c 0906 0106 0206 0300 0222
-10: 0d2c 0e02 0900 0301 0e02 0000 0b07 0306
+10: 0d2c 0e02 0900 ff01 0e02 0000 0b07 0306
 20: 0e03 0e04 0504 0e02 0e05 0000 0b03 0002
 30: 0100
 
@@ -11,10 +11,10 @@
 
     // @main = function() {
 00:            0b  04  00 // function with 4 registers and 0 parameters
-                          // 0: %return
-                          // 1: %this
-                          // 2: %x
-                          // 3: %ignore (so only actually allocate 3 registers)
+                          //  0: %return
+                          //  1: %this
+                          //  2: %x
+                          // ff: %ignore (so only actually allocate 3 registers)
                           // declaring the number of registers implicitly indicates
                           // the byte width for representing registers in this
                           // function
@@ -23,7 +23,7 @@
 03:      21   0d1c 09 0601 0602 0603 00 02
 
     //   apply @f2  %x   [  ]  %ignore
-0f:      22    0d2c 0e02 09 00 03
+0f:      22    0d2c 0e02 09 00 ff
 
     //   mov %x   %return
 17:      01  0e02 00
@@ -33,13 +33,13 @@
 
     // @f1 = function(%a, %b, %c) {
 1c:          0b  07  03 // function with 7 registers and 3 parameters
-                        // 0: %return
-                        // 1: %this
-                        // 2: %a
-                        // 3: %b
-                        // 4: %c
-                        // 5: %_tmp0
-                        // 6: %ignore
+                        //  0: %return
+                        //  1: %this
+                        //  2: %a
+                        //  3: %b
+                        //  4: %c
+                        //  5: %_tmp0
+                        // ff: %ignore
 
     //   op* %b   %c   %_tmp0
 1f:      06  0e03 0e04 05
@@ -52,9 +52,9 @@
 
     // @f2 = function() {
 2c:          0b  03  00 // function with 3 registers and 0 parameters
-                        // 0: %return
-                        // 1: %this
-                        // 2: %ignore
+                        //  0: %return
+                        //  1: %this
+                        // ff: %ignore
 
     //   op++ %this
 2f:      02   01
