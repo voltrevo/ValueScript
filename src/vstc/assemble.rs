@@ -1,5 +1,6 @@
 use std::process::exit;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 pub fn command(args: &Vec<String>) {
   if args.len() != 3 {
@@ -39,12 +40,19 @@ fn show_help() {
   println!("    vstc assemble <file>");
 }
 
-fn assemble(content: &String) -> std::vec::Vec<u8> {
+fn assemble(content: &str) -> std::vec::Vec<u8> {
   let mut output: Vec<u8> = Vec::new();
   let mut pos: usize = 0;
 
-  let instr = parse_instruction_word(content, &mut pos);
-  dbg!(instr);
+  loop {
+    parse_optional_whitespace(content, &mut pos);
+
+    if pos >= content.len() {
+      break;
+    }
+
+    assemble_definition(content, &mut pos, &mut output);
+  }
 
   return output;
 }
@@ -94,7 +102,7 @@ enum Instruction {
   JmpIf = 0x28,
 }
 
-fn parse_instruction_word(content: &String, pos: &mut usize) -> Instruction {
+fn parse_instruction_word(content: &str, pos: &mut usize) -> Instruction {
   let instruction_word_map: HashMap<&str, Instruction> = HashMap::from([
     ("end", Instruction::End),
     ("mov", Instruction::Mov),
@@ -190,4 +198,184 @@ fn parse_optional_whitespace(content: &str, pos: &mut usize) {
 
     *pos += 1;
   }
+}
+
+fn parse_identifier(content: &str, pos: &mut usize) -> String {
+  let start = *pos;
+  let leading_char = content.chars().nth(start).unwrap();
+
+  if !is_leading_identifier_char(leading_char) {
+    std::panic!("Invalid identifier at {}", pos);
+  }
+
+  *pos += 1;
+
+  while *pos < content.len() {
+    let c = content.chars().nth(*pos).unwrap();
+
+    if !is_identifier_char(c) {
+      break;
+    }
+
+    *pos += 1;
+  }
+
+  unsafe {
+    return content.get_unchecked(start..*pos).to_string();
+  }
+}
+
+fn is_leading_identifier_char(c: char) -> bool {
+  return
+    c == '_' ||
+    ('a' <= c && c <= 'z') ||
+    ('A' <= c && c <= 'Z')
+  ;
+}
+
+fn is_identifier_char(c: char) -> bool {
+  return
+    c == '_' ||
+    ('0' <= c && c <= '9') ||
+    ('a' <= c && c <= 'z') ||
+    ('A' <= c && c <= 'Z')
+  ;
+}
+
+fn parse_exact(content: &str, pos: &mut usize, chars: &str) {
+  for c in chars.chars() {
+    if *pos >= content.len() || content.chars().nth(*pos).unwrap() != c {
+      std::panic!("Expected '{}' at {}", c, *pos);
+    }
+
+    *pos += 1;
+  }
+}
+
+fn parse_optional_exact(content: &str, pos: &mut usize, chars: &str) -> bool {
+  if test_chars(content, *pos, chars) {
+    *pos += chars.len();
+    return true;
+  }
+
+  return false;
+}
+
+fn parse_one_of(content: &str, pos: &mut usize, options: &[&str]) -> String {
+  for opt in options {
+    if test_chars(content, *pos, opt) {
+      *pos += opt.len();
+      return opt.to_string();
+    }
+  }
+
+  // FIXME: How best to display options here?
+  std::panic!("Expected one of (options) at {}", pos);
+}
+
+fn assemble_definition(content: &str, pos: &mut usize, output: &mut Vec<u8>) {
+  parse_exact(content, pos, "@");
+  let def_name = parse_identifier(content, pos);
+  println!("assembling {}", def_name);
+  parse_optional_whitespace(content, pos);
+  parse_exact(content, pos, "=");
+  parse_optional_whitespace(content, pos);
+
+  // TODO: Handle other kinds of definitions
+  assemble_function(content, pos, output);
+}
+
+fn assemble_function(content: &str, pos: &mut usize, output: &mut Vec<u8>) {
+  parse_exact(content, pos, "function(");
+  output.push(ValueType::Function as u8);
+
+  let mut register_names: Vec<String> = Vec::from([
+    "return".to_string(),
+    "this".to_string(),
+  ]);
+
+  let mut param_names: HashSet<String> = HashSet::new();
+
+  loop {
+    parse_optional_whitespace(content, pos);
+    let mut next = parse_one_of(content, pos, &["%", ")"]);
+
+    if next == ")" {
+      output.push(0xff); // TODO: This byte should be the number of registers
+      output.push(param_names.len() as u8); // TODO: Handle >255 params
+      break;
+    }
+
+    if next != "%" {
+      std::panic!("Expected this to be impossible");
+    }
+
+    let param_name = parse_identifier(content, pos);
+    param_names.insert(param_name.clone());
+    register_names.push(param_name);
+    parse_optional_whitespace(content, pos);
+
+    next = parse_one_of(content, pos, &[",", ")"]);
+
+    if next == ")" {
+      output.push(0xff); // TODO: This byte should be the number of registers
+      output.push(param_names.len() as u8); // TODO: Handle >255 params
+      break;
+    }
+  }
+
+  parse_optional_whitespace(content, pos);
+  parse_exact(content, pos, "{");
+
+  loop {
+    parse_optional_whitespace(content, pos);
+
+    let c = content.chars().nth(*pos);
+
+    if c == None {
+      std::panic!("Expected instruction or end of function at {}", pos);
+    }
+
+    if c.unwrap() == '}' {
+      output.push(Instruction::End as u8);
+      *pos += 1;
+      break;
+    }
+
+    assemble_instruction(content, pos, output);
+  }
+}
+
+enum ValueType {
+  Void = 0x01,
+  Undefined = 0x02,
+  Null = 0x03,
+  False = 0x04,
+  True = 0x05,
+  SignedByte = 0x06,
+  Number = 0x07,
+  String = 0x08,
+  Array = 0x09,
+  Object = 0x0a,
+  Function = 0x0b,
+  Instance = 0x0c,
+}
+
+fn assemble_instruction(content: &str, pos: &mut usize, output: &mut Vec<u8>) {
+  let instr = parse_instruction_word(content, pos);
+  println!("Skipping instruction {:?}", instr);
+  skip_line(content, pos);
+}
+
+fn skip_line(content: &str, pos: &mut usize) {
+  while *pos < content.len() {
+    let c = content.chars().nth(*pos).unwrap();
+    *pos += 1;
+
+    if c == '\n' {
+      return;
+    }
+  }
+
+  std::panic!("Reached end of file looking for newline");
 }
