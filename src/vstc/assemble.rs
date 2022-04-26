@@ -595,7 +595,7 @@ impl Assembler for AssemblerData {
       c = self.peek("Expected comma or object end");
 
       if c == ',' {
-        // Do nothing
+        self.pos += 1;
       } else if c == '}' {
         self.output.push(ValueType::End as u8);
         self.pos += 1;
