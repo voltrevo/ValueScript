@@ -60,7 +60,9 @@ trait Assembler {
   fn parse_one_of(&mut self, options: &[&str]) -> String;
   fn assemble_function(&mut self);
   fn assemble_instruction(&mut self);
-  fn skip_line(&mut self);
+  fn assemble_value(&mut self);
+  fn assemble_array(&mut self);
+  fn assemble_register(&mut self);
 }
 
 impl Assembler for AssemblerData {
@@ -312,21 +314,89 @@ impl Assembler for AssemblerData {
 
   fn assemble_instruction(&mut self) {
     let instr = self.parse_instruction_word();
-    println!("Skipping instruction {:?}", instr);
-    self.skip_line();
-  }
-
-  fn skip_line(&mut self) {
-    while self.pos < self.content.len() {
-      let c = self.content_at(self.pos);
-      self.pos += 1;
-
-      if c == '\n' {
-        return;
+    
+    for arg in get_instruction_layout(instr) {
+      match arg {
+        InstructionArg::Value => self.assemble_value(),
+        InstructionArg::Register => self.assemble_register(),
       }
     }
+  }
 
-    std::panic!("Reached end of file looking for newline");
+  fn assemble_value(&mut self) {
+    self.parse_optional_whitespace();
+
+    if self.pos >= self.content.len() {
+      std::panic!("Expected value at {}", self.pos);
+    }
+
+    let c = self.content_at(self.pos);
+
+    if c == '%' {
+      self.output.push(ValueType::Register as u8);
+      self.assemble_register();
+    } else if c == '@' {
+      self.parse_exact("@");
+      self.output.push(ValueType::Pointer as u8);
+      self.parse_identifier();
+
+      // TODO: Definition location based on identifier needs to be written here
+      self.output.push(0xff);
+    } else if c == '[' {
+      self.assemble_array();
+    } else {
+      std::panic!("Unexpected character {} at {}", c, self.pos);
+    }
+  }
+
+  fn assemble_array(&mut self) {
+    self.parse_optional_whitespace();
+
+    self.parse_exact("[");
+    self.output.push(ValueType::Array as u8);
+
+    loop {
+      self.parse_optional_whitespace();
+
+      if self.pos >= self.content.len() {
+        std::panic!("Expected value or array end at {}", self.pos);
+      }
+
+      let c = self.content_at(self.pos);
+
+      if c == ']' {
+        self.pos += 1;
+        self.output.push(ValueType::End as u8);
+        break;
+      }
+
+      self.assemble_value();
+      self.parse_optional_whitespace();
+
+      let next = self.parse_one_of(&[",", "]"]);
+
+      if next == "," {
+        self.pos += 1;
+        continue;
+      }
+
+      if next == "]" {
+        self.pos += 1;
+        self.output.push(ValueType::End as u8);
+        break;
+      }
+
+      std::panic!("Expected this to be impossible");
+    }
+  }
+
+  fn assemble_register(&mut self) {
+    self.parse_optional_whitespace();
+    self.parse_exact("%");
+    self.parse_identifier();
+
+    // TODO: Register number based on identifier needs to be written here
+    self.output.push(0xff);
   }
 }
 
@@ -459,6 +529,7 @@ fn is_identifier_char(c: char) -> bool {
 }
 
 enum ValueType {
+  End = 0x00,
   Void = 0x01,
   Undefined = 0x02,
   Null = 0x03,
@@ -471,4 +542,7 @@ enum ValueType {
   Object = 0x0a,
   Function = 0x0b,
   Instance = 0x0c,
+  Pointer = 0x0d,
+  Register = 0x0e,
+  External = 0x0f,
 }
