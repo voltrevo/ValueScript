@@ -41,12 +41,15 @@ fn show_help() {
 
 fn assemble(content: &String) -> std::vec::Vec<u8> {
   let mut output: Vec<u8> = Vec::new();
+  let mut pos: usize = 0;
 
-  // TODO: Assemble content into output
-  
+  let instr = parse_instruction_word(content, &mut pos);
+  dbg!(instr);
+
   return output;
 }
 
+#[derive(Debug)]
 enum Instruction {
   End = 0x00,
   Mov = 0x01,
@@ -91,51 +94,51 @@ enum Instruction {
   JmpIf = 0x28,
 }
 
-static instruction_word_map: HashMap<&str, Instruction> = HashMap::from([
-  ("end", Instruction::End),
-  ("mov", Instruction::Mov),
-  ("op++", Instruction::OpInc),
-  ("op--", Instruction::OpDec),
-  ("op+", Instruction::OpPlus),
-  ("op-", Instruction::OpMinus),
-  ("op*", Instruction::OpMul),
-  ("op/", Instruction::OpDiv),
-  ("op%", Instruction::OpMod),
-  ("op**", Instruction::OpExp),
-  ("op==", Instruction::OpEq),
-  ("op!=", Instruction::OpNe),
-  ("op===", Instruction::OpTripleEq),
-  ("op!==", Instruction::OpTripleNe),
-  ("op&&", Instruction::OpAnd),
-  ("op||", Instruction::OpOr),
-  ("op!", Instruction::OpNot),
-  ("op<", Instruction::OpLess),
-  ("op<=", Instruction::OpLessEq),
-  ("op>", Instruction::OpGreater),
-  ("op>=", Instruction::OpGreaterEq),
-  ("op??", Instruction::OpNullishCoalesce),
-  ("op?.", Instruction::OpOptionalChain),
-  ("op&", Instruction::OpBitAnd),
-  ("op|", Instruction::OpBitOr),
-  ("op~", Instruction::OpBitNot),
-  ("op^", Instruction::OpBitXor),
-  ("op<<", Instruction::OpLeftShift),
-  ("op>>", Instruction::OpRightShift),
-  ("op>>>", Instruction::OpRightShiftUnsigned),
-  ("typeof", Instruction::TypeOf),
-  ("instanceof", Instruction::InstanceOf),
-  ("in", Instruction::In),
-  ("call", Instruction::Call),
-  ("apply", Instruction::Apply),
-  ("bind", Instruction::Bind),
-  ("sub", Instruction::Sub),
-  ("submov", Instruction::SubMov),
-  ("subcall", Instruction::SubCall),
-  ("jmp", Instruction::Jmp),
-  ("jmpif", Instruction::JmpIf),
-]);
+fn parse_instruction_word(content: &String, pos: &mut usize) -> Instruction {
+  let instruction_word_map: HashMap<&str, Instruction> = HashMap::from([
+    ("end", Instruction::End),
+    ("mov", Instruction::Mov),
+    ("op++", Instruction::OpInc),
+    ("op--", Instruction::OpDec),
+    ("op+", Instruction::OpPlus),
+    ("op-", Instruction::OpMinus),
+    ("op*", Instruction::OpMul),
+    ("op/", Instruction::OpDiv),
+    ("op%", Instruction::OpMod),
+    ("op**", Instruction::OpExp),
+    ("op==", Instruction::OpEq),
+    ("op!=", Instruction::OpNe),
+    ("op===", Instruction::OpTripleEq),
+    ("op!==", Instruction::OpTripleNe),
+    ("op&&", Instruction::OpAnd),
+    ("op||", Instruction::OpOr),
+    ("op!", Instruction::OpNot),
+    ("op<", Instruction::OpLess),
+    ("op<=", Instruction::OpLessEq),
+    ("op>", Instruction::OpGreater),
+    ("op>=", Instruction::OpGreaterEq),
+    ("op??", Instruction::OpNullishCoalesce),
+    ("op?.", Instruction::OpOptionalChain),
+    ("op&", Instruction::OpBitAnd),
+    ("op|", Instruction::OpBitOr),
+    ("op~", Instruction::OpBitNot),
+    ("op^", Instruction::OpBitXor),
+    ("op<<", Instruction::OpLeftShift),
+    ("op>>", Instruction::OpRightShift),
+    ("op>>>", Instruction::OpRightShiftUnsigned),
+    ("typeof", Instruction::TypeOf),
+    ("instanceof", Instruction::InstanceOf),
+    ("in", Instruction::In),
+    ("call", Instruction::Call),
+    ("apply", Instruction::Apply),
+    ("bind", Instruction::Bind),
+    ("sub", Instruction::Sub),
+    ("submov", Instruction::SubMov),
+    ("subcall", Instruction::SubCall),
+    ("jmp", Instruction::Jmp),
+    ("jmpif", Instruction::JmpIf),
+  ]);
 
-fn parse_instruction_word(content: &String, pos: &usize) -> Instruction {
   for (word, instruction) in instruction_word_map {
     if test_instruction_word(content, *pos, word) {
       *pos += word.len() + 1;
@@ -144,10 +147,10 @@ fn parse_instruction_word(content: &String, pos: &usize) -> Instruction {
     }
   }
 
-  std::panic!(std::format!("Failed to parse instruction at {}", pos));
+  std::panic!("Failed to parse instruction at {}", pos);
 }
 
-fn test_chars(content: &str, pos: usize, chars: &str) -> bool {
+fn test_chars(content: &str, mut pos: usize, chars: &str) -> bool {
   for c in chars.chars() {
     if pos >= content.len() || content.chars().nth(pos).unwrap() != c {
       return false;
@@ -159,7 +162,7 @@ fn test_chars(content: &str, pos: usize, chars: &str) -> bool {
   return true;
 }
 
-fn test_instruction_word(content: &str, pos: usize, word: &str) -> bool {
+fn test_instruction_word(content: &str, mut pos: usize, word: &str) -> bool {
   let has_chars = test_chars(content, pos, word);
 
   if !has_chars {
@@ -177,7 +180,7 @@ fn test_instruction_word(content: &str, pos: usize, word: &str) -> bool {
   return ch == ' ' || ch == '\n';
 }
 
-fn parse_optional_whitespace(content: &str, pos: &usize) {
+fn parse_optional_whitespace(content: &str, pos: &mut usize) {
   while *pos < content.len() {
     let c = content.chars().nth(*pos).unwrap();
 
