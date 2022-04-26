@@ -146,8 +146,13 @@ impl Assembler for AssemblerData {
     self.parse_exact("=");
     self.parse_optional_whitespace();
 
-    // TODO: Handle other kinds of definitions
-    self.assemble_function();
+    let c = self.peek("Expected value for definition");
+
+    if c == 'f' {
+      self.assemble_function();
+    } else {
+      self.assemble_value();
+    }
   }
 
   fn parse_instruction_word(&mut self) -> Instruction {
