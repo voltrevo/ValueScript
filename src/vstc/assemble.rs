@@ -62,14 +62,19 @@ trait Assembler {
   fn parse_exact(&mut self, chars: &str);
   fn parse_optional_exact(&mut self, chars: &str) -> bool;
   fn parse_one_of(&mut self, options: &[&str]) -> String;
+  fn parse_string_literal(&mut self) -> String;
   fn assemble_function(&mut self);
   fn assemble_instruction(&mut self);
   fn assemble_value(&mut self);
   fn assemble_array(&mut self);
   fn assemble_register(&mut self);
   fn assemble_number(&mut self);
+  fn assemble_string(&mut self);
+  fn assemble_object(&mut self);
   fn get_register_index(&mut self, register_name: &str) -> u8;
   fn write_unresolved_definition(&mut self, definition_name: &str);
+  fn write_varsize_uint(&mut self, value: usize);
+  fn peek(&self, failure_msg: &str) -> char;
 }
 
 impl Assembler for AssemblerData {
@@ -276,6 +281,52 @@ impl Assembler for AssemblerData {
     std::panic!("Expected one of (options) at {}", self.pos);
   }
 
+  fn parse_string_literal(&mut self) -> String {
+    let mut result = "".to_string();
+
+    self.parse_exact("\"");
+    let mut escaping = false;
+
+    while self.pos < self.content.len() {
+      let c = self.content_at(self.pos);
+
+      if escaping {
+        if c == '\\' {
+          result.push('\\');
+        } else if c == '"' {
+          result.push('"');
+        } else if c == 'n' {
+          result.push('\n');
+        } else if c == 't' {
+          result.push('\t');
+        } else {
+          std::panic!("Unimplemented escape sequence at {}", self.pos);
+        }
+
+        escaping = false;
+      } else if c == '\\' {
+        escaping = true;
+      } else if c == '"' {
+        break;
+      } else {
+        result.push(c);
+      }
+
+      self.pos += 1;
+    }
+
+    if escaping {
+      std::panic!(
+        "Unexpected end of input after escape character at {}",
+        self.pos,
+      );
+    }
+
+    self.parse_exact("\"");
+
+    return result;
+  }
+
   fn assemble_function(&mut self) {
     self.parse_exact("function(");
     self.output.push(ValueType::Function as u8);
@@ -378,6 +429,10 @@ impl Assembler for AssemblerData {
       self.assemble_array();
     } else if c == '-' || c == '.' || ('0' <= c && c <= '9') {
       self.assemble_number();
+    } else if c == '"' {
+      self.assemble_string();
+    } else if c == '{' {
+      self.assemble_object();
     } else {
       let parsed = self.parse_one_of(&[
         "void",
@@ -490,6 +545,62 @@ impl Assembler for AssemblerData {
     }
   }
 
+  fn assemble_string(&mut self) {
+    let value = self.parse_string_literal();
+
+    self.output.push(ValueType::String as u8);
+    self.write_varsize_uint(value.len());
+
+    for b in value.as_bytes() {
+      self.output.push(*b);
+    }
+  }
+
+  fn assemble_object(&mut self) {
+    self.parse_exact("{");
+    self.output.push(ValueType::Object as u8);
+
+    loop {
+      self.parse_optional_whitespace();
+      let mut c = self.peek("Expected object content or end");
+
+      if c == '"' {
+        self.assemble_string();
+      } else if c == '%' {
+        self.output.push(ValueType::Register as u8);
+        self.assemble_register();
+      } else if c == '@' {
+        self.parse_exact("@");
+        self.output.push(ValueType::Pointer as u8);
+        let definition_name = self.parse_identifier();
+        self.write_unresolved_definition(definition_name.as_str());
+      } else if c == '}' {
+        self.output.push(ValueType::End as u8);
+        self.pos += 1;
+        break;
+      } else {
+        std::panic!("Unexpected character {} at {}", c, self.pos);
+      }
+
+      self.parse_optional_whitespace();
+      self.parse_exact(":");
+      self.assemble_value();
+      self.parse_optional_whitespace();
+
+      c = self.peek("Expected comma or object end");
+
+      if c == ',' {
+        // Do nothing
+      } else if c == '}' {
+        self.output.push(ValueType::End as u8);
+        self.pos += 1;
+        break;
+      } else {
+        std::panic!("Unexpected character {} at {}", c, self.pos);
+      }
+    }
+  }
+
   fn get_register_index(&mut self, register_name: &str) -> u8 {
     let get_result = self.register_map.get(&register_name.to_string());
     let result: u8;
@@ -517,6 +628,33 @@ impl Assembler for AssemblerData {
       .push(self.output.len());
     
     self.output.push(0xff);
+  }
+
+  fn write_varsize_uint(&mut self, value: usize) {
+    let mut x = value;
+
+    loop {
+      let mut b: u8 = (x % 128) as u8;
+      x /= 128;
+
+      if x != 0 {
+        b += 128;
+      }
+
+      self.output.push(b);
+
+      if x == 0 {
+        break;
+      }
+    }
+  }
+
+  fn peek(&self, failure_msg: &str) -> char {
+    if self.pos >= self.content.len() {
+      std::panic!("{} at {}", failure_msg, self.pos);
+    }
+
+    return self.content_at(self.pos);
   }
 }
 
