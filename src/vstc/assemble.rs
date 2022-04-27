@@ -107,7 +107,7 @@ impl Assembler for AssemblerData {
       let def_location = def_location_optional.unwrap();
 
       for location in locations {
-        self.output[*location] = *def_location;
+        self.output[*location] = *def_location as u8; // TODO: Support >255
       }
     }
   }
@@ -145,7 +145,7 @@ impl Assembler for AssemblerData {
   fn assemble_definition(&mut self) {
     self.parse_exact("@");
     let def_name = self.parse_identifier();
-    self.definition_map.insert(def_name, self.output.len() as u8); // TODO: Support >255
+    self.definition_map.insert(def_name, self.output.len());
     self.parse_optional_whitespace();
     self.parse_exact("=");
     self.parse_optional_whitespace();
