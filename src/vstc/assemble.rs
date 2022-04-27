@@ -123,7 +123,6 @@ trait Assembler {
   fn assemble_string(&mut self);
   fn assemble_object(&mut self);
   fn get_register_index(&mut self, register_name: &str) -> u8;
-  fn write_unresolved_definition(&mut self, definition_name: &String);
   fn write_varsize_uint(&mut self, value: usize);
   fn peek(&self, failure_msg: &str) -> char;
 }
@@ -485,7 +484,7 @@ impl Assembler for AssemblerData {
       self.parse_exact("@");
       self.output.push(ValueType::Pointer as u8);
       let definition_name = self.parse_identifier();
-      self.write_unresolved_definition(&definition_name);
+      self.definitions_map.add_unresolved(&definition_name, &mut self.output);
     } else if c == '[' {
       self.assemble_array();
     } else if c == '-' || c == '.' || ('0' <= c && c <= '9') {
@@ -668,7 +667,7 @@ impl Assembler for AssemblerData {
         self.parse_exact("@");
         self.output.push(ValueType::Pointer as u8);
         let definition_name = self.parse_identifier();
-        self.write_unresolved_definition(&definition_name);
+        self.definitions_map.add_unresolved(&definition_name, &mut self.output);
       } else if c == '}' {
         self.output.push(ValueType::End as u8);
         self.pos += 1;
@@ -709,15 +708,6 @@ impl Assembler for AssemblerData {
     }
 
     return result;
-  }
-
-  fn write_unresolved_definition(&mut self, definition_name: &String) {
-    self.definitions_map.references
-      .entry(definition_name.clone())
-      .or_default()
-      .push(self.output.len());
-
-    self.output.push(0xff);
   }
 
   fn write_varsize_uint(&mut self, value: usize) {
