@@ -40,9 +40,42 @@ fn show_help() {
   println!("    vstc assemble <file>");
 }
 
+struct LocationMap {
+  references: HashMap<String, Vec<usize>>,
+  found_locations: HashMap<String, usize>,
+}
+
+trait LocationMapper {
+  fn resolve(&self, output: &mut Vec<u8>);
+}
+
+impl LocationMapper for LocationMap {
+  fn resolve(&self, output: &mut Vec<u8>) {
+    for (name, ref_locations) in &self.references {
+      let location_optional = self.found_locations.get(name);
+
+      if location_optional.is_none() {
+        std::panic!(
+          "Unresolved reference to {} at {}",
+          name,
+          ref_locations[0],
+        );
+      }
+
+      let location = location_optional.unwrap();
+
+      for ref_location in ref_locations {
+        output[*ref_location] = *location as u8; // TODO: Support >255
+      }
+    }
+  }
+}
+
 struct AssemblerFnData {
   register_map: HashMap<String, u8>,
   register_count_pos: usize,
+  // labels_unresolved: HashMap<String, Vec<usize>>,
+  // label_map: HashMap<String, u8>,
 }
 
 struct AssemblerData {
@@ -50,8 +83,7 @@ struct AssemblerData {
   pos: usize,
   output: Vec<u8>,
   fn_data: AssemblerFnData,
-  definitions_unresolved: HashMap<String, Vec<usize>>,
-  definition_map: HashMap<String, u8>,
+  definitions_map: LocationMap,
 }
 
 trait Assembler {
@@ -93,23 +125,7 @@ impl Assembler for AssemblerData {
       self.assemble_definition();
     }
 
-    for (def_name, locations) in &self.definitions_unresolved {
-      let def_location_optional = self.definition_map.get(def_name);
-
-      if def_location_optional.is_none() {
-        std::panic!(
-          "Unresolved reference to @{} at {}",
-          def_name,
-          locations[0],
-        );
-      }
-
-      let def_location = def_location_optional.unwrap();
-
-      for location in locations {
-        self.output[*location] = *def_location as u8; // TODO: Support >255
-      }
-    }
+    self.definitions_map.resolve(&mut self.output);
   }
 
   fn content_at(&self, pos: usize) -> char {
@@ -145,7 +161,7 @@ impl Assembler for AssemblerData {
   fn assemble_definition(&mut self) {
     self.parse_exact("@");
     let def_name = self.parse_identifier();
-    self.definition_map.insert(def_name, self.output.len());
+    self.definitions_map.found_locations.insert(def_name, self.output.len());
     self.parse_optional_whitespace();
     self.parse_exact("=");
     self.parse_optional_whitespace();
@@ -631,16 +647,16 @@ impl Assembler for AssemblerData {
   }
 
   fn write_unresolved_definition(&mut self, definition_name: &str) {
-    if !self.definitions_unresolved.contains_key(definition_name) {
-      self.definitions_unresolved.insert(
+    if !self.definitions_map.references.contains_key(definition_name) {
+      self.definitions_map.references.insert(
         definition_name.to_string(),
         Vec::new(),
       );
     }
 
-    self.definitions_unresolved.get_mut(definition_name).unwrap()
+    self.definitions_map.references.get_mut(definition_name).unwrap()
       .push(self.output.len());
-    
+
     self.output.push(0xff);
   }
 
@@ -681,8 +697,10 @@ fn assemble(content: &str) -> Vec<u8> {
       register_map: HashMap::new(),
       register_count_pos: 0,
     },
-    definitions_unresolved: HashMap::new(),
-    definition_map: HashMap::new(),
+    definitions_map: LocationMap {
+      references: HashMap::new(),
+      found_locations: HashMap::new(),
+    },
   };
 
   assembler.run();
