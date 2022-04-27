@@ -1,0 +1,10 @@
+@factorial = function(%n) {
+  op!== %n 0 %notZero
+  jmpif %notZero :recurse
+  mov 1 %return
+  end
+recurse:
+  op- %n 1 %nMinus1
+  call @factorial [%nMinus1] %previousFactorial
+  op* %n %previousFactorial %return
+}

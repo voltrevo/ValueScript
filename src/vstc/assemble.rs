@@ -40,16 +40,27 @@ fn show_help() {
   println!("    vstc assemble <file>");
 }
 
+#[derive(Default)]
 struct LocationMap {
   references: HashMap<String, Vec<usize>>,
   found_locations: HashMap<String, usize>,
 }
 
 trait LocationMapper {
+  fn add_unresolved(&mut self, name: &String, output: &mut Vec<u8>);
   fn resolve(&self, output: &mut Vec<u8>);
 }
 
 impl LocationMapper for LocationMap {
+  fn add_unresolved(&mut self, name: &String, output: &mut Vec<u8>){
+    self.references
+      .entry(name.clone())
+      .or_default()
+      .push(output.len());
+
+    output.push(0xff); // TODO: Support >255
+  }
+
   fn resolve(&self, output: &mut Vec<u8>) {
     for (name, ref_locations) in &self.references {
       let location_optional = self.found_locations.get(name);
@@ -71,11 +82,11 @@ impl LocationMapper for LocationMap {
   }
 }
 
+#[derive(Default)]
 struct AssemblerFnData {
   register_map: HashMap<String, u8>,
   register_count_pos: usize,
-  // labels_unresolved: HashMap<String, Vec<usize>>,
-  // label_map: HashMap<String, u8>,
+  labels_map: LocationMap,
 }
 
 struct AssemblerData {
@@ -94,6 +105,7 @@ trait Assembler {
   fn assemble_definition(&mut self);
   fn parse_instruction_word(&mut self) -> Instruction;
   fn test_instruction_word(&self, word: &str) -> bool;
+  fn test_identifier(&self) -> Option<String>;
   fn parse_identifier(&mut self) -> String;
   fn parse_exact(&mut self, chars: &str);
   fn parse_optional_exact(&mut self, chars: &str) -> bool;
@@ -104,11 +116,14 @@ trait Assembler {
   fn assemble_value(&mut self);
   fn assemble_array(&mut self);
   fn assemble_register(&mut self);
+  fn test_label(&self) -> Option<String>;
+  fn assemble_label(&mut self, label_name: String);
+  fn assemble_label_read(&mut self);
   fn assemble_number(&mut self);
   fn assemble_string(&mut self);
   fn assemble_object(&mut self);
   fn get_register_index(&mut self, register_name: &str) -> u8;
-  fn write_unresolved_definition(&mut self, definition_name: &str);
+  fn write_unresolved_definition(&mut self, definition_name: &String);
   fn write_varsize_uint(&mut self, value: usize);
   fn peek(&self, failure_msg: &str) -> char;
 }
@@ -250,29 +265,43 @@ impl Assembler for AssemblerData {
     return ch == ' ' || ch == '\n';
   }
 
-  fn parse_identifier(&mut self) -> String {
+  fn test_identifier(&self) -> Option<String> {
     let start = self.pos;
+    let mut pos = start;
     let leading_char = self.content_at(start);
 
     if !is_leading_identifier_char(leading_char) {
-      std::panic!("Invalid identifier at {}", self.pos);
+      return None;
     }
 
-    self.pos += 1;
+    pos += 1;
 
-    while self.pos < self.content.len() {
-      let c = self.content_at(self.pos);
+    while pos < self.content.len() {
+      let c = self.content_at(pos);
 
       if !is_identifier_char(c) {
         break;
       }
 
-      self.pos += 1;
+      pos += 1;
     }
 
     unsafe {
-      return self.content.get_unchecked(start..self.pos).to_string();
+      return Some(self.content.get_unchecked(start..pos).to_string());
     }
+  }
+
+  fn parse_identifier(&mut self) -> String {
+    let optional_identifier = self.test_identifier();
+
+    if optional_identifier.is_none() {
+      std::panic!("Invalid identifier at {}", self.pos);
+    }
+
+    let identifier = optional_identifier.unwrap();
+    self.pos += identifier.len();
+
+    return identifier;
   }
 
   fn parse_exact(&mut self, chars: &str) {
@@ -356,10 +385,7 @@ impl Assembler for AssemblerData {
     self.parse_exact("function(");
     self.output.push(ValueType::Function as u8);
 
-    self.fn_data = AssemblerFnData {
-      register_map: HashMap::new(),
-      register_count_pos: 0,
-    };
+    self.fn_data = Default::default();
 
     self.fn_data.register_map.clear();
     self.fn_data.register_map.insert("return".to_string(), 0);
@@ -406,23 +432,27 @@ impl Assembler for AssemblerData {
     loop {
       self.parse_optional_whitespace();
 
-      let c = self.content.chars().nth(self.pos);
+      let c = self.peek("Expected instruction, label, or end of function");
 
-      if c == None {
-        std::panic!("Expected instruction or end of function at {}", self.pos);
-      }
-
-      if c.unwrap() == '}' {
+      if c == '}' {
         self.output.push(Instruction::End as u8);
         self.pos += 1;
         break;
       }
 
-      self.assemble_instruction();
+      let optional_label = self.test_label();
+
+      if optional_label.is_some() {
+        self.assemble_label(optional_label.unwrap());
+      } else {
+        self.assemble_instruction();
+      }
     }
 
     // TODO: Handle >255 registers
     self.output[self.fn_data.register_count_pos] = self.fn_data.register_map.len() as u8;
+
+    self.fn_data.labels_map.resolve(&mut self.output);
   }
 
   fn assemble_instruction(&mut self) {
@@ -434,6 +464,7 @@ impl Assembler for AssemblerData {
       match arg {
         InstructionArg::Value => self.assemble_value(),
         InstructionArg::Register => self.assemble_register(),
+        InstructionArg::Label => self.assemble_label_read(),
       }
     }
   }
@@ -454,7 +485,7 @@ impl Assembler for AssemblerData {
       self.parse_exact("@");
       self.output.push(ValueType::Pointer as u8);
       let definition_name = self.parse_identifier();
-      self.write_unresolved_definition(definition_name.as_str());
+      self.write_unresolved_definition(&definition_name);
     } else if c == '[' {
       self.assemble_array();
     } else if c == '-' || c == '.' || ('0' <= c && c <= '9') {
@@ -539,6 +570,40 @@ impl Assembler for AssemblerData {
     self.output.push(register_index);
   }
 
+  fn test_label(&self) -> Option<String> {
+    let optional_identifier = self.test_identifier();
+
+    if optional_identifier.is_none() {
+      return None;
+    }
+
+    let identifier = optional_identifier.unwrap();
+
+    if self.content_at(self.pos + identifier.len()) == ':' {
+      return Some(identifier);
+    }
+
+    return None;
+  }
+
+  fn assemble_label(&mut self, label_name: String) {
+    self.parse_optional_whitespace();
+    
+    self.pos += label_name.len() + 1;
+
+    self.fn_data.labels_map.found_locations.insert(
+      label_name,
+      self.output.len(),
+    );
+  }
+
+  fn assemble_label_read(&mut self) {
+    self.parse_optional_whitespace();
+    self.parse_exact(":");
+    let label_name = self.parse_identifier();
+    self.fn_data.labels_map.add_unresolved(&label_name, &mut self.output);
+  }
+
   fn assemble_number(&mut self) {
     let start = self.pos;
 
@@ -603,7 +668,7 @@ impl Assembler for AssemblerData {
         self.parse_exact("@");
         self.output.push(ValueType::Pointer as u8);
         let definition_name = self.parse_identifier();
-        self.write_unresolved_definition(definition_name.as_str());
+        self.write_unresolved_definition(&definition_name);
       } else if c == '}' {
         self.output.push(ValueType::End as u8);
         self.pos += 1;
@@ -646,15 +711,10 @@ impl Assembler for AssemblerData {
     return result;
   }
 
-  fn write_unresolved_definition(&mut self, definition_name: &str) {
-    if !self.definitions_map.references.contains_key(definition_name) {
-      self.definitions_map.references.insert(
-        definition_name.to_string(),
-        Vec::new(),
-      );
-    }
-
-    self.definitions_map.references.get_mut(definition_name).unwrap()
+  fn write_unresolved_definition(&mut self, definition_name: &String) {
+    self.definitions_map.references
+      .entry(definition_name.clone())
+      .or_default()
       .push(self.output.len());
 
     self.output.push(0xff);
@@ -693,10 +753,7 @@ fn assemble(content: &str) -> Vec<u8> {
     content: content.to_string(),
     pos: 0,
     output: Vec::new(),
-    fn_data: AssemblerFnData {
-      register_map: HashMap::new(),
-      register_count_pos: 0,
-    },
+    fn_data: Default::default(),
     definitions_map: LocationMap {
       references: HashMap::new(),
       found_locations: HashMap::new(),
@@ -757,6 +814,7 @@ enum Instruction {
 enum InstructionArg {
   Value,
   Register,
+  Label,
 }
 
 fn get_instruction_layout(instruction: Instruction) -> Vec<InstructionArg> {
@@ -803,8 +861,8 @@ fn get_instruction_layout(instruction: Instruction) -> Vec<InstructionArg> {
     Sub => Vec::from([Value, Value, Register]),
     SubMov => Vec::from([Value, Value, Register]),
     SubCall => Vec::from([Value, Value, Value, Register]),
-    Jmp => Vec::from([Value]),
-    JmpIf => Vec::from([Value, Value]),
+    Jmp => Vec::from([Label]),
+    JmpIf => Vec::from([Value, Label]),
   };
 }
 
