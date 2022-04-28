@@ -1,10 +1,15 @@
 mod assemble;
+mod run;
 
 use std::env;
 use std::process::exit;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        std::panic!("Not implemented: ValueScript repl");
+    }
 
     if args.len() == 2 && (
         args[1] == "-h" ||
@@ -17,6 +22,11 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "assemble" {
         assemble::command(&args);
+        return;
+    }
+
+    if args.len() >= 2 && args[1] == "run" {
+        run::command(&args);
         return;
     }
 

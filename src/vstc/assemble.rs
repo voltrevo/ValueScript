@@ -34,6 +34,7 @@ pub fn command(args: &Vec<String>) {
 
 fn show_help() {
   println!("vstc assemble");
+  println!("");
   println!("Convert ValueScript assembly to bytecode");
   println!("");
   println!("USAGE:");
@@ -738,7 +739,7 @@ impl Assembler for AssemblerData {
   }
 }
 
-fn assemble(content: &str) -> Vec<u8> {
+pub fn assemble(content: &str) -> Vec<u8> {
   let mut assembler = AssemblerData {
     content: content.to_string(),
     pos: 0,
