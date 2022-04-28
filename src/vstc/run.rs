@@ -1,4 +1,5 @@
 use super::assemble::assemble;
+use super::virtual_machine::VirtualMachine;
 use std::process::exit;
 
 pub fn command(args: &Vec<String>) {
@@ -19,8 +20,10 @@ pub fn command(args: &Vec<String>) {
 
   let bytecode = to_bytecode(&args[2], &args[3]);
 
-  std::println!("Found {} bytes of bytecode", bytecode.len());
-  std::panic!("Not implemented: Run bytecode");
+  let mut vm = VirtualMachine::new();
+  vm.load(bytecode);
+  vm.run();
+  vm.print();
 }
 
 fn to_bytecode(option: &String, file_path: &String) -> Vec<u8> {
