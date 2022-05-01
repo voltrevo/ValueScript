@@ -15,7 +15,7 @@ enum VsType {
 }
 
 impl VsType {
-  fn as_val(&self) -> Val {
+  pub fn as_val(&self) -> Val {
     return VsString::from_str(match self {
       Undefined => "undefined",
       Null => "object",
@@ -29,7 +29,7 @@ impl VsType {
   }
 }
 
-trait VsValue {
+pub trait VsValue {
   fn typeof_(&self) -> VsType;
   fn to_string(&self) -> String;
   fn to_number(&self) -> f64;
@@ -40,7 +40,7 @@ pub struct VsNumber {
 }
 
 impl VsNumber {
-  fn from_f64(value: f64) -> Val {
+  pub fn from_f64(value: f64) -> Val {
     return Rc::new(VsNumber { value: value });
   }
 }
@@ -50,11 +50,11 @@ pub struct VsString {
 }
 
 impl VsString {
-  fn from_str(value: &str) -> Val {
+  pub fn from_str(value: &str) -> Val {
     return Rc::new(VsString { value: value.to_string() });
   }
 
-  fn from_string(value: String) -> Val {
+  pub fn from_string(value: String) -> Val {
     return Rc::new(VsString { value: value });
   }
 }
@@ -87,9 +87,14 @@ impl VsValue for VsString {
   }
 }
 
-fn add(left: &Rc<dyn VsValue>, right: &Rc<dyn VsValue>) -> Rc<dyn VsValue> {
+impl std::fmt::Display for dyn VsValue {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.to_string())
+  }
+}
+
+pub fn add(left: &Rc<dyn VsValue>, right: &Rc<dyn VsValue>) -> Rc<dyn VsValue> {
   if left.typeof_() == VsType::String || right.typeof_() == VsType::String {
-    // TODO: Do we need .clone() on the left here? If not, why?
     return VsString::from_string(left.to_string() + &right.to_string());
   }
 
