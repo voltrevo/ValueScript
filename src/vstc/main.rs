@@ -2,6 +2,7 @@ mod assemble;
 mod run;
 mod virtual_machine;
 mod vs_value;
+mod bytecode;
 
 use std::env;
 use std::process::exit;
