@@ -1,6 +1,7 @@
 mod assemble;
 mod run;
 mod virtual_machine;
+mod vs_value;
 
 use std::env;
 use std::process::exit;
