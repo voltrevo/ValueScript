@@ -59,28 +59,28 @@ impl VsString {
   }
 }
 
-pub struct VsPointer {
-  bytecode: Rc<Vec<u8>>,
-  pos: usize,
-}
+// pub struct VsPointer {
+//   bytecode: Rc<Vec<u8>>,
+//   pos: usize,
+// }
 
-impl VsPointer {
-  fn decode(&self) -> Val {
-    return match self.bytecode[self.pos] {
-      // 0x02 => VsType::Undefined,
-      // 0x03 => VsType::Null,
-      // 0x04 => VsType::Bool,
-      // 0x05 => VsType::Bool,
-      0x06 => VsType::Number,
-      0x07 => VsType::Number,
-      0x08 => VsType::String,
-      // 0x09 => VsType::Array,
-      // 0x0a => VsType::Object,
-      // 0x0b => VsType::Function,
-      _ => std::panic!("not imlemented"),
-    };
-  }
-}
+// impl VsPointer {
+//   fn decode(&self) -> Val {
+//     return match self.bytecode[self.pos] {
+//       // 0x02 => VsType::Undefined,
+//       // 0x03 => VsType::Null,
+//       // 0x04 => VsType::Bool,
+//       // 0x05 => VsType::Bool,
+//       0x06 => VsType::Number,
+//       0x07 => VsType::Number,
+//       0x08 => VsType::String,
+//       // 0x09 => VsType::Array,
+//       // 0x0a => VsType::Object,
+//       // 0x0b => VsType::Function,
+//       _ => std::panic!("not imlemented"),
+//     };
+//   }
+// }
 
 impl VsValue for VsNumber {
   fn typeof_(&self) -> VsType {
@@ -110,23 +110,23 @@ impl VsValue for VsString {
   }
 }
 
-impl VsValue for VsPointer {
-  fn typeof_(&self) -> VsType {
-    return match self.bytecode[self.pos] {
-      0x02 => VsType::Undefined,
-      0x03 => VsType::Null,
-      0x04 => VsType::Bool,
-      0x05 => VsType::Bool,
-      0x06 => VsType::Number,
-      0x07 => VsType::Number,
-      0x08 => VsType::String,
-      0x09 => VsType::Array,
-      0x0a => VsType::Object,
-      0x0b => VsType::Function,
-      _ => std::panic!("not imlemented"),
-    };
-  }
-}
+// impl VsValue for VsPointer {
+//   fn typeof_(&self) -> VsType {
+//     return match self.bytecode[self.pos] {
+//       0x02 => VsType::Undefined,
+//       0x03 => VsType::Null,
+//       0x04 => VsType::Bool,
+//       0x05 => VsType::Bool,
+//       0x06 => VsType::Number,
+//       0x07 => VsType::Number,
+//       0x08 => VsType::String,
+//       0x09 => VsType::Array,
+//       0x0a => VsType::Object,
+//       0x0b => VsType::Function,
+//       _ => std::panic!("not imlemented"),
+//     };
+//   }
+// }
 
 impl std::fmt::Display for dyn VsValue {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -142,10 +142,10 @@ pub fn add(left: &Rc<dyn VsValue>, right: &Rc<dyn VsValue>) -> Rc<dyn VsValue> {
   return VsNumber::from_f64(left.to_number() + right.to_number());
 }
 
-pub fn from_bytecode(bytecode: &Rc<Vec<u8>>) -> Rc<dyn VsValue> {
-  return from_bytecode_at(&bytecode, 0);
-}
+// pub fn from_bytecode(bytecode: &Rc<Vec<u8>>) -> Rc<dyn VsValue> {
+//   return from_bytecode_at(&bytecode, 0);
+// }
 
-pub fn from_bytecode_at(bytecode: &Rc<Vec<u8>>, pos: usize) -> Rc<dyn VsValue> {
+// pub fn from_bytecode_at(bytecode: &Rc<Vec<u8>>, pos: usize) -> Rc<dyn VsValue> {
 
-}
+// }

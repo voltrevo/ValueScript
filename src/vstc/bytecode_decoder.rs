@@ -6,31 +6,47 @@ struct BytecodeDecoder {
   pos: usize,
 }
 
+#[repr(u8)]
 #[derive(PartialEq)]
 enum BytecodeType {
-  Undefined = 0x02_u8,
-  Null = 0x03_u8,
-  False = 0x04_u8,
-  True = 0x05_u8,
-  SignedByte = 0x06_u8,
-  Number = 0x07_u8,
-  String = 0x08_u8,
-  Array = 0x09_u8,
-  Object = 0x0a_u8,
-  Function = 0x0b_u8,
-  Instance = 0x0c_u8,
+  Undefined = 0x02,
+  Null = 0x03,
+  False = 0x04,
+  True = 0x05,
+  SignedByte = 0x06,
+  Number = 0x07,
+  String = 0x08,
+  Array = 0x09,
+  Object = 0x0a,
+  Function = 0x0b,
+  Instance = 0x0c,
 }
 
 impl BytecodeDecoder {
   pub fn decode_byte(&mut self) -> u8 {
     let byte = self.data[self.pos];
     self.pos += 1;
-    return byte;    
+    return byte;
   }
 
   pub fn decode_type(&mut self) -> BytecodeType {
-    // TODO: Does this panic if byte is not a valid BytecodeType?
-    return self.decode_byte() as BytecodeType;
+    use BytecodeType::*;
+
+    return match self.decode_byte() {
+      0x02 => Undefined,
+      0x03 => Null,
+      0x04 => False,
+      0x05 => True,
+      0x06 => SignedByte,
+      0x07 => Number,
+      0x08 => String,
+      0x09 => Array,
+      0x0a => Object,
+      0x0b => Function,
+      0x0c => Instance,
+
+      _ => std::panic!("Unrecognized BytecodeType"),
+    };
   }
 
   pub fn decode_val(&mut self) -> vs_value::Val {
@@ -43,7 +59,9 @@ impl BytecodeDecoder {
       Number => vs_value::VsNumber::from_f64(
         self.decode_number()
       ),
-      String => VsType::String,
+      String => vs_value::VsString::from_string(
+        self.decode_string()
+      ),
       _ => std::panic!("not imlemented"),
     }
   }
@@ -62,17 +80,20 @@ impl BytecodeDecoder {
     return f64::from_le_bytes(buf);
   }
 
-  pub fn decode_string(&mut self) {
-    let size = self.decode_varsize_uint();
-    // TODO: Decode utf8 string
+  pub fn decode_string(&mut self) -> String {
+    let start = self.pos;
+    self.pos += self.decode_varsize_uint();
+    let res = String::from_utf8_lossy(&self.data[start..self.pos]).into_owned();
+
+    return res;
   }
 
   pub fn decode_varsize_uint(&mut self) -> usize {
-    let res = 0_usize;
+    let mut res = 0_usize;
 
     loop {
       let byte = self.decode_byte();
-      res += byte;
+      res += byte as usize;
 
       if byte & 128 == 0 {
         return res;
