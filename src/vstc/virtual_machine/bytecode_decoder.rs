@@ -62,6 +62,10 @@ impl BytecodeDecoder {
     use BytecodeType::*;
 
     return match self.decode_type() {
+      Undefined => std::panic!("Not implemented"),
+      Null => std::panic!("Not implemented"),
+      False => std::panic!("Not implemented"),
+      True => std::panic!("Not implemented"),
       SignedByte => VsNumber::from_f64(
         self.decode_signed_byte() as f64
       ),
@@ -71,6 +75,10 @@ impl BytecodeDecoder {
       String => VsString::from_string(
         self.decode_string()
       ),
+      Array => std::panic!("Not implemented"),
+      Object => std::panic!("Not implemented"),
+      Function => std::panic!("Not implemented"),
+      Instance => std::panic!("Not implemented"),
       Pointer => {
         let from_pos = self.pos;
         let pos = self.decode_pos();
@@ -86,7 +94,7 @@ impl BytecodeDecoder {
           pos,
         );
       },
-      _ => std::panic!("Not implemented"),
+      Register => std::panic!("Not implemented"),
     }
   }
 
