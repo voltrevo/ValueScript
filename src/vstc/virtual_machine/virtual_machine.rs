@@ -37,13 +37,6 @@ impl VirtualMachine {
     while self.stack.len() > 0 {
       self.step();
     }
-
-    let a = VsNumber::from_f64(1_f64);
-    let b = VsString::from_str("2");
-
-    std::println!("a + b = {}", op_plus(&a, &b));
-
-    std::panic!("Not implemented");
   }
 
   pub fn new() -> VirtualMachine {

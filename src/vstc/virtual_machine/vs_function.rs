@@ -35,8 +35,8 @@ impl VsValue for VsFunction {
   fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
     let mut registers: Vec<Val> = Vec::with_capacity(self.register_count - 1);
     
-    for i in 0..(self.register_count - 1) {
-      registers[i] = VsUndefined::new();
+    for _ in 0..(self.register_count - 1) {
+      registers.push(VsUndefined::new());
     }
 
     vm.stack.push(StackFrame {
