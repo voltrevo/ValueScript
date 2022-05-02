@@ -4,7 +4,7 @@ use super::vs_value::Val;
 use super::vs_undefined::VsUndefined;
 use super::vs_number::VsNumber;
 use super::vs_string::VsString;
-use super::operations::op_plus;
+use super::operations;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::instruction::Instruction;
 
@@ -57,6 +57,25 @@ impl VirtualMachine {
         self.pop();
       },
 
+      Mov => {
+        let val = frame.decoder.decode_val();
+        let register_index = frame.decoder.decode_register();
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = val;
+        }
+      },
+
+      OpInc => {
+        let mut val = frame.decoder.decode_val();
+        val = operations::op_plus(&val, &VsNumber::from_f64(1_f64));
+        let register_index = frame.decoder.decode_register();
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = val;
+        }
+      },
+
       OpPlus => {
         let left = frame.decoder.decode_val();
         let right = frame.decoder.decode_val();
@@ -64,9 +83,35 @@ impl VirtualMachine {
         let register_index = frame.decoder.decode_register();
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = op_plus(&left, &right);
+          frame.registers[register_index.unwrap()] = operations::op_plus(&left, &right);
         }
       },
+
+      OpMul => {
+        let left = frame.decoder.decode_val();
+        let right = frame.decoder.decode_val();
+
+        let register_index = frame.decoder.decode_register();
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = operations::op_mul(&left, &right);
+        }
+      },
+
+      OpMod => {
+        let left = frame.decoder.decode_val();
+        let right = frame.decoder.decode_val();
+
+        let register_index = frame.decoder.decode_register();
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = operations::op_mod(&left, &right);
+        }
+      },
+
+      // 0x11 => OpLess,
+      // 0x27 => Jmp,
+      // 0x28 => JmpIf,
 
       _ => std::panic!("Not implemented"),
     };

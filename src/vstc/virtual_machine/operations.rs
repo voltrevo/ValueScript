@@ -14,3 +14,11 @@ pub fn op_plus(left: &Val, right: &Val) -> Val {
 
   return VsNumber::from_f64(left_prim.to_number() + right_prim.to_number());
 }
+
+pub fn op_mul(left: &Val, right: &Val) -> Val {
+  return VsNumber::from_f64(left.to_number() * right.to_number());
+}
+
+pub fn op_mod(left: &Val, right: &Val) -> Val {
+  return VsNumber::from_f64(left.to_number() % right.to_number());
+}

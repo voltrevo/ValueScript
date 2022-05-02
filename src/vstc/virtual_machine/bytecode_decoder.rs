@@ -178,7 +178,14 @@ impl BytecodeDecoder {
 
     return match self.decode_byte() {
       0x00 => End,
+      0x01 => Mov,
+      0x02 => OpInc,
       0x04 => OpPlus,
+      0x06 => OpMul,
+      0x08 => OpMod,
+      0x11 => OpLess,
+      0x27 => Jmp,
+      0x28 => JmpIf,
 
       _ => std::panic!("Not implemented"),
     }
