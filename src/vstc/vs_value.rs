@@ -69,21 +69,7 @@ pub struct VsPointer {
 }
 
 impl VsPointer {
-  pub fn new(bytecode: &Rc<Vec<u8>>, from_pos: usize, pos: usize) -> Val {
-    if pos < from_pos {
-      let mut bd = BytecodeDecoder {
-        data: bytecode.clone(),
-        pos: pos,
-      };
-
-      let byte = bd.decode_byte();
-
-      if byte != BytecodeType::Function as u8 {
-        // Prevent circular objects
-        std::panic!("Invalid: non-function pointer that points backwards");
-      }
-    }
-
+  pub fn new(bytecode: &Rc<Vec<u8>>, pos: usize) -> Val {
     return Rc::new(VsPointer {
       bytecode: bytecode.clone(),
       pos: pos,

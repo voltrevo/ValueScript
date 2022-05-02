@@ -71,9 +71,14 @@ impl BytecodeDecoder {
         let from_pos = self.pos;
         let pos = self.decode_pos();
         
+        if pos < from_pos {
+          if self.clone_at(pos).decode_type() != BytecodeType::Function {
+            std::panic!("Invalid: non-function pointer that points backwards");
+          }
+        }
+
         return vs_value::VsPointer::new(
           &self.data,
-          from_pos,
           pos,
         );
       },
@@ -122,5 +127,9 @@ impl BytecodeDecoder {
     // TODO: the number of bytes to represent a position should be based on the
     // size of the bytecode
     return self.decode_byte() as usize;
+  }
+
+  pub fn clone_at(&self, pos: usize) -> BytecodeDecoder {
+    return BytecodeDecoder { data: self.data.clone(), pos: pos };
   }
 }
