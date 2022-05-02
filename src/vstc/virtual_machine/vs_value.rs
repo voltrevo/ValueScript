@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use super::vs_string::VsString;
+use super::virtual_machine::VirtualMachine;
 
 pub type Val = Rc<dyn VsValue>;
 
@@ -36,6 +37,8 @@ pub trait VsValue {
   fn to_string(&self) -> String;
   fn to_number(&self) -> f64;
   fn is_primitive(&self) -> bool;
+
+  fn push_frame(&self, vm: &mut VirtualMachine) -> bool;
 }
 
 pub trait ValTrait {

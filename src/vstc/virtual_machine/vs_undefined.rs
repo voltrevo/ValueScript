@@ -5,31 +5,25 @@ use super::vs_value::VsType;
 use super::vs_value::VsValue;
 use super::virtual_machine::VirtualMachine;
 
-pub struct VsString {
-  value: String,
-}
+pub struct VsUndefined {}
 
-impl VsString {
-  pub fn from_str(value: &str) -> Val {
-    return Rc::new(VsString { value: value.to_string() });
-  }
-
-  pub fn from_string(value: String) -> Val {
-    return Rc::new(VsString { value: value });
+impl VsUndefined {
+  pub fn new() -> Val {
+    return Rc::new(VsUndefined {});
   }
 }
 
-impl VsValue for VsString {
+impl VsValue for VsUndefined {
   fn typeof_(&self) -> VsType {
-    return VsType::String;
+    return VsType::Undefined;
   }
 
   fn to_string(&self) -> String {
-    return self.value.clone();
+    return "undefined".to_string();
   }
 
   fn to_number(&self) -> f64 {
-    std::panic!("not implemented");
+    return f64::NAN;
   }
 
   fn is_primitive(&self) -> bool {

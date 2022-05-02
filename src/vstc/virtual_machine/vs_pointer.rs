@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use super::vs_value::Val;
 use super::vs_value::VsValue;
 use super::vs_value::VsType;
+use super::virtual_machine::VirtualMachine;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::bytecode_decoder::BytecodeType;
 
@@ -87,5 +88,9 @@ impl VsValue for VsPointer {
       Object => false,
       Function => false,
     }
+  }
+
+  fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
+    return self.decode().push_frame(vm);
   }
 }

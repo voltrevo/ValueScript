@@ -5,6 +5,7 @@ use super::vs_number::VsNumber;
 use super::vs_string::VsString;
 use super::vs_pointer::VsPointer;
 use super::vs_function::VsFunction;
+use super::instruction::Instruction;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -128,6 +129,17 @@ impl BytecodeDecoder {
     return self.decode_byte() as usize;
   }
 
+  pub fn decode_register(&mut self) -> Option<usize> {
+    // TODO: Handle multi-byte registers
+    let byte = self.decode_byte();
+
+    if byte == 0xff {
+      return None;
+    }
+
+    return Some(byte as usize);
+  }
+
   pub fn clone_at(&self, pos: usize) -> BytecodeDecoder {
     return BytecodeDecoder { data: self.data.clone(), pos: pos };
   }
@@ -159,5 +171,16 @@ impl BytecodeDecoder {
       parameter_count: parameter_count,
       start: self.pos,
     });
+  }
+
+  pub fn decode_instruction(&mut self) -> Instruction {
+    use Instruction::*;
+
+    return match self.decode_byte() {
+      0x00 => End,
+      0x04 => OpPlus,
+
+      _ => std::panic!("Not implemented"),
+    }
   }
 }
