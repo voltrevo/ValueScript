@@ -1,4 +1,6 @@
-use super::vs_value;
+use super::vs_number::VsNumber;
+use super::vs_string::VsString;
+use super::operations::op_plus;
 
 #[derive(Default)]
 pub struct VirtualMachine {
@@ -11,10 +13,10 @@ impl VirtualMachine {
   }
 
   pub fn run(&mut self) {
-    let a = vs_value::VsNumber::from_f64(1_f64);
-    let b = vs_value::VsString::from_str("2");
+    let a = VsNumber::from_f64(1_f64);
+    let b = VsString::from_str("2");
 
-    std::println!("a + b = {}", vs_value::add(&a, &b));
+    std::println!("a + b = {}", op_plus(&a, &b));
 
     std::panic!("Not implemented");
   }

@@ -1,5 +1,9 @@
 use std::rc::Rc;
-use super::vs_value;
+
+use super::vs_value::Val;
+use super::vs_number::VsNumber;
+use super::vs_string::VsString;
+use super::vs_pointer::VsPointer;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -54,17 +58,17 @@ impl BytecodeDecoder {
     };
   }
 
-  pub fn decode_val(&mut self) -> vs_value::Val {
+  pub fn decode_val(&mut self) -> Val {
     use BytecodeType::*;
 
     return match self.decode_type() {
-      SignedByte => vs_value::VsNumber::from_f64(
+      SignedByte => VsNumber::from_f64(
         self.decode_signed_byte() as f64
       ),
-      Number => vs_value::VsNumber::from_f64(
+      Number => VsNumber::from_f64(
         self.decode_number()
       ),
-      String => vs_value::VsString::from_string(
+      String => VsString::from_string(
         self.decode_string()
       ),
       Pointer => {
@@ -77,7 +81,7 @@ impl BytecodeDecoder {
           }
         }
 
-        return vs_value::VsPointer::new(
+        return VsPointer::new(
           &self.data,
           pos,
         );
