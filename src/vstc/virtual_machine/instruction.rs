@@ -1,4 +1,7 @@
 // TODO: Fix duplication with assembler (requires internal crate?)
+
+#[derive(Debug)]
+#[derive(Clone)]
 pub enum Instruction {
   End = 0x00,
   Mov = 0x01,

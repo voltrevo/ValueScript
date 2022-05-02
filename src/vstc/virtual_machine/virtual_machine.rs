@@ -66,13 +66,10 @@ impl VirtualMachine {
       },
 
       OpInc => {
-        let mut val = frame.decoder.decode_val(&frame.registers);
+        let register_index = frame.decoder.decode_register_index().unwrap();
+        let mut val = frame.registers[register_index].clone();
         val = operations::op_plus(&val, &VsNumber::from_f64(1_f64));
-        let register_index = frame.decoder.decode_register_index();
-
-        if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = val;
-        }
+        frame.registers[register_index] = val;
       },
 
       OpPlus => {
