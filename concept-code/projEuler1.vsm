@@ -1,0 +1,20 @@
+@main = function() {
+  mov 0 %return
+  mov 0 %i
+
+while_test:
+  op< %i 1000 %cond
+  jmpif %cond :while_body
+  end
+
+while_body:
+  op% %i 3 %mod3
+  op% %i 5 %mod5
+  op* %mod3 %mod5 %skip
+  jmpif %skip :after_add
+  op+ %return %i %return
+
+after_add:
+  op++ %i
+  jmp :while_test
+}
