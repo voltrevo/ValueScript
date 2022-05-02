@@ -26,4 +26,8 @@ impl VsValue for VsNumber {
   fn to_number(&self) -> f64 {
     return self.value;
   }
+
+  fn is_primitive(&self) -> bool {
+    return true;
+  }
 }

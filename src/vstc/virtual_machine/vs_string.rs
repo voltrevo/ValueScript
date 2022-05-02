@@ -30,4 +30,8 @@ impl VsValue for VsString {
   fn to_number(&self) -> f64 {
     std::panic!("not implemented");
   }
+
+  fn is_primitive(&self) -> bool {
+    return true;
+  }
 }

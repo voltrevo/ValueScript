@@ -35,6 +35,21 @@ pub trait VsValue {
   fn typeof_(&self) -> VsType;
   fn to_string(&self) -> String;
   fn to_number(&self) -> f64;
+  fn is_primitive(&self) -> bool;
+}
+
+pub trait ValTrait {
+  fn to_primitive(&self) -> Val;
+}
+
+impl ValTrait for Val {
+  fn to_primitive(&self) -> Val {
+    if self.is_primitive() {
+      return self.clone();
+    }
+
+    return VsString::from_string(self.to_string());
+  }
 }
 
 impl std::fmt::Display for dyn VsValue {

@@ -75,4 +75,17 @@ impl VsValue for VsPointer {
   fn to_number(&self) -> f64 {
     return self.decode().to_number();
   }
+
+  fn is_primitive(&self) -> bool {
+    return match self.typeof_() {
+      Undefined => true,
+      Null => true,
+      Bool => true,
+      Number => true,
+      String => true,
+      Array => false,
+      Object => true,
+      Function => false,
+    }
+  }
 }
