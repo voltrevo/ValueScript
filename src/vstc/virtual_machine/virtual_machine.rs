@@ -108,9 +108,30 @@ impl VirtualMachine {
         }
       },
 
-      // 0x11 => OpLess,
-      // 0x27 => Jmp,
-      // 0x28 => JmpIf,
+      OpLess => {
+        let left = frame.decoder.decode_val(&frame.registers);
+        let right = frame.decoder.decode_val(&frame.registers);
+
+        let register_index = frame.decoder.decode_register_index();
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = operations::op_less(&left, &right);
+        }
+      }
+
+      Jmp => {
+        let dst = frame.decoder.decode_pos();
+        frame.decoder.pos = dst;
+      }
+
+      JmpIf => {
+        let cond = frame.decoder.decode_val(&frame.registers);
+        let dst = frame.decoder.decode_pos();
+
+        if cond.is_truthy() {
+          frame.decoder.pos = dst;
+        }
+      }
 
       _ => std::panic!("Not implemented"),
     };
