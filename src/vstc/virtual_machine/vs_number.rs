@@ -35,4 +35,8 @@ impl VsValue for VsNumber {
   fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
     return false;
   }
+
+  fn is_truthy(&self) -> bool {
+    return self.value != 0_f64;
+  }
 }

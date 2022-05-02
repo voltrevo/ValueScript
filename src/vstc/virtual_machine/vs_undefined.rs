@@ -33,4 +33,8 @@ impl VsValue for VsUndefined {
   fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
     return false;
   }
+
+  fn is_truthy(&self) -> bool {
+    return false;
+  }
 }

@@ -39,4 +39,8 @@ impl VsValue for VsString {
   fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
     return false;
   }
+
+  fn is_truthy(&self) -> bool {
+    return self.value != "";
+  }
 }

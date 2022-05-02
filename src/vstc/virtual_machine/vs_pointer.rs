@@ -93,4 +93,8 @@ impl VsValue for VsPointer {
   fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
     return self.decode().push_frame(vm);
   }
+
+  fn is_truthy(&self) -> bool {
+    return self.decode().is_truthy();
+  }
 }

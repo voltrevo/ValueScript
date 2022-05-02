@@ -51,4 +51,8 @@ impl VsValue for VsFunction {
 
     return true;
   }
+
+  fn is_truthy(&self) -> bool {
+    return true;
+  }
 }

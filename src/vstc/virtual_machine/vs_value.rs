@@ -37,6 +37,7 @@ pub trait VsValue {
   fn to_string(&self) -> String;
   fn to_number(&self) -> f64;
   fn is_primitive(&self) -> bool;
+  fn is_truthy(&self) -> bool;
 
   fn push_frame(&self, vm: &mut VirtualMachine) -> bool;
 }
