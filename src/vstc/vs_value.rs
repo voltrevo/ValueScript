@@ -1,4 +1,7 @@
 use std::rc::Rc;
+use std::cell::RefCell;
+use super::bytecode_decoder::BytecodeDecoder;
+use super::bytecode_decoder::BytecodeType;
 
 pub type Val = Rc<dyn VsValue>;
 
@@ -59,28 +62,56 @@ impl VsString {
   }
 }
 
-// pub struct VsPointer {
-//   bytecode: Rc<Vec<u8>>,
-//   pos: usize,
-// }
+pub struct VsPointer {
+  bytecode: Rc<Vec<u8>>,
+  pos: usize,
+  decoded: RefCell<Option<Val>>,
+}
 
-// impl VsPointer {
-//   fn decode(&self) -> Val {
-//     return match self.bytecode[self.pos] {
-//       // 0x02 => VsType::Undefined,
-//       // 0x03 => VsType::Null,
-//       // 0x04 => VsType::Bool,
-//       // 0x05 => VsType::Bool,
-//       0x06 => VsType::Number,
-//       0x07 => VsType::Number,
-//       0x08 => VsType::String,
-//       // 0x09 => VsType::Array,
-//       // 0x0a => VsType::Object,
-//       // 0x0b => VsType::Function,
-//       _ => std::panic!("not imlemented"),
-//     };
-//   }
-// }
+impl VsPointer {
+  pub fn new(bytecode: &Rc<Vec<u8>>, from_pos: usize, pos: usize) -> Val {
+    if pos < from_pos {
+      let mut bd = BytecodeDecoder {
+        data: bytecode.clone(),
+        pos: pos,
+      };
+
+      let byte = bd.decode_byte();
+
+      if byte != BytecodeType::Function as u8 {
+        // Prevent circular objects
+        std::panic!("Invalid: non-function pointer that points backwards");
+      }
+    }
+
+    return Rc::new(VsPointer {
+      bytecode: bytecode.clone(),
+      pos: pos,
+      decoded: RefCell::new(None),
+    });
+  }
+
+  pub fn decode(&self) -> Val {
+    let mut decoded = self.decoded.borrow_mut();
+
+    if decoded.is_some() {
+      return decoded.clone().unwrap();
+    }
+
+    let mut bd = BytecodeDecoder {
+      data: self.bytecode.clone(),
+      pos: self.pos,
+    };
+
+    let val = bd.decode_val();
+
+    // TODO: Check that this actually inserts into the cell and not just a copy
+    // somehow
+    *decoded = Some(val.clone());
+
+    return val;
+  }
+}
 
 impl VsValue for VsNumber {
   fn typeof_(&self) -> VsType {
@@ -110,23 +141,38 @@ impl VsValue for VsString {
   }
 }
 
-// impl VsValue for VsPointer {
-//   fn typeof_(&self) -> VsType {
-//     return match self.bytecode[self.pos] {
-//       0x02 => VsType::Undefined,
-//       0x03 => VsType::Null,
-//       0x04 => VsType::Bool,
-//       0x05 => VsType::Bool,
-//       0x06 => VsType::Number,
-//       0x07 => VsType::Number,
-//       0x08 => VsType::String,
-//       0x09 => VsType::Array,
-//       0x0a => VsType::Object,
-//       0x0b => VsType::Function,
-//       _ => std::panic!("not imlemented"),
-//     };
-//   }
-// }
+impl VsValue for VsPointer {
+  fn typeof_(&self) -> VsType {
+    let mut bd = BytecodeDecoder {
+      data: self.bytecode.clone(),
+      pos: self.pos,
+    };
+
+    return match bd.decode_type() {
+      BytecodeType::Undefined => VsType::Undefined,
+      BytecodeType::Null => VsType::Null,
+      BytecodeType::False => VsType::Bool,
+      BytecodeType::True => VsType::Bool,
+      BytecodeType::SignedByte => VsType::Number,
+      BytecodeType::Number => VsType::Number,
+      BytecodeType::String => VsType::String,
+      BytecodeType::Array => VsType::Array,
+      BytecodeType::Object => VsType::Object,
+      BytecodeType::Function => VsType::Function,
+      BytecodeType::Instance => std::panic!("Not implemented"),
+      BytecodeType::Pointer => std::panic!("Invalid: pointer to pointer"),
+      BytecodeType::Register => std::panic!("Invalid: pointer to register"),
+    }
+  }
+
+  fn to_string(&self) -> String {
+    return self.decode().to_string();
+  }
+
+  fn to_number(&self) -> f64 {
+    return self.decode().to_number();
+  }
+}
 
 impl std::fmt::Display for dyn VsValue {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -141,11 +187,3 @@ pub fn add(left: &Rc<dyn VsValue>, right: &Rc<dyn VsValue>) -> Rc<dyn VsValue> {
 
   return VsNumber::from_f64(left.to_number() + right.to_number());
 }
-
-// pub fn from_bytecode(bytecode: &Rc<Vec<u8>>) -> Rc<dyn VsValue> {
-//   return from_bytecode_at(&bytecode, 0);
-// }
-
-// pub fn from_bytecode_at(bytecode: &Rc<Vec<u8>>, pos: usize) -> Rc<dyn VsValue> {
-
-// }

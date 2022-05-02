@@ -1,14 +1,15 @@
 use std::rc::Rc;
 use super::vs_value;
 
-struct BytecodeDecoder {
-  data: Rc<Vec<u8>>,
-  pos: usize,
+pub struct BytecodeDecoder {
+  // TODO: Enable borrow usage to avoid the rc overhead
+  pub data: Rc<Vec<u8>>,
+  pub pos: usize,
 }
 
 #[repr(u8)]
 #[derive(PartialEq)]
-enum BytecodeType {
+pub enum BytecodeType {
   Undefined = 0x02,
   Null = 0x03,
   False = 0x04,
@@ -20,6 +21,8 @@ enum BytecodeType {
   Object = 0x0a,
   Function = 0x0b,
   Instance = 0x0c,
+  Pointer = 0x0d,
+  Register = 0x0e,
 }
 
 impl BytecodeDecoder {
@@ -44,6 +47,8 @@ impl BytecodeDecoder {
       0x0a => Object,
       0x0b => Function,
       0x0c => Instance,
+      0x0d => Pointer,
+      0x0e => Register,
 
       _ => std::panic!("Unrecognized BytecodeType"),
     };
@@ -62,7 +67,17 @@ impl BytecodeDecoder {
       String => vs_value::VsString::from_string(
         self.decode_string()
       ),
-      _ => std::panic!("not imlemented"),
+      Pointer => {
+        let from_pos = self.pos;
+        let pos = self.decode_pos();
+        
+        return vs_value::VsPointer::new(
+          &self.data,
+          from_pos,
+          pos,
+        );
+      },
+      _ => std::panic!("Not implemented"),
     }
   }
 
@@ -101,5 +116,11 @@ impl BytecodeDecoder {
 
       res *= 128;
     }
+  }
+
+  pub fn decode_pos(&mut self) -> usize {
+    // TODO: the number of bytes to represent a position should be based on the
+    // size of the bytecode
+    return self.decode_byte() as usize;
   }
 }
