@@ -60,7 +60,7 @@ impl BytecodeDecoder {
     };
   }
 
-  pub fn decode_val(&mut self) -> Val {
+  pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
     use BytecodeType::*;
 
     return match self.decode_type() {
@@ -82,7 +82,7 @@ impl BytecodeDecoder {
       Function => self.decode_function_header(),
       Instance => std::panic!("Not implemented"),
       Pointer => self.decode_pointer(),
-      Register => std::panic!("Not implemented"),
+      Register => registers[self.decode_register_index().unwrap()].clone(),
     }
   }
 
@@ -129,7 +129,7 @@ impl BytecodeDecoder {
     return self.decode_byte() as usize;
   }
 
-  pub fn decode_register(&mut self) -> Option<usize> {
+  pub fn decode_register_index(&mut self) -> Option<usize> {
     // TODO: Handle multi-byte registers
     let byte = self.decode_byte();
 

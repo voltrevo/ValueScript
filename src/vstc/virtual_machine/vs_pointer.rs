@@ -35,7 +35,7 @@ impl VsPointer {
       pos: self.pos,
     };
 
-    let val = bd.decode_val();
+    let val = bd.decode_val(&Vec::new());
 
     // TODO: Check that this actually inserts into the cell and not just a copy
     // somehow

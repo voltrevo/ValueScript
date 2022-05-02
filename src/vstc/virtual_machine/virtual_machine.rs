@@ -3,7 +3,6 @@ use std::rc::Rc;
 use super::vs_value::Val;
 use super::vs_undefined::VsUndefined;
 use super::vs_number::VsNumber;
-use super::vs_string::VsString;
 use super::operations;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::instruction::Instruction;
@@ -28,7 +27,7 @@ impl VirtualMachine {
       pos: 0,
     };
 
-    let main_fn = bd.decode_val();
+    let main_fn = bd.decode_val(&Vec::new());
 
     if !main_fn.push_frame(self) {
       std::panic!("bytecode does start with function")
@@ -58,8 +57,8 @@ impl VirtualMachine {
       },
 
       Mov => {
-        let val = frame.decoder.decode_val();
-        let register_index = frame.decoder.decode_register();
+        let val = frame.decoder.decode_val(&frame.registers);
+        let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
           frame.registers[register_index.unwrap()] = val;
@@ -67,9 +66,9 @@ impl VirtualMachine {
       },
 
       OpInc => {
-        let mut val = frame.decoder.decode_val();
+        let mut val = frame.decoder.decode_val(&frame.registers);
         val = operations::op_plus(&val, &VsNumber::from_f64(1_f64));
-        let register_index = frame.decoder.decode_register();
+        let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
           frame.registers[register_index.unwrap()] = val;
@@ -77,10 +76,10 @@ impl VirtualMachine {
       },
 
       OpPlus => {
-        let left = frame.decoder.decode_val();
-        let right = frame.decoder.decode_val();
+        let left = frame.decoder.decode_val(&frame.registers);
+        let right = frame.decoder.decode_val(&frame.registers);
 
-        let register_index = frame.decoder.decode_register();
+        let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
           frame.registers[register_index.unwrap()] = operations::op_plus(&left, &right);
@@ -88,10 +87,10 @@ impl VirtualMachine {
       },
 
       OpMul => {
-        let left = frame.decoder.decode_val();
-        let right = frame.decoder.decode_val();
+        let left = frame.decoder.decode_val(&frame.registers);
+        let right = frame.decoder.decode_val(&frame.registers);
 
-        let register_index = frame.decoder.decode_register();
+        let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
           frame.registers[register_index.unwrap()] = operations::op_mul(&left, &right);
@@ -99,10 +98,10 @@ impl VirtualMachine {
       },
 
       OpMod => {
-        let left = frame.decoder.decode_val();
-        let right = frame.decoder.decode_val();
+        let left = frame.decoder.decode_val(&frame.registers);
+        let right = frame.decoder.decode_val(&frame.registers);
 
-        let register_index = frame.decoder.decode_register();
+        let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
           frame.registers[register_index.unwrap()] = operations::op_mod(&left, &right);
