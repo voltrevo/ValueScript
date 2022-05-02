@@ -1,3 +1,4 @@
+use std::rc::Rc;  
 use std::process::exit;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -23,8 +24,9 @@ pub fn command(args: &Vec<String>) {
 
   let content = read_result.expect("");
   let output_filename = "out.vsb";
+  let bytecode = assemble(&content);
 
-  let write_result = std::fs::write(output_filename, assemble(&content));
+  let write_result = std::fs::write(output_filename, &*bytecode);
 
   if write_result.is_err() {
     println!("Failed to write file {}", output_filename);
@@ -739,7 +741,7 @@ impl Assembler for AssemblerData {
   }
 }
 
-pub fn assemble(content: &str) -> Vec<u8> {
+pub fn assemble(content: &str) -> Rc<Vec<u8>> {
   let mut assembler = AssemblerData {
     content: content.to_string(),
     pos: 0,
@@ -753,7 +755,7 @@ pub fn assemble(content: &str) -> Vec<u8> {
 
   assembler.run();
 
-  return assembler.output;
+  return Rc::new(assembler.output);
 }
 
 #[derive(Debug)]

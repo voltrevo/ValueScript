@@ -1,18 +1,15 @@
+use std::rc::Rc;
+
 use super::vs_number::VsNumber;
 use super::vs_string::VsString;
 use super::operations::op_plus;
 
 #[derive(Default)]
 pub struct VirtualMachine {
-  bytecode: Vec<u8>,
 }
 
 impl VirtualMachine {
-  pub fn load(&mut self, bytecode: Vec<u8>) {
-    self.bytecode = bytecode;
-  }
-
-  pub fn run(&mut self) {
+  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>) {
     let a = VsNumber::from_f64(1_f64);
     let b = VsString::from_str("2");
 

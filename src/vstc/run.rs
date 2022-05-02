@@ -1,6 +1,8 @@
+use std::rc::Rc;
+use std::process::exit;
+
 use super::assemble::assemble;
 use super::virtual_machine::VirtualMachine;
-use std::process::exit;
 
 pub fn command(args: &Vec<String>) {
   if args.len() < 3 {
@@ -21,12 +23,11 @@ pub fn command(args: &Vec<String>) {
   let bytecode = to_bytecode(&args[2], &args[3]);
 
   let mut vm = VirtualMachine::new();
-  vm.load(bytecode);
-  vm.run();
+  vm.run(&bytecode);
   vm.print();
 }
 
-fn to_bytecode(option: &String, file_path: &String) -> Vec<u8> {
+fn to_bytecode(option: &String, file_path: &String) -> Rc<Vec<u8>> {
   if option == "--assembly" {
     let file_content = std::fs::read_to_string(&file_path)
       .expect(&std::format!("Failed to read file {}", file_path));
@@ -35,8 +36,10 @@ fn to_bytecode(option: &String, file_path: &String) -> Vec<u8> {
   }
 
   if option == "--bytecode" {
-    return std::fs::read(&file_path)
-      .expect(&std::format!("Failed to read file {}", file_path));
+    return Rc::new(
+      std::fs::read(&file_path)
+        .expect(&std::format!("Failed to read file {}", file_path))
+    );
   }
 
   std::panic!("Unrecognized option {}", option);
