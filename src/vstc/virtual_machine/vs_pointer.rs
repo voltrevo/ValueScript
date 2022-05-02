@@ -84,7 +84,7 @@ impl VsValue for VsPointer {
       Number => true,
       String => true,
       Array => false,
-      Object => true,
+      Object => false,
       Function => false,
     }
   }

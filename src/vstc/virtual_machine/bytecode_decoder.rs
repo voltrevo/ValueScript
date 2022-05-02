@@ -4,6 +4,7 @@ use super::vs_value::Val;
 use super::vs_number::VsNumber;
 use super::vs_string::VsString;
 use super::vs_pointer::VsPointer;
+use super::vs_function::VsFunction;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -77,23 +78,9 @@ impl BytecodeDecoder {
       ),
       Array => std::panic!("Not implemented"),
       Object => std::panic!("Not implemented"),
-      Function => std::panic!("Not implemented"),
+      Function => self.decode_function_header(),
       Instance => std::panic!("Not implemented"),
-      Pointer => {
-        let from_pos = self.pos;
-        let pos = self.decode_pos();
-        
-        if pos < from_pos {
-          if self.clone_at(pos).decode_type() != BytecodeType::Function {
-            std::panic!("Invalid: non-function pointer that points backwards");
-          }
-        }
-
-        return VsPointer::new(
-          &self.data,
-          pos,
-        );
-      },
+      Pointer => self.decode_pointer(),
       Register => std::panic!("Not implemented"),
     }
   }
@@ -143,5 +130,34 @@ impl BytecodeDecoder {
 
   pub fn clone_at(&self, pos: usize) -> BytecodeDecoder {
     return BytecodeDecoder { data: self.data.clone(), pos: pos };
+  }
+
+  pub fn decode_pointer(&mut self) -> Val {
+    let from_pos = self.pos;
+    let pos = self.decode_pos();
+    
+    if pos < from_pos {
+      if self.clone_at(pos).decode_type() != BytecodeType::Function {
+        std::panic!("Invalid: non-function pointer that points backwards");
+      }
+    }
+
+    return VsPointer::new(
+      &self.data,
+      pos,
+    );
+  }
+
+  pub fn decode_function_header(&mut self) -> Val {
+    // TODO: Support >256
+    let register_count = self.decode_byte() as usize;
+    let parameter_count = self.decode_byte() as usize;
+
+    return Rc::new(VsFunction {
+      bytecode: self.data.clone(),
+      register_count: register_count,
+      parameter_count: parameter_count,
+      start: self.pos,
+    });
   }
 }
