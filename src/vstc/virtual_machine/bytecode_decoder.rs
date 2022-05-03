@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
 use super::vs_value::Val;
+use super::vs_undefined::VsUndefined;
+use super::vs_null::VsNull;
 use super::vs_number::VsNumber;
 use super::vs_string::VsString;
 use super::vs_pointer::VsPointer;
@@ -81,8 +83,8 @@ impl BytecodeDecoder {
 
     return match self.decode_type() {
       End => std::panic!("Cannot decode end"),
-      Undefined => std::panic!("Not implemented"),
-      Null => std::panic!("Not implemented"),
+      Undefined => VsUndefined::new(),
+      Null => VsNull::new(),
       False => std::panic!("Not implemented"),
       True => std::panic!("Not implemented"),
       SignedByte => VsNumber::from_f64(

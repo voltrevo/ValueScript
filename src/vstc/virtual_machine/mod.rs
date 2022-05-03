@@ -1,5 +1,6 @@
 mod vs_value;
 mod vs_undefined;
+mod vs_null;
 mod vs_bool;
 mod vs_number;
 mod vs_string;
