@@ -1,8 +1,7 @@
 use std::rc::Rc;
 
 use super::vs_value::Val;
-use super::vs_undefined::VsUndefined;
-use super::vs_number::VsNumber;
+use super::vs_value::ValTrait;
 use super::operations;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::bytecode_decoder::BytecodeType;
@@ -48,8 +47,8 @@ impl VirtualMachine {
     };
 
     let mut registers: Vec<Val> = Vec::with_capacity(2);
-    registers.push(VsUndefined::new());
-    registers.push(VsUndefined::new());
+    registers.push(Val::Undefined);
+    registers.push(Val::Undefined);
 
     let frame = StackFrame {
       decoder: BytecodeDecoder {
@@ -88,7 +87,7 @@ impl VirtualMachine {
       OpInc => {
         let register_index = frame.decoder.decode_register_index().unwrap();
         let mut val = frame.registers[register_index].clone();
-        val = operations::op_plus(&val, &VsNumber::from_f64(1_f64));
+        val = operations::op_plus(&val, &Val::Number(1_f64));
         frame.registers[register_index] = val;
       },
 

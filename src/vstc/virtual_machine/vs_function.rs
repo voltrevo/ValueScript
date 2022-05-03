@@ -1,9 +1,8 @@
 use std::rc::Rc;
 
 use super::vs_value::VsType;
-use super::vs_value::VsValue;
 use super::vs_value::Val;
-use super::vs_undefined::VsUndefined;
+use super::vs_value::ValTrait;
 use super::virtual_machine::StackFrame;
 use super::bytecode_decoder::BytecodeDecoder;
 
@@ -14,12 +13,12 @@ pub struct VsFunction {
   pub start: usize,
 }
 
-impl VsValue for VsFunction {
+impl ValTrait for VsFunction {
   fn typeof_(&self) -> VsType {
     return VsType::Function;
   }
 
-  fn to_string(&self) -> String {
+  fn val_to_string(&self) -> String {
     return "[function]".to_string();
   }
 
@@ -31,11 +30,15 @@ impl VsValue for VsFunction {
     return false;
   }
 
+  fn to_primitive(&self) -> Val {
+    return Val::String(Rc::new(self.val_to_string()));
+  }
+
   fn make_frame(&self) -> Option<StackFrame> {
     let mut registers: Vec<Val> = Vec::with_capacity(self.register_count - 1);
     
     for _ in 0..(self.register_count - 1) {
-      registers.push(VsUndefined::new());
+      registers.push(Val::Undefined);
     }
 
     return Some(StackFrame {

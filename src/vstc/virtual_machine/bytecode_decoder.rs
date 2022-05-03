@@ -1,10 +1,6 @@
 use std::rc::Rc;
 
 use super::vs_value::Val;
-use super::vs_undefined::VsUndefined;
-use super::vs_null::VsNull;
-use super::vs_number::VsNumber;
-use super::vs_string::VsString;
 use super::vs_pointer::VsPointer;
 use super::vs_function::VsFunction;
 use super::instruction::Instruction;
@@ -83,19 +79,19 @@ impl BytecodeDecoder {
 
     return match self.decode_type() {
       End => std::panic!("Cannot decode end"),
-      Undefined => VsUndefined::new(),
-      Null => VsNull::new(),
-      False => std::panic!("Not implemented"),
-      True => std::panic!("Not implemented"),
-      SignedByte => VsNumber::from_f64(
+      Undefined => Val::Undefined,
+      Null => Val::Null,
+      False => Val::Bool(false),
+      True => Val::Bool(true),
+      SignedByte => Val::Number(
         self.decode_signed_byte() as f64
       ),
-      Number => VsNumber::from_f64(
+      Number => Val::Number(
         self.decode_number()
       ),
-      String => VsString::from_string(
+      String => Val::String(Rc::new(
         self.decode_string()
-      ),
+      )),
       Array => std::panic!("Not implemented"),
       Object => std::panic!("Not implemented"),
       Function => self.decode_function_header(),
@@ -184,12 +180,12 @@ impl BytecodeDecoder {
     let register_count = self.decode_byte() as usize;
     let parameter_count = self.decode_byte() as usize;
 
-    return Rc::new(VsFunction {
+    return Val::Function(Rc::new(VsFunction {
       bytecode: self.data.clone(),
       register_count: register_count,
       parameter_count: parameter_count,
       start: self.pos,
-    });
+    }));
   }
 
   pub fn decode_instruction(&mut self) -> Instruction {

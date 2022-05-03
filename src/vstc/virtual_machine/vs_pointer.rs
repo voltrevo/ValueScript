@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use super::vs_value::Val;
-use super::vs_value::VsValue;
+use super::vs_value::ValTrait;
 use super::vs_value::VsType;
 use super::virtual_machine::StackFrame;
 use super::bytecode_decoder::BytecodeDecoder;
@@ -16,11 +16,11 @@ pub struct VsPointer {
 
 impl VsPointer {
   pub fn new(bytecode: &Rc<Vec<u8>>, pos: usize) -> Val {
-    return Rc::new(VsPointer {
+    return Val::Custom(Rc::new(VsPointer {
       bytecode: bytecode.clone(),
       pos: pos,
       decoded: RefCell::new(None),
-    });
+    }));
   }
 
   pub fn decode(&self) -> Val {
@@ -45,7 +45,7 @@ impl VsPointer {
   }
 }
 
-impl VsValue for VsPointer {
+impl ValTrait for VsPointer {
   fn typeof_(&self) -> VsType {
     let mut bd = BytecodeDecoder {
       data: self.bytecode.clone(),
@@ -70,8 +70,8 @@ impl VsValue for VsPointer {
     }
   }
 
-  fn to_string(&self) -> String {
-    return self.decode().to_string();
+  fn val_to_string(&self) -> String {
+    return self.decode().val_to_string();
   }
 
   fn to_number(&self) -> f64 {
@@ -89,6 +89,10 @@ impl VsValue for VsPointer {
       Object => false,
       Function => false,
     }
+  }
+
+  fn to_primitive(&self) -> Val {
+    return self.decode().to_primitive();
   }
 
   fn make_frame(&self) -> Option<StackFrame> {
