@@ -23,9 +23,9 @@ pub fn command(args: &Vec<String>) {
   let bytecode = to_bytecode(&args[2], &args[3]);
 
   let mut vm = VirtualMachine::new();
-  vm.run(&bytecode);
+  let result = vm.run(&bytecode);
 
-  println!("{}", vm.return_value);
+  println!("{}", result);
 }
 
 fn to_bytecode(option: &String, file_path: &String) -> Rc<Vec<u8>> {

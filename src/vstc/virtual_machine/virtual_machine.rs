@@ -8,8 +8,6 @@ use super::bytecode_decoder::BytecodeDecoder;
 use super::instruction::Instruction;
 
 pub struct VirtualMachine {
-  pub return_value: Val,
-  pub root: Val,
   pub stack: Vec<StackFrame>,
 }
 
@@ -21,7 +19,7 @@ pub struct StackFrame {
 }
 
 impl VirtualMachine {
-  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>) {
+  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>) -> Val {
     let mut bd = BytecodeDecoder {
       data: bytecode.clone(),
       pos: 0,
@@ -33,17 +31,35 @@ impl VirtualMachine {
       std::panic!("bytecode does start with function")
     }
 
-    while self.stack.len() > 0 {
+    while self.stack.len() > 1 {
       self.step();
     }
+
+    return self.stack[0].registers[0].clone();
   }
 
   pub fn new() -> VirtualMachine {
-    return VirtualMachine {
-      root: VsUndefined::new(),
-      return_value: VsUndefined::new(),
+    let mut vm = VirtualMachine {
       stack: Default::default(),
     };
+
+    let mut registers: Vec<Val> = Vec::with_capacity(2);
+    registers.push(VsUndefined::new());
+    registers.push(VsUndefined::new());
+
+    let frame = StackFrame {
+      decoder: BytecodeDecoder {
+        data: Rc::new(Vec::new()),
+        pos: 0,
+      },
+      registers: registers,
+      return_target: 0,
+      this_target: 1,
+    };
+
+    vm.stack.push(frame);
+
+    return vm;
   }
 
   pub fn step(&mut self) {
@@ -136,17 +152,9 @@ impl VirtualMachine {
 
   pub fn pop(&mut self) {
     let old_frame = self.stack.pop().unwrap();
-    let optional_frame = self.stack.last_mut();
+    let frame = self.stack.last_mut().unwrap();
 
-    if optional_frame.is_some() {
-      let frame = optional_frame.unwrap();
-
-      frame.registers[frame.return_target] = old_frame.registers[0].clone();
-      frame.registers[frame.this_target] = old_frame.registers[1].clone();
-    } else {
-      // TODO: Use special init frame to avoid branching
-      self.return_value = old_frame.registers[0].clone();
-      self.root = old_frame.registers[1].clone();
-    }
+    frame.registers[frame.return_target] = old_frame.registers[0].clone();
+    frame.registers[frame.this_target] = old_frame.registers[1].clone();
   }
 }
