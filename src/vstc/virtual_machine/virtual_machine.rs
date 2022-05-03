@@ -91,6 +91,8 @@ impl VirtualMachine {
         frame.registers[register_index] = val;
       },
 
+      OpDec => std::panic!("Instruction not implemented: OpDec"),
+
       OpPlus => {
         let left = frame.decoder.decode_val(&frame.registers);
         let right = frame.decoder.decode_val(&frame.registers);
@@ -124,6 +126,8 @@ impl VirtualMachine {
         }
       },
 
+      OpDiv => std::panic!("Instruction not implemented: OpDiv"),
+
       OpMod => {
         let left = frame.decoder.decode_val(&frame.registers);
         let right = frame.decoder.decode_val(&frame.registers);
@@ -134,6 +138,31 @@ impl VirtualMachine {
           frame.registers[register_index.unwrap()] = operations::op_mod(&left, &right);
         }
       },
+
+      OpExp => std::panic!("Instruction not implemented: OpExp"),
+
+      OpEq => std::panic!("Instruction not implemented: OpEq"),
+
+      OpNe => std::panic!("Instruction not implemented: OpNe"),
+
+      OpTripleEq => std::panic!("Instruction not implemented: OpTripleEq"),
+
+      OpTripleNe => {
+        let left = frame.decoder.decode_val(&frame.registers);
+        let right = frame.decoder.decode_val(&frame.registers);
+
+        let register_index = frame.decoder.decode_register_index();
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = operations::op_triple_ne(&left, &right);
+        }
+      }
+
+      OpAnd => std::panic!("Instruction not implemented: OpAnd"),
+
+      OpOr => std::panic!("Instruction not implemented: OpOr"),
+
+      OpNot => std::panic!("Instruction not implemented: OpNot"),
 
       OpLess => {
         let left = frame.decoder.decode_val(&frame.registers);
@@ -146,16 +175,35 @@ impl VirtualMachine {
         }
       }
 
-      OpTripleNe => {
-        let left = frame.decoder.decode_val(&frame.registers);
-        let right = frame.decoder.decode_val(&frame.registers);
+      OpLessEq => std::panic!("Instruction not implemented: OpLessEq"),
 
-        let register_index = frame.decoder.decode_register_index();
+      OpGreater => std::panic!("Instruction not implemented: OpGreater"),
 
-        if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_triple_ne(&left, &right);
-        }
-      }
+      OpGreaterEq => std::panic!("Instruction not implemented: OpGreaterEq"),
+
+      OpNullishCoalesce => std::panic!("Instruction not implemented: OpNullishCoalesce"),
+
+      OpOptionalChain => std::panic!("Instruction not implemented: OpOptionalChain"),
+
+      OpBitAnd => std::panic!("Instruction not implemented: OpBitAnd"),
+
+      OpBitOr => std::panic!("Instruction not implemented: OpBitOr"),
+
+      OpBitNot => std::panic!("Instruction not implemented: OpBitNot"),
+
+      OpBitXor => std::panic!("Instruction not implemented: OpBitXor"),
+
+      OpLeftShift => std::panic!("Instruction not implemented: OpLeftShift"),
+
+      OpRightShift => std::panic!("Instruction not implemented: OpRightShift"),
+
+      OpRightShiftUnsigned => std::panic!("Instruction not implemented: OpRightShiftUnsigned"),
+
+      TypeOf => std::panic!("Instruction not implemented: TypeOf"),
+
+      InstanceOf => std::panic!("Instruction not implemented: InstanceOf"),
+
+      In => std::panic!("Instruction not implemented: In"),
 
       Call => {
         let fn_ = frame.decoder.decode_val(&frame.registers);
@@ -204,6 +252,14 @@ impl VirtualMachine {
         self.stack.push(new_frame);
       }
 
+      Bind => std::panic!("Instruction not implemented: Bind"),
+
+      Sub => std::panic!("Instruction not implemented: Sub"),
+
+      SubMov => std::panic!("Instruction not implemented: SubMov"),
+
+      SubCall => std::panic!("Instruction not implemented: SubCall"),
+
       Jmp => {
         let dst = frame.decoder.decode_pos();
         frame.decoder.pos = dst;
@@ -217,8 +273,6 @@ impl VirtualMachine {
           frame.decoder.pos = dst;
         }
       }
-
-      _ => std::panic!("Not implemented"),
     };
   }
 
