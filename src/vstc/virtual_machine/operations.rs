@@ -16,6 +16,10 @@ pub fn op_plus(left: &Val, right: &Val) -> Val {
   return VsNumber::from_f64(left_prim.to_number() + right_prim.to_number());
 }
 
+pub fn op_minus(left: &Val, right: &Val) -> Val {
+  return VsNumber::from_f64(left.to_number() - right.to_number());
+}
+
 pub fn op_mul(left: &Val, right: &Val) -> Val {
   return VsNumber::from_f64(left.to_number() * right.to_number());
 }
@@ -30,4 +34,12 @@ pub fn op_less(left: &Val, right: &Val) -> Val {
   }
 
   return VsBool::from_bool(left.to_number() < right.to_number());
+}
+
+pub fn op_triple_ne(left: &Val, right: &Val) -> Val {
+  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
+    std::panic!("Not implemented");
+  }
+
+  return VsBool::from_bool(left.to_number() != right.to_number());
 }

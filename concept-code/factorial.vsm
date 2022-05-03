@@ -1,3 +1,6 @@
+@main = function() {
+  call @factorial [5] %return
+}
 @factorial = function(%n) {
   op!== %n 0 %notZero
   jmpif %notZero :recurse

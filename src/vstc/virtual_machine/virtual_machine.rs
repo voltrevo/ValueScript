@@ -103,6 +103,17 @@ impl VirtualMachine {
         }
       },
 
+      OpMinus => {
+        let left = frame.decoder.decode_val(&frame.registers);
+        let right = frame.decoder.decode_val(&frame.registers);
+
+        let register_index = frame.decoder.decode_register_index();
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = operations::op_minus(&left, &right);
+        }
+      },
+
       OpMul => {
         let left = frame.decoder.decode_val(&frame.registers);
         let right = frame.decoder.decode_val(&frame.registers);
@@ -133,6 +144,17 @@ impl VirtualMachine {
 
         if register_index.is_some() {
           frame.registers[register_index.unwrap()] = operations::op_less(&left, &right);
+        }
+      }
+
+      OpTripleNe => {
+        let left = frame.decoder.decode_val(&frame.registers);
+        let right = frame.decoder.decode_val(&frame.registers);
+
+        let register_index = frame.decoder.decode_register_index();
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = operations::op_triple_ne(&left, &right);
         }
       }
 
