@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use super::vs_string::VsString;
-use super::virtual_machine::VirtualMachine;
+use super::virtual_machine::StackFrame;
 
 pub type Val = Rc<dyn VsValue>;
 
@@ -39,7 +39,7 @@ pub trait VsValue {
   fn is_primitive(&self) -> bool;
   fn is_truthy(&self) -> bool;
 
-  fn push_frame(&self, vm: &mut VirtualMachine) -> bool;
+  fn make_frame(&self) -> Option<StackFrame>;
 }
 
 pub trait ValTrait {

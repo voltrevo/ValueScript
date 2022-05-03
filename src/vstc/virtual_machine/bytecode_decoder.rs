@@ -16,6 +16,7 @@ pub struct BytecodeDecoder {
 #[repr(u8)]
 #[derive(PartialEq)]
 pub enum BytecodeType {
+  End = 0x00,
   Undefined = 0x02,
   Null = 0x03,
   False = 0x04,
@@ -31,17 +32,12 @@ pub enum BytecodeType {
   Register = 0x0e,
 }
 
-impl BytecodeDecoder {
-  pub fn decode_byte(&mut self) -> u8 {
-    let byte = self.data[self.pos];
-    self.pos += 1;
-    return byte;
-  }
-
-  pub fn decode_type(&mut self) -> BytecodeType {
+impl BytecodeType {
+  fn from_byte(byte: u8) -> BytecodeType {
     use BytecodeType::*;
 
-    return match self.decode_byte() {
+    return match byte {
+      0x00 => End,
       0x02 => Undefined,
       0x03 => Null,
       0x04 => False,
@@ -59,11 +55,32 @@ impl BytecodeDecoder {
       _ => std::panic!("Unrecognized BytecodeType"),
     };
   }
+}
+
+impl BytecodeDecoder {
+  pub fn decode_byte(&mut self) -> u8 {
+    let byte = self.data[self.pos];
+    self.pos += 1;
+    return byte;
+  }
+
+  pub fn peek_byte(&self) -> u8 {
+    return self.data[self.pos];
+  }
+
+  pub fn decode_type(&mut self) -> BytecodeType {
+    return BytecodeType::from_byte(self.decode_byte());
+  }
+
+  pub fn peek_type(&self) -> BytecodeType {
+    return BytecodeType::from_byte(self.peek_byte());
+  }
 
   pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
     use BytecodeType::*;
 
     return match self.decode_type() {
+      End => std::panic!("Cannot decode end"),
       Undefined => std::panic!("Not implemented"),
       Null => std::panic!("Not implemented"),
       False => std::panic!("Not implemented"),
@@ -184,6 +201,7 @@ impl BytecodeDecoder {
       0x06 => OpMul,
       0x08 => OpMod,
       0x11 => OpLess,
+      0x21 => Call,
       0x27 => Jmp,
       0x28 => JmpIf,
 

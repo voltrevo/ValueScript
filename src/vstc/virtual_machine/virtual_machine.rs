@@ -5,6 +5,7 @@ use super::vs_undefined::VsUndefined;
 use super::vs_number::VsNumber;
 use super::operations;
 use super::bytecode_decoder::BytecodeDecoder;
+use super::bytecode_decoder::BytecodeType;
 use super::instruction::Instruction;
 
 pub struct VirtualMachine {
@@ -14,8 +15,8 @@ pub struct VirtualMachine {
 pub struct StackFrame {
   pub decoder: BytecodeDecoder,
   pub registers: Vec<Val>,
-  pub this_target: usize,
-  pub return_target: usize,
+  pub this_target: Option<usize>,
+  pub return_target: Option<usize>,
 }
 
 impl VirtualMachine {
@@ -26,10 +27,13 @@ impl VirtualMachine {
     };
 
     let main_fn = bd.decode_val(&Vec::new());
+    let frame = main_fn.make_frame();
 
-    if !main_fn.push_frame(self) {
+    if !frame.is_some() {
       std::panic!("bytecode does start with function")
     }
+
+    self.stack.push(frame.unwrap());
 
     while self.stack.len() > 1 {
       self.step();
@@ -53,8 +57,8 @@ impl VirtualMachine {
         pos: 0,
       },
       registers: registers,
-      return_target: 0,
-      this_target: 1,
+      return_target: Some(0),
+      this_target: Some(1),
     };
 
     vm.stack.push(frame);
@@ -65,8 +69,8 @@ impl VirtualMachine {
   pub fn step(&mut self) {
     use Instruction::*;
 
-    let frame = self.stack.last_mut().unwrap();
-    
+    let mut frame = self.stack.last_mut().unwrap();
+
     match frame.decoder.decode_instruction() {
       End => {
         self.pop();
@@ -132,6 +136,46 @@ impl VirtualMachine {
         }
       }
 
+      Call => {
+        let fn_ = frame.decoder.decode_val(&frame.registers);
+        let maybe_new_frame = fn_.make_frame();
+
+        if maybe_new_frame.is_none() {
+          std::panic!("Not implemented: throw exception (fn_ is not a function)");
+        }
+
+        let mut new_frame = maybe_new_frame.unwrap();
+
+        let bytecode_type = frame.decoder.decode_type();
+
+        if bytecode_type != BytecodeType::Array {
+          std::panic!("Not implemented: call instruction not using inline array");
+        }
+
+        // Params start at 2 since 0:return, 1:this
+        let mut reg_i = 2;
+
+        while frame.decoder.peek_type() != BytecodeType::End {
+          let val = frame.decoder.decode_val(&frame.registers);
+
+          if reg_i < new_frame.registers.len() {
+            // TODO: We should also stop writing into registers when hitting the
+            // parameter count. This won't matter for correctly constructed
+            // bytecode but hand-written assembly/bytecode may violate
+            // optimization assumptions.
+            new_frame.registers[reg_i] = val;
+            reg_i += 1;
+          }
+        }
+
+        frame.decoder.decode_type(); // End (TODO: assert)
+
+        frame.return_target = frame.decoder.decode_register_index();
+        frame.this_target = None;
+
+        self.stack.push(new_frame);
+      }
+
       Jmp => {
         let dst = frame.decoder.decode_pos();
         frame.decoder.pos = dst;
@@ -154,7 +198,12 @@ impl VirtualMachine {
     let old_frame = self.stack.pop().unwrap();
     let frame = self.stack.last_mut().unwrap();
 
-    frame.registers[frame.return_target] = old_frame.registers[0].clone();
-    frame.registers[frame.this_target] = old_frame.registers[1].clone();
+    if frame.return_target.is_some() {
+      frame.registers[frame.return_target.unwrap()] = old_frame.registers[0].clone();
+    }
+
+    if frame.this_target.is_some() {
+      frame.registers[frame.this_target.unwrap()] = old_frame.registers[1].clone();
+    }
   }
 }

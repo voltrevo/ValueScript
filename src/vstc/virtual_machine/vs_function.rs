@@ -4,7 +4,6 @@ use super::vs_value::VsType;
 use super::vs_value::VsValue;
 use super::vs_value::Val;
 use super::vs_undefined::VsUndefined;
-use super::virtual_machine::VirtualMachine;
 use super::virtual_machine::StackFrame;
 use super::bytecode_decoder::BytecodeDecoder;
 
@@ -32,24 +31,22 @@ impl VsValue for VsFunction {
     return false;
   }
 
-  fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
+  fn make_frame(&self) -> Option<StackFrame> {
     let mut registers: Vec<Val> = Vec::with_capacity(self.register_count - 1);
     
     for _ in 0..(self.register_count - 1) {
       registers.push(VsUndefined::new());
     }
 
-    vm.stack.push(StackFrame {
+    return Some(StackFrame {
       decoder: BytecodeDecoder {
         data: self.bytecode.clone(),
         pos: self.start,
       },
       registers: registers,
-      this_target: 0,
-      return_target: 0,
+      this_target: None,
+      return_target: None,
     });
-
-    return true;
   }
 
   fn is_truthy(&self) -> bool {

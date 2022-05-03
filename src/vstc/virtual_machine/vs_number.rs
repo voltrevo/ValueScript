@@ -3,7 +3,7 @@ use std::rc::Rc;
 use super::vs_value::Val;
 use super::vs_value::VsType;
 use super::vs_value::VsValue;
-use super::virtual_machine::VirtualMachine;
+use super::virtual_machine::StackFrame;
 
 pub struct VsNumber {
   value: f64,
@@ -32,8 +32,8 @@ impl VsValue for VsNumber {
     return true;
   }
 
-  fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
-    return false;
+  fn make_frame(&self) -> Option<StackFrame> {
+    return None;
   }
 
   fn is_truthy(&self) -> bool {

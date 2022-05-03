@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use super::vs_value::Val;
 use super::vs_value::VsValue;
 use super::vs_value::VsType;
-use super::virtual_machine::VirtualMachine;
+use super::virtual_machine::StackFrame;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::bytecode_decoder::BytecodeType;
 
@@ -53,6 +53,7 @@ impl VsValue for VsPointer {
     };
 
     return match bd.decode_type() {
+      BytecodeType::End => std::panic!("Invalid: pointer to end"),
       BytecodeType::Undefined => VsType::Undefined,
       BytecodeType::Null => VsType::Null,
       BytecodeType::False => VsType::Bool,
@@ -90,8 +91,8 @@ impl VsValue for VsPointer {
     }
   }
 
-  fn push_frame(&self, vm: &mut VirtualMachine) -> bool {
-    return self.decode().push_frame(vm);
+  fn make_frame(&self) -> Option<StackFrame> {
+    return self.decode().make_frame();
   }
 
   fn is_truthy(&self) -> bool {
