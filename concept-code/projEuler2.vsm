@@ -1,0 +1,20 @@
+@main = function() {
+  mov 0 %return
+  mov 1 %fa
+  mov 1 %fb
+
+loop:
+  op+ %fa %fb %fc
+  mov %fb %fa
+  mov %fc %fb
+
+  op< %fb 4000000 %skip_end
+  jmpif %skip_end :skip_end
+  end
+
+skip_end:
+  op% %fb 2 %isOdd
+  jmpif %isOdd :loop
+  op+ %return %fb %return
+  jmp :loop
+}
