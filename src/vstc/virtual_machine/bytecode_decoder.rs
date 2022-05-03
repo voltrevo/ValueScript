@@ -193,23 +193,6 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_instruction(&mut self) -> Instruction {
-    use Instruction::*;
-
-    return match self.decode_byte() {
-      0x00 => End,
-      0x01 => Mov,
-      0x02 => OpInc,
-      0x04 => OpPlus,
-      0x05 => OpMinus,
-      0x06 => OpMul,
-      0x08 => OpMod,
-      0x0d => OpTripleNe,
-      0x11 => OpLess,
-      0x21 => Call,
-      0x27 => Jmp,
-      0x28 => JmpIf,
-
-      _ => std::panic!("Not implemented"),
-    }
+    return Instruction::from_byte(self.decode_byte());
   }
 }
