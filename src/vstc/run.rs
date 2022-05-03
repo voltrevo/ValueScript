@@ -1,5 +1,7 @@
 use std::rc::Rc;
 use std::process::exit;
+use std::path::Path;
+use std::ffi::OsStr;
 
 use super::assemble::assemble;
 use super::virtual_machine::VirtualMachine;
@@ -16,11 +18,23 @@ pub fn command(args: &Vec<String>) {
     return;
   }
 
-  if args.len() == 3 {
-    std::panic!("Not implemented: Run script");
-  }
+  let format = match args.len() {
+    3 => format_from_path(&args[2]),
+    4 => format_from_option(&args[2]),
+    _ => {
+      println!("ERROR: Unrecognized command\n");
+      show_help();
+      exit(1);
+    }
+  };
 
-  let bytecode = to_bytecode(&args[2], &args[3]);
+  let file_path = match args.len() {
+    3 => &args[2],
+    4 => &args[3],
+    _ => std::panic!("Should not be possible"),
+  };
+
+  let bytecode = to_bytecode(format, &file_path);
 
   let mut vm = VirtualMachine::new();
   let result = vm.run(&bytecode);
@@ -28,22 +42,61 @@ pub fn command(args: &Vec<String>) {
   println!("{}", result);
 }
 
-fn to_bytecode(option: &String, file_path: &String) -> Rc<Vec<u8>> {
-  if option == "--assembly" {
-    let file_content = std::fs::read_to_string(&file_path)
-      .expect(&std::format!("Failed to read file {}", file_path));
+enum RunFormat {
+  TypeScript,
+  Assembly,
+  Bytecode,
+}
 
-    return assemble(&file_content);
+fn format_from_option(option: &String) -> RunFormat {
+  return match option.as_str() {
+    "--typescript" => RunFormat::TypeScript,
+    "--assembly" => RunFormat::Assembly,
+    "--bytecode" => RunFormat::Bytecode,
+    _ => std::panic!("Unrecognized option {}", option),
   }
+}
 
-  if option == "--bytecode" {
-    return Rc::new(
+fn format_from_path(file_path: &String) -> RunFormat {
+  let ext = Path::new(&file_path)
+    .extension()
+    .and_then(OsStr::to_str)
+    .unwrap_or("");
+  
+  return match ext {
+    "ts" => RunFormat::TypeScript,
+    "mts" => RunFormat::TypeScript,
+    "js" => RunFormat::TypeScript,
+    "mjs" => RunFormat::TypeScript,
+    "vsm" => RunFormat::Assembly,
+    "vsb" => RunFormat::Bytecode,
+    _ => std::panic!("Unrecognized file extension \"{}\"", ext),
+  };
+}
+
+fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
+  return match format {
+    RunFormat::TypeScript => {
+      let _file_content = Rc::new(
+        std::fs::read(&file_path)
+          .expect(&std::format!("Failed to read file {}", file_path))
+      );
+  
+      std::panic!("Not implemented: convert typescript to bytecode");
+    },
+
+    RunFormat::Assembly => {
+      let file_content = std::fs::read_to_string(&file_path)
+        .expect(&std::format!("Failed to read file {}", file_path));
+
+      assemble(&file_content)
+    },
+
+    RunFormat::Bytecode => Rc::new(
       std::fs::read(&file_path)
         .expect(&std::format!("Failed to read file {}", file_path))
-    );
-  }
-
-  std::panic!("Unrecognized option {}", option);
+    ),
+  };
 }
 
 fn show_help() {
@@ -60,4 +113,10 @@ fn show_help() {
   println!("");
   println!("    --bytecode");
   println!("            Interpret <file> as bytecode");
+  println!("");
+  println!("    --typescript");
+  println!("            Interpret <file> as typescript");
+  println!("");
+  println!("NOTE:");
+  println!("    <file> will be interpreted based on file extension if not otherwise specified");
 }
