@@ -167,33 +167,40 @@ impl VirtualMachine {
         }
 
         let mut new_frame = maybe_new_frame.unwrap();
-
-        let bytecode_type = frame.decoder.decode_type();
-
-        if bytecode_type != BytecodeType::Array {
-          std::panic!("Not implemented: call instruction not using inline array");
-        }
-
-        // Params start at 2 since 0:return, 1:this
-        let mut reg_i = 2;
-
-        while frame.decoder.peek_type() != BytecodeType::End {
-          let val = frame.decoder.decode_val(&frame.registers);
-
-          if reg_i < new_frame.registers.len() {
-            // TODO: We should also stop writing into registers when hitting the
-            // parameter count. This won't matter for correctly constructed
-            // bytecode but hand-written assembly/bytecode may violate
-            // optimization assumptions.
-            new_frame.registers[reg_i] = val;
-            reg_i += 1;
-          }
-        }
-
-        frame.decoder.decode_type(); // End (TODO: assert)
+        load_parameters(&mut frame, &mut new_frame);
 
         frame.return_target = frame.decoder.decode_register_index();
         frame.this_target = None;
+
+        self.stack.push(new_frame);
+      }
+
+      Apply => {
+        let fn_ = frame.decoder.decode_val(&frame.registers);
+        let maybe_new_frame = fn_.make_frame();
+
+        if maybe_new_frame.is_none() {
+          std::panic!("Not implemented: throw exception (fn_ is not a function)");
+        }
+
+        let mut new_frame = maybe_new_frame.unwrap();
+
+        if frame.decoder.peek_type() == BytecodeType::Register {
+          frame.decoder.decode_type();
+          let this_target = frame.decoder.decode_register_index();
+          frame.this_target = this_target;
+
+          if this_target.is_some() {
+            new_frame.registers[1] = frame.registers[this_target.unwrap()].clone();
+          }
+        } else {
+          frame.this_target = None;
+          new_frame.registers[1] = frame.decoder.decode_val(&frame.registers);
+        }
+
+        load_parameters(&mut frame, &mut new_frame);
+
+        frame.return_target = frame.decoder.decode_register_index();
 
         self.stack.push(new_frame);
       }
@@ -228,4 +235,33 @@ impl VirtualMachine {
       frame.registers[frame.this_target.unwrap()] = old_frame.registers[1].clone();
     }
   }
+}
+
+fn load_parameters(
+  frame: &mut StackFrame,
+  new_frame: &mut StackFrame,
+) {
+  let bytecode_type = frame.decoder.decode_type();
+
+  if bytecode_type != BytecodeType::Array {
+    std::panic!("Not implemented: call instruction not using inline array");
+  }
+
+  // Params start at 2 since 0:return, 1:this
+  let mut reg_i = 2;
+
+  while frame.decoder.peek_type() != BytecodeType::End {
+    let val = frame.decoder.decode_val(&frame.registers);
+
+    if reg_i < new_frame.registers.len() {
+      // TODO: We should also stop writing into registers when hitting the
+      // parameter count. This won't matter for correctly constructed
+      // bytecode but hand-written assembly/bytecode may violate
+      // optimization assumptions.
+      new_frame.registers[reg_i] = val;
+      reg_i += 1;
+    }
+  }
+
+  frame.decoder.decode_type(); // End (TODO: assert)
 }
