@@ -110,4 +110,8 @@ impl ValTrait for VsPointer {
   fn is_truthy(&self) -> bool {
     return self.decode().is_truthy();
   }
+
+  fn is_nullish(&self) -> bool {
+    return self.decode().is_nullish();
+  }
 }

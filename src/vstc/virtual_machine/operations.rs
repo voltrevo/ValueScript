@@ -35,9 +35,29 @@ pub fn op_exp(left: Val, right: Val) -> Val {
   return Val::Number(left.to_number().powf(right.to_number()));
 }
 
-// OpEq = 0x0a,
-// OpNe = 0x0b,
-// OpTripleEq = 0x0c,
+pub fn op_eq(left: Val, right: Val) -> Val {
+  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
+    std::panic!("Not implemented");
+  }
+
+  return Val::Bool(left.to_number() == right.to_number());
+}
+
+pub fn op_ne(left: Val, right: Val) -> Val {
+  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
+    std::panic!("Not implemented");
+  }
+
+  return Val::Bool(left.to_number() != right.to_number());
+}
+
+pub fn op_triple_eq(left: Val, right: Val) -> Val {
+  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
+    std::panic!("Not implemented");
+  }
+
+  return Val::Bool(left.to_number() == right.to_number());
+}
 
 pub fn op_triple_ne(left: Val, right: Val) -> Val {
   if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
@@ -63,7 +83,9 @@ pub fn op_or(left: Val, right: Val) -> Val {
   };
 }
 
-// OpNot = 0x10,
+pub fn op_not(input: Val) -> Val {
+  return Val::Bool(!input.is_truthy());
+}
 
 pub fn op_less(left: Val, right: Val) -> Val {
   if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
@@ -73,10 +95,38 @@ pub fn op_less(left: Val, right: Val) -> Val {
   return Val::Bool(left.to_number() < right.to_number());
 }
 
-// OpLessEq = 0x12,
-// OpGreater = 0x13,
-// OpGreaterEq = 0x14,
-// OpNullishCoalesce = 0x15,
+pub fn op_less_eq(left: Val, right: Val) -> Val {
+  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
+    std::panic!("Not implemented");
+  }
+
+  return Val::Bool(left.to_number() <= right.to_number());
+}
+
+pub fn op_greater(left: Val, right: Val) -> Val {
+  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
+    std::panic!("Not implemented");
+  }
+
+  return Val::Bool(left.to_number() > right.to_number());
+}
+
+pub fn op_greater_eq(left: Val, right: Val) -> Val {
+  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
+    std::panic!("Not implemented");
+  }
+
+  return Val::Bool(left.to_number() >= right.to_number());
+}
+
+pub fn op_nullish_coalesce(left: Val, right: Val) -> Val {
+  return if left.is_nullish() {
+    right
+  } else {
+    left
+  };
+}
+
 // OpOptionalChain = 0x16,
 // OpBitAnd = 0x17,
 // OpBitOr = 0x18,

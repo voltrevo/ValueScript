@@ -21,6 +21,19 @@ pub struct StackFrame {
 }
 
 impl StackFrame {
+  pub fn apply_unary_op(
+    &mut self,
+    op: fn(input: Val) -> Val,
+  ) {
+    let input = self.decoder.decode_val(&self.registers);
+
+    let register_index = self.decoder.decode_register_index();
+
+    if register_index.is_some() {
+      self.registers[register_index.unwrap()] = op(input);
+    }
+  }
+
   pub fn apply_binary_op(
     &mut self,
     op: fn(left: Val, right: Val) -> Val,
@@ -124,28 +137,20 @@ impl VirtualMachine {
       OpDiv => frame.apply_binary_op(operations::op_div),
       OpMod => frame.apply_binary_op(operations::op_mod),
       OpExp => frame.apply_binary_op(operations::op_exp),
-
-      OpEq => std::panic!("Instruction not implemented: OpEq"),
-
-      OpNe => std::panic!("Instruction not implemented: OpNe"),
-
-      OpTripleEq => std::panic!("Instruction not implemented: OpTripleEq"),
-
+      OpEq => frame.apply_binary_op(operations::op_eq),
+      OpNe => frame.apply_binary_op(operations::op_ne),
+      OpTripleEq => frame.apply_binary_op(operations::op_triple_eq),
       OpTripleNe => frame.apply_binary_op(operations::op_triple_ne),
       OpAnd => frame.apply_binary_op(operations::op_and),
       OpOr => frame.apply_binary_op(operations::op_or),
 
-      OpNot => std::panic!("Instruction not implemented: OpNot"),
+      OpNot => frame.apply_unary_op(operations::op_not),
 
       OpLess => frame.apply_binary_op(operations::op_less),
-
-      OpLessEq => std::panic!("Instruction not implemented: OpLessEq"),
-
-      OpGreater => std::panic!("Instruction not implemented: OpGreater"),
-
-      OpGreaterEq => std::panic!("Instruction not implemented: OpGreaterEq"),
-
-      OpNullishCoalesce => std::panic!("Instruction not implemented: OpNullishCoalesce"),
+      OpLessEq => frame.apply_binary_op(operations::op_less_eq),
+      OpGreater => frame.apply_binary_op(operations::op_greater),
+      OpGreaterEq => frame.apply_binary_op(operations::op_greater_eq),
+      OpNullishCoalesce => frame.apply_binary_op(operations::op_nullish_coalesce),
 
       OpOptionalChain => std::panic!("Instruction not implemented: OpOptionalChain"),
 

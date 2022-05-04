@@ -39,6 +39,7 @@ pub trait ValTrait {
   fn is_primitive(&self) -> bool;
   fn to_primitive(&self) -> Val;
   fn is_truthy(&self) -> bool;
+  fn is_nullish(&self) -> bool;
   fn bind(&self, params: Vec<Val>) -> Option<Val>;
 
   fn make_frame(&self) -> Option<StackFrame>;
@@ -167,6 +168,23 @@ impl ValTrait for Val {
       Function(_) => true,
       Custom(val) => val.is_truthy(),
     }
+  }
+
+  fn is_nullish(&self) -> bool {
+    use Val::*;
+
+    return match self {
+      Void => std::panic!("Shouldn't happen"), // TODO: Or just true?
+      Undefined => true,
+      Null => true,
+      Bool(_) => false,
+      Number(_) => false,
+      String(_) => false,
+      Array(_) => false,
+      Object(_) => false,
+      Function(_) => false,
+      Custom(val) => val.is_nullish(),
+    };
   }
 
   fn bind(&self, params: Vec<Val>) -> Option<Val> {
