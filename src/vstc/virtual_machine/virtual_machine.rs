@@ -91,14 +91,14 @@ impl VirtualMachine {
       OpInc => {
         let register_index = frame.decoder.decode_register_index().unwrap();
         let mut val = frame.registers[register_index].clone();
-        val = operations::op_plus(&val, &Val::Number(1_f64));
+        val = operations::op_plus(val, Val::Number(1_f64));
         frame.registers[register_index] = val;
       },
 
       OpDec => {
         let register_index = frame.decoder.decode_register_index().unwrap();
         let mut val = frame.registers[register_index].clone();
-        val = operations::op_minus(&val, &Val::Number(1_f64));
+        val = operations::op_minus(val, Val::Number(1_f64));
         frame.registers[register_index] = val;
       },
 
@@ -109,7 +109,7 @@ impl VirtualMachine {
         let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_plus(&left, &right);
+          frame.registers[register_index.unwrap()] = operations::op_plus(left, right);
         }
       },
 
@@ -120,7 +120,7 @@ impl VirtualMachine {
         let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_minus(&left, &right);
+          frame.registers[register_index.unwrap()] = operations::op_minus(left, right);
         }
       },
 
@@ -131,7 +131,7 @@ impl VirtualMachine {
         let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_mul(&left, &right);
+          frame.registers[register_index.unwrap()] = operations::op_mul(left, right);
         }
       },
 
@@ -144,7 +144,7 @@ impl VirtualMachine {
         let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_mod(&left, &right);
+          frame.registers[register_index.unwrap()] = operations::op_mod(left, right);
         }
       },
 
@@ -163,7 +163,7 @@ impl VirtualMachine {
         let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_triple_ne(&left, &right);
+          frame.registers[register_index.unwrap()] = operations::op_triple_ne(left, right);
         }
       }
 
@@ -180,7 +180,7 @@ impl VirtualMachine {
         let register_index = frame.decoder.decode_register_index();
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_less(&left, &right);
+          frame.registers[register_index.unwrap()] = operations::op_less(left, right);
         }
       }
 
