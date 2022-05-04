@@ -1,6 +1,8 @@
 use std::rc::Rc;
+use std::collections::BTreeMap;
 
 use super::vs_value::Val;
+use super::vs_value::ValTrait;
 use super::vs_pointer::VsPointer;
 use super::vs_function::VsFunction;
 use super::instruction::Instruction;
@@ -25,7 +27,6 @@ pub enum BytecodeType {
   Array = 0x09,
   Object = 0x0a,
   Function = 0x0b,
-  Instance = 0x0c,
   Pointer = 0x0d,
   Register = 0x0e,
 }
@@ -46,7 +47,6 @@ impl BytecodeType {
       0x09 => Array,
       0x0a => Object,
       0x0b => Function,
-      0x0c => Instance,
       0x0d => Pointer,
       0x0e => Register,
 
@@ -75,24 +75,22 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
-    use BytecodeType::*;
-
     return match self.decode_type() {
-      End => std::panic!("Cannot decode end"),
-      Undefined => Val::Undefined,
-      Null => Val::Null,
-      False => Val::Bool(false),
-      True => Val::Bool(true),
-      SignedByte => Val::Number(
+      BytecodeType::End => std::panic!("Cannot decode end"),
+      BytecodeType::Undefined => Val::Undefined,
+      BytecodeType::Null => Val::Null,
+      BytecodeType::False => Val::Bool(false),
+      BytecodeType::True => Val::Bool(true),
+      BytecodeType::SignedByte => Val::Number(
         self.decode_signed_byte() as f64
       ),
-      Number => Val::Number(
+      BytecodeType::Number => Val::Number(
         self.decode_number()
       ),
-      String => Val::String(Rc::new(
+      BytecodeType::String => Val::String(Rc::new(
         self.decode_string()
       )),
-      Array => {
+      BytecodeType::Array => {
         let mut vals: Vec<Val> = Vec::new();
 
         while self.peek_type() != BytecodeType::End {
@@ -103,11 +101,21 @@ impl BytecodeDecoder {
 
         Val::Array(Rc::new(vals))
       },
-      Object => std::panic!("Not implemented"),
-      Function => self.decode_function_header(),
-      Instance => std::panic!("Not implemented"),
-      Pointer => self.decode_pointer(),
-      Register => registers[self.decode_register_index().unwrap()].clone(),
+      BytecodeType::Object => {
+        let mut obj: BTreeMap<String, Val> = BTreeMap::new();
+
+        while self.peek_type() != BytecodeType::End {
+          obj.insert(
+            self.decode_val(registers).val_to_string(),
+            self.decode_val(registers),
+          );
+        }
+
+        Val::Object(Rc::new(obj))
+      },
+      BytecodeType::Function => self.decode_function_header(),
+      BytecodeType::Pointer => self.decode_pointer(),
+      BytecodeType::Register => registers[self.decode_register_index().unwrap()].clone(),
     }
   }
 
