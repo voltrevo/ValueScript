@@ -1,8 +1,6 @@
 use std::rc::Rc;
 
-use super::vs_value::VsType;
 use super::vs_value::Val;
-use super::vs_value::ValTrait;
 use super::virtual_machine::StackFrame;
 use super::bytecode_decoder::BytecodeDecoder;
 
@@ -11,33 +9,37 @@ pub struct VsFunction {
   pub register_count: usize,
   pub parameter_count: usize,
   pub start: usize,
+  pub binds: Vec<Val>,
 }
 
-impl ValTrait for VsFunction {
-  fn typeof_(&self) -> VsType {
-    return VsType::Function;
+impl VsFunction {
+  pub fn bind(&self, params: Vec<Val>) -> VsFunction {
+    let mut new_binds = self.binds.clone();
+
+    for p in params {
+      new_binds.push(p);
+    }
+
+    return VsFunction {
+      bytecode: self.bytecode.clone(),
+      register_count: self.register_count,
+      parameter_count: self.parameter_count,
+      start: self.start,
+      binds: new_binds,
+    };
   }
 
-  fn val_to_string(&self) -> String {
-    return "[function]".to_string();
-  }
-
-  fn to_number(&self) -> f64 {
-    return f64::NAN;
-  }
-
-  fn is_primitive(&self) -> bool {
-    return false;
-  }
-
-  fn to_primitive(&self) -> Val {
-    return Val::String(Rc::new(self.val_to_string()));
-  }
-
-  fn make_frame(&self) -> Option<StackFrame> {
+  pub fn make_frame(&self) -> Option<StackFrame> {
     let mut registers: Vec<Val> = Vec::with_capacity(self.register_count - 1);
-    
-    for _ in 0..(self.register_count - 1) {
+
+    registers.push(Val::Undefined);
+    registers.push(Val::Undefined);
+
+    for bind_val in &self.binds {
+      registers.push(bind_val.clone());
+    }
+
+    while registers.len() < registers.capacity() {
       registers.push(Val::Undefined);
     }
 
@@ -47,12 +49,10 @@ impl ValTrait for VsFunction {
         pos: self.start,
       },
       registers: registers,
+      param_start: self.binds.len() + 2,
+      param_end: self.parameter_count + 2,
       this_target: None,
       return_target: None,
     });
-  }
-
-  fn is_truthy(&self) -> bool {
-    return true;
   }
 }

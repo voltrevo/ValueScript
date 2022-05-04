@@ -78,6 +78,10 @@ impl ValTrait for VsPointer {
     return self.decode().to_number();
   }
 
+  fn as_array(&self) -> Option<Rc<Vec<Val>>> {
+    return self.decode().as_array();
+  }
+
   fn is_primitive(&self) -> bool {
     return match self.typeof_() {
       Undefined => true,
@@ -93,6 +97,10 @@ impl ValTrait for VsPointer {
 
   fn to_primitive(&self) -> Val {
     return self.decode().to_primitive();
+  }
+
+  fn bind(&self, params: Vec<Val>) -> Option<Val> {
+    return self.decode().bind(params);
   }
 
   fn make_frame(&self) -> Option<StackFrame> {

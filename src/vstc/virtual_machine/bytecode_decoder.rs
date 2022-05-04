@@ -92,7 +92,17 @@ impl BytecodeDecoder {
       String => Val::String(Rc::new(
         self.decode_string()
       )),
-      Array => std::panic!("Not implemented"),
+      Array => {
+        let mut vals: Vec<Val> = Vec::new();
+
+        while self.peek_type() != BytecodeType::End {
+          vals.push(self.decode_val(registers));
+        }
+
+        self.decode_byte(); // End (TODO: assert)
+
+        Val::Array(Rc::new(vals))
+      },
       Object => std::panic!("Not implemented"),
       Function => self.decode_function_header(),
       Instance => std::panic!("Not implemented"),
@@ -185,6 +195,7 @@ impl BytecodeDecoder {
       register_count: register_count,
       parameter_count: parameter_count,
       start: self.pos,
+      binds: Vec::new(),
     }));
   }
 

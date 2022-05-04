@@ -14,6 +14,8 @@ pub struct VirtualMachine {
 pub struct StackFrame {
   pub decoder: BytecodeDecoder,
   pub registers: Vec<Val>,
+  pub param_start: usize,
+  pub param_end: usize,
   pub this_target: Option<usize>,
   pub return_target: Option<usize>,
 }
@@ -56,6 +58,8 @@ impl VirtualMachine {
         pos: 0,
       },
       registers: registers,
+      param_start: 2,
+      param_end: 2,
       return_target: Some(0),
       this_target: Some(1),
     };
@@ -91,7 +95,12 @@ impl VirtualMachine {
         frame.registers[register_index] = val;
       },
 
-      OpDec => std::panic!("Instruction not implemented: OpDec"),
+      OpDec => {
+        let register_index = frame.decoder.decode_register_index().unwrap();
+        let mut val = frame.registers[register_index].clone();
+        val = operations::op_minus(&val, &Val::Number(1_f64));
+        frame.registers[register_index] = val;
+      },
 
       OpPlus => {
         let left = frame.decoder.decode_val(&frame.registers);
@@ -252,7 +261,31 @@ impl VirtualMachine {
         self.stack.push(new_frame);
       }
 
-      Bind => std::panic!("Instruction not implemented: Bind"),
+      Bind => {
+        let fn_val = frame.decoder.decode_val(&frame.registers);
+        let params = frame.decoder.decode_val(&frame.registers);
+        let register_index = frame.decoder.decode_register_index();
+
+        let params_array = params.as_array();
+
+        if params_array.is_none() {
+          // Not sure this needs to be an exception in future since compiled
+          // code should never violate this
+          std::panic!("bind params should always be array")
+        }
+
+        let bound_fn = fn_val.bind((*params_array.unwrap()).clone());
+
+        if bound_fn.is_none() {
+          // Not sure this needs to be an exception in future since compiled
+          // code should never violate this
+          std::panic!("fn parameter of bind should always be bindable");
+        }
+
+        if register_index.is_some() {
+          frame.registers[register_index.unwrap()] = bound_fn.unwrap();
+        }
+      },
 
       Sub => std::panic!("Instruction not implemented: Sub"),
 
@@ -300,17 +333,12 @@ fn load_parameters(
     std::panic!("Not implemented: call instruction not using inline array");
   }
 
-  // Params start at 2 since 0:return, 1:this
-  let mut reg_i = 2;
+  let mut reg_i = new_frame.param_start;
 
   while frame.decoder.peek_type() != BytecodeType::End {
     let val = frame.decoder.decode_val(&frame.registers);
 
-    if reg_i < new_frame.registers.len() {
-      // TODO: We should also stop writing into registers when hitting the
-      // parameter count. This won't matter for correctly constructed
-      // bytecode but hand-written assembly/bytecode may violate
-      // optimization assumptions.
+    if reg_i < new_frame.param_end {
       new_frame.registers[reg_i] = val;
       reg_i += 1;
     }

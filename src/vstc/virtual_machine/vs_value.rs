@@ -35,9 +35,11 @@ pub trait ValTrait {
   fn typeof_(&self) -> VsType;
   fn val_to_string(&self) -> String;
   fn to_number(&self) -> f64;
+  fn as_array(&self) -> Option<Rc<Vec<Val>>>;
   fn is_primitive(&self) -> bool;
   fn to_primitive(&self) -> Val;
   fn is_truthy(&self) -> bool;
+  fn bind(&self, params: Vec<Val>) -> Option<Val>;
 
   fn make_frame(&self) -> Option<StackFrame>;
 }
@@ -114,6 +116,17 @@ impl ValTrait for Val {
     };
   }
 
+  fn as_array(&self) -> Option<Rc<Vec<Val>>> {
+    use Val::*;
+
+    return match self {
+      Array(a) => Some(a.clone()),
+      Custom(val) => val.as_array(),
+
+      _ => None,
+    }
+  }
+
   fn is_primitive(&self) -> bool {
     use Val::*;
 
@@ -153,6 +166,17 @@ impl ValTrait for Val {
       Object(_) => true,
       Function(_) => true,
       Custom(val) => val.is_truthy(),
+    }
+  }
+
+  fn bind(&self, params: Vec<Val>) -> Option<Val> {
+    use Val::*;
+
+    return match self {
+      Function(f) => Some(Val::Function(Rc::new(f.bind(params)))),
+      Custom(val) => val.bind(params),
+
+      _ => None,
     }
   }
 
