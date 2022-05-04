@@ -217,7 +217,7 @@ impl VirtualMachine {
         let params = frame.decoder.decode_val(&frame.registers);
         let register_index = frame.decoder.decode_register_index();
 
-        let params_array = params.as_array();
+        let params_array = params.as_array_data();
 
         if params_array.is_none() {
           // Not sure this needs to be an exception in future since compiled

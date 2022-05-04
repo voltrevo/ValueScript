@@ -97,7 +97,7 @@ impl BytecodeDecoder {
           vals.push(self.decode_val(registers));
         }
 
-        self.decode_byte(); // End (TODO: assert)
+        self.decode_type(); // End (TODO: assert)
 
         Val::Array(Rc::new(vals))
       },
@@ -110,6 +110,8 @@ impl BytecodeDecoder {
             self.decode_val(registers),
           );
         }
+
+        self.decode_type(); // End (TODO: assert)
 
         Val::Object(Rc::new(obj))
       },

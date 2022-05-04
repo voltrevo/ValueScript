@@ -182,6 +182,52 @@ pub fn op_in(_left: Val, _right: Val) -> Val {
   std::panic!("Not implemented: op_in");
 }
 
-pub fn op_sub(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_sub");
+pub fn op_sub(left: Val, right: Val) -> Val {
+  return match left {
+    Val::Void => std::panic!("Shouldn't happen"),
+    Val::Undefined => std::panic!("Not implemented: exceptions"),
+    Val::Null => std::panic!("Not implemented: exceptions"),
+    Val::Bool(_) => Val::Undefined, // TODO: toString etc
+    Val::Number(_) => Val::Undefined, // TODO: toString etc
+    Val::String(string_data) => {
+      let right_index = match right.to_index() {
+        None => { return Val::Undefined }
+        Some(i) => i,
+      };
+
+      let string_bytes = string_data.as_bytes();
+
+      if right_index >= string_bytes.len() {
+        return Val::Undefined;
+      }
+
+      let byte = string_bytes[right_index];
+
+      // TODO: Val::Strings need to change to not use rust's string type,
+      // because they need to represent an actual byte array underneath. This
+      // occurs for invalid utf8 sequences which are getting converted to U+FFFD
+      // here. To be analogous to js, the information of the actual byte needs
+      // to be preserved, but that can't be represented in rust's string type.
+      return Val::String(Rc::new(String::from_utf8_lossy(&[byte]).into_owned()));
+    },
+    Val::Array(array_data) => {
+      let right_index = match right.to_index() {
+        None => { return Val::Undefined }
+        Some(i) => i,
+      };
+
+      if right_index >= array_data.len() {
+        return Val::Undefined;
+      }
+
+      return array_data[right_index].clone();
+    },
+    Val::Object(object_data) => {
+      return object_data
+        .get(&right.val_to_string())
+        .unwrap_or(&Val::Undefined).clone();
+    },
+    Val::Function(_) => Val::Undefined,
+    Val::Custom(custom_data) => op_sub(custom_data.resolve(), right),
+  }
 }

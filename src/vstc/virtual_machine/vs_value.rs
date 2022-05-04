@@ -35,12 +35,18 @@ pub trait ValTrait {
   fn typeof_(&self) -> VsType;
   fn val_to_string(&self) -> String;
   fn to_number(&self) -> f64;
-  fn as_array(&self) -> Option<Rc<Vec<Val>>>;
+  fn to_index(&self) -> Option<usize>;
   fn is_primitive(&self) -> bool;
   fn to_primitive(&self) -> Val;
   fn is_truthy(&self) -> bool;
   fn is_nullish(&self) -> bool;
+
+  fn resolve(&self) -> Val;
+
   fn bind(&self, params: Vec<Val>) -> Option<Val>;
+
+  fn as_array_data(&self) -> Option<Rc<Vec<Val>>>;
+  fn as_object_data(&self) -> Option<Rc<BTreeMap<String, Val>>>;
 
   fn make_frame(&self) -> Option<StackFrame>;
 }
@@ -117,15 +123,24 @@ impl ValTrait for Val {
     };
   }
 
-  fn as_array(&self) -> Option<Rc<Vec<Val>>> {
+  fn to_index(&self) -> Option<usize> {
     use Val::*;
 
     return match self {
-      Array(a) => Some(a.clone()),
-      Custom(val) => val.as_array(),
-
-      _ => None,
-    }
+      Void => std::panic!("Shouldn't happen"),
+      Undefined => None,
+      Null => None,
+      Bool(_) => None,
+      Number(x) => number_to_index(*x),
+      String(s) => match f64::from_str(s) {
+        Ok(x) => number_to_index(x),
+        Err(_) => None,
+      },
+      Array(vals) => None,
+      Object(_) => None,
+      Function(_) => None,
+      Custom(val) => val.to_index(),
+    };
   }
 
   fn is_primitive(&self) -> bool {
@@ -167,7 +182,7 @@ impl ValTrait for Val {
       Object(_) => true,
       Function(_) => true,
       Custom(val) => val.is_truthy(),
-    }
+    };
   }
 
   fn is_nullish(&self) -> bool {
@@ -187,6 +202,10 @@ impl ValTrait for Val {
     };
   }
 
+  fn resolve(&self) -> Val {
+    std::panic!("Unexpected resolve call on plain Val")
+  }
+
   fn bind(&self, params: Vec<Val>) -> Option<Val> {
     use Val::*;
 
@@ -198,12 +217,35 @@ impl ValTrait for Val {
     }
   }
 
+  fn as_array_data(&self) -> Option<Rc<Vec<Val>>> {
+    use Val::*;
+
+    return match self {
+      Array(a) => Some(a.clone()),
+      Custom(val) => val.as_array_data(),
+
+      _ => None,
+    }
+  }
+
+  fn as_object_data(&self) -> Option<Rc<BTreeMap<String, Val>>> {
+    use Val::*;
+
+    return match self {
+      Object(obj) => Some(obj.clone()),
+      Custom(val) => val.as_object_data(),
+
+      _ => None,
+    }
+  }
+
   fn make_frame(&self) -> Option<StackFrame> {
     use Val::*;
 
     return match self {
       Function(f) => f.make_frame(),
       Custom(val) => val.make_frame(),
+
       _ => None,
     }
   }
@@ -213,4 +255,12 @@ impl std::fmt::Display for Val {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.val_to_string())
   }
+}
+
+fn number_to_index(x: f64) -> Option<usize> {
+  if x < 0_f64 || x != x.floor() {
+    return None
+  }
+
+  return Some(x as usize);
 }

@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 
 use super::vs_value::Val;
 use super::vs_value::ValTrait;
@@ -11,7 +12,7 @@ use super::bytecode_decoder::BytecodeType;
 pub struct VsPointer {
   bytecode: Rc<Vec<u8>>,
   pos: usize,
-  decoded: RefCell<Option<Val>>,
+  resolved: RefCell<Option<Val>>,
 }
 
 impl VsPointer {
@@ -19,29 +20,8 @@ impl VsPointer {
     return Val::Custom(Rc::new(VsPointer {
       bytecode: bytecode.clone(),
       pos: pos,
-      decoded: RefCell::new(None),
+      resolved: RefCell::new(None),
     }));
-  }
-
-  pub fn decode(&self) -> Val {
-    let mut decoded = self.decoded.borrow_mut();
-
-    if decoded.is_some() {
-      return decoded.clone().unwrap();
-    }
-
-    let mut bd = BytecodeDecoder {
-      data: self.bytecode.clone(),
-      pos: self.pos,
-    };
-
-    let val = bd.decode_val(&Vec::new());
-
-    // TODO: Check that this actually inserts into the cell and not just a copy
-    // somehow
-    *decoded = Some(val.clone());
-
-    return val;
   }
 }
 
@@ -70,15 +50,15 @@ impl ValTrait for VsPointer {
   }
 
   fn val_to_string(&self) -> String {
-    return self.decode().val_to_string();
+    return self.resolve().val_to_string();
   }
 
   fn to_number(&self) -> f64 {
-    return self.decode().to_number();
+    return self.resolve().to_number();
   }
 
-  fn as_array(&self) -> Option<Rc<Vec<Val>>> {
-    return self.decode().as_array();
+  fn to_index(&self) -> Option<usize> {
+    return self.resolve().to_index();
   }
 
   fn is_primitive(&self) -> bool {
@@ -95,22 +75,51 @@ impl ValTrait for VsPointer {
   }
 
   fn to_primitive(&self) -> Val {
-    return self.decode().to_primitive();
+    return self.resolve().to_primitive();
+  }
+
+  fn resolve(&self) -> Val {
+    let mut resolved = self.resolved.borrow_mut();
+
+    if resolved.is_some() {
+      return resolved.clone().unwrap();
+    }
+
+    let mut bd = BytecodeDecoder {
+      data: self.bytecode.clone(),
+      pos: self.pos,
+    };
+
+    let val = bd.decode_val(&Vec::new());
+
+    // TODO: Check that this actually inserts into the cell and not just a copy
+    // somehow
+    *resolved = Some(val.clone());
+
+    return val;
   }
 
   fn bind(&self, params: Vec<Val>) -> Option<Val> {
-    return self.decode().bind(params);
-  }
-
-  fn make_frame(&self) -> Option<StackFrame> {
-    return self.decode().make_frame();
+    return self.resolve().bind(params);
   }
 
   fn is_truthy(&self) -> bool {
-    return self.decode().is_truthy();
+    return self.resolve().is_truthy();
   }
 
   fn is_nullish(&self) -> bool {
-    return self.decode().is_nullish();
+    return self.resolve().is_nullish();
+  }
+
+  fn as_array_data(&self) -> Option<Rc<Vec<Val>>> {
+    return self.resolve().as_array_data();
+  }
+
+  fn as_object_data(&self) -> Option<Rc<BTreeMap<String, Val>>> {
+    return self.resolve().as_object_data();
+  }
+
+  fn make_frame(&self) -> Option<StackFrame> {
+    return self.resolve().make_frame();
   }
 }
