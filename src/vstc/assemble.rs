@@ -145,6 +145,7 @@ impl Assembler for AssemblerData {
     self.definitions_map.resolve(&mut self.output);
   }
 
+  // FIXME: Inefficient because unicode
   fn content_at(&self, pos: usize) -> char {
     return self.content.chars().nth(pos).unwrap();
   }
