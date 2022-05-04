@@ -92,9 +92,9 @@ struct AssemblerFnData {
   labels_map: LocationMap,
 }
 
-struct AssemblerData {
-  content: String, // TODO: Avoid copying this in
-  pos: usize,
+struct AssemblerData<'a> {
+  content: &'a str,
+  pos: std::iter::Peekable<std::str::Chars<'a>>,
   output: Vec<u8>,
   fn_data: AssemblerFnData,
   definitions_map: LocationMap,
@@ -102,7 +102,7 @@ struct AssemblerData {
 
 trait Assembler {
   fn run(&mut self);
-  fn content_at(&self, pos: usize) -> char;
+  fn get_pos_index(&self) -> usize;
   fn test_chars(&self, chars: &str) -> bool;
   fn parse_optional_whitespace(&mut self);
   fn assemble_definition(&mut self);
@@ -127,15 +127,14 @@ trait Assembler {
   fn assemble_object(&mut self);
   fn get_register_index(&mut self, register_name: &str) -> u8;
   fn write_varsize_uint(&mut self, value: usize);
-  fn peek(&self, failure_msg: &str) -> char;
 }
 
-impl Assembler for AssemblerData {
+impl<'a> Assembler for AssemblerData<'a> {
   fn run(&mut self) {
     loop {
       self.parse_optional_whitespace();
 
-      if self.pos >= self.content.len() {
+      if self.pos.peek().is_none() {
         break;
       }
 
@@ -145,34 +144,41 @@ impl Assembler for AssemblerData {
     self.definitions_map.resolve(&mut self.output);
   }
 
-  // FIXME: Inefficient because unicode
-  fn content_at(&self, pos: usize) -> char {
-    return self.content.chars().nth(pos).unwrap();
+  fn get_pos_index(&self) -> usize {
+    let mut start = self.content.chars();
+    let mut i = 0_usize;
+
+    loop {
+      if start.clone().eq(self.pos.clone()) {
+        return i;
+      }
+
+      i += 1;
+      start.next();
+    }
   }
 
   fn test_chars(&self, chars: &str) -> bool {
-    let mut pos = self.pos;
+    let mut pos = self.pos.clone();
 
     for c in chars.chars() {
-      if pos >= self.content.len() || self.content_at(pos) != c {
+      if pos.next() != Some(c) {
         return false;
       }
-
-      pos += 1;
     }
 
     return true;
   }
 
   fn parse_optional_whitespace(&mut self) {
-    while self.pos < self.content.len() {
-      let c = self.content_at(self.pos);
-
-      if c != ' ' && c != '\n' {
-        return;
+    loop {
+      match self.pos.peek() {
+        Some(' ') => {},
+        Some('\n') => {},
+        _ => { return; }
       }
 
-      self.pos += 1;
+      self.pos.next();
     }
   }
 
@@ -184,7 +190,7 @@ impl Assembler for AssemblerData {
     self.parse_exact("=");
     self.parse_optional_whitespace();
 
-    let c = self.peek("Expected value for definition");
+    let c = *self.pos.peek().expect("Expected value for definition");
 
     if c == 'f' {
       self.assemble_function();
@@ -240,86 +246,89 @@ impl Assembler for AssemblerData {
 
     for (word, instruction) in instruction_word_map {
       if self.test_instruction_word(word) {
-        self.pos += word.len() + 1;
+        advance_chars(&mut self.pos, word.len() + 1);
         self.parse_optional_whitespace();
         return instruction;
       }
     }
 
-    std::panic!("Failed to parse instruction at {}", self.pos);
+    std::panic!("Failed to parse instruction at {}", self.get_pos_index());
   }
 
   fn test_instruction_word(&self, word: &str) -> bool {
-    let mut pos = self.pos;
+    let mut pos = self.pos.clone();
     let has_chars = self.test_chars(word);
 
     if !has_chars {
       return false;
     }
 
-    pos += word.len();
+    advance_chars(&mut pos, word.len());
 
-    if pos >= self.content.len() {
-      return true;
-    }
-
-    let ch = self.content_at(pos);
-
-    return ch == ' ' || ch == '\n';
+    return match pos.next() {
+      None => true,
+      Some(' ') => true,
+      Some('\n') => true,
+      _ => false,
+    };
   }
 
   fn test_identifier(&self) -> Option<String> {
-    let start = self.pos;
+    let start = self.pos.clone();
     let mut pos = start;
-    let leading_char = self.content_at(start);
+    let mut res = "".to_string();
+
+    let leading_char = match pos.next() {
+      None => { return None; },
+      Some(c) => c,
+    };
 
     if !is_leading_identifier_char(leading_char) {
       return None;
     }
 
-    pos += 1;
+    res.push(leading_char);
 
-    while pos < self.content.len() {
-      let c = self.content_at(pos);
+    loop {
+      match pos.next() {
+        None => { break; }
+        Some(c) => {
+          if !is_identifier_char(c) {
+            break;
+          }
 
-      if !is_identifier_char(c) {
-        break;
-      }
-
-      pos += 1;
+          res.push(c);
+        }
+      };
     }
 
-    unsafe {
-      return Some(self.content.get_unchecked(start..pos).to_string());
-    }
+    return Some(res);
   }
 
   fn parse_identifier(&mut self) -> String {
     let optional_identifier = self.test_identifier();
 
     if optional_identifier.is_none() {
-      std::panic!("Invalid identifier at {}", self.pos);
+      std::panic!("Invalid identifier at {}", self.get_pos_index());
     }
 
     let identifier = optional_identifier.unwrap();
-    self.pos += identifier.len();
+    advance_chars(&mut self.pos, identifier.len());
 
     return identifier;
   }
 
   fn parse_exact(&mut self, chars: &str) {
     for c in chars.chars() {
-      if self.pos >= self.content.len() || self.content_at(self.pos) != c {
-        std::panic!("Expected '{}' at {}", c, self.pos);
+      if self.pos.next() != Some(c) {
+        std::panic!("Expected '{}' at {}", c, self.get_pos_index());
       }
-
-      self.pos += 1;
     }
   }
 
   fn parse_optional_exact(&mut self, chars: &str) -> bool {
     if self.test_chars(chars) {
-      self.pos += chars.len();
+      advance_chars(&mut self.pos, chars.len());
       return true;
     }
 
@@ -329,13 +338,13 @@ impl Assembler for AssemblerData {
   fn parse_one_of(&mut self, options: &[&str]) -> String {
     for opt in options {
       if self.test_chars(opt) {
-        self.pos += opt.len();
+        advance_chars(&mut self.pos, opt.len());
         return opt.to_string();
       }
     }
 
     // FIXME: How best to display options here?
-    std::panic!("Expected one of (options) at {}", self.pos);
+    std::panic!("Expected one of (options) at {}", self.get_pos_index());
   }
 
   fn parse_string_literal(&mut self) -> String {
@@ -344,8 +353,14 @@ impl Assembler for AssemblerData {
     self.parse_exact("\"");
     let mut escaping = false;
 
-    while self.pos < self.content.len() {
-      let c = self.content_at(self.pos);
+    loop {
+      let oc = self.pos.next();
+
+      if oc.is_none() {
+        break;
+      }
+
+      let c = oc.unwrap();
 
       if escaping {
         if c == '\\' {
@@ -357,7 +372,7 @@ impl Assembler for AssemblerData {
         } else if c == 't' {
           result.push('\t');
         } else {
-          std::panic!("Unimplemented escape sequence at {}", self.pos);
+          std::panic!("Unimplemented escape sequence at {}", self.get_pos_index());
         }
 
         escaping = false;
@@ -368,14 +383,12 @@ impl Assembler for AssemblerData {
       } else {
         result.push(c);
       }
-
-      self.pos += 1;
     }
 
     if escaping {
       std::panic!(
         "Unexpected end of input after escape character at {}",
-        self.pos,
+        self.get_pos_index(),
       );
     }
 
@@ -413,7 +426,7 @@ impl Assembler for AssemblerData {
       let param_name = self.parse_identifier();
 
       if self.fn_data.register_map.contains_key(param_name.as_str()) {
-        std::panic!("Unexpected duplicate parameter name at {}", self.pos);
+        std::panic!("Unexpected duplicate parameter name at {}", self.get_pos_index());
       }
 
       self.get_register_index(param_name.as_str());
@@ -435,11 +448,11 @@ impl Assembler for AssemblerData {
     loop {
       self.parse_optional_whitespace();
 
-      let c = self.peek("Expected instruction, label, or end of function");
+      let c = *self.pos.peek().expect("Expected instruction, label, or end of function");
 
       if c == '}' {
         self.output.push(Instruction::End as u8);
-        self.pos += 1;
+        self.pos.next();
         break;
       }
 
@@ -475,52 +488,57 @@ impl Assembler for AssemblerData {
   fn assemble_value(&mut self) {
     self.parse_optional_whitespace();
 
-    if self.pos >= self.content.len() {
-      std::panic!("Expected value at {}", self.pos);
-    }
+    match self.pos.peek() {
+      None => std::panic!("Expected value at {}", self.get_pos_index()),
+      Some('%') => {
+        self.output.push(ValueType::Register as u8);
+        self.assemble_register();
+      },
+      Some('@') => {
+        self.parse_exact("@");
+        self.output.push(ValueType::Pointer as u8);
+        let definition_name = self.parse_identifier();
+        self.definitions_map.add_unresolved(&definition_name, &mut self.output);
+      },
+      Some('[') => {
+        self.assemble_array();
+      },
+      Some('-' | '.' | '0' ..= '9') => {
+        self.assemble_number();
+      },
+      Some('"') => {
+        self.assemble_string();
+      },
+      Some('{') => {
+        self.assemble_object();
+      },
+      Some(ref_c) => {
+        let c = *ref_c;
 
-    let c = self.content_at(self.pos);
-
-    if c == '%' {
-      self.output.push(ValueType::Register as u8);
-      self.assemble_register();
-    } else if c == '@' {
-      self.parse_exact("@");
-      self.output.push(ValueType::Pointer as u8);
-      let definition_name = self.parse_identifier();
-      self.definitions_map.add_unresolved(&definition_name, &mut self.output);
-    } else if c == '[' {
-      self.assemble_array();
-    } else if c == '-' || c == '.' || ('0' <= c && c <= '9') {
-      self.assemble_number();
-    } else if c == '"' {
-      self.assemble_string();
-    } else if c == '{' {
-      self.assemble_object();
-    } else {
-      let parsed = self.parse_one_of(&[
-        "void",
-        "undefined",
-        "null",
-        "false",
-        "true",
-        "",
-      ]);
-
-      match parsed.as_str() {
-        "void" => self.output.push(ValueType::Void as u8),
-        "undefined" => self.output.push(ValueType::Undefined as u8),
-        "null" => self.output.push(ValueType::Null as u8),
-        "false" => self.output.push(ValueType::False as u8),
-        "true" => self.output.push(ValueType::True as u8),
-
-        // TODO: Finish implementing the different values
-        _ => std::panic!(
-          "Unimplemented value type or unexpected character {} at {}",
-          c,
-          self.pos
-        ),
-      }
+        let parsed = self.parse_one_of(&[
+          "void",
+          "undefined",
+          "null",
+          "false",
+          "true",
+          "",
+        ]);
+  
+        match parsed.as_str() {
+          "void" => self.output.push(ValueType::Void as u8),
+          "undefined" => self.output.push(ValueType::Undefined as u8),
+          "null" => self.output.push(ValueType::Null as u8),
+          "false" => self.output.push(ValueType::False as u8),
+          "true" => self.output.push(ValueType::True as u8),
+  
+          // TODO: Finish implementing the different values
+          _ => std::panic!(
+            "Unimplemented value type or unexpected character {} at {}",
+            c,
+            self.get_pos_index(),
+          ),
+        }
+      },
     }
   }
 
@@ -533,16 +551,14 @@ impl Assembler for AssemblerData {
     loop {
       self.parse_optional_whitespace();
 
-      if self.pos >= self.content.len() {
-        std::panic!("Expected value or array end at {}", self.pos);
-      }
-
-      let c = self.content_at(self.pos);
-
-      if c == ']' {
-        self.pos += 1;
-        self.output.push(ValueType::End as u8);
-        break;
+      match self.pos.peek() {
+        None => std::panic!("Expected value or array end at {}", self.get_pos_index()),
+        Some(']') => {
+          self.pos.next();
+          self.output.push(ValueType::End as u8);
+          break;
+        },
+        _ => {},
       }
 
       self.assemble_value();
@@ -551,12 +567,12 @@ impl Assembler for AssemblerData {
       let next = self.parse_one_of(&[",", "]"]);
 
       if next == "," {
-        self.pos += 1;
+        self.pos.next(); // TODO: Assert whitespace
         continue;
       }
 
       if next == "]" {
-        self.pos += 1;
+        self.pos.next(); // TODO: Assert whitespace
         self.output.push(ValueType::End as u8);
         break;
       }
@@ -582,7 +598,10 @@ impl Assembler for AssemblerData {
 
     let identifier = optional_identifier.unwrap();
 
-    if self.content_at(self.pos + identifier.len()) == ':' {
+    let mut pos = self.pos.clone();
+    advance_chars(&mut pos, identifier.len());
+
+    if pos.next() == Some(':') {
       return Some(identifier);
     }
 
@@ -591,8 +610,8 @@ impl Assembler for AssemblerData {
 
   fn assemble_label(&mut self, label_name: String) {
     self.parse_optional_whitespace();
-    
-    self.pos += label_name.len() + 1;
+
+    advance_chars(&mut self.pos, label_name.len() + 1);
 
     self.fn_data.labels_map.found_locations.insert(
       label_name,
@@ -608,22 +627,21 @@ impl Assembler for AssemblerData {
   }
 
   fn assemble_number(&mut self) {
-    let start = self.pos;
+    let mut num_string = "".to_string();
 
-    while self.pos < self.content.len() {
-      let c = self.content_at(self.pos);
-
-      if c == '-' || c == '.' || c == 'e' || ('0' <= c && c <= '9') {
-        self.pos += 1;
-      } else {
-        break;
+    loop {
+      match self.pos.peek() {
+        Some('-' | '.' | 'e' | '0' ..= '9') => {
+          num_string.push(self.pos.next().unwrap());
+        }
+        _ => { break; }
       }
     }
 
-    let value_result = f64::from_str(self.content.get(start..self.pos).unwrap());
+    let value_result = f64::from_str(num_string.as_str());
 
     if value_result.is_err() {
-      std::panic!("Expected valid number at {}", start);
+      std::panic!("Expected valid number at {}", self.get_pos_index());
     }
 
     let value = value_result.unwrap();
@@ -660,7 +678,7 @@ impl Assembler for AssemblerData {
 
     loop {
       self.parse_optional_whitespace();
-      let mut c = self.peek("Expected object content or end");
+      let mut c = *self.pos.peek().expect("Expected object content or end");
 
       if c == '"' {
         self.assemble_string();
@@ -674,10 +692,10 @@ impl Assembler for AssemblerData {
         self.definitions_map.add_unresolved(&definition_name, &mut self.output);
       } else if c == '}' {
         self.output.push(ValueType::End as u8);
-        self.pos += 1;
+        self.pos.next();
         break;
       } else {
-        std::panic!("Unexpected character {} at {}", c, self.pos);
+        std::panic!("Unexpected character {} at {}", c, self.get_pos_index());
       }
 
       self.parse_optional_whitespace();
@@ -685,16 +703,16 @@ impl Assembler for AssemblerData {
       self.assemble_value();
       self.parse_optional_whitespace();
 
-      c = self.peek("Expected comma or object end");
+      c = *self.pos.peek().expect("Expected comma or object end");
 
       if c == ',' {
-        self.pos += 1;
+        self.pos.next();
       } else if c == '}' {
         self.output.push(ValueType::End as u8);
-        self.pos += 1;
+        self.pos.next();
         break;
       } else {
-        std::panic!("Unexpected character {} at {}", c, self.pos);
+        std::panic!("Unexpected character {} at {}", c, self.get_pos_index());
       }
     }
   }
@@ -732,20 +750,12 @@ impl Assembler for AssemblerData {
       }
     }
   }
-
-  fn peek(&self, failure_msg: &str) -> char {
-    if self.pos >= self.content.len() {
-      std::panic!("{} at {}", failure_msg, self.pos);
-    }
-
-    return self.content_at(self.pos);
-  }
 }
 
 pub fn assemble(content: &str) -> Rc<Vec<u8>> {
   let mut assembler = AssemblerData {
-    content: content.to_string(),
-    pos: 0,
+    content: content,
+    pos: content.chars().peekable(),
     output: Vec::new(),
     fn_data: Default::default(),
     definitions_map: LocationMap {
@@ -894,4 +904,10 @@ enum ValueType {
   Pointer = 0x0d,
   Register = 0x0e,
   External = 0x0f,
+}
+
+fn advance_chars(iter: &mut std::iter::Peekable<std::str::Chars>, len: usize) {
+  for _ in 0..len {
+    iter.next();
+  }
 }
