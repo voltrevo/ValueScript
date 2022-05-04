@@ -127,14 +127,37 @@ pub fn op_nullish_coalesce(left: Val, right: Val) -> Val {
   };
 }
 
-// OpOptionalChain = 0x16,
-// OpBitAnd = 0x17,
-// OpBitOr = 0x18,
-// OpBitNot = 0x19,
-// OpBitXor = 0x1a,
-// OpLeftShift = 0x1b,
-// OpRightShift = 0x1c,
-// OpRightShiftUnsigned = 0x1d,
+pub fn op_optional_chain(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_optional_chain");
+}
+
+pub fn op_bit_and(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_bit_and");
+}
+
+pub fn op_bit_or(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_bit_or");
+}
+
+pub fn op_bit_not(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_bit_not");
+}
+
+pub fn op_bit_xor(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_bit_xor");
+}
+
+pub fn op_left_shift(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_left_shift");
+}
+
+pub fn op_right_shift(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_right_shift");
+}
+
+pub fn op_right_shift_unsigned(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_right_shift_unsigned");
+}
 
 pub fn op_typeof(input: Val) -> Val {
   use VsType::*;
@@ -151,6 +174,14 @@ pub fn op_typeof(input: Val) -> Val {
   }));
 }
 
-// InstanceOf = 0x1f,
-// In = 0x20,
-// Sub = 0x24,
+pub fn op_instance_of(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_instance_of");
+}
+
+pub fn op_in(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_in");
+}
+
+pub fn op_sub(_left: Val, _right: Val) -> Val {
+  std::panic!("Not implemented: op_sub");
+}

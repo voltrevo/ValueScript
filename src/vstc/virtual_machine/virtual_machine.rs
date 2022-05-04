@@ -151,28 +151,19 @@ impl VirtualMachine {
       OpGreater => frame.apply_binary_op(operations::op_greater),
       OpGreaterEq => frame.apply_binary_op(operations::op_greater_eq),
       OpNullishCoalesce => frame.apply_binary_op(operations::op_nullish_coalesce),
-
-      OpOptionalChain => std::panic!("Instruction not implemented: OpOptionalChain"),
-
-      OpBitAnd => std::panic!("Instruction not implemented: OpBitAnd"),
-
-      OpBitOr => std::panic!("Instruction not implemented: OpBitOr"),
-
-      OpBitNot => std::panic!("Instruction not implemented: OpBitNot"),
-
-      OpBitXor => std::panic!("Instruction not implemented: OpBitXor"),
-
-      OpLeftShift => std::panic!("Instruction not implemented: OpLeftShift"),
-
-      OpRightShift => std::panic!("Instruction not implemented: OpRightShift"),
-
-      OpRightShiftUnsigned => std::panic!("Instruction not implemented: OpRightShiftUnsigned"),
+      OpOptionalChain => frame.apply_binary_op(operations::op_optional_chain),
+      OpBitAnd => frame.apply_binary_op(operations::op_bit_and),
+      OpBitOr => frame.apply_binary_op(operations::op_bit_or),
+      OpBitNot => frame.apply_binary_op(operations::op_bit_not),
+      OpBitXor => frame.apply_binary_op(operations::op_bit_xor),
+      OpLeftShift => frame.apply_binary_op(operations::op_left_shift),
+      OpRightShift => frame.apply_binary_op(operations::op_right_shift),
+      OpRightShiftUnsigned => frame.apply_binary_op(operations::op_right_shift_unsigned),
 
       TypeOf => frame.apply_unary_op(operations::op_typeof),
 
-      InstanceOf => std::panic!("Instruction not implemented: InstanceOf"),
-
-      In => std::panic!("Instruction not implemented: In"),
+      InstanceOf => frame.apply_binary_op(operations::op_instance_of),
+      In => frame.apply_binary_op(operations::op_in),
 
       Call => {
         let fn_ = frame.decoder.decode_val(&frame.registers);
@@ -247,7 +238,7 @@ impl VirtualMachine {
         }
       },
 
-      Sub => std::panic!("Instruction not implemented: Sub"),
+      Sub => frame.apply_binary_op(operations::op_sub),
 
       SubMov => std::panic!("Instruction not implemented: SubMov"),
 
