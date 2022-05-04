@@ -23,6 +23,14 @@ pub fn op_mul(left: Val, right: Val) -> Val {
   return Val::Number(left.to_number() * right.to_number());
 }
 
+pub fn op_div(left: Val, right: Val) -> Val {
+  return Val::Number(left.to_number() / right.to_number());
+}
+
+pub fn op_exp(left: Val, right: Val) -> Val {
+  return Val::Number(left.to_number().powf(right.to_number()));
+}
+
 pub fn op_mod(left: Val, right: Val) -> Val {
   return Val::Number(left.to_number() % right.to_number());
 }
@@ -41,4 +49,20 @@ pub fn op_triple_ne(left: Val, right: Val) -> Val {
   }
 
   return Val::Bool(left.to_number() != right.to_number());
+}
+
+pub fn op_and(left: Val, right: Val) -> Val {
+  return if left.is_truthy() {
+    right
+  } else {
+    left
+  };
+}
+
+pub fn op_or(left: Val, right: Val) -> Val {
+  return if left.is_truthy() {
+    left
+  } else {
+    right
+  };
 }

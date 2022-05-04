@@ -20,6 +20,22 @@ pub struct StackFrame {
   pub return_target: Option<usize>,
 }
 
+impl StackFrame {
+  pub fn apply_binary_op(
+    &mut self,
+    op: fn(left: Val, right: Val) -> Val,
+  ) {
+    let left = self.decoder.decode_val(&self.registers);
+    let right = self.decoder.decode_val(&self.registers);
+
+    let register_index = self.decoder.decode_register_index();
+
+    if register_index.is_some() {
+      self.registers[register_index.unwrap()] = op(left, right);
+    }
+  }
+}
+
 impl VirtualMachine {
   pub fn run(&mut self, bytecode: &Rc<Vec<u8>>) -> Val {
     let mut bd = BytecodeDecoder {
@@ -102,53 +118,12 @@ impl VirtualMachine {
         frame.registers[register_index] = val;
       },
 
-      OpPlus => {
-        let left = frame.decoder.decode_val(&frame.registers);
-        let right = frame.decoder.decode_val(&frame.registers);
-
-        let register_index = frame.decoder.decode_register_index();
-
-        if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_plus(left, right);
-        }
-      },
-
-      OpMinus => {
-        let left = frame.decoder.decode_val(&frame.registers);
-        let right = frame.decoder.decode_val(&frame.registers);
-
-        let register_index = frame.decoder.decode_register_index();
-
-        if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_minus(left, right);
-        }
-      },
-
-      OpMul => {
-        let left = frame.decoder.decode_val(&frame.registers);
-        let right = frame.decoder.decode_val(&frame.registers);
-
-        let register_index = frame.decoder.decode_register_index();
-
-        if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_mul(left, right);
-        }
-      },
-
-      OpDiv => std::panic!("Instruction not implemented: OpDiv"),
-
-      OpMod => {
-        let left = frame.decoder.decode_val(&frame.registers);
-        let right = frame.decoder.decode_val(&frame.registers);
-
-        let register_index = frame.decoder.decode_register_index();
-
-        if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_mod(left, right);
-        }
-      },
-
-      OpExp => std::panic!("Instruction not implemented: OpExp"),
+      OpPlus => frame.apply_binary_op(operations::op_plus),
+      OpMinus => frame.apply_binary_op(operations::op_minus),
+      OpMul => frame.apply_binary_op(operations::op_mul),
+      OpDiv => frame.apply_binary_op(operations::op_div),
+      OpMod => frame.apply_binary_op(operations::op_mod),
+      OpExp => frame.apply_binary_op(operations::op_exp),
 
       OpEq => std::panic!("Instruction not implemented: OpEq"),
 
@@ -156,33 +131,13 @@ impl VirtualMachine {
 
       OpTripleEq => std::panic!("Instruction not implemented: OpTripleEq"),
 
-      OpTripleNe => {
-        let left = frame.decoder.decode_val(&frame.registers);
-        let right = frame.decoder.decode_val(&frame.registers);
-
-        let register_index = frame.decoder.decode_register_index();
-
-        if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_triple_ne(left, right);
-        }
-      }
-
-      OpAnd => std::panic!("Instruction not implemented: OpAnd"),
-
-      OpOr => std::panic!("Instruction not implemented: OpOr"),
+      OpTripleNe => frame.apply_binary_op(operations::op_triple_ne),
+      OpAnd => frame.apply_binary_op(operations::op_and),
+      OpOr => frame.apply_binary_op(operations::op_or),
 
       OpNot => std::panic!("Instruction not implemented: OpNot"),
 
-      OpLess => {
-        let left = frame.decoder.decode_val(&frame.registers);
-        let right = frame.decoder.decode_val(&frame.registers);
-
-        let register_index = frame.decoder.decode_register_index();
-
-        if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = operations::op_less(left, right);
-        }
-      }
+      OpLess => frame.apply_binary_op(operations::op_less),
 
       OpLessEq => std::panic!("Instruction not implemented: OpLessEq"),
 
