@@ -135,7 +135,22 @@ pub fn op_nullish_coalesce(left: Val, right: Val) -> Val {
 // OpLeftShift = 0x1b,
 // OpRightShift = 0x1c,
 // OpRightShiftUnsigned = 0x1d,
-// TypeOf = 0x1e,
+
+pub fn op_typeof(input: Val) -> Val {
+  use VsType::*;
+
+  return Val::String(Rc::new(match input.typeof_() {
+    Undefined => "undefined".to_string(),
+    Null => "object".to_string(),
+    Bool => "boolean".to_string(),
+    Number => "number".to_string(),
+    String => "string".to_string(),
+    Array => "object".to_string(),
+    Object => "object".to_string(),
+    Function => "function".to_string(),
+  }));
+}
+
 // InstanceOf = 0x1f,
 // In = 0x20,
 // Sub = 0x24,

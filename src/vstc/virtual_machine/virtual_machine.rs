@@ -168,7 +168,7 @@ impl VirtualMachine {
 
       OpRightShiftUnsigned => std::panic!("Instruction not implemented: OpRightShiftUnsigned"),
 
-      TypeOf => std::panic!("Instruction not implemented: TypeOf"),
+      TypeOf => frame.apply_unary_op(operations::op_typeof),
 
       InstanceOf => std::panic!("Instruction not implemented: InstanceOf"),
 
