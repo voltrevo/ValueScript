@@ -849,7 +849,7 @@ fn get_instruction_layout(instruction: Instruction) -> Vec<InstructionArg> {
     OpOptionalChain => Vec::from([Value, Value, Register]),
     OpBitAnd => Vec::from([Value, Value, Register]),
     OpBitOr => Vec::from([Value, Value, Register]),
-    OpBitNot => Vec::from([Value, Value, Register]),
+    OpBitNot => Vec::from([Value, Register]),
     OpBitXor => Vec::from([Value, Value, Register]),
     OpLeftShift => Vec::from([Value, Value, Register]),
     OpRightShift => Vec::from([Value, Value, Register]),

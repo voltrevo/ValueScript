@@ -154,7 +154,9 @@ impl VirtualMachine {
       OpOptionalChain => frame.apply_binary_op(operations::op_optional_chain),
       OpBitAnd => frame.apply_binary_op(operations::op_bit_and),
       OpBitOr => frame.apply_binary_op(operations::op_bit_or),
-      OpBitNot => frame.apply_binary_op(operations::op_bit_not),
+
+      OpBitNot => frame.apply_unary_op(operations::op_bit_not),
+
       OpBitXor => frame.apply_binary_op(operations::op_bit_xor),
       OpLeftShift => frame.apply_binary_op(operations::op_left_shift),
       OpRightShift => frame.apply_binary_op(operations::op_right_shift),

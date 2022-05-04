@@ -127,36 +127,68 @@ pub fn op_nullish_coalesce(left: Val, right: Val) -> Val {
   };
 }
 
-pub fn op_optional_chain(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_optional_chain");
+pub fn op_optional_chain(left: Val, right: Val) -> Val {
+  return match left {
+    Val::Undefined => Val::Undefined,
+    Val::Null => Val::Undefined,
+
+    _ => op_sub(left, right),
+  };
 }
 
-pub fn op_bit_and(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_bit_and");
+fn to_i32(x: f64) -> i32 {
+  if x == f64::INFINITY {
+    return 0;
+  }
+
+  let int1 = ((x.signum() * x.abs().floor()) as i64) & 0xffffffff;
+
+  return int1 as i32;
 }
 
-pub fn op_bit_or(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_bit_or");
+fn to_u32(x: f64) -> u32 {
+  if x == f64::INFINITY {
+    return 0;
+  }
+
+  let int1 = ((x.signum() * x.abs().floor()) as i64) & 0xffffffff;
+
+  return int1 as u32;
 }
 
-pub fn op_bit_not(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_bit_not");
+pub fn op_bit_and(left: Val, right: Val) -> Val {
+  let res_i32 = to_i32(left.to_number()) & to_i32(right.to_number());
+  return Val::Number(res_i32 as f64);
 }
 
-pub fn op_bit_xor(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_bit_xor");
+pub fn op_bit_or(left: Val, right: Val) -> Val {
+  let res_i32 = to_i32(left.to_number()) | to_i32(right.to_number());
+  return Val::Number(res_i32 as f64);
 }
 
-pub fn op_left_shift(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_left_shift");
+pub fn op_bit_not(input: Val) -> Val {
+  let res_i32 = !to_i32(input.to_number());
+  return Val::Number(res_i32 as f64);
 }
 
-pub fn op_right_shift(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_right_shift");
+pub fn op_bit_xor(left: Val, right: Val) -> Val {
+  let res_i32 = to_i32(left.to_number()) ^ to_i32(right.to_number());
+  return Val::Number(res_i32 as f64);
 }
 
-pub fn op_right_shift_unsigned(_left: Val, _right: Val) -> Val {
-  std::panic!("Not implemented: op_right_shift_unsigned");
+pub fn op_left_shift(left: Val, right: Val) -> Val {
+  let res_i32 = to_i32(left.to_number()) << (to_u32(right.to_number()) & 0x1f);
+  return Val::Number(res_i32 as f64);
+}
+
+pub fn op_right_shift(left: Val, right: Val) -> Val {
+  let res_i32 = to_i32(left.to_number()) >> (to_u32(right.to_number()) & 0x1f);
+  return Val::Number(res_i32 as f64);
+}
+
+pub fn op_right_shift_unsigned(left: Val, right: Val) -> Val {
+  let res_u32 = to_u32(left.to_number()) >> (to_u32(right.to_number()) & 0x1f);
+  return Val::Number(res_u32 as f64);
 }
 
 pub fn op_typeof(input: Val) -> Val {
