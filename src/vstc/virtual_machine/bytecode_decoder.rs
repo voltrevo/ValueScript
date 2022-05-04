@@ -136,25 +136,28 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_string(&mut self) -> String {
-    let start = self.pos;
-    self.pos += self.decode_varsize_uint();
-    let res = String::from_utf8_lossy(&self.data[start..self.pos]).into_owned();
+    let len = self.decode_varsize_uint();
+    let start = self.pos; // Start after decoding varsize
+    let end = self.pos + len;
+    let res = String::from_utf8_lossy(&self.data[start..end]).into_owned();
+    self.pos = end;
 
     return res;
   }
 
   pub fn decode_varsize_uint(&mut self) -> usize {
     let mut res = 0_usize;
+    let mut mul = 1_usize;
 
     loop {
       let byte = self.decode_byte();
-      res += byte as usize;
+      res += mul * ((byte % 128) as usize);
 
       if byte & 128 == 0 {
         return res;
       }
 
-      res *= 128;
+      mul *= 128;
     }
   }
 

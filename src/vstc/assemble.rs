@@ -392,8 +392,6 @@ impl<'a> Assembler for AssemblerData<'a> {
       );
     }
 
-    self.parse_exact("\"");
-
     return result;
   }
 
