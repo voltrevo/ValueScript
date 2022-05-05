@@ -60,6 +60,45 @@ pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
 }
 
 pub fn compile(program: &swc_ecma_ast::Program) -> String {
-  dbg!(program);
-  std::panic!("Not implemented: compile");
+  let mut compiler = Compiler::default();
+  compiler.compile_program(&program);
+  std::panic!("Not implemented");
+}
+
+#[derive(Default)]
+struct Compiler {
+  output: Vec<String>,
+}
+
+impl Compiler {
+  fn compile_program(&mut self, program: &swc_ecma_ast::Program) {
+    use swc_ecma_ast::Program::*;
+
+    match program {
+      Module(module) => self.compile_module(module),
+      Script(_) => std::panic!("Not supported: script"),
+    }
+  }
+
+  fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
+    if module.body.len() != 1 {
+      std::panic!("Not implemented: modules that aren't just export default");
+    }
+
+    self.compile_module_item(&module.body[0]);
+  }
+
+  fn compile_module_item(&mut self, module_item: &swc_ecma_ast::ModuleItem) {
+    use swc_ecma_ast::ModuleItem::*;
+
+    match module_item {
+      ModuleDecl(module_decl) => self.compile_module_decl(module_decl),
+      Stmt(_) => std::panic!("Not supported: module statement"),
+    }
+  }
+
+  fn compile_module_decl(&mut self, module_decl: &swc_ecma_ast::ModuleDecl) {
+    dbg!(module_decl);
+    std::panic!("Not implemented");
+  }
 }
