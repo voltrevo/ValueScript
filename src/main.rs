@@ -4,7 +4,7 @@ use swc_common::{
     errors::{ColorConfig, Handler},
     SourceMap, FileName,
 };
-use swc_ecma_parser::{EsConfig, Syntax};
+use swc_ecma_parser::{TsConfig, Syntax};
 
 fn main() {
     let cm = Arc::<SourceMap>::default();
@@ -21,7 +21,7 @@ fn main() {
     let fm = cm.new_source_file(
         FileName::Custom("test.js".into()),
         "
-        function foo(x) {
+        function foo(x: number) {
             if (x < 3) {
                 return 'lt3';
             }
@@ -34,7 +34,7 @@ fn main() {
         fm,
         &handler,
         EsVersion::Es2020,
-        Syntax::Es(EsConfig::default()),
+        Syntax::Typescript(TsConfig::default()),
         swc::config::IsModule::Bool(true),
         None,
     );
