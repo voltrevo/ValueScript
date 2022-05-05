@@ -1,5 +1,6 @@
 use std::process::exit;
 use std::{path::Path, sync::Arc};
+use std::collections::HashSet;
 
 use swc_ecma_ast::{EsVersion};
 use swc_common::{
@@ -68,6 +69,7 @@ pub fn compile(program: &swc_ecma_ast::Program) -> String {
 #[derive(Default)]
 struct Compiler {
   output: Vec<String>,
+  definition_allocator: NameAllocator,
 }
 
 impl Compiler {
@@ -119,7 +121,48 @@ impl Compiler {
   }
 
   fn compile_main_fn(&mut self, main_fn: &swc_ecma_ast::FnExpr) {
+    let name = self.definition_allocator.allocate(&match &main_fn.ident {
+      Some(ident) => ident.sym.to_string(),
+      None => "main".to_string(),
+    });
+
     dbg!(main_fn);
+    dbg!(name);
     std::panic!("Not implemented");
+  }
+}
+
+#[derive(Default)]
+struct NameAllocator {
+  used_names: HashSet<String>,
+}
+
+impl NameAllocator {
+  fn allocate(&mut self, based_on_name: &String) -> String {
+    if !self.used_names.contains(based_on_name) {
+      self.used_names.insert(based_on_name.clone());
+      return based_on_name.clone();
+    }
+
+    return self.allocate_numbered(&(based_on_name.clone() + "_"));
+  }
+
+  fn allocate_numbered(&mut self, prefix: &String) -> String {
+    let mut i = 0_u64;
+
+    loop {
+      let candidate = prefix.clone() + &i.to_string();
+
+      if !self.used_names.contains(&candidate) {
+        self.used_names.insert(candidate.clone());
+        return candidate;
+      }
+
+      i += 1;
+    }
+  }
+
+  fn release(&mut self, name: &String) {
+    self.used_names.remove(name);
   }
 }

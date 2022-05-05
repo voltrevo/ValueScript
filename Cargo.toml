@@ -14,3 +14,4 @@ swc_common = { version = "0.17.22", features=["tty-emitter"] }
 swc_ecma_parser = "0.102.2"
 swc = "0.168.3"
 swc_ecma_ast = "0.76.0"
+swc_atoms = "0.2"
