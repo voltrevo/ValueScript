@@ -98,7 +98,28 @@ impl Compiler {
   }
 
   fn compile_module_decl(&mut self, module_decl: &swc_ecma_ast::ModuleDecl) {
+    use swc_ecma_ast::ModuleDecl::*;
+
+    match module_decl {
+      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
+      _ => std::panic!("Not implemented: non-default module declaration"),
+    }
+
     dbg!(module_decl);
+    std::panic!("Not implemented");
+  }
+
+  fn compile_export_default_decl(&mut self, edd: &swc_ecma_ast::ExportDefaultDecl) {
+    use swc_ecma_ast::DefaultDecl::*;
+
+    match &edd.decl {
+      Fn(fn_) => self.compile_main_fn(fn_),
+      _ => std::panic!("Not implemented: Non-function default export"),
+    }
+  }
+
+  fn compile_main_fn(&mut self, main_fn: &swc_ecma_ast::FnExpr) {
+    dbg!(main_fn);
     std::panic!("Not implemented");
   }
 }
