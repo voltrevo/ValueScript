@@ -1,6 +1,7 @@
 mod assemble;
 mod run;
 mod virtual_machine;
+mod compile;
 
 use std::env;
 use std::process::exit;
@@ -28,6 +29,11 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "run" {
         run::command(&args);
+        return;
+    }
+
+    if args.len() >= 2 && args[1] == "compile" {
+        compile::command(&args);
         return;
     }
 
