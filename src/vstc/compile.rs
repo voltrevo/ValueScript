@@ -1,6 +1,7 @@
 use std::process::exit;
 use std::{path::Path, sync::Arc};
 use std::collections::HashSet;
+use std::collections::HashMap;
 
 use swc_ecma_ast::{EsVersion};
 use swc_common::{
@@ -68,8 +69,8 @@ pub fn compile(program: &swc_ecma_ast::Program) -> String {
 
 #[derive(Default)]
 struct Compiler {
-  output: Vec<String>,
   definition_allocator: NameAllocator,
+  definitions: Vec<Vec<String>>,
 }
 
 impl Compiler {
@@ -121,13 +122,54 @@ impl Compiler {
   }
 
   fn compile_main_fn(&mut self, main_fn: &swc_ecma_ast::FnExpr) {
-    let name = self.definition_allocator.allocate(&match &main_fn.ident {
+    let mut definition: Vec<String> = Vec::new();
+    
+    let fn_defn_name = self.definition_allocator.allocate(&match &main_fn.ident {
       Some(ident) => ident.sym.to_string(),
       None => "main".to_string(),
     });
 
-    dbg!(main_fn);
-    dbg!(name);
+    let mut name_reg_map = HashMap::<String, String>::new();
+    let mut reg_allocator = NameAllocator::default();
+    let mut param_registers = Vec::<String>::new();
+
+    for p in &main_fn.function.params {
+      match &p.pat {
+        swc_ecma_ast::Pat::Ident(binding_ident) => {
+          let param_name = binding_ident.id.sym.to_string();
+          let reg = reg_allocator.allocate(&param_name);
+          param_registers.push(reg.clone());
+          name_reg_map.insert(param_name, reg);
+        },
+        _ => std::panic!("Not implemented: parameter destructuring"),
+      }
+    }
+
+    let mut heading = "@".to_string();
+    heading += &fn_defn_name;
+    heading += " = function(";
+
+    for i in 0..param_registers.len() {
+      heading += "%";
+      heading += &param_registers[i];
+
+      if i != param_registers.len() - 1 {
+        heading += ", ";
+      }
+    }
+
+    heading += ") {";
+
+    definition.push(heading);
+
+    definition.push("}".to_string());
+
+    dbg!(&definition);
+
+    self.definitions.push(definition);
+
+    // dbg!(main_fn);
+    dbg!(fn_defn_name);
     std::panic!("Not implemented");
   }
 }
