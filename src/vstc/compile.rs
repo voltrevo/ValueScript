@@ -181,7 +181,10 @@ impl Compiler {
       None => std::panic!(""),
     };
 
-    for statement in statements {
+    for i in 0..statements.len() {
+      let statement = &statements[i];
+      let last = i == statements.len() - 1;
+
       use swc_ecma_ast::Stmt::*;
 
       match statement {
@@ -198,7 +201,9 @@ impl Compiler {
               Some(&"return".to_string()),
             );
 
-            definition.push("  end".to_string());
+            if !last {
+              definition.push("  end".to_string());
+            }
           },
         },
         _ => std::panic!("Not implemented"),
