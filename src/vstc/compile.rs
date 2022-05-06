@@ -307,9 +307,9 @@ fn compile_literal(lit: &swc_ecma_ast::Lit) -> String {
 
   return match lit {
     Str(str_) => std::format!("\"{}\"", str_.value), // TODO: Escaping
-    Bool(_) => std::panic!("Not implemented: Bool expression"),
-    Null(_) => std::panic!("Not implemented: Null expression"),
-    Num(_) => std::panic!("Not implemented: Num expression"),
+    Bool(bool_) => bool_.value.to_string(),
+    Null(_) => "null".to_string(),
+    Num(num) => num.value.to_string(),
     BigInt(_) => std::panic!("Not implemented: BigInt expression"),
     Regex(_) => std::panic!("Not implemented: Regex expression"),
     JSXText(_) => std::panic!("Not implemented: JSXText expression"),
