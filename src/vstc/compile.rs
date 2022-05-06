@@ -131,6 +131,8 @@ impl Compiler {
 
     let mut name_reg_map = HashMap::<String, String>::new();
     let mut reg_allocator = NameAllocator::default();
+    reg_allocator.allocate(&"return".to_string());
+    reg_allocator.allocate(&"this".to_string());
     let mut param_registers = Vec::<String>::new();
 
     for p in &main_fn.function.params {
@@ -172,8 +174,20 @@ impl Compiler {
 
       match statement {
         Return(ret_stmt) => match &ret_stmt.arg {
-          None => { definition.push("  end".to_string()); }
-          Some(_expr) => std::panic!("Not implemented: expressions")
+          None => {
+            definition.push("  end".to_string());
+          },
+          Some(expr) => {
+            compile_expression(
+              &mut definition,
+              &mut name_reg_map,
+              &mut reg_allocator,
+              expr,
+              &"return".to_string(),
+            );
+
+            definition.push("  end".to_string());
+          },
         },
         _ => std::panic!("Not implemented"),
       }
@@ -224,4 +238,74 @@ impl NameAllocator {
   fn release(&mut self, name: &String) {
     self.used_names.remove(name);
   }
+}
+
+fn compile_expression(
+  definition: &mut Vec<String>,
+  name_reg_map: &mut HashMap<String, String>,
+  reg_allocator: &mut NameAllocator,
+  expr: &swc_ecma_ast::Expr,
+  target_register: &String,
+) {
+  use swc_ecma_ast::Expr::*;
+
+  match expr {
+    This(_) => std::panic!("Not implemented: This expression"),
+    Array(_) => std::panic!("Not implemented: Array expression"),
+    Object(_) => std::panic!("Not implemented: Object expression"),
+    Fn(_) => std::panic!("Not implemented: Fn expression"),
+    Unary(_) => std::panic!("Not implemented: Unary expression"),
+    Update(_) => std::panic!("Not implemented: Update expression"),
+    Bin(_) => std::panic!("Not implemented: Bin expression"),
+    Assign(_) => std::panic!("Not implemented: Assign expression"),
+    Member(_) => std::panic!("Not implemented: Member expression"),
+    SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
+    Cond(_) => std::panic!("Not implemented: Cond expression"),
+    Call(_) => std::panic!("Not implemented: Call expression"),
+    New(_) => std::panic!("Not implemented: New expression"),
+    Seq(_) => std::panic!("Not implemented: Seq expression"),
+    Ident(_) => std::panic!("Not implemented: Ident expression"),
+    Lit(lit) => {
+      let mut instr = "  mov ".to_string();
+      instr += &compile_literal(lit);
+      instr += " %";
+      instr += target_register;
+      definition.push(instr);
+    },
+    Tpl(_) => std::panic!("Not implemented: Tpl expression"),
+    TaggedTpl(_) => std::panic!("Not implemented: TaggedTpl expression"),
+    Arrow(_) => std::panic!("Not implemented: Arrow expression"),
+    Class(_) => std::panic!("Not implemented: Class expression"),
+    Yield(_) => std::panic!("Not implemented: Yield expression"),
+    MetaProp(_) => std::panic!("Not implemented: MetaProp expression"),
+    Await(_) => std::panic!("Not implemented: Await expression"),
+    Paren(_) => std::panic!("Not implemented: Paren expression"),
+    JSXMember(_) => std::panic!("Not implemented: JSXMember expression"),
+    JSXNamespacedName(_) => std::panic!("Not implemented: JSXNamespacedName expression"),
+    JSXEmpty(_) => std::panic!("Not implemented: JSXEmpty expression"),
+    JSXElement(_) => std::panic!("Not implemented: JSXElement expression"),
+    JSXFragment(_) => std::panic!("Not implemented: JSXFragment expression"),
+    TsTypeAssertion(_) => std::panic!("Not implemented: TsTypeAssertion expression"),
+    TsConstAssertion(_) => std::panic!("Not implemented: TsConstAssertion expression"),
+    TsNonNull(_) => std::panic!("Not implemented: TsNonNull expression"),
+    TsAs(_) => std::panic!("Not implemented: TsAs expression"),
+    TsInstantiation(_) => std::panic!("Not implemented: TsInstantiation expression"),
+    PrivateName(_) => std::panic!("Not implemented: PrivateName expression"),
+    OptChain(_) => std::panic!("Not implemented: OptChain expression"),
+    Invalid(_) => std::panic!("Not implemented: Invalid expression"),
+  };
+}
+
+fn compile_literal(lit: &swc_ecma_ast::Lit) -> String {
+  use swc_ecma_ast::Lit::*;
+
+  return match lit {
+    Str(str_) => std::format!("\"{}\"", str_.value), // TODO: Escaping
+    Bool(_) => std::panic!("Not implemented: Bool expression"),
+    Null(_) => std::panic!("Not implemented: Null expression"),
+    Num(_) => std::panic!("Not implemented: Num expression"),
+    BigInt(_) => std::panic!("Not implemented: BigInt expression"),
+    Regex(_) => std::panic!("Not implemented: Regex expression"),
+    JSXText(_) => std::panic!("Not implemented: JSXText expression"),
+  };
 }
