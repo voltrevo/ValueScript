@@ -2,6 +2,8 @@ use std::process::exit;
 use std::{path::Path, sync::Arc};
 use std::collections::HashSet;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::prelude::*;
 
 use swc_ecma_ast::{EsVersion};
 use swc_common::{
@@ -20,8 +22,12 @@ pub fn command(args: &Vec<String>) {
   let program = parse(&args[2]);
   let assembly = compile(&program);
 
-  std::fs::write("out.vsm", assembly)
-    .expect("Failed to write out.vsm");
+  let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
+
+  for line in assembly {
+    file.write_all(line.as_bytes()).expect("Failed to write line");
+    file.write_all(b"\n").expect("Failed to write line");
+  }
 }
 
 fn show_help() {
@@ -61,10 +67,19 @@ pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
   return result.expect("Parse failed");
 }
 
-pub fn compile(program: &swc_ecma_ast::Program) -> String {
+pub fn compile(program: &swc_ecma_ast::Program) -> Vec<String> {
   let mut compiler = Compiler::default();
   compiler.compile_program(&program);
-  std::panic!("Not implemented");
+  
+  let mut lines = Vec::<String>::new();
+
+  for def in compiler.definitions {
+    for line in def {
+      lines.push(line);
+    }
+  }
+
+  return lines;
 }
 
 #[derive(Default)]
@@ -107,9 +122,6 @@ impl Compiler {
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
       _ => std::panic!("Not implemented: non-default module declaration"),
     }
-
-    dbg!(module_decl);
-    std::panic!("Not implemented");
   }
 
   fn compile_export_default_decl(&mut self, edd: &swc_ecma_ast::ExportDefaultDecl) {
@@ -195,13 +207,7 @@ impl Compiler {
 
     definition.push("}".to_string());
 
-    dbg!(&definition);
-
     self.definitions.push(definition);
-
-    // dbg!(main_fn);
-    dbg!(fn_defn_name);
-    std::panic!("Not implemented");
   }
 }
 
