@@ -4,6 +4,8 @@ use std::path::Path;
 use std::ffi::OsStr;
 
 use super::assemble::assemble;
+use super::compile::parse;
+use super::compile::compile;
 use super::virtual_machine::VirtualMachine;
 
 pub fn command(args: &Vec<String>) {
@@ -77,12 +79,17 @@ fn format_from_path(file_path: &String) -> RunFormat {
 fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
   return match format {
     RunFormat::TypeScript => {
-      let _file_content = Rc::new(
-        std::fs::read(&file_path)
-          .expect(&std::format!("Failed to read file {}", file_path))
-      );
-  
-      std::panic!("Not implemented: convert typescript to bytecode");
+      let ast = parse(file_path);
+      let assembly_lines = compile(&ast);
+
+      let mut assembly = String::new();
+
+      for line in assembly_lines {
+        assembly.push_str(&line);
+        assembly.push('\n');
+      }
+
+      return assemble(&assembly);
     },
 
     RunFormat::Assembly => {
