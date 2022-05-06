@@ -198,7 +198,8 @@ impl Compiler {
               &mut name_reg_map,
               &mut reg_allocator,
               expr,
-              Some(&"return".to_string()),
+              None,
+              Some("return".to_string()),
             );
 
             if !last {
@@ -253,6 +254,7 @@ impl NameAllocator {
 
 struct CompiledExpression {
   value_assembly: String,
+  used_available_register: bool,
   nested_registers: Vec<String>,
 }
 
@@ -261,9 +263,12 @@ fn compile_expression(
   name_reg_map: &mut HashMap<String, String>,
   reg_allocator: &mut NameAllocator,
   expr: &swc_ecma_ast::Expr,
-  target_register: Option<&String>,
+  mut available_register: Option<String>,
+  target_register: Option<String>,
 ) -> CompiledExpression {
   use swc_ecma_ast::Expr::*;
+
+  available_register = available_register.or(target_register.clone());
 
   let mut nested_registers = Vec::<String>::new();
 
@@ -275,19 +280,30 @@ fn compile_expression(
     Unary(_) => std::panic!("Not implemented: Unary expression"),
     Update(_) => std::panic!("Not implemented: Update expression"),
     Bin(bin) => {
+      // If the available register is used in subexpressions it'll still be
+      // available afterwards. We do need to make sure the same register isn't
+      // used for both subexpressions though.
+      let mut sub_available_register = available_register.clone();
+
       let left = compile_expression(
         definition,
         name_reg_map,
         reg_allocator,
         &bin.left,
+        sub_available_register.clone(),
         None
       );
+
+      if left.used_available_register {
+        sub_available_register = None;
+      }
 
       let right = compile_expression(
         definition,
         name_reg_map,
         reg_allocator,
         &bin.right,
+        sub_available_register.clone(),
         None,
       );
 
@@ -298,11 +314,26 @@ fn compile_expression(
       instr += " ";
       instr += &right.value_assembly;
 
-      let target: String = match target_register {
-        None => {
-          let res = reg_allocator.allocate_numbered(&"_tmp".to_string());
-          nested_registers.push(res.clone());
-          res
+      for used_reg in left.nested_registers {
+        reg_allocator.release(&used_reg);
+      }
+
+      for used_reg in right.nested_registers {
+        reg_allocator.release(&used_reg);
+      }
+
+      let target: String = match &target_register {
+        None => match available_register {
+          None => {
+            let res = reg_allocator.allocate_numbered(&"_tmp".to_string());
+            nested_registers.push(res.clone());
+            res
+          },
+          Some(a) => {
+            let res = a.clone();
+            available_register = None;
+            res
+          },
         },
         Some(t) => t.clone(),
       };
@@ -314,6 +345,11 @@ fn compile_expression(
 
       return CompiledExpression {
         value_assembly: std::format!("%{}", target),
+
+        // Note: Possibly misleading here - we'll return true here even if we
+        // weren't given an available register (FIXME?)
+        used_available_register: available_register.is_none(),
+
         nested_registers: nested_registers,
       };
     },
@@ -329,6 +365,7 @@ fn compile_expression(
       None => {
         return CompiledExpression {
           value_assembly: compile_literal(lit),
+          used_available_register: false,
           nested_registers: nested_registers,
         };
       },
@@ -336,11 +373,12 @@ fn compile_expression(
         let mut instr = "  mov ".to_string();
         instr += &compile_literal(lit);
         instr += " %";
-        instr += t;
+        instr += &t;
         definition.push(instr);
 
         return CompiledExpression {
           value_assembly: std::format!("%{}", t),
+          used_available_register: false,
           nested_registers: nested_registers,
         };
       },
