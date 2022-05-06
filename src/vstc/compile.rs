@@ -262,7 +262,38 @@ fn compile_expression(
     Fn(_) => std::panic!("Not implemented: Fn expression"),
     Unary(_) => std::panic!("Not implemented: Unary expression"),
     Update(_) => std::panic!("Not implemented: Update expression"),
-    Bin(_) => std::panic!("Not implemented: Bin expression"),
+    Bin(bin) => {
+      let left_reg = reg_allocator.allocate_numbered(&"_tmp".to_string());
+
+      compile_expression(
+        definition,
+        name_reg_map,
+        reg_allocator,
+        &bin.left,
+        &left_reg,
+      );
+
+      let right_reg = reg_allocator.allocate_numbered(&"_tmp".to_string());
+
+      compile_expression(
+        definition,
+        name_reg_map,
+        reg_allocator,
+        &bin.right,
+        &right_reg,
+      );
+
+      let mut instr = "  ".to_string();
+      instr += get_binary_op_str(bin.op);
+      instr += " %";
+      instr += &left_reg;
+      instr += " %";
+      instr += &right_reg;
+      instr += " %";
+      instr += target_register;
+
+      definition.push(instr);
+    },
     Assign(_) => std::panic!("Not implemented: Assign expression"),
     Member(_) => std::panic!("Not implemented: Member expression"),
     SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
@@ -313,5 +344,37 @@ fn compile_literal(lit: &swc_ecma_ast::Lit) -> String {
     BigInt(_) => std::panic!("Not implemented: BigInt expression"),
     Regex(_) => std::panic!("Not implemented: Regex expression"),
     JSXText(_) => std::panic!("Not implemented: JSXText expression"),
+  };
+}
+
+fn get_binary_op_str(op: swc_ecma_ast::BinaryOp) -> &'static str {
+  use swc_ecma_ast::BinaryOp::*;
+
+  return match op {
+    EqEq => "op==",
+    NotEq => "op!=",
+    EqEqEq => "op===",
+    NotEqEq => "op!==",
+    Lt => "op<",
+    LtEq => "op<=",
+    Gt => "op>",
+    GtEq => "op>=",
+    LShift => "op<<",
+    RShift => "op>>",
+    ZeroFillRShift => "op>>>",
+    Add => "op+",
+    Sub => "op-",
+    Mul => "op*",
+    Div => "op/",
+    Mod => "op%",
+    BitOr => "op|",
+    BitXor => "op^",
+    BitAnd => "op&",
+    LogicalOr => "op||",
+    LogicalAnd => "op&&",
+    In => "in",
+    InstanceOf => "instanceof",
+    Exp => "op**",
+    NullishCoalescing => "op??",
   };
 }
