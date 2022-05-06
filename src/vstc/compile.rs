@@ -195,7 +195,7 @@ impl Compiler {
               &mut name_reg_map,
               &mut reg_allocator,
               expr,
-              &"return".to_string(),
+              Some(&"return".to_string()),
             );
 
             definition.push("  end".to_string());
@@ -246,14 +246,21 @@ impl NameAllocator {
   }
 }
 
+struct CompiledExpression {
+  value_assembly: String,
+  nested_registers: Vec<String>,
+}
+
 fn compile_expression(
   definition: &mut Vec<String>,
   name_reg_map: &mut HashMap<String, String>,
   reg_allocator: &mut NameAllocator,
   expr: &swc_ecma_ast::Expr,
-  target_register: &String,
-) {
+  target_register: Option<&String>,
+) -> CompiledExpression {
   use swc_ecma_ast::Expr::*;
+
+  let mut nested_registers = Vec::<String>::new();
 
   match expr {
     This(_) => std::panic!("Not implemented: This expression"),
@@ -263,36 +270,47 @@ fn compile_expression(
     Unary(_) => std::panic!("Not implemented: Unary expression"),
     Update(_) => std::panic!("Not implemented: Update expression"),
     Bin(bin) => {
-      let left_reg = reg_allocator.allocate_numbered(&"_tmp".to_string());
-
-      compile_expression(
+      let left = compile_expression(
         definition,
         name_reg_map,
         reg_allocator,
         &bin.left,
-        &left_reg,
+        None
       );
 
-      let right_reg = reg_allocator.allocate_numbered(&"_tmp".to_string());
-
-      compile_expression(
+      let right = compile_expression(
         definition,
         name_reg_map,
         reg_allocator,
         &bin.right,
-        &right_reg,
+        None,
       );
 
       let mut instr = "  ".to_string();
       instr += get_binary_op_str(bin.op);
+      instr += " ";
+      instr += &left.value_assembly;
+      instr += " ";
+      instr += &right.value_assembly;
+
+      let target: String = match target_register {
+        None => {
+          let res = reg_allocator.allocate_numbered(&"_tmp".to_string());
+          nested_registers.push(res.clone());
+          res
+        },
+        Some(t) => t.clone(),
+      };
+
       instr += " %";
-      instr += &left_reg;
-      instr += " %";
-      instr += &right_reg;
-      instr += " %";
-      instr += target_register;
+      instr += &target;
 
       definition.push(instr);
+
+      return CompiledExpression {
+        value_assembly: std::format!("%{}", target),
+        nested_registers: nested_registers,
+      };
     },
     Assign(_) => std::panic!("Not implemented: Assign expression"),
     Member(_) => std::panic!("Not implemented: Member expression"),
@@ -302,12 +320,25 @@ fn compile_expression(
     New(_) => std::panic!("Not implemented: New expression"),
     Seq(_) => std::panic!("Not implemented: Seq expression"),
     Ident(_) => std::panic!("Not implemented: Ident expression"),
-    Lit(lit) => {
-      let mut instr = "  mov ".to_string();
-      instr += &compile_literal(lit);
-      instr += " %";
-      instr += target_register;
-      definition.push(instr);
+    Lit(lit) => match target_register {
+      None => {
+        return CompiledExpression {
+          value_assembly: compile_literal(lit),
+          nested_registers: nested_registers,
+        };
+      },
+      Some(t) => {
+        let mut instr = "  mov ".to_string();
+        instr += &compile_literal(lit);
+        instr += " %";
+        instr += t;
+        definition.push(instr);
+
+        return CompiledExpression {
+          value_assembly: std::format!("%{}", t),
+          nested_registers: nested_registers,
+        };
+      },
     },
     Tpl(_) => std::panic!("Not implemented: Tpl expression"),
     TaggedTpl(_) => std::panic!("Not implemented: TaggedTpl expression"),
