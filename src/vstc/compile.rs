@@ -162,6 +162,23 @@ impl Compiler {
 
     definition.push(heading);
 
+    let statements = match &main_fn.function.body {
+      Some(body) => &body.stmts,
+      None => std::panic!(""),
+    };
+
+    for statement in statements {
+      use swc_ecma_ast::Stmt::*;
+
+      match statement {
+        Return(ret_stmt) => match &ret_stmt.arg {
+          None => { definition.push("  end".to_string()); }
+          Some(_expr) => std::panic!("Not implemented: expressions")
+        },
+        _ => std::panic!("Not implemented"),
+      }
+    }
+
     definition.push("}".to_string());
 
     dbg!(&definition);
