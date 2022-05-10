@@ -277,7 +277,56 @@ fn compile_expression(
     Array(_) => std::panic!("Not implemented: Array expression"),
     Object(_) => std::panic!("Not implemented: Object expression"),
     Fn(_) => std::panic!("Not implemented: Fn expression"),
-    Unary(_) => std::panic!("Not implemented: Unary expression"),
+    Unary(un_exp) => {
+      let arg = compile_expression(
+        definition,
+        name_reg_map,
+        reg_allocator,
+        &un_exp.arg,
+        available_register.clone(),
+        None,
+      );
+
+      let mut instr = "  ".to_string();
+      instr += get_unary_op_str(un_exp.op);
+      instr += " ";
+      instr += &arg.value_assembly;
+
+      for used_reg in arg.nested_registers {
+        reg_allocator.release(&used_reg);
+      }
+
+      let target: String = match &target_register {
+        None => match available_register {
+          None => {
+            let res = reg_allocator.allocate_numbered(&"_tmp".to_string());
+            nested_registers.push(res.clone());
+            res
+          },
+          Some(a) => {
+            let res = a.clone();
+            available_register = None;
+            res
+          },
+        },
+        Some(t) => t.clone(),
+      };
+
+      instr += " %";
+      instr += &target;
+
+      definition.push(instr);
+
+      return CompiledExpression {
+        value_assembly: std::format!("%{}", target),
+
+        // Note: Possibly misleading here - we'll return true here even if we
+        // weren't given an available register (FIXME?)
+        used_available_register: available_register.is_none(),
+
+        nested_registers: nested_registers,
+      };
+    },
     Update(_) => std::panic!("Not implemented: Update expression"),
     Bin(bin) => {
       // If the available register is used in subexpressions it'll still be
@@ -450,5 +499,19 @@ fn get_binary_op_str(op: swc_ecma_ast::BinaryOp) -> &'static str {
     InstanceOf => "instanceof",
     Exp => "op**",
     NullishCoalescing => "op??",
+  };
+}
+
+fn get_unary_op_str(op: swc_ecma_ast::UnaryOp) -> &'static str {
+  use swc_ecma_ast::UnaryOp::*;
+
+  return match op {
+    Minus => "unary-",
+    Plus => "unary+",
+    Bang => "op!",
+    Tilde => "op~",
+    TypeOf => "typeof",
+    Void => std::panic!("No matching instruction"),
+    Delete => std::panic!("No matching instruction"),
   };
 }
