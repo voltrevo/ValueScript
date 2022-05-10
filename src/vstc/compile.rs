@@ -193,14 +193,13 @@ impl Compiler {
             definition.push("  end".to_string());
           },
           Some(expr) => {
-            compile_expression(
-              &mut definition,
-              &mut name_reg_map,
-              &mut reg_allocator,
-              expr,
-              None,
-              Some("return".to_string()),
-            );
+            let mut expression_compiler = ExpressionCompiler {
+              definition: &mut definition,
+              name_reg_map: &mut name_reg_map,
+              reg_allocator: &mut reg_allocator,
+            };
+
+            expression_compiler.compile(expr, None, Some("return".to_string()));
 
             if !last {
               definition.push("  end".to_string());
@@ -258,202 +257,199 @@ struct CompiledExpression {
   nested_registers: Vec<String>,
 }
 
-fn compile_expression(
-  definition: &mut Vec<String>,
-  name_reg_map: &mut HashMap<String, String>,
-  reg_allocator: &mut NameAllocator,
-  expr: &swc_ecma_ast::Expr,
-  mut available_register: Option<String>,
-  target_register: Option<String>,
-) -> CompiledExpression {
-  use swc_ecma_ast::Expr::*;
+struct ExpressionCompiler<'a> {
+  definition: &'a mut Vec<String>,
+  name_reg_map: &'a mut HashMap<String, String>,
+  reg_allocator: &'a mut NameAllocator,
+}
 
-  available_register = available_register.or(target_register.clone());
+impl<'a> ExpressionCompiler<'a> {
+  fn compile(
+    &mut self,
+    expr: &swc_ecma_ast::Expr,
+    mut available_register: Option<String>,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    use swc_ecma_ast::Expr::*;
 
-  let mut nested_registers = Vec::<String>::new();
-
-  match expr {
-    This(_) => std::panic!("Not implemented: This expression"),
-    Array(_) => std::panic!("Not implemented: Array expression"),
-    Object(_) => std::panic!("Not implemented: Object expression"),
-    Fn(_) => std::panic!("Not implemented: Fn expression"),
-    Unary(un_exp) => {
-      let arg = compile_expression(
-        definition,
-        name_reg_map,
-        reg_allocator,
-        &un_exp.arg,
-        available_register.clone(),
-        None,
-      );
-
-      let mut instr = "  ".to_string();
-      instr += get_unary_op_str(un_exp.op);
-      instr += " ";
-      instr += &arg.value_assembly;
-
-      for used_reg in arg.nested_registers {
-        reg_allocator.release(&used_reg);
-      }
-
-      let target: String = match &target_register {
-        None => match available_register {
-          None => {
-            let res = reg_allocator.allocate_numbered(&"_tmp".to_string());
-            nested_registers.push(res.clone());
-            res
+    available_register = available_register.or(target_register.clone());
+  
+    let mut nested_registers = Vec::<String>::new();
+  
+    match expr {
+      This(_) => std::panic!("Not implemented: This expression"),
+      Array(_) => std::panic!("Not implemented: Array expression"),
+      Object(_) => std::panic!("Not implemented: Object expression"),
+      Fn(_) => std::panic!("Not implemented: Fn expression"),
+      Unary(un_exp) => {
+        let arg = self.compile(
+          &un_exp.arg,
+          available_register.clone(),
+          None,
+        );
+  
+        let mut instr = "  ".to_string();
+        instr += get_unary_op_str(un_exp.op);
+        instr += " ";
+        instr += &arg.value_assembly;
+  
+        for used_reg in arg.nested_registers {
+          self.reg_allocator.release(&used_reg);
+        }
+  
+        let target: String = match &target_register {
+          None => match available_register {
+            None => {
+              let res = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+              nested_registers.push(res.clone());
+              res
+            },
+            Some(a) => {
+              let res = a.clone();
+              available_register = None;
+              res
+            },
           },
-          Some(a) => {
-            let res = a.clone();
-            available_register = None;
-            res
-          },
-        },
-        Some(t) => t.clone(),
-      };
-
-      instr += " %";
-      instr += &target;
-
-      definition.push(instr);
-
-      return CompiledExpression {
-        value_assembly: std::format!("%{}", target),
-
-        // Note: Possibly misleading here - we'll return true here even if we
-        // weren't given an available register (FIXME?)
-        used_available_register: available_register.is_none(),
-
-        nested_registers: nested_registers,
-      };
-    },
-    Update(_) => std::panic!("Not implemented: Update expression"),
-    Bin(bin) => {
-      // If the available register is used in subexpressions it'll still be
-      // available afterwards. We do need to make sure the same register isn't
-      // used for both subexpressions though.
-      let mut sub_available_register = available_register.clone();
-
-      let left = compile_expression(
-        definition,
-        name_reg_map,
-        reg_allocator,
-        &bin.left,
-        sub_available_register.clone(),
-        None
-      );
-
-      if left.used_available_register {
-        sub_available_register = None;
-      }
-
-      let right = compile_expression(
-        definition,
-        name_reg_map,
-        reg_allocator,
-        &bin.right,
-        sub_available_register.clone(),
-        None,
-      );
-
-      let mut instr = "  ".to_string();
-      instr += get_binary_op_str(bin.op);
-      instr += " ";
-      instr += &left.value_assembly;
-      instr += " ";
-      instr += &right.value_assembly;
-
-      for used_reg in left.nested_registers {
-        reg_allocator.release(&used_reg);
-      }
-
-      for used_reg in right.nested_registers {
-        reg_allocator.release(&used_reg);
-      }
-
-      let target: String = match &target_register {
-        None => match available_register {
-          None => {
-            let res = reg_allocator.allocate_numbered(&"_tmp".to_string());
-            nested_registers.push(res.clone());
-            res
-          },
-          Some(a) => {
-            let res = a.clone();
-            available_register = None;
-            res
-          },
-        },
-        Some(t) => t.clone(),
-      };
-
-      instr += " %";
-      instr += &target;
-
-      definition.push(instr);
-
-      return CompiledExpression {
-        value_assembly: std::format!("%{}", target),
-
-        // Note: Possibly misleading here - we'll return true here even if we
-        // weren't given an available register (FIXME?)
-        used_available_register: available_register.is_none(),
-
-        nested_registers: nested_registers,
-      };
-    },
-    Assign(_) => std::panic!("Not implemented: Assign expression"),
-    Member(_) => std::panic!("Not implemented: Member expression"),
-    SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
-    Cond(_) => std::panic!("Not implemented: Cond expression"),
-    Call(_) => std::panic!("Not implemented: Call expression"),
-    New(_) => std::panic!("Not implemented: New expression"),
-    Seq(_) => std::panic!("Not implemented: Seq expression"),
-    Ident(_) => std::panic!("Not implemented: Ident expression"),
-    Lit(lit) => match target_register {
-      None => {
-        return CompiledExpression {
-          value_assembly: compile_literal(lit),
-          used_available_register: false,
-          nested_registers: nested_registers,
+          Some(t) => t.clone(),
         };
-      },
-      Some(t) => {
-        let mut instr = "  mov ".to_string();
-        instr += &compile_literal(lit);
+  
         instr += " %";
-        instr += &t;
-        definition.push(instr);
-
+        instr += &target;
+  
+        self.definition.push(instr);
+  
         return CompiledExpression {
-          value_assembly: std::format!("%{}", t),
-          used_available_register: false,
+          value_assembly: std::format!("%{}", target),
+  
+          // Note: Possibly misleading here - we'll return true here even if we
+          // weren't given an available register (FIXME?)
+          used_available_register: available_register.is_none(),
+  
           nested_registers: nested_registers,
         };
       },
-    },
-    Tpl(_) => std::panic!("Not implemented: Tpl expression"),
-    TaggedTpl(_) => std::panic!("Not implemented: TaggedTpl expression"),
-    Arrow(_) => std::panic!("Not implemented: Arrow expression"),
-    Class(_) => std::panic!("Not implemented: Class expression"),
-    Yield(_) => std::panic!("Not implemented: Yield expression"),
-    MetaProp(_) => std::panic!("Not implemented: MetaProp expression"),
-    Await(_) => std::panic!("Not implemented: Await expression"),
-    Paren(_) => std::panic!("Not implemented: Paren expression"),
-    JSXMember(_) => std::panic!("Not implemented: JSXMember expression"),
-    JSXNamespacedName(_) => std::panic!("Not implemented: JSXNamespacedName expression"),
-    JSXEmpty(_) => std::panic!("Not implemented: JSXEmpty expression"),
-    JSXElement(_) => std::panic!("Not implemented: JSXElement expression"),
-    JSXFragment(_) => std::panic!("Not implemented: JSXFragment expression"),
-    TsTypeAssertion(_) => std::panic!("Not implemented: TsTypeAssertion expression"),
-    TsConstAssertion(_) => std::panic!("Not implemented: TsConstAssertion expression"),
-    TsNonNull(_) => std::panic!("Not implemented: TsNonNull expression"),
-    TsAs(_) => std::panic!("Not implemented: TsAs expression"),
-    TsInstantiation(_) => std::panic!("Not implemented: TsInstantiation expression"),
-    PrivateName(_) => std::panic!("Not implemented: PrivateName expression"),
-    OptChain(_) => std::panic!("Not implemented: OptChain expression"),
-    Invalid(_) => std::panic!("Not implemented: Invalid expression"),
-  };
+      Update(_) => std::panic!("Not implemented: Update expression"),
+      Bin(bin) => {
+        // If the available register is used in subexpressions it'll still be
+        // available afterwards. We do need to make sure the same register isn't
+        // used for both subexpressions though.
+        let mut sub_available_register = available_register.clone();
+
+        let left = self.compile(
+          &bin.left,
+          sub_available_register.clone(),
+          None
+        );
+
+        if left.used_available_register {
+          sub_available_register = None;
+        }
+
+        let right = self.compile(
+          &bin.right,
+          sub_available_register.clone(),
+          None,
+        );
+
+        let mut instr = "  ".to_string();
+        instr += get_binary_op_str(bin.op);
+        instr += " ";
+        instr += &left.value_assembly;
+        instr += " ";
+        instr += &right.value_assembly;
+
+        for used_reg in left.nested_registers {
+          self.reg_allocator.release(&used_reg);
+        }
+
+        for used_reg in right.nested_registers {
+          self.reg_allocator.release(&used_reg);
+        }
+
+        let target: String = match &target_register {
+          None => match available_register {
+            None => {
+              let res = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+              nested_registers.push(res.clone());
+              res
+            },
+            Some(a) => {
+              let res = a.clone();
+              available_register = None;
+              res
+            },
+          },
+          Some(t) => t.clone(),
+        };
+
+        instr += " %";
+        instr += &target;
+
+        self.definition.push(instr);
+
+        return CompiledExpression {
+          value_assembly: std::format!("%{}", target),
+
+          // Note: Possibly misleading here - we'll return true here even if we
+          // weren't given an available register (FIXME?)
+          used_available_register: available_register.is_none(),
+
+          nested_registers: nested_registers,
+        };
+      },
+      Assign(_) => std::panic!("Not implemented: Assign expression"),
+      Member(_) => std::panic!("Not implemented: Member expression"),
+      SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
+      Cond(_) => std::panic!("Not implemented: Cond expression"),
+      Call(_) => std::panic!("Not implemented: Call expression"),
+      New(_) => std::panic!("Not implemented: New expression"),
+      Seq(_) => std::panic!("Not implemented: Seq expression"),
+      Ident(_) => std::panic!("Not implemented: Ident expression"),
+      Lit(lit) => match target_register {
+        None => {
+          return CompiledExpression {
+            value_assembly: compile_literal(lit),
+            used_available_register: false,
+            nested_registers: nested_registers,
+          };
+        },
+        Some(t) => {
+          let mut instr = "  mov ".to_string();
+          instr += &compile_literal(lit);
+          instr += " %";
+          instr += &t;
+          self.definition.push(instr);
+  
+          return CompiledExpression {
+            value_assembly: std::format!("%{}", t),
+            used_available_register: false,
+            nested_registers: nested_registers,
+          };
+        },
+      },
+      Tpl(_) => std::panic!("Not implemented: Tpl expression"),
+      TaggedTpl(_) => std::panic!("Not implemented: TaggedTpl expression"),
+      Arrow(_) => std::panic!("Not implemented: Arrow expression"),
+      Class(_) => std::panic!("Not implemented: Class expression"),
+      Yield(_) => std::panic!("Not implemented: Yield expression"),
+      MetaProp(_) => std::panic!("Not implemented: MetaProp expression"),
+      Await(_) => std::panic!("Not implemented: Await expression"),
+      Paren(_) => std::panic!("Not implemented: Paren expression"),
+      JSXMember(_) => std::panic!("Not implemented: JSXMember expression"),
+      JSXNamespacedName(_) => std::panic!("Not implemented: JSXNamespacedName expression"),
+      JSXEmpty(_) => std::panic!("Not implemented: JSXEmpty expression"),
+      JSXElement(_) => std::panic!("Not implemented: JSXElement expression"),
+      JSXFragment(_) => std::panic!("Not implemented: JSXFragment expression"),
+      TsTypeAssertion(_) => std::panic!("Not implemented: TsTypeAssertion expression"),
+      TsConstAssertion(_) => std::panic!("Not implemented: TsConstAssertion expression"),
+      TsNonNull(_) => std::panic!("Not implemented: TsNonNull expression"),
+      TsAs(_) => std::panic!("Not implemented: TsAs expression"),
+      TsInstantiation(_) => std::panic!("Not implemented: TsInstantiation expression"),
+      PrivateName(_) => std::panic!("Not implemented: PrivateName expression"),
+      OptChain(_) => std::panic!("Not implemented: OptChain expression"),
+      Invalid(_) => std::panic!("Not implemented: Invalid expression"),
+    };
+  }
 }
 
 fn compile_literal(lit: &swc_ecma_ast::Lit) -> String {
