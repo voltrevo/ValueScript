@@ -188,6 +188,11 @@ impl Compiler {
       use swc_ecma_ast::Stmt::*;
 
       match statement {
+        Block(_) => std::panic!("Not implemented: Block statement"),
+        Empty(_) => std::panic!("Not implemented: Empty statement"),
+        Debugger(_) => std::panic!("Not implemented: Debugger statement"),
+        With(_) => std::panic!("Not supported: With statement"),
+
         Return(ret_stmt) => match &ret_stmt.arg {
           None => {
             definition.push("  end".to_string());
@@ -206,7 +211,21 @@ impl Compiler {
             }
           },
         },
-        _ => std::panic!("Not implemented"),
+
+        Labeled(_) => std::panic!("Not implemented: Labeled statement"),
+        Break(_) => std::panic!("Not implemented: Break statement"),
+        Continue(_) => std::panic!("Not implemented: Continue statement"),
+        If(_) => std::panic!("Not implemented: If statement"),
+        Switch(_) => std::panic!("Not implemented: Switch statement"),
+        Throw(_) => std::panic!("Not implemented: Throw statement"),
+        Try(_) => std::panic!("Not implemented: Try statement"),
+        While(_) => std::panic!("Not implemented: While statement"),
+        DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
+        For(_) => std::panic!("Not implemented: For statement"),
+        ForIn(_) => std::panic!("Not implemented: ForIn statement"),
+        ForOf(_) => std::panic!("Not implemented: ForOf statement"),
+        Decl(_) => std::panic!("Not implemented: Decl statement"),
+        Expr(_) => std::panic!("Not implemented: Expr statement"),
       }
     }
 
