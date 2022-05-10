@@ -44,6 +44,8 @@ pub enum Instruction {
   SubCall = 0x26,
   Jmp = 0x27,
   JmpIf = 0x28,
+  UnaryPlus = 0x29,
+  UnaryMinus = 0x2a,
 }
 
 impl Instruction {
@@ -92,6 +94,8 @@ impl Instruction {
       0x26 => SubCall,
       0x27 => Jmp,
       0x28 => JmpIf,
+      0x29 => UnaryPlus,
+      0x2a => UnaryMinus,
 
       _ => std::panic!("Unrecognized instruction: {}", byte),
     };

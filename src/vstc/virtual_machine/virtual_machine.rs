@@ -259,6 +259,9 @@ impl VirtualMachine {
           frame.decoder.pos = dst;
         }
       }
+
+      UnaryPlus => frame.apply_unary_op(operations::op_unary_plus),
+      UnaryMinus => frame.apply_unary_op(operations::op_unary_minus),
     };
   }
 

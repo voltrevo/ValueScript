@@ -15,8 +15,16 @@ pub fn op_plus(left: Val, right: Val) -> Val {
   return Val::Number(left_prim.to_number() + right_prim.to_number());
 }
 
+pub fn op_unary_plus(input: Val) -> Val {
+  return Val::Number(input.to_number());
+}
+
 pub fn op_minus(left: Val, right: Val) -> Val {
   return Val::Number(left.to_number() - right.to_number());
+}
+
+pub fn op_unary_minus(input: Val) -> Val {
+  return Val::Number(-input.to_number());
 }
 
 pub fn op_mul(left: Val, right: Val) -> Val {

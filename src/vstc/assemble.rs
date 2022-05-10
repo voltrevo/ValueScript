@@ -242,6 +242,8 @@ impl<'a> Assembler for AssemblerData<'a> {
       ("subcall", Instruction::SubCall),
       ("jmp", Instruction::Jmp),
       ("jmpif", Instruction::JmpIf),
+      ("unary+", Instruction::UnaryPlus),
+      ("unary-", Instruction::UnaryMinus),
     ]);
 
     for (word, instruction) in instruction_word_map {
@@ -811,6 +813,8 @@ enum Instruction {
   SubCall = 0x26,
   Jmp = 0x27,
   JmpIf = 0x28,
+  UnaryPlus = 0x29,
+  UnaryMinus = 0x2a,
 }
 
 enum InstructionArg {
@@ -865,6 +869,8 @@ fn get_instruction_layout(instruction: Instruction) -> Vec<InstructionArg> {
     SubCall => Vec::from([Value, Value, Value, Register]),
     Jmp => Vec::from([Label]),
     JmpIf => Vec::from([Value, Label]),
+    UnaryPlus => Vec::from([Value, Register]),
+    UnaryMinus => Vec::from([Value, Register]),
   };
 }
 
