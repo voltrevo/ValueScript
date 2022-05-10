@@ -302,7 +302,9 @@ impl<'a> ExpressionCompiler<'a> {
       Yield(_) => std::panic!("Not implemented: Yield expression"),
       MetaProp(_) => std::panic!("Not implemented: MetaProp expression"),
       Await(_) => std::panic!("Not implemented: Await expression"),
-      Paren(_) => std::panic!("Not implemented: Paren expression"),
+      Paren(p) => {
+        return self.compile(&*p.expr, available_register, target_register);
+      },
       JSXMember(_) => std::panic!("Not implemented: JSXMember expression"),
       JSXNamespacedName(_) => std::panic!("Not implemented: JSXNamespacedName expression"),
       JSXEmpty(_) => std::panic!("Not implemented: JSXEmpty expression"),
