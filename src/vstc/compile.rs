@@ -189,7 +189,7 @@ impl Compiler {
 
       match statement {
         Block(_) => std::panic!("Not implemented: Block statement"),
-        Empty(_) => std::panic!("Not implemented: Empty statement"),
+        Empty(_) => {},
         Debugger(_) => std::panic!("Not implemented: Debugger statement"),
         With(_) => std::panic!("Not supported: With statement"),
 
