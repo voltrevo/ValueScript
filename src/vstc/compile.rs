@@ -224,7 +224,9 @@ impl Compiler {
         For(_) => std::panic!("Not implemented: For statement"),
         ForIn(_) => std::panic!("Not implemented: ForIn statement"),
         ForOf(_) => std::panic!("Not implemented: ForOf statement"),
-        Decl(_) => std::panic!("Not implemented: Decl statement"),
+        Decl(decl) => {
+          self.compile_declaration(decl, &mut definition);
+        },
         Expr(_) => std::panic!("Not implemented: Expr statement"),
       }
     }
@@ -232,6 +234,24 @@ impl Compiler {
     definition.push("}".to_string());
 
     self.definitions.push(definition);
+  }
+
+  fn compile_declaration(
+    &mut self,
+    decl: &swc_ecma_ast::Decl,
+    definition: &mut Vec<String>,
+  ) {
+    use swc_ecma_ast::Decl::*;
+
+    match decl {
+      Class(_) => std::panic!("Not implemented: Class declaration"),
+      Fn(_) => std::panic!("Not implemented: Fn declaration"),
+      Var(_) => std::panic!("Not implemented: Var declaration"),
+      TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
+      TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
+      TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
+      TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
+    };
   }
 }
 
