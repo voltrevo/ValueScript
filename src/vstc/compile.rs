@@ -273,7 +273,9 @@ impl<'a> ExpressionCompiler<'a> {
     use swc_ecma_ast::Expr::*;
 
     match expr {
-      This(_) => std::panic!("Not implemented: This expression"),
+      This(_) => {
+        return self.inline("%this".to_string(), target_register);
+      },
       Array(_) => std::panic!("Not implemented: Array expression"),
       Object(_) => std::panic!("Not implemented: Object expression"),
       Fn(_) => std::panic!("Not implemented: Fn expression"),
@@ -461,15 +463,23 @@ impl<'a> ExpressionCompiler<'a> {
     lit: &swc_ecma_ast::Lit,
     target_register: Option<String>,
   ) -> CompiledExpression {
+    return self.inline(compile_literal(lit), target_register);
+  }
+
+  fn inline(
+    &mut self,
+    value_assembly: String,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
     return match target_register {
       None => CompiledExpression {
-        value_assembly: compile_literal(lit),
+        value_assembly: value_assembly,
         used_available_register: false,
         nested_registers: Vec::new(),
       },
       Some(t) => {
         let mut instr = "  mov ".to_string();
-        instr += &compile_literal(lit);
+        instr += &value_assembly;
         instr += " %";
         instr += &t;
         self.definition.push(instr);
