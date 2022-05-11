@@ -291,8 +291,9 @@ impl Compiler {
     &mut self,
     fn_name: String,
     fn_: &swc_ecma_ast::Function,
-    scope: &Scope,
+    parent_scope: &Scope,
   ) {
+    let scope = parent_scope.nest();
     let mut definition: Vec<String> = Vec::new();
 
     let mut name_reg_map = HashMap::<String, String>::new();
@@ -330,10 +331,61 @@ impl Compiler {
 
     definition.push(heading);
 
-    let statements = match &fn_.body {
-      Some(body) => &body.stmts,
-      None => std::panic!(""),
-    };
+    let statements = &fn_.body.as_ref()
+      .expect("Not implemented: function without body")
+      .stmts;
+    
+    for statement in statements {
+      use swc_ecma_ast::Stmt::*;
+
+      match statement {
+        Block(_) => std::panic!("Not implemented: Block statement"),
+        Empty(_) => {},
+        Debugger(_) => std::panic!("Not implemented: Debugger statement"),
+        With(_) => std::panic!("Not supported: With statement"),
+        Return(_) => {},
+        Labeled(_) => std::panic!("Not implemented: Labeled statement"),
+        Break(_) => std::panic!("Not implemented: Break statement"),
+        Continue(_) => std::panic!("Not implemented: Continue statement"),
+        If(_) => std::panic!("Not implemented: If statement"),
+        Switch(_) => std::panic!("Not implemented: Switch statement"),
+        Throw(_) => std::panic!("Not implemented: Throw statement"),
+        Try(_) => std::panic!("Not implemented: Try statement"),
+        While(_) => std::panic!("Not implemented: While statement"),
+        DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
+        For(_) => std::panic!("Not implemented: For statement"),
+        ForIn(_) => std::panic!("Not implemented: ForIn statement"),
+        ForOf(_) => std::panic!("Not implemented: ForOf statement"),
+        Decl(decl) => {
+          use swc_ecma_ast::Decl::*;
+
+          match decl {
+            Class(_) => std::panic!("Not implemented: Class declaration"),
+            Fn(_) => std::panic!("Not implemented: Fn declaration"),
+            Var(var_decl) => {
+              for decl in &var_decl.decls {
+                match &decl.name {
+                  swc_ecma_ast::Pat::Ident(ident) => {
+                    let name = ident.id.sym.to_string();
+
+                    scope.set(
+                      name.clone(),
+                      MappedName::Register(reg_allocator.allocate(&name)),
+                    );
+                  },
+                  _ => std::panic!("Not implemented: destructuring"),
+                }
+              }
+            },
+            TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
+            TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
+            TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
+            TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
+          }
+        },
+        Expr(_) => std::panic!("Not implemented: Expr statement"),
+      };
+    }
 
     for i in 0..statements.len() {
       let statement = &statements[i];
@@ -354,7 +406,7 @@ impl Compiler {
           Some(expr) => {
             let mut expression_compiler = ExpressionCompiler {
               definition: &mut definition,
-              scope: scope,
+              scope: &scope,
               reg_allocator: &mut reg_allocator,
             };
 
@@ -379,7 +431,7 @@ impl Compiler {
         ForIn(_) => std::panic!("Not implemented: ForIn statement"),
         ForOf(_) => std::panic!("Not implemented: ForOf statement"),
         Decl(decl) => {
-          self.compile_declaration(decl, &mut definition);
+          self.compile_declaration(decl, &scope, &mut definition, &mut reg_allocator);
         },
         Expr(_) => std::panic!("Not implemented: Expr statement"),
       }
@@ -393,19 +445,54 @@ impl Compiler {
   fn compile_declaration(
     &mut self,
     decl: &swc_ecma_ast::Decl,
+    scope: &Scope,
     definition: &mut Vec<String>,
+    reg_allocator: &mut NameAllocator,
   ) {
     use swc_ecma_ast::Decl::*;
 
     match decl {
       Class(_) => std::panic!("Not implemented: Class declaration"),
       Fn(_) => std::panic!("Not implemented: Fn declaration"),
-      Var(_) => std::panic!("Not implemented: Var declaration"),
+      Var(var_decl) => self.compile_var_declaration(var_decl, scope, definition, reg_allocator),
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
       TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
       TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
       TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
     };
+  }
+
+  fn compile_var_declaration(
+    &mut self,
+    var_decl: &swc_ecma_ast::VarDecl,
+    scope: &Scope,
+    definition: &mut Vec<String>,
+    reg_allocator: &mut NameAllocator,
+  ) {
+    for decl in &var_decl.decls {
+      match &decl.init {
+        Some(expr) => {
+          let mut expr_compiler = ExpressionCompiler {
+            definition: definition,
+            scope: scope,
+            reg_allocator: reg_allocator,
+          };
+
+          let name = match &decl.name {
+            swc_ecma_ast::Pat::Ident(ident) => ident.id.sym.to_string(),
+            _ => std::panic!("Not implemented: destructuring"),
+          };
+
+          let target_register = match scope.get(&name) {
+            Some(MappedName::Register(reg_name)) => reg_name,
+            _ => std::panic!("var decl should always get mapped to a register during scan"),
+          };
+
+          expr_compiler.compile(expr, None, Some(target_register));
+        },
+        None => {},
+      }
+    }
   }
 }
 
