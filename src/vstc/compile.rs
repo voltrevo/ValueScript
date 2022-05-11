@@ -160,8 +160,8 @@ impl Compiler {
               Decl::Class(_) => std::panic!("Not implemented: module level Class declaration"),
               Decl::Fn(fn_) => {
                 scope.set(
-                  fn_.ident.to_string(),
-                  MappedName::Definition(fn_.ident.to_string()),
+                  fn_.ident.sym.to_string(),
+                  MappedName::Definition(fn_.ident.sym.to_string()),
                 );
               },
               Decl::Var(_) => std::panic!("Not implemented: module level Var declaration"),
@@ -176,46 +176,124 @@ impl Compiler {
       };
     }
 
+    // First compile default
     for module_item in &module.body {
-      self.compile_module_item(module_item);
+      match module_item {
+        ModuleItem::ModuleDecl(
+          ModuleDecl::ExportDefaultDecl(edd)
+        ) => self.compile_export_default_decl(edd, &scope),
+        _ => {},
+      }
+    }
+
+    // Then compile others
+    for module_item in &module.body {
+      match module_item {
+        ModuleItem::ModuleDecl(
+          ModuleDecl::ExportDefaultDecl(_)
+        ) => {},
+        _ => self.compile_module_item(module_item, &scope),
+      }
     }
   }
 
-  fn compile_module_item(&mut self, module_item: &swc_ecma_ast::ModuleItem) {
+  fn compile_module_item(
+    &mut self,
+    module_item: &swc_ecma_ast::ModuleItem,
+    scope: &Scope,
+  ) {
     use swc_ecma_ast::ModuleItem::*;
 
     match module_item {
-      ModuleDecl(module_decl) => self.compile_module_decl(module_decl),
-      Stmt(_) => std::panic!("Not supported: module statement"),
+      ModuleDecl(module_decl) => self.compile_module_decl(module_decl, scope),
+      Stmt(stmt) => self.compile_module_statement(stmt, scope),
     }
   }
 
-  fn compile_module_decl(&mut self, module_decl: &swc_ecma_ast::ModuleDecl) {
+  fn compile_module_decl(
+    &mut self,
+    module_decl: &swc_ecma_ast::ModuleDecl,
+    scope: &Scope,
+  ) {
     use swc_ecma_ast::ModuleDecl::*;
 
     match module_decl {
-      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
+      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
       _ => std::panic!("Not implemented: non-default module declaration"),
     }
   }
 
-  fn compile_export_default_decl(&mut self, edd: &swc_ecma_ast::ExportDefaultDecl) {
+  fn compile_module_statement(
+    &mut self,
+    stmt: &swc_ecma_ast::Stmt,
+    scope: &Scope,
+  ) {
+    use swc_ecma_ast::Stmt::*;
+
+    match stmt {
+      Block(_) => std::panic!("Not implemented: module level Block statement"),
+      Empty(_) => std::panic!("Not implemented: module level Empty statement"),
+      Debugger(_) => std::panic!("Not implemented: module level Debugger statement"),
+      With(_) => std::panic!("Not implemented: module level With statement"),
+      Return(_) => std::panic!("Not implemented: module level Return statement"),
+      Labeled(_) => std::panic!("Not implemented: module level Labeled statement"),
+      Break(_) => std::panic!("Not implemented: module level Break statement"),
+      Continue(_) => std::panic!("Not implemented: module level Continue statement"),
+      If(_) => std::panic!("Not implemented: module level If statement"),
+      Switch(_) => std::panic!("Not implemented: module level Switch statement"),
+      Throw(_) => std::panic!("Not implemented: module level Throw statement"),
+      Try(_) => std::panic!("Not implemented: module level Try statement"),
+      While(_) => std::panic!("Not implemented: module level While statement"),
+      DoWhile(_) => std::panic!("Not implemented: module level DoWhile statement"),
+      For(_) => std::panic!("Not implemented: module level For statement"),
+      ForIn(_) => std::panic!("Not implemented: module level ForIn statement"),
+      ForOf(_) => std::panic!("Not implemented: module level ForOf statement"),
+      Decl(decl) => self.compile_module_level_decl(decl, scope),
+      Expr(_) => std::panic!("Not implemented: module level Expr statement"),
+    };
+  }
+
+  fn compile_module_level_decl(&mut self, decl: &swc_ecma_ast::Decl, scope: &Scope) {
+    use swc_ecma_ast::Decl::*;
+
+    match decl {
+      Class(_) => std::panic!("Not implemented: Class declaration"),
+      Fn(fn_) => self.compile_fn(fn_.ident.sym.to_string(), &fn_.function, scope),
+      Var(_) => std::panic!("Not implemented: Var declaration"),
+      TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
+      TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
+      TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
+      TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
+    };
+  }
+
+  fn compile_export_default_decl(
+    &mut self,
+    edd: &swc_ecma_ast::ExportDefaultDecl,
+    scope: &Scope,
+  ) {
     use swc_ecma_ast::DefaultDecl::*;
 
     match &edd.decl {
-      Fn(fn_) => self.compile_main_fn(fn_),
+      Fn(fn_) => self.compile_fn(
+        match &fn_.ident {
+          Some(ident) => ident.sym.to_string(),
+          None => "main".to_string(),
+        },
+        &fn_.function,
+        scope,
+      ),
       _ => std::panic!("Not implemented: Non-function default export"),
     }
   }
 
-  fn compile_main_fn(&mut self, main_fn: &swc_ecma_ast::FnExpr) {
-    let scope = init_scope();
+  fn compile_fn(
+    &mut self,
+    fn_name: String,
+    fn_: &swc_ecma_ast::Function,
+    scope: &Scope,
+  ) {
     let mut definition: Vec<String> = Vec::new();
-
-    let fn_defn_name = self.definition_allocator.allocate(&match &main_fn.ident {
-      Some(ident) => ident.sym.to_string(),
-      None => "main".to_string(),
-    });
 
     let mut name_reg_map = HashMap::<String, String>::new();
     let mut reg_allocator = NameAllocator::default();
@@ -223,7 +301,7 @@ impl Compiler {
     reg_allocator.allocate(&"this".to_string());
     let mut param_registers = Vec::<String>::new();
 
-    for p in &main_fn.function.params {
+    for p in &fn_.params {
       match &p.pat {
         swc_ecma_ast::Pat::Ident(binding_ident) => {
           let param_name = binding_ident.id.sym.to_string();
@@ -236,7 +314,7 @@ impl Compiler {
     }
 
     let mut heading = "@".to_string();
-    heading += &fn_defn_name;
+    heading += &fn_name;
     heading += " = function(";
 
     for i in 0..param_registers.len() {
@@ -252,7 +330,7 @@ impl Compiler {
 
     definition.push(heading);
 
-    let statements = match &main_fn.function.body {
+    let statements = match &fn_.body {
       Some(body) => &body.stmts,
       None => std::panic!(""),
     };
@@ -276,7 +354,7 @@ impl Compiler {
           Some(expr) => {
             let mut expression_compiler = ExpressionCompiler {
               definition: &mut definition,
-              scope: &scope,
+              scope: scope,
               reg_allocator: &mut reg_allocator,
             };
 
@@ -457,7 +535,9 @@ impl<'a> ExpressionCompiler<'a> {
       Call(_) => std::panic!("Not implemented: Call expression"),
       New(_) => std::panic!("Not implemented: New expression"),
       Seq(_) => std::panic!("Not implemented: Seq expression"),
-      Ident(_) => std::panic!("Not implemented: Ident expression"),
+      Ident(ident) => {
+        return self.identifier(ident, target_register);
+      },
       Lit(lit) => {
         return self.literal(lit, target_register);
       },
@@ -655,6 +735,23 @@ impl<'a> ExpressionCompiler<'a> {
         }
       },
     };
+  }
+
+  fn identifier(
+    &mut self,
+    ident: &swc_ecma_ast::Ident,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let ident_string = ident.sym.to_string();
+
+    let mapped = self.scope.get(&ident_string).expect("Identifier not found in scope");
+
+    let prefix = match mapped {
+      MappedName::Register(_) => "%",
+      MappedName::Definition(_) => "@",
+    };
+
+    return self.inline(prefix.to_string() + &ident_string, target_register);
   }
 }
 
