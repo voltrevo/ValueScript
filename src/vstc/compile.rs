@@ -101,11 +101,84 @@ impl Compiler {
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
-    if module.body.len() != 1 {
-      std::panic!("Not implemented: modules that aren't just export default");
+    let scope = init_scope();
+
+    use swc_ecma_ast::ModuleItem;
+    use swc_ecma_ast::ModuleDecl;
+    use swc_ecma_ast::Stmt;
+    use swc_ecma_ast::Decl;
+
+    // Populate scope with top-level declarations
+    for module_item in &module.body {
+      match module_item {
+        ModuleItem::ModuleDecl(module_decl) => match module_decl {
+          ModuleDecl::Import(_) => std::panic!("Not implemented: Import module declaration"),
+          ModuleDecl::ExportDecl(_) => std::panic!("Not implemented: ExportDecl module declaration"),
+          ModuleDecl::ExportNamed(_) => std::panic!("Not implemented: ExportNamed module declaration"),
+          ModuleDecl::ExportDefaultDecl(edd) => {
+            match &edd.decl {
+              swc_ecma_ast::DefaultDecl::Fn(fn_) => {
+                match &fn_.ident {
+                  Some(id) => {
+                    scope.set(
+                      id.sym.to_string(),
+                      MappedName::Definition(id.sym.to_string()),
+                    );
+                  },
+                  None => {},
+                };
+              },
+              _ => std::panic!("Not implemented: Non-function default export"),
+            };
+          },
+          ModuleDecl::ExportDefaultExpr(_) => std::panic!("Not implemented: ExportDefaultExpr module declaration"),
+          ModuleDecl::ExportAll(_) => std::panic!("Not implemented: ExportAll module declaration"),
+          ModuleDecl::TsImportEquals(_) => std::panic!("Not implemented: TsImportEquals module declaration"),
+          ModuleDecl::TsExportAssignment(_) => std::panic!("Not implemented: TsExportAssignment module declaration"),
+          ModuleDecl::TsNamespaceExport(_) => std::panic!("Not implemented: TsNamespaceExport module declaration"),
+        },
+        ModuleItem::Stmt(stmt) => match stmt {
+          Stmt::Block(_) => std::panic!("Not implemented: module level Block statement"),
+          Stmt::Empty(_) => std::panic!("Not implemented: module level Empty statement"),
+          Stmt::Debugger(_) => std::panic!("Not implemented: module level Debugger statement"),
+          Stmt::With(_) => std::panic!("Not implemented: module level With statement"),
+          Stmt::Return(_) => std::panic!("Not implemented: module level Return statement"),
+          Stmt::Labeled(_) => std::panic!("Not implemented: module level Labeled statement"),
+          Stmt::Break(_) => std::panic!("Not implemented: module level Break statement"),
+          Stmt::Continue(_) => std::panic!("Not implemented: module level Continue statement"),
+          Stmt::If(_) => std::panic!("Not implemented: module level If statement"),
+          Stmt::Switch(_) => std::panic!("Not implemented: module level Switch statement"),
+          Stmt::Throw(_) => std::panic!("Not implemented: module level Throw statement"),
+          Stmt::Try(_) => std::panic!("Not implemented: module level Try statement"),
+          Stmt::While(_) => std::panic!("Not implemented: module level While statement"),
+          Stmt::DoWhile(_) => std::panic!("Not implemented: module level DoWhile statement"),
+          Stmt::For(_) => std::panic!("Not implemented: module level For statement"),
+          Stmt::ForIn(_) => std::panic!("Not implemented: module level ForIn statement"),
+          Stmt::ForOf(_) => std::panic!("Not implemented: module level ForOf statement"),
+          Stmt::Decl(decl) => {
+            match decl {
+              Decl::Class(_) => std::panic!("Not implemented: module level Class declaration"),
+              Decl::Fn(fn_) => {
+                scope.set(
+                  fn_.ident.to_string(),
+                  MappedName::Definition(fn_.ident.to_string()),
+                );
+              },
+              Decl::Var(_) => std::panic!("Not implemented: module level Var declaration"),
+              Decl::TsInterface(_) => std::panic!("Not implemented: module level TsInterface declaration"),
+              Decl::TsTypeAlias(_) => std::panic!("Not implemented: module level TsTypeAlias declaration"),
+              Decl::TsEnum(_) => std::panic!("Not implemented: module level TsEnum declaration"),
+              Decl::TsModule(_) => std::panic!("Not implemented: module level TsModule declaration"),
+            };
+          },
+          Stmt::Expr(_) => std::panic!("Not implemented: module level Expr statement"),
+        },
+      };
     }
 
-    self.compile_module_item(&module.body[0]);
+    for module_item in &module.body {
+      self.compile_module_item(module_item);
+    }
   }
 
   fn compile_module_item(&mut self, module_item: &swc_ecma_ast::ModuleItem) {
