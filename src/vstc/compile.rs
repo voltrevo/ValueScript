@@ -122,7 +122,9 @@ impl Compiler {
                   Some(id) => {
                     scope.set(
                       id.sym.to_string(),
-                      MappedName::Definition(id.sym.to_string()),
+                      MappedName::Definition(
+                        self.definition_allocator.allocate(&id.sym.to_string()),
+                      ),
                     );
                   },
                   None => {},
@@ -161,7 +163,9 @@ impl Compiler {
               Decl::Fn(fn_) => {
                 scope.set(
                   fn_.ident.sym.to_string(),
-                  MappedName::Definition(fn_.ident.sym.to_string()),
+                  MappedName::Definition(
+                    self.definition_allocator.allocate(&fn_.ident.sym.to_string()),
+                  ),
                 );
               },
               Decl::Var(_) => std::panic!("Not implemented: module level Var declaration"),
