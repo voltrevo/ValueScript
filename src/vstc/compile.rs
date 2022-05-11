@@ -4,6 +4,8 @@ use std::collections::HashSet;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use swc_ecma_ast::{EsVersion};
 use swc_common::{
@@ -134,8 +136,9 @@ impl Compiler {
   }
 
   fn compile_main_fn(&mut self, main_fn: &swc_ecma_ast::FnExpr) {
+    let scope = init_scope();
     let mut definition: Vec<String> = Vec::new();
-    
+
     let fn_defn_name = self.definition_allocator.allocate(&match &main_fn.ident {
       Some(ident) => ident.sym.to_string(),
       None => "main".to_string(),
@@ -200,7 +203,7 @@ impl Compiler {
           Some(expr) => {
             let mut expression_compiler = ExpressionCompiler {
               definition: &mut definition,
-              name_reg_map: &mut name_reg_map,
+              scope: &scope,
               reg_allocator: &mut reg_allocator,
             };
 
@@ -255,6 +258,55 @@ impl Compiler {
   }
 }
 
+#[derive(Clone)]
+enum MappedName {
+  Register(String),
+  Definition(String),
+}
+
+struct ScopeData {
+  name_map: HashMap<String, MappedName>,
+  parent: Option<Rc<RefCell<ScopeData>>>,
+}
+
+type Scope = Rc<RefCell<ScopeData>>;
+
+trait ScopeTrait {
+  fn get(&self, name: &String) -> Option<MappedName>;
+  fn set(&self, name: String, mapped_name: MappedName);
+  fn nest(&self) -> Rc<RefCell<ScopeData>>;
+}
+
+impl ScopeTrait for Scope {
+  fn get(&self, name: &String) -> Option<MappedName> {
+    match self.borrow().name_map.get(name) {
+      Some(mapped_name) => Some(mapped_name.clone()),
+      None => match &self.borrow().parent {
+        Some(parent) => parent.get(name),
+        None => None,
+      },
+    }
+  }
+
+  fn set(&self, name: String, mapped_name: MappedName) {
+    self.borrow_mut().name_map.insert(name, mapped_name);
+  }
+
+  fn nest(&self) -> Rc<RefCell<ScopeData>> {
+    return Rc::new(RefCell::new(ScopeData {
+      name_map: Default::default(),
+      parent: Some(self.clone()),
+    }));
+  }
+}
+
+fn init_scope() -> Scope {
+  return Rc::new(RefCell::new(ScopeData {
+    name_map: Default::default(),
+    parent: None,
+  }));
+}
+
 #[derive(Default)]
 struct NameAllocator {
   used_names: HashSet<String>,
@@ -298,7 +350,7 @@ struct CompiledExpression {
 
 struct ExpressionCompiler<'a> {
   definition: &'a mut Vec<String>,
-  name_reg_map: &'a mut HashMap<String, String>,
+  scope: &'a Scope,
   reg_allocator: &'a mut NameAllocator,
 }
 
