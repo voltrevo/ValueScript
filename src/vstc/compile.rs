@@ -108,6 +108,8 @@ impl Compiler {
     use swc_ecma_ast::Stmt;
     use swc_ecma_ast::Decl;
 
+    let mut default_export_name = None;
+
     // Populate scope with top-level declarations
     for module_item in &module.body {
       match module_item {
@@ -120,14 +122,22 @@ impl Compiler {
               swc_ecma_ast::DefaultDecl::Fn(fn_) => {
                 match &fn_.ident {
                   Some(id) => {
+                    let allocated_name = self.definition_allocator.allocate(
+                      &id.sym.to_string()
+                    );
+
+                    default_export_name = Some(allocated_name.clone());
+
                     scope.set(
                       id.sym.to_string(),
-                      MappedName::Definition(
-                        self.definition_allocator.allocate(&id.sym.to_string()),
-                      ),
+                      MappedName::Definition(allocated_name),
                     );
                   },
-                  None => {},
+                  None => {
+                    default_export_name = Some(
+                      self.definition_allocator.allocate_numbered(&"_anon".to_string())
+                    );
+                  },
                 };
               },
               _ => std::panic!("Not implemented: Non-function default export"),
@@ -185,7 +195,12 @@ impl Compiler {
       match module_item {
         ModuleItem::ModuleDecl(
           ModuleDecl::ExportDefaultDecl(edd)
-        ) => self.compile_export_default_decl(edd, &scope),
+        ) => self.compile_export_default_decl(
+          edd,
+          // FIXME: clone() shouldn't be necessary here (we want to move)
+          default_export_name.clone().expect("Default export name should have been set"),
+          &scope,
+        ),
         _ => {},
       }
     }
@@ -217,12 +232,12 @@ impl Compiler {
   fn compile_module_decl(
     &mut self,
     module_decl: &swc_ecma_ast::ModuleDecl,
-    scope: &Scope,
+    _scope: &Scope,
   ) {
     use swc_ecma_ast::ModuleDecl::*;
 
     match module_decl {
-      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
+      ExportDefaultDecl(_) => std::panic!("Default export should be handled elsewhere"),
       _ => std::panic!("Not implemented: non-default module declaration"),
     }
   }
@@ -274,16 +289,14 @@ impl Compiler {
   fn compile_export_default_decl(
     &mut self,
     edd: &swc_ecma_ast::ExportDefaultDecl,
+    fn_name: String,
     scope: &Scope,
   ) {
     use swc_ecma_ast::DefaultDecl::*;
 
     match &edd.decl {
       Fn(fn_) => self.compile_fn(
-        match &fn_.ident {
-          Some(ident) => ident.sym.to_string(),
-          None => "main".to_string(),
-        },
+        fn_name,
         &fn_.function,
         scope,
       ),
