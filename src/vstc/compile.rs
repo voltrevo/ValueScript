@@ -347,7 +347,11 @@ impl ScopeTrait for Scope {
   }
 
   fn set(&self, name: String, mapped_name: MappedName) {
-    self.borrow_mut().name_map.insert(name, mapped_name);
+    let old_mapping = self.borrow_mut().name_map.insert(name, mapped_name);
+
+    if old_mapping.is_some() {
+      std::panic!("Scope overwrite occurred (not implemented: being permissive about this)");
+    }
   }
 
   fn nest(&self) -> Rc<RefCell<ScopeData>> {
