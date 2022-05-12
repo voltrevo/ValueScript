@@ -414,7 +414,7 @@ impl Compiler {
               reg_allocator: &mut reg_allocator,
             };
 
-            expression_compiler.compile(expr, None, Some("return".to_string()));
+            expression_compiler.compile(expr, Some("return".to_string()));
 
             if !last {
               definition.push("  end".to_string());
@@ -444,7 +444,7 @@ impl Compiler {
             reg_allocator: &mut reg_allocator,
           };
 
-          let compiled = expression_compiler.compile(&*expr.expr, None, None);
+          let compiled = expression_compiler.compile(&*expr.expr, None);
 
           for reg in compiled.nested_registers {
             reg_allocator.release(&reg);
@@ -504,7 +504,7 @@ impl Compiler {
             _ => std::panic!("var decl should always get mapped to a register during scan"),
           };
 
-          expr_compiler.compile(expr, None, Some(target_register));
+          expr_compiler.compile(expr, Some(target_register));
         },
         None => {},
       }
@@ -564,10 +564,18 @@ fn init_scope() -> Scope {
 #[derive(Default)]
 struct NameAllocator {
   used_names: HashSet<String>,
+  released_names: Vec<String>,
 }
 
 impl NameAllocator {
   fn allocate(&mut self, based_on_name: &String) -> String {
+    match self.released_names.pop() {
+      Some(name) => {
+        return name;
+      },
+      None => {},
+    };
+
     if !self.used_names.contains(based_on_name) {
       self.used_names.insert(based_on_name.clone());
       return based_on_name.clone();
@@ -577,6 +585,13 @@ impl NameAllocator {
   }
 
   fn allocate_numbered(&mut self, prefix: &String) -> String {
+    match self.released_names.pop() {
+      Some(name) => {
+        return name;
+      },
+      None => {},
+    };
+
     let mut i = 0_u64;
 
     loop {
@@ -593,12 +608,12 @@ impl NameAllocator {
 
   fn release(&mut self, name: &String) {
     self.used_names.remove(name);
+    self.released_names.push(name.clone());
   }
 }
 
 struct CompiledExpression {
   value_assembly: String,
-  used_available_register: bool,
   nested_registers: Vec<String>,
 }
 
@@ -612,7 +627,6 @@ impl<'a> ExpressionCompiler<'a> {
   fn compile(
     &mut self,
     expr: &swc_ecma_ast::Expr,
-    available_register: Option<String>,
     target_register: Option<String>,
   ) -> CompiledExpression {
     use swc_ecma_ast::Expr::*;
@@ -625,14 +639,14 @@ impl<'a> ExpressionCompiler<'a> {
       Object(_) => std::panic!("Not implemented: Object expression"),
       Fn(_) => std::panic!("Not implemented: Fn expression"),
       Unary(un_exp) => {
-        return self.unary_expression(un_exp, available_register, target_register);
+        return self.unary_expression(un_exp, target_register);
       },
       Update(_) => std::panic!("Not implemented: Update expression"),
       Bin(bin_exp) => {
-        return self.binary_expression(bin_exp, available_register, target_register);
+        return self.binary_expression(bin_exp, target_register);
       },
       Assign(assign_exp) => {
-        return self.assign_expression(assign_exp, available_register, target_register);
+        return self.assign_expression(assign_exp, target_register);
       },
       Member(_) => std::panic!("Not implemented: Member expression"),
       SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
@@ -654,7 +668,7 @@ impl<'a> ExpressionCompiler<'a> {
       MetaProp(_) => std::panic!("Not implemented: MetaProp expression"),
       Await(_) => std::panic!("Not implemented: Await expression"),
       Paren(p) => {
-        return self.compile(&*p.expr, available_register, target_register);
+        return self.compile(&*p.expr, target_register);
       },
       JSXMember(_) => std::panic!("Not implemented: JSXMember expression"),
       JSXNamespacedName(_) => std::panic!("Not implemented: JSXNamespacedName expression"),
@@ -675,16 +689,12 @@ impl<'a> ExpressionCompiler<'a> {
   fn unary_expression(
     &mut self,
     un_exp: &swc_ecma_ast::UnaryExpr,
-    mut available_register: Option<String>,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    available_register = available_register.or(target_register.clone());
-  
     let mut nested_registers = Vec::<String>::new();
 
     let arg = self.compile(
       &un_exp.arg,
-      available_register.clone(),
       None,
     );
 
@@ -698,17 +708,10 @@ impl<'a> ExpressionCompiler<'a> {
     }
 
     let target: String = match &target_register {
-      None => match available_register {
-        None => {
-          let res = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
-          nested_registers.push(res.clone());
-          res
-        },
-        Some(a) => {
-          let res = a.clone();
-          available_register = None;
-          res
-        },
+      None => {
+        let res = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        nested_registers.push(res.clone());
+        res
       },
       Some(t) => t.clone(),
     };
@@ -720,11 +723,6 @@ impl<'a> ExpressionCompiler<'a> {
 
     return CompiledExpression {
       value_assembly: std::format!("%{}", target),
-
-      // Note: Possibly misleading here - we'll return true here even if we
-      // weren't given an available register (FIXME?)
-      used_available_register: available_register.is_none(),
-
       nested_registers: nested_registers,
     };
   }
@@ -732,31 +730,17 @@ impl<'a> ExpressionCompiler<'a> {
   fn binary_expression(
     &mut self,
     bin: &swc_ecma_ast::BinExpr,
-    mut available_register: Option<String>,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    available_register = available_register.or(target_register.clone());
-  
     let mut nested_registers = Vec::<String>::new();
-
-    // If the available register is used in subexpressions it'll still be
-    // available afterwards. We do need to make sure the same register isn't
-    // used for both subexpressions though.
-    let mut sub_available_register = available_register.clone();
 
     let left = self.compile(
       &bin.left,
-      sub_available_register.clone(),
       None
     );
 
-    if left.used_available_register {
-      sub_available_register = None;
-    }
-
     let right = self.compile(
       &bin.right,
-      sub_available_register.clone(),
       None,
     );
 
@@ -776,17 +760,10 @@ impl<'a> ExpressionCompiler<'a> {
     }
 
     let target: String = match &target_register {
-      None => match available_register {
-        None => {
-          let res = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
-          nested_registers.push(res.clone());
-          res
-        },
-        Some(a) => {
-          let res = a.clone();
-          available_register = None;
-          res
-        },
+      None => {
+        let res = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        nested_registers.push(res.clone());
+        res
       },
       Some(t) => t.clone(),
     };
@@ -798,11 +775,6 @@ impl<'a> ExpressionCompiler<'a> {
 
     return CompiledExpression {
       value_assembly: std::format!("%{}", target),
-
-      // Note: Possibly misleading here - we'll return true here even if we
-      // weren't given an available register (FIXME?)
-      used_available_register: available_register.is_none(),
-
       nested_registers: nested_registers,
     };
   }
@@ -810,11 +782,8 @@ impl<'a> ExpressionCompiler<'a> {
   fn assign_expression(
     &mut self,
     assign_exp: &swc_ecma_ast::AssignExpr,
-    mut available_register: Option<String>,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    available_register = available_register.or(target_register.clone());
-
     if assign_exp.op != swc_ecma_ast::AssignOp::Assign {
       std::panic!("Not implemented: compound assignment");
     }
@@ -837,7 +806,6 @@ impl<'a> ExpressionCompiler<'a> {
 
     let rhs = self.compile(
       &*assign_exp.right,
-      available_register.clone(),
       Some(assign_register.clone()),
     );
 
@@ -858,7 +826,6 @@ impl<'a> ExpressionCompiler<'a> {
 
     return CompiledExpression {
       value_assembly: "%".to_string() + &assign_register,
-      used_available_register: false,
       nested_registers: Vec::new(),
     };
   }
@@ -879,7 +846,6 @@ impl<'a> ExpressionCompiler<'a> {
     return match target_register {
       None => CompiledExpression {
         value_assembly: value_assembly,
-        used_available_register: false,
         nested_registers: Vec::new(),
       },
       Some(t) => {
@@ -891,7 +857,6 @@ impl<'a> ExpressionCompiler<'a> {
 
         CompiledExpression {
           value_assembly: std::format!("%{}", t),
-          used_available_register: false,
           nested_registers: Vec::new(),
         }
       },
