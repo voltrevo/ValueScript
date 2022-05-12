@@ -379,6 +379,8 @@ impl NameAllocator {
   fn allocate(&mut self, based_on_name: &String) -> String {
     match self.released_names.pop() {
       Some(name) => {
+        // FIXME: When reallocating a register we need to ensure we don't read
+        // the leftover value
         self.used_names.insert(name.clone());
         return name;
       },
@@ -396,6 +398,8 @@ impl NameAllocator {
   fn allocate_numbered(&mut self, prefix: &String) -> String {
     match self.released_names.pop() {
       Some(name) => {
+        // FIXME: When reallocating a register we need to ensure we don't read
+        // the leftover value
         self.used_names.insert(name.clone());
         return name;
       },
@@ -531,12 +535,12 @@ impl FunctionCompiler {
         self.populate_fn_scope(nested_block, scope);
       },
       Empty(_) => {},
-      Debugger(_) => std::panic!("Not implemented: Debugger statement"),
+      Debugger(_) => {},
       With(_) => std::panic!("Not supported: With statement"),
       Return(_) => {},
       Labeled(_) => std::panic!("Not implemented: Labeled statement"),
-      Break(_) => std::panic!("Not implemented: Break statement"),
-      Continue(_) => std::panic!("Not implemented: Continue statement"),
+      Break(_) => {},
+      Continue(_) => {},
       If(if_) => {
         self.populate_fn_scope_statement(&if_.cons, scope);
 
@@ -545,7 +549,7 @@ impl FunctionCompiler {
         }
       },
       Switch(_) => std::panic!("Not implemented: Switch statement"),
-      Throw(_) => std::panic!("Not implemented: Throw statement"),
+      Throw(_) => {},
       Try(_) => std::panic!("Not implemented: Try statement"),
       While(_) => std::panic!("Not implemented: While statement"),
       DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
@@ -575,8 +579,8 @@ impl FunctionCompiler {
               }
             }
           },
-          TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
-          TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
+          TsInterface(_) => {},
+          TsTypeAlias(_) => {},
           TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
           TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
         }
@@ -596,21 +600,21 @@ impl FunctionCompiler {
       match statement {
         Block(_) => {},
         Empty(_) => {},
-        Debugger(_) => std::panic!("Not implemented: Debugger statement"),
+        Debugger(_) => {},
         With(_) => std::panic!("Not supported: With statement"),
         Return(_) => {},
         Labeled(_) => std::panic!("Not implemented: Labeled statement"),
-        Break(_) => std::panic!("Not implemented: Break statement"),
-        Continue(_) => std::panic!("Not implemented: Continue statement"),
+        Break(_) => {},
+        Continue(_) => {},
         If(_) => {},
-        Switch(_) => std::panic!("Not implemented: Switch statement"),
-        Throw(_) => std::panic!("Not implemented: Throw statement"),
-        Try(_) => std::panic!("Not implemented: Try statement"),
-        While(_) => std::panic!("Not implemented: While statement"),
-        DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
-        For(_) => std::panic!("Not implemented: For statement"),
-        ForIn(_) => std::panic!("Not implemented: ForIn statement"),
-        ForOf(_) => std::panic!("Not implemented: ForOf statement"),
+        Switch(_) => {},
+        Throw(_) => {},
+        Try(_) => {},
+        While(_) => {},
+        DoWhile(_) => {},
+        For(_) => {},
+        ForIn(_) => {},
+        ForOf(_) => {},
         Decl(decl) => {
           use swc_ecma_ast::Decl::*;
   
@@ -634,10 +638,10 @@ impl FunctionCompiler {
                 }
               }
             },
-            TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
-            TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
+            TsInterface(_) => {},
+            TsTypeAlias(_) => {},
             TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
-            TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
+            TsModule(_) => {},
           }
         },
         Expr(_) => {},
