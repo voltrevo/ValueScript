@@ -326,6 +326,11 @@ impl Compiler {
       heading += "%";
       heading += &param_registers[i];
 
+      scope.set(
+        param_registers[i].clone(),
+        MappedName::Register(reg_allocator.allocate(&param_registers[i])),
+      );
+
       if i != param_registers.len() - 1 {
         heading += ", ";
       }

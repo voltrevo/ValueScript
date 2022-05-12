@@ -50,20 +50,26 @@ impl StackFrame {
 }
 
 impl VirtualMachine {
-  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>) -> Val {
+  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>, params: &[String]) -> Val {
     let mut bd = BytecodeDecoder {
       data: bytecode.clone(),
       pos: 0,
     };
 
     let main_fn = bd.decode_val(&Vec::new());
-    let frame = main_fn.make_frame();
+    let mut frame = main_fn.make_frame().expect("bytecode does start with function");
 
-    if !frame.is_some() {
-      std::panic!("bytecode does start with function")
+    let mut reg_i = frame.param_start;
+    let mut param_i = 0;
+
+    while reg_i < frame.param_end && param_i < params.len() {
+      frame.registers[reg_i] = Val::String(Rc::new(params[param_i].clone()));
+
+      reg_i += 1;
+      param_i += 1;
     }
 
-    self.stack.push(frame.unwrap());
+    self.stack.push(frame);
 
     while self.stack.len() > 1 {
       self.step();

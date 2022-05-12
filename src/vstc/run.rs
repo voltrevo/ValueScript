@@ -15,31 +15,29 @@ pub fn command(args: &Vec<String>) {
     exit(1);
   }
 
-  if args[2] == "-h" || args[2] == "--help" {
+  let mut argpos = 2;
+
+  if args[argpos] == "-h" || args[argpos] == "--help" {
     show_help();
     return;
   }
 
-  let format = match args.len() {
-    3 => format_from_path(&args[2]),
-    4 => format_from_option(&args[2]),
-    _ => {
-      println!("ERROR: Unrecognized command\n");
-      show_help();
-      exit(1);
-    }
+  let format = match args[argpos].chars().next() {
+    Some('-') => {
+      let res = format_from_option(&args[argpos]);
+      argpos += 1;
+      res
+    },
+    _ => format_from_path(&args[argpos]),
   };
 
-  let file_path = match args.len() {
-    3 => &args[2],
-    4 => &args[3],
-    _ => std::panic!("Should not be possible"),
-  };
+  let file_path = &args[argpos];
+  argpos += 1;
 
-  let bytecode = to_bytecode(format, &file_path);
+  let bytecode = to_bytecode(format, file_path);
 
   let mut vm = VirtualMachine::new();
-  let result = vm.run(&bytecode);
+  let result = vm.run(&bytecode, &args[argpos..]);
 
   println!("{}", result);
 }
