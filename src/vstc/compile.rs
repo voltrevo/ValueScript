@@ -387,7 +387,7 @@ impl Compiler {
             TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
           }
         },
-        Expr(_) => std::panic!("Not implemented: Expr statement"),
+        Expr(_) => {},
       };
     }
 
@@ -437,7 +437,19 @@ impl Compiler {
         Decl(decl) => {
           self.compile_declaration(decl, &scope, &mut definition, &mut reg_allocator);
         },
-        Expr(_) => std::panic!("Not implemented: Expr statement"),
+        Expr(expr) => {
+          let mut expression_compiler = ExpressionCompiler {
+            definition: &mut definition,
+            scope: &scope,
+            reg_allocator: &mut reg_allocator,
+          };
+
+          let compiled = expression_compiler.compile(&*expr.expr, None, None);
+
+          for reg in compiled.nested_registers {
+            reg_allocator.release(&reg);
+          }
+        },
       }
     }
 
@@ -619,7 +631,9 @@ impl<'a> ExpressionCompiler<'a> {
       Bin(bin_exp) => {
         return self.binary_expression(bin_exp, available_register, target_register);
       },
-      Assign(_) => std::panic!("Not implemented: Assign expression"),
+      Assign(assign_exp) => {
+        return self.assign_expression(assign_exp, available_register, target_register);
+      },
       Member(_) => std::panic!("Not implemented: Member expression"),
       SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
       Cond(_) => std::panic!("Not implemented: Cond expression"),
@@ -790,6 +804,62 @@ impl<'a> ExpressionCompiler<'a> {
       used_available_register: available_register.is_none(),
 
       nested_registers: nested_registers,
+    };
+  }
+
+  fn assign_expression(
+    &mut self,
+    assign_exp: &swc_ecma_ast::AssignExpr,
+    mut available_register: Option<String>,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    available_register = available_register.or(target_register.clone());
+
+    if assign_exp.op != swc_ecma_ast::AssignOp::Assign {
+      std::panic!("Not implemented: compound assignment");
+    }
+
+    let assign_name = match &assign_exp.left {
+      swc_ecma_ast::PatOrExpr::Expr(_) => std::panic!("Not implemented: assign to expr"),
+      swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
+        swc_ecma_ast::Pat::Ident(ident) => ident.id.sym.to_string(),
+        _ => std::panic!("Not implemented: destructuring"),
+      },
+    };
+
+    let assign_register = match self.scope.get(&assign_name) {
+      None => std::panic!("Unresolved reference"),
+      Some(mapping) => match mapping {
+        MappedName::Definition(_) => std::panic!("Invalid: assignment to definition"),
+        MappedName::Register(reg_name) => reg_name,
+      }
+    };
+
+    let rhs = self.compile(
+      &*assign_exp.right,
+      available_register.clone(),
+      Some(assign_register.clone()),
+    );
+
+    // TODO: Consider making two variations of compile, one that takes a target
+    // register and one that doesn't. This may simplify things eg by not
+    // returning any nested registers when there's a target.
+    assert_eq!(rhs.nested_registers.len(), 0);
+    
+    if target_register.is_some() {
+      let tr = target_register.unwrap();
+
+      let mut instr = "  mov %".to_string();
+      instr += &assign_register;
+      instr += " %";
+      instr += &tr;
+      self.definition.push(instr);
+    }
+
+    return CompiledExpression {
+      value_assembly: "%".to_string() + &assign_register,
+      used_available_register: false,
+      nested_registers: Vec::new(),
     };
   }
 
