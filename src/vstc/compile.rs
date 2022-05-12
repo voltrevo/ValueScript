@@ -441,14 +441,23 @@ impl FunctionCompiler {
     parent_scope: &Scope,
   ) -> Vec<String> {
     let mut self_ = FunctionCompiler::new(parent_scope);
+    self_.compile_fn(fn_name, fn_);
 
+    return self_.definition;
+  }
+
+  fn compile_fn(
+    &mut self,
+    fn_name: String,
+    fn_: &swc_ecma_ast::Function,
+  ) {
     let mut param_registers = Vec::<String>::new();
 
     for p in &fn_.params {
       match &p.pat {
         swc_ecma_ast::Pat::Ident(binding_ident) => {
           let param_name = binding_ident.id.sym.to_string();
-          let reg = self_.reg_allocator.allocate(&param_name);
+          let reg = self.reg_allocator.allocate(&param_name);
           param_registers.push(reg.clone());
         },
         _ => std::panic!("Not implemented: parameter destructuring"),
@@ -463,9 +472,9 @@ impl FunctionCompiler {
       heading += "%";
       heading += &param_registers[i];
 
-      self_.scope.set(
+      self.scope.set(
         param_registers[i].clone(),
-        MappedName::Register(self_.reg_allocator.allocate(&param_registers[i])),
+        MappedName::Register(self.reg_allocator.allocate(&param_registers[i])),
       );
 
       if i != param_registers.len() - 1 {
@@ -475,7 +484,7 @@ impl FunctionCompiler {
 
     heading += ") {";
 
-    self_.definition.push(heading);
+    self.definition.push(heading);
 
     let statements = &fn_.body.as_ref()
       .expect("Not implemented: function without body")
@@ -514,9 +523,9 @@ impl FunctionCompiler {
                   swc_ecma_ast::Pat::Ident(ident) => {
                     let name = ident.id.sym.to_string();
 
-                    self_.scope.set(
+                    self.scope.set(
                       name.clone(),
-                      MappedName::Register(self_.reg_allocator.allocate(&name)),
+                      MappedName::Register(self.reg_allocator.allocate(&name)),
                     );
                   },
                   _ => std::panic!("Not implemented: destructuring"),
@@ -534,15 +543,13 @@ impl FunctionCompiler {
     }
 
     for i in 0..statements.len() {
-      self_.statement(
+      self.statement(
         &statements[i],
         i == statements.len() - 1,
       );
     }
 
-    self_.definition.push("}".to_string());
-
-    return self_.definition;
+    self.definition.push("}".to_string());
   }
 
   fn statement(
