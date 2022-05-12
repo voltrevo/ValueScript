@@ -422,19 +422,17 @@ impl NameAllocator {
 
 struct FunctionCompiler {
   definition: Vec<String>,
-  scope: Scope,
   reg_allocator: NameAllocator,
 }
 
 impl FunctionCompiler {
-  fn new(parent_scope: &Scope) -> FunctionCompiler {
+  fn new() -> FunctionCompiler {
     let mut reg_allocator = NameAllocator::default();
     reg_allocator.allocate(&"return".to_string());
     reg_allocator.allocate(&"this".to_string());
 
     return FunctionCompiler {
       definition: Vec::new(),
-      scope: parent_scope.nest(),
       reg_allocator: reg_allocator,
     };
   }
@@ -444,8 +442,8 @@ impl FunctionCompiler {
     fn_: &swc_ecma_ast::Function,
     parent_scope: &Scope,
   ) -> Vec<String> {
-    let mut self_ = FunctionCompiler::new(parent_scope);
-    self_.compile_fn(fn_name, fn_);
+    let mut self_ = FunctionCompiler::new();
+    self_.compile_fn(fn_name, fn_, parent_scope);
 
     return self_.definition;
   }
@@ -454,7 +452,9 @@ impl FunctionCompiler {
     &mut self,
     fn_name: String,
     fn_: &swc_ecma_ast::Function,
+    parent_scope: &Scope,
   ) {
+    let scope = parent_scope.nest();
     let mut param_registers = Vec::<String>::new();
 
     for p in &fn_.params {
@@ -476,7 +476,7 @@ impl FunctionCompiler {
       heading += "%";
       heading += &param_registers[i];
 
-      self.scope.set(
+      scope.set(
         param_registers[i].clone(),
         MappedName::Register(self.reg_allocator.allocate(&param_registers[i])),
       );
@@ -493,13 +493,14 @@ impl FunctionCompiler {
     let body = fn_.body.as_ref()
       .expect("Not implemented: function without body");
     
-    self.populate_fn_scope(body);
-    self.populate_block_scope(body, None);
+    self.populate_fn_scope(body, &scope);
+    self.populate_block_scope(body, &scope);
 
     for i in 0..body.stmts.len() {
       self.statement(
         &body.stmts[i],
         i == body.stmts.len() - 1,
+        &scope,
       );
     }
 
@@ -509,21 +510,23 @@ impl FunctionCompiler {
   fn populate_fn_scope(
     &mut self,
     block: &swc_ecma_ast::BlockStmt,
+    scope: &Scope,
   ) {
     for statement in &block.stmts {
-      self.populate_fn_scope_statement(statement);
+      self.populate_fn_scope_statement(statement, scope);
     }
   }
 
   fn populate_fn_scope_statement(
     &mut self,
     statement: &swc_ecma_ast::Stmt,
+    scope: &Scope,
   ) {
     use swc_ecma_ast::Stmt::*;
 
     match statement {
       Block(nested_block) => {
-        self.populate_fn_scope(nested_block);
+        self.populate_fn_scope(nested_block, scope);
       },
       Empty(_) => {},
       Debugger(_) => std::panic!("Not implemented: Debugger statement"),
@@ -533,10 +536,10 @@ impl FunctionCompiler {
       Break(_) => std::panic!("Not implemented: Break statement"),
       Continue(_) => std::panic!("Not implemented: Continue statement"),
       If(if_) => {
-        self.populate_fn_scope_statement(&if_.cons);
+        self.populate_fn_scope_statement(&if_.cons, scope);
 
         for stmt in &if_.alt {
-          self.populate_fn_scope_statement(stmt);
+          self.populate_fn_scope_statement(stmt, scope);
         }
       },
       Switch(_) => std::panic!("Not implemented: Switch statement"),
@@ -560,7 +563,7 @@ impl FunctionCompiler {
                   swc_ecma_ast::Pat::Ident(ident) => {
                     let name = ident.id.sym.to_string();
 
-                    self.scope.set(
+                    scope.set(
                       name.clone(),
                       MappedName::Register(self.reg_allocator.allocate(&name)),
                     );
@@ -583,10 +586,8 @@ impl FunctionCompiler {
   fn populate_block_scope(
     &mut self,
     block: &swc_ecma_ast::BlockStmt,
-    nested_scope: Option<&Scope>,
+    scope: &Scope,
   ) {
-    let scope = nested_scope.unwrap_or(&self.scope);
-
     for statement in &block.stmts {
       use swc_ecma_ast::Stmt::*;
 
@@ -646,11 +647,28 @@ impl FunctionCompiler {
     &mut self,
     statement: &swc_ecma_ast::Stmt,
     fn_last: bool,
+    scope: &Scope,
   ) {
     use swc_ecma_ast::Stmt::*;
 
     match statement {
-      Block(_) => std::panic!("Not implemented: Block statement"),
+      Block(block) => {
+        let block_scope = scope.nest();
+        self.populate_block_scope(block, &block_scope);
+
+        for stmt in &block.stmts {
+          self.statement(stmt, false, &block_scope);
+        }
+
+        for mapping in block_scope.borrow().name_map.values() {
+          match mapping {
+            MappedName::Register(reg) => {
+              self.reg_allocator.release(reg);
+            },
+            MappedName::Definition(_) => {},
+          }
+        }
+      },
       Empty(_) => {},
       Debugger(_) => std::panic!("Not implemented: Debugger statement"),
       With(_) => std::panic!("Not supported: With statement"),
@@ -663,7 +681,7 @@ impl FunctionCompiler {
         Some(expr) => {
           let mut expression_compiler = ExpressionCompiler {
             definition: &mut self.definition,
-            scope: &self.scope,
+            scope: scope,
             reg_allocator: &mut self.reg_allocator,
           };
 
@@ -688,12 +706,12 @@ impl FunctionCompiler {
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
       ForOf(_) => std::panic!("Not implemented: ForOf statement"),
       Decl(decl) => {
-        self.declaration(decl);
+        self.declaration(decl, scope);
       },
       Expr(expr) => {
         let mut expression_compiler = ExpressionCompiler {
           definition: &mut self.definition,
-          scope: &self.scope,
+          scope: scope,
           reg_allocator: &mut self.reg_allocator,
         };
 
@@ -709,13 +727,14 @@ impl FunctionCompiler {
   fn declaration(
     &mut self,
     decl: &swc_ecma_ast::Decl,
+    scope: &Scope,
   ) {
     use swc_ecma_ast::Decl::*;
 
     match decl {
       Class(_) => std::panic!("Not implemented: Class declaration"),
       Fn(_) => std::panic!("Not implemented: Fn declaration"),
-      Var(var_decl) => self.var_declaration(var_decl),
+      Var(var_decl) => self.var_declaration(var_decl, scope),
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
       TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
       TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
@@ -726,13 +745,14 @@ impl FunctionCompiler {
   fn var_declaration(
     &mut self,
     var_decl: &swc_ecma_ast::VarDecl,
+    scope: &Scope,
   ) {
     for decl in &var_decl.decls {
       match &decl.init {
         Some(expr) => {
           let mut expr_compiler = ExpressionCompiler {
             definition: &mut self.definition,
-            scope: &self.scope,
+            scope: scope,
             reg_allocator: &mut self.reg_allocator,
           };
 
@@ -741,7 +761,7 @@ impl FunctionCompiler {
             _ => std::panic!("Not implemented: destructuring"),
           };
 
-          let target_register = match self.scope.get(&name) {
+          let target_register = match scope.get(&name) {
             Some(MappedName::Register(reg_name)) => reg_name,
             _ => std::panic!("var decl should always get mapped to a register during scan"),
           };
@@ -1078,12 +1098,12 @@ impl<'a> ExpressionCompiler<'a> {
 
     let mapped = self.scope.get(&ident_string).expect("Identifier not found in scope");
 
-    let prefix = match mapped {
-      MappedName::Register(_) => "%",
-      MappedName::Definition(_) => "@",
+    let value_assembly = match mapped {
+      MappedName::Register(reg) => "%".to_string() + &reg,
+      MappedName::Definition(def) => "@".to_string() + &def,
     };
 
-    return self.inline(prefix.to_string() + &ident_string, target_register);
+    return self.inline(value_assembly, target_register);
   }
 }
 
