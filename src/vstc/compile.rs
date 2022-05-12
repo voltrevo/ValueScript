@@ -379,6 +379,7 @@ impl NameAllocator {
   fn allocate(&mut self, based_on_name: &String) -> String {
     match self.released_names.pop() {
       Some(name) => {
+        self.used_names.insert(name.clone());
         return name;
       },
       None => {},
@@ -395,6 +396,7 @@ impl NameAllocator {
   fn allocate_numbered(&mut self, prefix: &String) -> String {
     match self.released_names.pop() {
       Some(name) => {
+        self.used_names.insert(name.clone());
         return name;
       },
       None => {},
@@ -724,6 +726,8 @@ impl FunctionCompiler {
         jmpif_instr += " :";
         jmpif_instr += &else_label;
         self.definition.push(jmpif_instr);
+
+        self.reg_allocator.release(&cond_reg);
 
         self.statement(&*if_.cons, false, scope);
 
