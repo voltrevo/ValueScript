@@ -423,6 +423,7 @@ impl NameAllocator {
 struct FunctionCompiler {
   definition: Vec<String>,
   reg_allocator: NameAllocator,
+  label_allocator: NameAllocator,
 }
 
 impl FunctionCompiler {
@@ -434,6 +435,7 @@ impl FunctionCompiler {
     return FunctionCompiler {
       definition: Vec::new(),
       reg_allocator: reg_allocator,
+      label_allocator: NameAllocator::default(),
     };
   }
 
@@ -455,34 +457,32 @@ impl FunctionCompiler {
     parent_scope: &Scope,
   ) {
     let scope = parent_scope.nest();
-    let mut param_registers = Vec::<String>::new();
-
-    for p in &fn_.params {
-      match &p.pat {
-        swc_ecma_ast::Pat::Ident(binding_ident) => {
-          let param_name = binding_ident.id.sym.to_string();
-          let reg = self.reg_allocator.allocate(&param_name);
-          param_registers.push(reg.clone());
-        },
-        _ => std::panic!("Not implemented: parameter destructuring"),
-      }
-    }
 
     let mut heading = "@".to_string();
     heading += &fn_name;
     heading += " = function(";
 
-    for i in 0..param_registers.len() {
-      heading += "%";
-      heading += &param_registers[i];
+    for i in 0..fn_.params.len() {
+      let p = &fn_.params[i];
 
-      scope.set(
-        param_registers[i].clone(),
-        MappedName::Register(self.reg_allocator.allocate(&param_registers[i])),
-      );
+      match &p.pat {
+        swc_ecma_ast::Pat::Ident(binding_ident) => {
+          let param_name = binding_ident.id.sym.to_string();
+          let reg = self.reg_allocator.allocate(&param_name);
 
-      if i != param_registers.len() - 1 {
-        heading += ", ";
+          heading += "%";
+          heading += &reg;
+
+          scope.set(
+            param_name.clone(),
+            MappedName::Register(reg),
+          );
+
+          if i != fn_.params.len() - 1 {
+            heading += ", ";
+          }
+        },
+        _ => std::panic!("Not implemented: parameter destructuring"),
       }
     }
 
@@ -696,7 +696,50 @@ impl FunctionCompiler {
       Labeled(_) => std::panic!("Not implemented: Labeled statement"),
       Break(_) => std::panic!("Not implemented: Break statement"),
       Continue(_) => std::panic!("Not implemented: Continue statement"),
-      If(_) => std::panic!("Not implemented: If statement"),
+      If(if_) => {
+        let mut expression_compiler = ExpressionCompiler {
+          definition: &mut self.definition,
+          scope: scope,
+          reg_allocator: &mut self.reg_allocator,
+        };
+
+        let condition = expression_compiler.compile(&*if_.test, None);
+
+        for reg in condition.nested_registers {
+          self.reg_allocator.release(&reg);
+        }
+
+        let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
+
+        self.definition.push(std::format!(
+          "  op! {} %{}",
+          condition.value_assembly,
+          cond_reg,
+        ));
+
+        let else_label = self.label_allocator.allocate_numbered(&"else".to_string());
+
+        let mut jmpif_instr = "  jmpif %".to_string();
+        jmpif_instr += &cond_reg;
+        jmpif_instr += " :";
+        jmpif_instr += &else_label;
+        self.definition.push(jmpif_instr);
+
+        self.statement(&*if_.cons, false, scope);
+
+        match &if_.alt {
+          None => {
+            self.definition.push(std::format!("{}:", else_label));
+          },
+          Some(alt) => {
+            let after_else_label = self.label_allocator.allocate_numbered(&"after_else".to_string());
+            self.definition.push(std::format!("  jmp :{}", after_else_label));
+            self.definition.push(std::format!("{}:", else_label));
+            self.statement(&*alt, false, scope);
+            self.definition.push(std::format!("{}:", after_else_label));
+          }
+        }
+      },
       Switch(_) => std::panic!("Not implemented: Switch statement"),
       Throw(_) => std::panic!("Not implemented: Throw statement"),
       Try(_) => std::panic!("Not implemented: Try statement"),
