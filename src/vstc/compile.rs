@@ -656,7 +656,9 @@ impl<'a> ExpressionCompiler<'a> {
       Member(_) => std::panic!("Not implemented: Member expression"),
       SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
       Cond(_) => std::panic!("Not implemented: Cond expression"),
-      Call(_) => std::panic!("Not implemented: Call expression"),
+      Call(call_exp) => {
+        return self.call_expression(call_exp, target_register);
+      },
       New(_) => std::panic!("Not implemented: New expression"),
       Seq(_) => std::panic!("Not implemented: Seq expression"),
       Ident(ident) => {
@@ -832,6 +834,68 @@ impl<'a> ExpressionCompiler<'a> {
     return CompiledExpression {
       value_assembly: "%".to_string() + &assign_register,
       nested_registers: Vec::new(),
+    };
+  }
+
+  fn call_expression(
+    &mut self,
+    call_exp: &swc_ecma_ast::CallExpr,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let mut nested_registers = Vec::<String>::new();
+    let mut sub_nested_registers = Vec::<String>::new();
+
+    let mut callee = match &call_exp.callee {
+      swc_ecma_ast::Callee::Expr(expr) => self.compile(&*expr, None),
+      _ => std::panic!("Not implemented: non-expression callee"),
+    };
+
+    sub_nested_registers.append(&mut callee.nested_registers);
+
+    let mut instr = "  call ".to_string();
+    instr += &callee.value_assembly;
+    instr += " [";
+
+    for i in 0..call_exp.args.len() {
+      let arg = &call_exp.args[i];
+
+      if arg.spread.is_some() {
+        std::panic!("Not implemented: argument spreading");
+      }
+
+      let mut compiled_arg = self.compile(&*arg.expr, None);
+      sub_nested_registers.append(&mut compiled_arg.nested_registers);
+
+      instr += &compiled_arg.value_assembly;
+
+      if i != call_exp.args.len() - 1 {
+        instr += ", ";
+      }
+    }
+
+    instr += "] ";
+
+    let dest = match &target_register {
+      Some(tr) => ("%".to_string() + &tr),
+      None => {
+        let reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        nested_registers.push(reg.clone());
+
+        "%".to_string() + &reg
+      },
+    };
+
+    instr += &dest;
+
+    self.definition.push(instr);
+
+    for reg in sub_nested_registers {
+      self.reg_allocator.release(&reg);
+    }
+
+    return CompiledExpression {
+      value_assembly: dest,
+      nested_registers: nested_registers,
     };
   }
 
