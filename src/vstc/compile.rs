@@ -72,7 +72,7 @@ pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
 pub fn compile(program: &swc_ecma_ast::Program) -> Vec<String> {
   let mut compiler = Compiler::default();
   compiler.compile_program(&program);
-  
+
   let mut lines = Vec::<String>::new();
 
   for def in compiler.definitions {
@@ -356,7 +356,7 @@ impl Compiler {
     let statements = &fn_.body.as_ref()
       .expect("Not implemented: function without body")
       .stmts;
-    
+
     for statement in statements {
       use swc_ecma_ast::Stmt::*;
 
@@ -833,7 +833,7 @@ impl<'a> ExpressionCompiler<'a> {
     // register and one that doesn't. This may simplify things eg by not
     // returning any nested registers when there's a target.
     assert_eq!(rhs.nested_registers.len(), 0);
-    
+
     if target_register.is_some() {
       let tr = target_register.unwrap();
 
