@@ -534,65 +534,10 @@ impl FunctionCompiler {
     }
 
     for i in 0..statements.len() {
-      let statement = &statements[i];
-      let last = i == statements.len() - 1;
-
-      use swc_ecma_ast::Stmt::*;
-
-      match statement {
-        Block(_) => std::panic!("Not implemented: Block statement"),
-        Empty(_) => {},
-        Debugger(_) => std::panic!("Not implemented: Debugger statement"),
-        With(_) => std::panic!("Not supported: With statement"),
-
-        Return(ret_stmt) => match &ret_stmt.arg {
-          None => {
-            self_.definition.push("  end".to_string());
-          },
-          Some(expr) => {
-            let mut expression_compiler = ExpressionCompiler {
-              definition: &mut self_.definition,
-              scope: &self_.scope,
-              reg_allocator: &mut self_.reg_allocator,
-            };
-
-            expression_compiler.compile(expr, Some("return".to_string()));
-
-            if !last {
-              self_.definition.push("  end".to_string());
-            }
-          },
-        },
-
-        Labeled(_) => std::panic!("Not implemented: Labeled statement"),
-        Break(_) => std::panic!("Not implemented: Break statement"),
-        Continue(_) => std::panic!("Not implemented: Continue statement"),
-        If(_) => std::panic!("Not implemented: If statement"),
-        Switch(_) => std::panic!("Not implemented: Switch statement"),
-        Throw(_) => std::panic!("Not implemented: Throw statement"),
-        Try(_) => std::panic!("Not implemented: Try statement"),
-        While(_) => std::panic!("Not implemented: While statement"),
-        DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
-        For(_) => std::panic!("Not implemented: For statement"),
-        ForIn(_) => std::panic!("Not implemented: ForIn statement"),
-        ForOf(_) => std::panic!("Not implemented: ForOf statement"),
-        Decl(decl) => {
-          self_.compile_declaration(decl);
-        },
-        Expr(expr) => {
-          let mut expression_compiler = ExpressionCompiler {
-            definition: &mut self_.definition,
-            scope: &self_.scope,
-            reg_allocator: &mut self_.reg_allocator,
-          };
-
-          let compiled = expression_compiler.compile(&*expr.expr, None);
-
-          for reg in compiled.nested_registers {
-            self_.reg_allocator.release(&reg);
-          }
-        },
-      }
+      self_.statement(
+        &statements[i],
+        i == statements.len() - 1,
+      );
     }
 
     self_.definition.push("}".to_string());
@@ -600,7 +545,71 @@ impl FunctionCompiler {
     return self_.definition;
   }
 
-  fn compile_declaration(
+  fn statement(
+    &mut self,
+    statement: &swc_ecma_ast::Stmt,
+    fn_last: bool,
+  ) {
+    use swc_ecma_ast::Stmt::*;
+
+    match statement {
+      Block(_) => std::panic!("Not implemented: Block statement"),
+      Empty(_) => {},
+      Debugger(_) => std::panic!("Not implemented: Debugger statement"),
+      With(_) => std::panic!("Not supported: With statement"),
+
+      Return(ret_stmt) => match &ret_stmt.arg {
+        None => {
+          // TODO: Skip if fn_last
+          self.definition.push("  end".to_string());
+        },
+        Some(expr) => {
+          let mut expression_compiler = ExpressionCompiler {
+            definition: &mut self.definition,
+            scope: &self.scope,
+            reg_allocator: &mut self.reg_allocator,
+          };
+
+          expression_compiler.compile(expr, Some("return".to_string()));
+
+          if !fn_last {
+            self.definition.push("  end".to_string());
+          }
+        },
+      },
+
+      Labeled(_) => std::panic!("Not implemented: Labeled statement"),
+      Break(_) => std::panic!("Not implemented: Break statement"),
+      Continue(_) => std::panic!("Not implemented: Continue statement"),
+      If(_) => std::panic!("Not implemented: If statement"),
+      Switch(_) => std::panic!("Not implemented: Switch statement"),
+      Throw(_) => std::panic!("Not implemented: Throw statement"),
+      Try(_) => std::panic!("Not implemented: Try statement"),
+      While(_) => std::panic!("Not implemented: While statement"),
+      DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
+      For(_) => std::panic!("Not implemented: For statement"),
+      ForIn(_) => std::panic!("Not implemented: ForIn statement"),
+      ForOf(_) => std::panic!("Not implemented: ForOf statement"),
+      Decl(decl) => {
+        self.declaration(decl);
+      },
+      Expr(expr) => {
+        let mut expression_compiler = ExpressionCompiler {
+          definition: &mut self.definition,
+          scope: &self.scope,
+          reg_allocator: &mut self.reg_allocator,
+        };
+
+        let compiled = expression_compiler.compile(&*expr.expr, None);
+
+        for reg in compiled.nested_registers {
+          self.reg_allocator.release(&reg);
+        }
+      },
+    }
+  }
+
+  fn declaration(
     &mut self,
     decl: &swc_ecma_ast::Decl,
   ) {
@@ -609,7 +618,7 @@ impl FunctionCompiler {
     match decl {
       Class(_) => std::panic!("Not implemented: Class declaration"),
       Fn(_) => std::panic!("Not implemented: Fn declaration"),
-      Var(var_decl) => self.compile_var_declaration(var_decl),
+      Var(var_decl) => self.var_declaration(var_decl),
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
       TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
       TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
@@ -617,7 +626,7 @@ impl FunctionCompiler {
     };
   }
 
-  fn compile_var_declaration(
+  fn var_declaration(
     &mut self,
     var_decl: &swc_ecma_ast::VarDecl,
   ) {
