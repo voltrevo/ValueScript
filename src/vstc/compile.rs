@@ -490,38 +490,71 @@ impl FunctionCompiler {
 
     self.definition.push(heading);
 
-    let statements = &fn_.body.as_ref()
-      .expect("Not implemented: function without body")
-      .stmts;
+    let body = fn_.body.as_ref()
+      .expect("Not implemented: function without body");
+    
+    self.populate_fn_scope(body);
+    self.populate_block_scope(body, None);
 
-    for statement in statements {
-      use swc_ecma_ast::Stmt::*;
+    for i in 0..body.stmts.len() {
+      self.statement(
+        &body.stmts[i],
+        i == body.stmts.len() - 1,
+      );
+    }
 
-      match statement {
-        Block(_) => std::panic!("Not implemented: Block statement"),
-        Empty(_) => {},
-        Debugger(_) => std::panic!("Not implemented: Debugger statement"),
-        With(_) => std::panic!("Not supported: With statement"),
-        Return(_) => {},
-        Labeled(_) => std::panic!("Not implemented: Labeled statement"),
-        Break(_) => std::panic!("Not implemented: Break statement"),
-        Continue(_) => std::panic!("Not implemented: Continue statement"),
-        If(_) => std::panic!("Not implemented: If statement"),
-        Switch(_) => std::panic!("Not implemented: Switch statement"),
-        Throw(_) => std::panic!("Not implemented: Throw statement"),
-        Try(_) => std::panic!("Not implemented: Try statement"),
-        While(_) => std::panic!("Not implemented: While statement"),
-        DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
-        For(_) => std::panic!("Not implemented: For statement"),
-        ForIn(_) => std::panic!("Not implemented: ForIn statement"),
-        ForOf(_) => std::panic!("Not implemented: ForOf statement"),
-        Decl(decl) => {
-          use swc_ecma_ast::Decl::*;
+    self.definition.push("}".to_string());
+  }
 
-          match decl {
-            Class(_) => std::panic!("Not implemented: Class declaration"),
-            Fn(_) => std::panic!("Not implemented: Fn declaration"),
-            Var(var_decl) => {
+  fn populate_fn_scope(
+    &mut self,
+    block: &swc_ecma_ast::BlockStmt,
+  ) {
+    for statement in &block.stmts {
+      self.populate_fn_scope_statement(statement);
+    }
+  }
+
+  fn populate_fn_scope_statement(
+    &mut self,
+    statement: &swc_ecma_ast::Stmt,
+  ) {
+    use swc_ecma_ast::Stmt::*;
+
+    match statement {
+      Block(nested_block) => {
+        self.populate_fn_scope(nested_block);
+      },
+      Empty(_) => {},
+      Debugger(_) => std::panic!("Not implemented: Debugger statement"),
+      With(_) => std::panic!("Not supported: With statement"),
+      Return(_) => {},
+      Labeled(_) => std::panic!("Not implemented: Labeled statement"),
+      Break(_) => std::panic!("Not implemented: Break statement"),
+      Continue(_) => std::panic!("Not implemented: Continue statement"),
+      If(if_) => {
+        self.populate_fn_scope_statement(&if_.cons);
+
+        for stmt in &if_.alt {
+          self.populate_fn_scope_statement(stmt);
+        }
+      },
+      Switch(_) => std::panic!("Not implemented: Switch statement"),
+      Throw(_) => std::panic!("Not implemented: Throw statement"),
+      Try(_) => std::panic!("Not implemented: Try statement"),
+      While(_) => std::panic!("Not implemented: While statement"),
+      DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
+      For(_) => std::panic!("Not implemented: For statement"),
+      ForIn(_) => std::panic!("Not implemented: ForIn statement"),
+      ForOf(_) => std::panic!("Not implemented: ForOf statement"),
+      Decl(decl) => {
+        use swc_ecma_ast::Decl::*;
+
+        match decl {
+          Class(_) => std::panic!("Not implemented: Class declaration"),
+          Fn(_) => std::panic!("Not implemented: Fn declaration"),
+          Var(var_decl) => {
+            if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
               for decl in &var_decl.decls {
                 match &decl.name {
                   swc_ecma_ast::Pat::Ident(ident) => {
@@ -535,6 +568,68 @@ impl FunctionCompiler {
                   _ => std::panic!("Not implemented: destructuring"),
                 }
               }
+            }
+          },
+          TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
+          TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
+          TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
+          TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
+        }
+      },
+      Expr(_) => {},
+    };
+  }
+
+  fn populate_block_scope(
+    &mut self,
+    block: &swc_ecma_ast::BlockStmt,
+    nested_scope: Option<&Scope>,
+  ) {
+    let scope = nested_scope.unwrap_or(&self.scope);
+
+    for statement in &block.stmts {
+      use swc_ecma_ast::Stmt::*;
+
+      match statement {
+        Block(_) => {},
+        Empty(_) => {},
+        Debugger(_) => std::panic!("Not implemented: Debugger statement"),
+        With(_) => std::panic!("Not supported: With statement"),
+        Return(_) => {},
+        Labeled(_) => std::panic!("Not implemented: Labeled statement"),
+        Break(_) => std::panic!("Not implemented: Break statement"),
+        Continue(_) => std::panic!("Not implemented: Continue statement"),
+        If(_) => {},
+        Switch(_) => std::panic!("Not implemented: Switch statement"),
+        Throw(_) => std::panic!("Not implemented: Throw statement"),
+        Try(_) => std::panic!("Not implemented: Try statement"),
+        While(_) => std::panic!("Not implemented: While statement"),
+        DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
+        For(_) => std::panic!("Not implemented: For statement"),
+        ForIn(_) => std::panic!("Not implemented: ForIn statement"),
+        ForOf(_) => std::panic!("Not implemented: ForOf statement"),
+        Decl(decl) => {
+          use swc_ecma_ast::Decl::*;
+  
+          match decl {
+            Class(_) => std::panic!("Not implemented: Class declaration"),
+            Fn(_) => std::panic!("Not implemented: Fn declaration"),
+            Var(var_decl) => {
+              if var_decl.kind != swc_ecma_ast::VarDeclKind::Var {
+                for decl in &var_decl.decls {
+                  match &decl.name {
+                    swc_ecma_ast::Pat::Ident(ident) => {
+                      let name = ident.id.sym.to_string();
+  
+                      scope.set(
+                        name.clone(),
+                        MappedName::Register(self.reg_allocator.allocate(&name)),
+                      );
+                    },
+                    _ => std::panic!("Not implemented: destructuring"),
+                  }
+                }
+              }
             },
             TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
             TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
@@ -545,15 +640,6 @@ impl FunctionCompiler {
         Expr(_) => {},
       };
     }
-
-    for i in 0..statements.len() {
-      self.statement(
-        &statements[i],
-        i == statements.len() - 1,
-      );
-    }
-
-    self.definition.push("}".to_string());
   }
 
   fn statement(
