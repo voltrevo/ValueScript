@@ -2,6 +2,7 @@ mod assemble;
 mod run;
 mod virtual_machine;
 mod compile;
+mod scope;
 
 use std::env;
 use std::process::exit;

@@ -1,11 +1,8 @@
 use std::process::exit;
 use std::{path::Path, sync::Arc};
 use std::collections::HashSet;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
-use std::rc::Rc;
-use std::cell::RefCell;
 
 use swc_ecma_ast::{EsVersion};
 use swc_common::{
@@ -13,6 +10,8 @@ use swc_common::{
     SourceMap,
 };
 use swc_ecma_parser::{TsConfig, Syntax};
+
+use super::scope::{Scope, MappedName, init_scope, ScopeTrait};
 
 pub fn command(args: &Vec<String>) {
   if args.len() != 3 {
@@ -314,59 +313,6 @@ impl Compiler {
       FunctionCompiler::compile(fn_name, fn_, parent_scope),
     );
   }
-}
-
-#[derive(Clone)]
-enum MappedName {
-  Register(String),
-  Definition(String),
-}
-
-struct ScopeData {
-  name_map: HashMap<String, MappedName>,
-  parent: Option<Rc<RefCell<ScopeData>>>,
-}
-
-type Scope = Rc<RefCell<ScopeData>>;
-
-trait ScopeTrait {
-  fn get(&self, name: &String) -> Option<MappedName>;
-  fn set(&self, name: String, mapped_name: MappedName);
-  fn nest(&self) -> Rc<RefCell<ScopeData>>;
-}
-
-impl ScopeTrait for Scope {
-  fn get(&self, name: &String) -> Option<MappedName> {
-    match self.borrow().name_map.get(name) {
-      Some(mapped_name) => Some(mapped_name.clone()),
-      None => match &self.borrow().parent {
-        Some(parent) => parent.get(name),
-        None => None,
-      },
-    }
-  }
-
-  fn set(&self, name: String, mapped_name: MappedName) {
-    let old_mapping = self.borrow_mut().name_map.insert(name, mapped_name);
-
-    if old_mapping.is_some() {
-      std::panic!("Scope overwrite occurred (not implemented: being permissive about this)");
-    }
-  }
-
-  fn nest(&self) -> Rc<RefCell<ScopeData>> {
-    return Rc::new(RefCell::new(ScopeData {
-      name_map: Default::default(),
-      parent: Some(self.clone()),
-    }));
-  }
-}
-
-fn init_scope() -> Scope {
-  return Rc::new(RefCell::new(ScopeData {
-    name_map: Default::default(),
-    parent: None,
-  }));
 }
 
 #[derive(Default)]
