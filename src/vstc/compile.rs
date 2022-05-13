@@ -447,7 +447,16 @@ impl FunctionCompiler {
       DoWhile(do_while) => {
         self.populate_fn_scope_statement(&do_while.body, scope);
       },
-      For(_) => std::panic!("Not implemented: For statement"),
+      For(for_) => {
+        match &for_.init {
+          Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) => {
+            self.populate_fn_scope_var_decl(var_decl, scope);
+          },
+          _ => {},
+        };
+
+        self.populate_fn_scope_statement(&for_.body, scope);
+      },
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
       ForOf(_) => std::panic!("Not implemented: ForOf statement"),
       Decl(decl) => {
@@ -456,23 +465,7 @@ impl FunctionCompiler {
         match decl {
           Class(_) => std::panic!("Not implemented: Class declaration"),
           Fn(_) => std::panic!("Not implemented: Fn declaration"),
-          Var(var_decl) => {
-            if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
-              for decl in &var_decl.decls {
-                match &decl.name {
-                  swc_ecma_ast::Pat::Ident(ident) => {
-                    let name = ident.id.sym.to_string();
-
-                    scope.set(
-                      name.clone(),
-                      MappedName::Register(self.reg_allocator.allocate(&name)),
-                    );
-                  },
-                  _ => std::panic!("Not implemented: destructuring"),
-                }
-              }
-            }
-          },
+          Var(var_decl) => self.populate_fn_scope_var_decl(var_decl, scope),
           TsInterface(_) => {},
           TsTypeAlias(_) => {},
           TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
@@ -481,6 +474,30 @@ impl FunctionCompiler {
       },
       Expr(_) => {},
     };
+  }
+
+  fn populate_fn_scope_var_decl(
+    &mut self,
+    var_decl: &swc_ecma_ast::VarDecl,
+    scope: &Scope,
+  ) {
+    if var_decl.kind != swc_ecma_ast::VarDeclKind::Var {
+      return;
+    }
+
+    for decl in &var_decl.decls {
+      match &decl.name {
+        swc_ecma_ast::Pat::Ident(ident) => {
+          let name = ident.id.sym.to_string();
+
+          scope.set(
+            name.clone(),
+            MappedName::Register(self.reg_allocator.allocate(&name)),
+          );
+        },
+        _ => std::panic!("Not implemented: destructuring"),
+      }
+    }
   }
 
   fn populate_block_scope(
@@ -515,23 +532,7 @@ impl FunctionCompiler {
           match decl {
             Class(_) => std::panic!("Not implemented: Class declaration"),
             Fn(_) => std::panic!("Not implemented: Fn declaration"),
-            Var(var_decl) => {
-              if var_decl.kind != swc_ecma_ast::VarDeclKind::Var {
-                for decl in &var_decl.decls {
-                  match &decl.name {
-                    swc_ecma_ast::Pat::Ident(ident) => {
-                      let name = ident.id.sym.to_string();
-  
-                      scope.set(
-                        name.clone(),
-                        MappedName::Register(self.reg_allocator.allocate(&name)),
-                      );
-                    },
-                    _ => std::panic!("Not implemented: destructuring"),
-                  }
-                }
-              }
-            },
+            Var(var_decl) => self.populate_block_scope_var_decl(var_decl, scope),
             TsInterface(_) => {},
             TsTypeAlias(_) => {},
             TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
@@ -540,6 +541,30 @@ impl FunctionCompiler {
         },
         Expr(_) => {},
       };
+    }
+  }
+
+  fn populate_block_scope_var_decl(
+    &mut self,
+    var_decl: &swc_ecma_ast::VarDecl,
+    scope: &Scope,
+  ) {
+    if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
+      return;
+    }
+
+    for decl in &var_decl.decls {
+      match &decl.name {
+        swc_ecma_ast::Pat::Ident(ident) => {
+          let name = ident.id.sym.to_string();
+
+          scope.set(
+            name.clone(),
+            MappedName::Register(self.reg_allocator.allocate(&name)),
+          );
+        },
+        _ => std::panic!("Not implemented: destructuring"),
+      }
     }
   }
 
@@ -720,24 +745,96 @@ impl FunctionCompiler {
         jmpif_instr += &start_label;
         self.definition.push(jmpif_instr);
       },
-      For(_) => std::panic!("Not implemented: For statement"),
+      For(for_) => {
+        let for_scope = scope.nest();
+
+        match &for_.init {
+          Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) => {
+            self.populate_block_scope_var_decl(var_decl, &for_scope);
+          },
+          _ => {},
+        }
+
+        match &for_.init {
+          Some(var_decl_or_expr) => match var_decl_or_expr {
+            swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl) => {
+              self.var_declaration(var_decl, &for_scope);
+            },
+            swc_ecma_ast::VarDeclOrExpr::Expr(expr) => {
+              self.expression(expr, &for_scope);
+            },
+          },
+          None => {},
+        }
+
+        let for_test_label = self.label_allocator.allocate_numbered(
+          &"for_test".to_string()
+        );
+
+        self.definition.push(
+          format!("{}:", &for_test_label)
+        );
+
+        let for_end_label = self.label_allocator.allocate_numbered(
+          &"for_end".to_string()
+        );
+
+        match &for_.test {
+          Some(cond) => {
+            let mut ec = ExpressionCompiler {
+              definition: &mut self.definition,
+              scope: &for_scope,
+              reg_allocator: &mut self.reg_allocator,
+            };
+    
+            let condition = ec.compile(cond, None);
+    
+            for reg in condition.nested_registers {
+              self.reg_allocator.release(&reg);
+            }
+
+            let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
+
+            // TODO: Add negated jmpif instruction to avoid this
+            self.definition.push(std::format!(
+              "  op! {} %{}",
+              condition.value_assembly,
+              cond_reg,
+            ));
+
+            let mut jmpif_instr = "  jmpif %".to_string();
+            jmpif_instr += &cond_reg;
+            jmpif_instr += " :";
+            jmpif_instr += &for_end_label;
+            self.definition.push(jmpif_instr);
+
+            self.reg_allocator.release(&cond_reg);
+          },
+          None => {},
+        }
+
+        self.statement(&for_.body, false, &for_scope);
+
+        match &for_.update {
+          Some(update) => self.expression(update, &for_scope),
+          None => {},
+        }
+
+        self.definition.push(
+          format!("  jmp :{}", for_test_label)
+        );
+
+        self.definition.push(
+          format!("{}:", for_end_label)
+        );
+      },
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
       ForOf(_) => std::panic!("Not implemented: ForOf statement"),
       Decl(decl) => {
         self.declaration(decl, scope);
       },
       Expr(expr) => {
-        let mut expression_compiler = ExpressionCompiler {
-          definition: &mut self.definition,
-          scope: scope,
-          reg_allocator: &mut self.reg_allocator,
-        };
-
-        let compiled = expression_compiler.compile(&*expr.expr, None);
-
-        for reg in compiled.nested_registers {
-          self.reg_allocator.release(&reg);
-        }
+        self.expression(&expr.expr, scope);
       },
     }
   }
@@ -788,6 +885,29 @@ impl FunctionCompiler {
         },
         None => {},
       }
+    }
+  }
+
+  fn expression(
+    &mut self,
+    expr: &swc_ecma_ast::Expr,
+    scope: &Scope,
+  ) {
+    let mut expression_compiler = ExpressionCompiler {
+      definition: &mut self.definition,
+      scope: scope,
+      reg_allocator: &mut self.reg_allocator,
+    };
+
+    let compiled = expression_compiler.compile(
+      expr,
+
+      // FIXME: Specify the ignore register instead
+      None,
+    );
+
+    for reg in compiled.nested_registers {
+      self.reg_allocator.release(&reg);
     }
   }
 }
