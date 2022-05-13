@@ -3,6 +3,7 @@ mod run;
 mod virtual_machine;
 mod compile;
 mod scope;
+mod name_allocator;
 
 use std::env;
 use std::process::exit;
