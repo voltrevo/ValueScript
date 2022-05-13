@@ -691,7 +691,35 @@ impl FunctionCompiler {
 
         self.definition.push(std::format!("{}:", end_label));
       },
-      DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
+      DoWhile(do_while) => {
+        let start_label = self.label_allocator.allocate_numbered(
+          &"do_while".to_string()
+        );
+
+        self.definition.push(
+          std::format!("{}:", start_label)
+        );
+
+        self.statement(&*do_while.body, false, scope);
+        
+        let mut expression_compiler = ExpressionCompiler {
+          definition: &mut self.definition,
+          scope: scope,
+          reg_allocator: &mut self.reg_allocator,
+        };
+
+        let condition = expression_compiler.compile(&*do_while.test, None);
+
+        for reg in condition.nested_registers {
+          self.reg_allocator.release(&reg);
+        }
+
+        let mut jmpif_instr = "  jmpif ".to_string();
+        jmpif_instr += &condition.value_assembly;
+        jmpif_instr += " :";
+        jmpif_instr += &start_label;
+        self.definition.push(jmpif_instr);
+      },
       For(_) => std::panic!("Not implemented: For statement"),
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
       ForOf(_) => std::panic!("Not implemented: ForOf statement"),
