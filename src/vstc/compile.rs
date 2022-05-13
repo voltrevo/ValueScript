@@ -551,8 +551,12 @@ impl FunctionCompiler {
       Switch(_) => std::panic!("Not implemented: Switch statement"),
       Throw(_) => {},
       Try(_) => std::panic!("Not implemented: Try statement"),
-      While(_) => std::panic!("Not implemented: While statement"),
-      DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
+      While(while_) => {
+        self.populate_fn_scope_statement(&while_.body, scope);
+      },
+      DoWhile(do_while) => {
+        self.populate_fn_scope_statement(&do_while.body, scope);
+      },
       For(_) => std::panic!("Not implemented: For statement"),
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
       ForOf(_) => std::panic!("Not implemented: ForOf statement"),
@@ -717,6 +721,7 @@ impl FunctionCompiler {
 
         let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
 
+        // TODO: Add negated jmpif instruction to avoid this
         self.definition.push(std::format!(
           "  op! {} %{}",
           condition.value_assembly,
@@ -751,7 +756,51 @@ impl FunctionCompiler {
       Switch(_) => std::panic!("Not implemented: Switch statement"),
       Throw(_) => std::panic!("Not implemented: Throw statement"),
       Try(_) => std::panic!("Not implemented: Try statement"),
-      While(_) => std::panic!("Not implemented: While statement"),
+      While(while_) => {
+        let start_label = self.label_allocator.allocate_numbered(
+          &"while".to_string()
+        );
+
+        self.definition.push(
+          std::format!("{}:", start_label)
+        );
+
+        let mut expression_compiler = ExpressionCompiler {
+          definition: &mut self.definition,
+          scope: scope,
+          reg_allocator: &mut self.reg_allocator,
+        };
+
+        let condition = expression_compiler.compile(&*while_.test, None);
+
+        for reg in condition.nested_registers {
+          self.reg_allocator.release(&reg);
+        }
+
+        let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
+
+        // TODO: Add negated jmpif instruction to avoid this
+        self.definition.push(std::format!(
+          "  op! {} %{}",
+          condition.value_assembly,
+          cond_reg,
+        ));
+
+        let end_label = self.label_allocator.allocate_numbered(&"while_end".to_string());
+
+        let mut jmpif_instr = "  jmpif %".to_string();
+        jmpif_instr += &cond_reg;
+        jmpif_instr += " :";
+        jmpif_instr += &end_label;
+        self.definition.push(jmpif_instr);
+
+        self.reg_allocator.release(&cond_reg);
+
+        self.statement(&*while_.body, false, scope);
+        self.definition.push(std::format!("  jmp :{}", start_label));
+
+        self.definition.push(std::format!("{}:", end_label));
+      },
       DoWhile(_) => std::panic!("Not implemented: DoWhile statement"),
       For(_) => std::panic!("Not implemented: For statement"),
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
