@@ -41,7 +41,9 @@ impl<'a> ExpressionCompiler<'a> {
       Assign(assign_exp) => {
         return self.assign_expression(assign_exp, target_register);
       },
-      Member(_) => std::panic!("Not implemented: Member expression"),
+      Member(member_exp) => {
+        return self.member_expression(member_exp, target_register);
+      },
       SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
       Cond(_) => std::panic!("Not implemented: Cond expression"),
       Call(call_exp) => {
@@ -140,7 +142,11 @@ impl<'a> ExpressionCompiler<'a> {
     );
 
     let mut instr = "  ".to_string();
+
+    // FIXME: && and || need to avoid executing the right side where applicable
+    // (mandatory if they mutate)
     instr += get_binary_op_str(bin.op);
+
     instr += " ";
     instr += &left.value_assembly;
     instr += " ";
@@ -362,6 +368,63 @@ impl<'a> ExpressionCompiler<'a> {
           nested_registers: Vec::new(),
         }
       },
+    };
+  }
+
+  pub fn member_expression(
+    &mut self,
+    member_exp: &swc_ecma_ast::MemberExpr,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let compiled_obj = self.compile(&member_exp.obj, None);
+    
+    let mut sub_instr = "  sub ".to_string();
+    sub_instr += &compiled_obj.value_assembly;
+
+    let compiled_prop = match &member_exp.prop {
+      swc_ecma_ast::MemberProp::Ident(ident) => CompiledExpression {
+        value_assembly: format!("\"{}\"", ident.sym.to_string()),
+        nested_registers: Vec::new(),
+      },
+      swc_ecma_ast::MemberProp::Computed(computed) => {
+        self.compile(&computed.expr, None)
+      },
+      swc_ecma_ast::MemberProp::PrivateName(_) => {
+        std::panic!("Not implemented: private name");
+      },
+    };
+
+    sub_instr += " ";
+    sub_instr += &compiled_prop.value_assembly;
+
+    for reg in compiled_obj.nested_registers {
+      self.reg_allocator.release(&reg);
+    }
+
+    for reg in compiled_prop.nested_registers {
+      self.reg_allocator.release(&reg);
+    }
+
+    let mut nested_registers = Vec::<String>::new();
+
+    let dest = match &target_register {
+      Some(tr) => ("%".to_string() + &tr),
+      None => {
+        let reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        nested_registers.push(reg.clone());
+
+        "%".to_string() + &reg
+      },
+    };
+
+    sub_instr += " ";
+    sub_instr += &dest;
+
+    self.definition.push(sub_instr);
+
+    return CompiledExpression {
+      value_assembly: dest,
+      nested_registers: nested_registers,
     };
   }
 
