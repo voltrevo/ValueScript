@@ -851,7 +851,9 @@ impl<'a> ExpressionCompiler<'a> {
       Array(array_exp) => {
         return self.array_expression(array_exp, target_register);
       },
-      Object(_) => std::panic!("Not implemented: Object expression"),
+      Object(object_exp) => {
+        return self.object_expression(object_exp, target_register);
+      },
       Fn(_) => std::panic!("Not implemented: Fn expression"),
       Unary(un_exp) => {
         return self.unary_expression(un_exp, target_register);
@@ -1077,6 +1079,93 @@ impl<'a> ExpressionCompiler<'a> {
     }
 
     value_assembly += "]";
+
+    return match target_register {
+      None => CompiledExpression {
+        value_assembly: value_assembly,
+        nested_registers: sub_nested_registers,
+      },
+      Some(tr) => {
+        self.definition.push(
+          std::format!("  mov {} %{}", value_assembly, tr)
+        );
+
+        for reg in sub_nested_registers {
+          self.reg_allocator.release(&reg);
+        }
+        
+        CompiledExpression {
+          value_assembly: std::format!("%{}", tr),
+          nested_registers: Vec::new(),
+        }
+      },
+    };
+  }
+
+  fn object_expression(
+    &mut self,
+    object_exp: &swc_ecma_ast::ObjectLit,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let mut value_assembly = "{".to_string();
+    let mut sub_nested_registers = Vec::<String>::new();
+
+    for i in 0..object_exp.props.len() {
+      match &object_exp.props[i] {
+        swc_ecma_ast::PropOrSpread::Spread(_) => {
+          std::panic!("Not implemented: spread expression");
+        },
+        swc_ecma_ast::PropOrSpread::Prop(prop) => match &**prop {
+          swc_ecma_ast::Prop::Shorthand(_) => std::panic!("Not implemented: Shorthand prop"),
+          swc_ecma_ast::Prop::KeyValue(kv) => {
+            let key_assembly = match &kv.key {
+              swc_ecma_ast::PropName::Ident(ident) =>
+                std::format!("\"{}\"", ident.sym.to_string())
+              ,
+              swc_ecma_ast::PropName::Str(str_) =>
+                // TODO: Escaping
+                std::format!("\"{}\"", str_.value.to_string())
+              ,
+              swc_ecma_ast::PropName::Num(num) =>
+                // TODO: JS number stringification (different from rust)
+                std::format!("\"{}\"", num.value.to_string())
+              ,
+              swc_ecma_ast::PropName::Computed(comp) => {
+                // TODO: Always using a register is maybe not ideal
+                // At the least, the assembly supports definitions and should
+                // maybe support any value here
+                let reg = self.reg_allocator.allocate_numbered(&"computed_key".to_string());
+                let compiled = self.compile(&comp.expr, Some(reg.clone()));
+                assert_eq!(compiled.nested_registers.len(), 0);
+                sub_nested_registers.push(reg.clone());
+
+                std::format!("%{}", reg)
+              },
+              swc_ecma_ast::PropName::BigInt(bigint) =>
+                std::format!("\"{}\"", bigint.value.to_string())
+              ,
+            };
+
+            value_assembly += &key_assembly;
+            value_assembly += ": ";
+
+            let mut compiled_value = self.compile(&kv.value, None);
+            sub_nested_registers.append(&mut compiled_value.nested_registers);
+            value_assembly += &compiled_value.value_assembly;
+          },
+          swc_ecma_ast::Prop::Assign(_) => std::panic!("Not implemented: Assign prop"),
+          swc_ecma_ast::Prop::Getter(_) => std::panic!("Not implemented: Getter prop"),
+          swc_ecma_ast::Prop::Setter(_) => std::panic!("Not implemented: Setter prop"),
+          swc_ecma_ast::Prop::Method(_) => std::panic!("Not implemented: Method prop"),
+        },
+      }
+
+      if i != object_exp.props.len() - 1 {
+        value_assembly += ", ";
+      }
+    }
+
+    value_assembly += "}";
 
     return match target_register {
       None => CompiledExpression {
