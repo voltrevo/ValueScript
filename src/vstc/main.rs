@@ -4,6 +4,7 @@ mod virtual_machine;
 mod compile;
 mod scope;
 mod name_allocator;
+mod expression_compiler;
 
 use std::env;
 use std::process::exit;
