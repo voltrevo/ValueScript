@@ -848,7 +848,9 @@ impl<'a> ExpressionCompiler<'a> {
       This(_) => {
         return self.inline("%this".to_string(), target_register);
       },
-      Array(_) => std::panic!("Not implemented: Array expression"),
+      Array(array_exp) => {
+        return self.array_expression(array_exp, target_register);
+      },
       Object(_) => std::panic!("Not implemented: Object expression"),
       Fn(_) => std::panic!("Not implemented: Fn expression"),
       Unary(un_exp) => {
@@ -1042,6 +1044,59 @@ impl<'a> ExpressionCompiler<'a> {
     return CompiledExpression {
       value_assembly: "%".to_string() + &assign_register,
       nested_registers: Vec::new(),
+    };
+  }
+
+  fn array_expression(
+    &mut self,
+    array_exp: &swc_ecma_ast::ArrayLit,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let mut value_assembly = "[".to_string();
+    let mut sub_nested_registers = Vec::<String>::new();
+
+    for i in 0..array_exp.elems.len() {
+      match &array_exp.elems[i] {
+        None => {
+          value_assembly += "void";
+        },
+        Some(elem) => {
+          if elem.spread.is_some() {
+            std::panic!("Not implemented: spread expression");
+          }
+
+          let mut compiled_elem = self.compile(&*elem.expr, None);
+          value_assembly += &compiled_elem.value_assembly;
+          sub_nested_registers.append(&mut compiled_elem.nested_registers);
+        },
+      }
+
+      if i != array_exp.elems.len() - 1 {
+        value_assembly += ", ";
+      }
+    }
+
+    value_assembly += "]";
+
+    return match target_register {
+      None => CompiledExpression {
+        value_assembly: value_assembly,
+        nested_registers: sub_nested_registers,
+      },
+      Some(tr) => {
+        self.definition.push(
+          std::format!("  mov {} %{}", value_assembly, tr)
+        );
+
+        for reg in sub_nested_registers {
+          self.reg_allocator.release(&reg);
+        }
+        
+        CompiledExpression {
+          value_assembly: std::format!("%{}", tr),
+          nested_registers: Vec::new(),
+        }
+      },
     };
   }
 
