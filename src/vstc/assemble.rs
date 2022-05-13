@@ -572,7 +572,7 @@ impl<'a> Assembler for AssemblerData<'a> {
       }
 
       if next == "]" {
-        self.pos.next(); // TODO: Assert whitespace
+        self.parse_optional_whitespace();
         self.output.push(ValueType::End as u8);
         break;
       }
