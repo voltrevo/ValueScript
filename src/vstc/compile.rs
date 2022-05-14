@@ -2,6 +2,9 @@ use std::process::exit;
 use std::{path::Path, sync::Arc};
 use std::fs::File;
 use std::io::prelude::*;
+use std::rc::Rc;
+use std::cell::RefCell;
+use queues::*;
 
 use swc_ecma_ast::{EsVersion};
 use swc_common::{
@@ -86,7 +89,7 @@ pub fn compile(program: &swc_ecma_ast::Program) -> Vec<String> {
 
 #[derive(Default)]
 struct Compiler {
-  definition_allocator: NameAllocator,
+  definition_allocator: Rc<RefCell<NameAllocator>>,
   definitions: Vec<Vec<String>>,
 }
 
@@ -122,7 +125,7 @@ impl Compiler {
               swc_ecma_ast::DefaultDecl::Fn(fn_) => {
                 match &fn_.ident {
                   Some(id) => {
-                    let allocated_name = self.definition_allocator.allocate(
+                    let allocated_name = self.definition_allocator.borrow_mut().allocate(
                       &id.sym.to_string()
                     );
 
@@ -135,7 +138,7 @@ impl Compiler {
                   },
                   None => {
                     default_export_name = Some(
-                      self.definition_allocator.allocate_numbered(&"_anon".to_string())
+                      self.definition_allocator.borrow_mut().allocate_numbered(&"_anon".to_string())
                     );
                   },
                 };
@@ -174,7 +177,7 @@ impl Compiler {
                 scope.set(
                   fn_.ident.sym.to_string(),
                   MappedName::Definition(
-                    self.definition_allocator.allocate(&fn_.ident.sym.to_string()),
+                    self.definition_allocator.borrow_mut().allocate(&fn_.ident.sym.to_string()),
                   ),
                 );
               },
@@ -199,6 +202,7 @@ impl Compiler {
           edd,
           // FIXME: clone() shouldn't be necessary here (we want to move)
           default_export_name.clone().expect("Default export name should have been set"),
+          self.definition_allocator.clone(),
           &scope,
         ),
         _ => {},
@@ -277,7 +281,7 @@ impl Compiler {
 
     match decl {
       Class(_) => std::panic!("Not implemented: Class declaration"),
-      Fn(fn_) => self.compile_fn(fn_.ident.sym.to_string(), &fn_.function, scope),
+      Fn(fn_) => self.compile_fn(fn_.ident.sym.to_string(), &fn_.function, self.definition_allocator.clone(), scope),
       Var(_) => std::panic!("Not implemented: Var declaration"),
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
       TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
@@ -290,6 +294,7 @@ impl Compiler {
     &mut self,
     edd: &swc_ecma_ast::ExportDefaultDecl,
     fn_name: String,
+    definition_allocator: Rc<RefCell<NameAllocator>>,
     scope: &Scope,
   ) {
     use swc_ecma_ast::DefaultDecl::*;
@@ -298,6 +303,7 @@ impl Compiler {
       Fn(fn_) => self.compile_fn(
         fn_name,
         &fn_.function,
+        definition_allocator,
         scope,
       ),
       _ => std::panic!("Not implemented: Non-function default export"),
@@ -308,77 +314,133 @@ impl Compiler {
     &mut self,
     fn_name: String,
     fn_: &swc_ecma_ast::Function,
+    definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) {
     self.definitions.push(
-      FunctionCompiler::compile(fn_name, fn_, parent_scope),
+      FunctionCompiler::compile(
+        fn_name.clone(),
+        Some(fn_name),
+        fn_,
+        definition_allocator,
+        parent_scope,
+      ),
     );
   }
 }
 
+#[derive(Clone)]
+struct QueuedFunction {
+  definition_name: String,
+  fn_name: Option<String>,
+  extra_params: Vec<String>,
+  function: swc_ecma_ast::Function,
+}
+
 struct FunctionCompiler {
   definition: Vec<String>,
+  definition_allocator: Rc<RefCell<NameAllocator>>,
   reg_allocator: NameAllocator,
   label_allocator: NameAllocator,
+  queue: Queue<QueuedFunction>,
 }
 
 impl FunctionCompiler {
-  fn new() -> FunctionCompiler {
+  fn new(definition_allocator: Rc<RefCell<NameAllocator>>) -> FunctionCompiler {
     let mut reg_allocator = NameAllocator::default();
     reg_allocator.allocate(&"return".to_string());
     reg_allocator.allocate(&"this".to_string());
 
     return FunctionCompiler {
       definition: Vec::new(),
+      definition_allocator: definition_allocator,
       reg_allocator: reg_allocator,
       label_allocator: NameAllocator::default(),
+      queue: Queue::new(),
     };
   }
 
   fn compile(
-    fn_name: String,
+    definition_name: String,
+    fn_name: Option<String>,
     fn_: &swc_ecma_ast::Function,
+    definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) -> Vec<String> {
-    let mut self_ = FunctionCompiler::new();
-    self_.compile_fn(fn_name, fn_, parent_scope);
+    let mut self_ = FunctionCompiler::new(definition_allocator);
+
+    self_.queue.add(QueuedFunction {
+      definition_name: definition_name.clone(),
+      fn_name: fn_name,
+      extra_params: Vec::new(),
+      function: fn_.clone(),
+    }).expect("Failed to queue function");
+
+    loop {
+      match self_.queue.remove() {
+        Ok(qfn) => self_.compile_fn(
+          qfn.definition_name,
+          qfn.fn_name,
+          qfn.extra_params,
+          &qfn.function,
+          parent_scope,
+        ),
+        Err(_) => { break; },
+      }
+    }
 
     return self_.definition;
   }
 
   fn compile_fn(
     &mut self,
-    fn_name: String,
+    definition_name: String,
+    fn_name: Option<String>,
+    mut extra_params: Vec<String>,
     fn_: &swc_ecma_ast::Function,
     parent_scope: &Scope,
   ) {
     let scope = parent_scope.nest();
 
+    match fn_name {
+      // TODO: Capture propagation when using this name recursively
+      Some(fn_name_) => scope.set(
+        fn_name_,
+        MappedName::Definition(definition_name.clone()),
+      ),
+      None => {},
+    }
+
     let mut heading = "@".to_string();
-    heading += &fn_name;
+    heading += &definition_name;
     heading += " = function(";
 
-    for i in 0..fn_.params.len() {
-      let p = &fn_.params[i];
+    let mut params = Vec::<String>::new();
+    params.append(&mut extra_params);
 
+    for p in &fn_.params {
       match &p.pat {
         swc_ecma_ast::Pat::Ident(binding_ident) => {
           let param_name = binding_ident.id.sym.to_string();
-          let reg = self.reg_allocator.allocate(&param_name);
-
-          heading += "%";
-          heading += &reg;
-
-          scope.set(
-            param_name.clone(),
-            MappedName::Register(reg),
-          );
-
-          if i != fn_.params.len() - 1 {
-            heading += ", ";
-          }
+          params.push(param_name);
         },
         _ => std::panic!("Not implemented: parameter destructuring"),
+      }
+    }
+
+    for i in 0..params.len() {
+      let reg = self.reg_allocator.allocate(&params[i]);
+
+      heading += "%";
+      heading += &reg;
+
+      scope.set(
+        params[i].clone(),
+        MappedName::Register(reg),
+      );
+
+      if i != params.len() - 1 {
+        heading += ", ";
       }
     }
 
