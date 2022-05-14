@@ -10,6 +10,7 @@ test = false
 bench = false
 
 [dependencies]
+queues = "1.0.2"
 swc_common = { version = "0.17.22", features=["tty-emitter"] }
 swc_ecma_parser = "0.102.2"
 swc = "0.168.3"
