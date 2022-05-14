@@ -526,7 +526,7 @@ impl FunctionCompiler {
 
         match decl {
           Class(_) => std::panic!("Not implemented: Class declaration"),
-          Fn(_) => std::panic!("Not implemented: Fn declaration"),
+          Fn(_) => {},
           Var(var_decl) => self.populate_fn_scope_var_decl(var_decl, scope),
           TsInterface(_) => {},
           TsTypeAlias(_) => {},
@@ -593,7 +593,27 @@ impl FunctionCompiler {
   
           match decl {
             Class(_) => std::panic!("Not implemented: Class declaration"),
-            Fn(_) => std::panic!("Not implemented: Fn declaration"),
+            Fn(fn_) => {
+              let fn_name = fn_.ident.sym.to_string();
+
+              let definition_name = self
+                .definition_allocator
+                .borrow_mut()
+                .allocate(&fn_name)
+              ;
+
+              scope.set(
+                fn_name.clone(),
+                MappedName::Definition(definition_name.clone()),
+              );
+
+              self.queue.add(QueuedFunction {
+                definition_name: definition_name,
+                fn_name: Some(fn_name),
+                extra_params: Vec::new(),
+                function: fn_.function.clone(),
+              }).expect("Failed to queue function");
+            },
             Var(var_decl) => self.populate_block_scope_var_decl(var_decl, scope),
             TsInterface(_) => {},
             TsTypeAlias(_) => {},
@@ -910,7 +930,7 @@ impl FunctionCompiler {
 
     match decl {
       Class(_) => std::panic!("Not implemented: Class declaration"),
-      Fn(_) => std::panic!("Not implemented: Fn declaration"),
+      Fn(_) => {},
       Var(var_decl) => self.var_declaration(var_decl, scope),
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
       TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
