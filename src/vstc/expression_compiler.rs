@@ -1,5 +1,5 @@
 use super::scope::{Scope, ScopeTrait, MappedName};
-use super::name_allocator::NameAllocator;
+use super::function_compiler::FunctionCompiler;
 
 pub struct CompiledExpression {
   pub value_assembly: String,
@@ -7,9 +7,8 @@ pub struct CompiledExpression {
 }
 
 pub struct ExpressionCompiler<'a> {
-  pub definition: &'a mut Vec<String>,
   pub scope: &'a Scope,
-  pub reg_allocator: &'a mut NameAllocator,
+  pub fnc: &'a mut FunctionCompiler,
 }
 
 impl<'a> ExpressionCompiler<'a> {
@@ -101,12 +100,12 @@ impl<'a> ExpressionCompiler<'a> {
     instr += &arg.value_assembly;
 
     for used_reg in arg.nested_registers {
-      self.reg_allocator.release(&used_reg);
+      self.fnc.reg_allocator.release(&used_reg);
     }
 
     let target: String = match &target_register {
       None => {
-        let res = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        let res = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
         nested_registers.push(res.clone());
         res
       },
@@ -116,7 +115,7 @@ impl<'a> ExpressionCompiler<'a> {
     instr += " %";
     instr += &target;
 
-    self.definition.push(instr);
+    self.fnc.definition.push(instr);
 
     return CompiledExpression {
       value_assembly: std::format!("%{}", target),
@@ -153,16 +152,16 @@ impl<'a> ExpressionCompiler<'a> {
     instr += &right.value_assembly;
 
     for used_reg in left.nested_registers {
-      self.reg_allocator.release(&used_reg);
+      self.fnc.reg_allocator.release(&used_reg);
     }
 
     for used_reg in right.nested_registers {
-      self.reg_allocator.release(&used_reg);
+      self.fnc.reg_allocator.release(&used_reg);
     }
 
     let target: String = match &target_register {
       None => {
-        let res = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        let res = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
         nested_registers.push(res.clone());
         res
       },
@@ -172,7 +171,7 @@ impl<'a> ExpressionCompiler<'a> {
     instr += " %";
     instr += &target;
 
-    self.definition.push(instr);
+    self.fnc.definition.push(instr);
 
     return CompiledExpression {
       value_assembly: std::format!("%{}", target),
@@ -222,7 +221,7 @@ impl<'a> ExpressionCompiler<'a> {
       instr += &assign_register;
       instr += " %";
       instr += &tr;
-      self.definition.push(instr);
+      self.fnc.definition.push(instr);
     }
 
     return CompiledExpression {
@@ -268,12 +267,12 @@ impl<'a> ExpressionCompiler<'a> {
         nested_registers: sub_nested_registers,
       },
       Some(tr) => {
-        self.definition.push(
+        self.fnc.definition.push(
           std::format!("  mov {} %{}", value_assembly, tr)
         );
 
         for reg in sub_nested_registers {
-          self.reg_allocator.release(&reg);
+          self.fnc.reg_allocator.release(&reg);
         }
         
         CompiledExpression {
@@ -316,7 +315,7 @@ impl<'a> ExpressionCompiler<'a> {
                 // TODO: Always using a register is maybe not ideal
                 // At the least, the assembly supports definitions and should
                 // maybe support any value here
-                let reg = self.reg_allocator.allocate_numbered(&"computed_key".to_string());
+                let reg = self.fnc.reg_allocator.allocate_numbered(&"computed_key".to_string());
                 let compiled = self.compile(&comp.expr, Some(reg.clone()));
                 assert_eq!(compiled.nested_registers.len(), 0);
                 sub_nested_registers.push(reg.clone());
@@ -355,12 +354,12 @@ impl<'a> ExpressionCompiler<'a> {
         nested_registers: sub_nested_registers,
       },
       Some(tr) => {
-        self.definition.push(
+        self.fnc.definition.push(
           std::format!("  mov {} %{}", value_assembly, tr)
         );
 
         for reg in sub_nested_registers {
-          self.reg_allocator.release(&reg);
+          self.fnc.reg_allocator.release(&reg);
         }
         
         CompiledExpression {
@@ -398,11 +397,11 @@ impl<'a> ExpressionCompiler<'a> {
     sub_instr += &compiled_prop.value_assembly;
 
     for reg in compiled_obj.nested_registers {
-      self.reg_allocator.release(&reg);
+      self.fnc.reg_allocator.release(&reg);
     }
 
     for reg in compiled_prop.nested_registers {
-      self.reg_allocator.release(&reg);
+      self.fnc.reg_allocator.release(&reg);
     }
 
     let mut nested_registers = Vec::<String>::new();
@@ -410,7 +409,7 @@ impl<'a> ExpressionCompiler<'a> {
     let dest = match &target_register {
       Some(tr) => ("%".to_string() + &tr),
       None => {
-        let reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        let reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
         nested_registers.push(reg.clone());
 
         "%".to_string() + &reg
@@ -420,7 +419,7 @@ impl<'a> ExpressionCompiler<'a> {
     sub_instr += " ";
     sub_instr += &dest;
 
-    self.definition.push(sub_instr);
+    self.fnc.definition.push(sub_instr);
 
     return CompiledExpression {
       value_assembly: dest,
@@ -469,7 +468,7 @@ impl<'a> ExpressionCompiler<'a> {
     let dest = match &target_register {
       Some(tr) => ("%".to_string() + &tr),
       None => {
-        let reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        let reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
         nested_registers.push(reg.clone());
 
         "%".to_string() + &reg
@@ -478,10 +477,10 @@ impl<'a> ExpressionCompiler<'a> {
 
     instr += &dest;
 
-    self.definition.push(instr);
+    self.fnc.definition.push(instr);
 
     for reg in sub_nested_registers {
-      self.reg_allocator.release(&reg);
+      self.fnc.reg_allocator.release(&reg);
     }
 
     return CompiledExpression {
@@ -513,7 +512,7 @@ impl<'a> ExpressionCompiler<'a> {
         instr += &value_assembly;
         instr += " %";
         instr += &t;
-        self.definition.push(instr);
+        self.fnc.definition.push(instr);
 
         CompiledExpression {
           value_assembly: std::format!("%{}", t),

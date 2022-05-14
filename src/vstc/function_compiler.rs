@@ -7,7 +7,7 @@ use super::expression_compiler::ExpressionCompiler;
 use super::scope::{Scope, MappedName, ScopeTrait};
 
 #[derive(Clone)]
-struct QueuedFunction {
+pub struct QueuedFunction {
   definition_name: String,
   fn_name: Option<String>,
   extra_params: Vec<String>,
@@ -15,11 +15,11 @@ struct QueuedFunction {
 }
 
 pub struct FunctionCompiler {
-  definition: Vec<String>,
-  definition_allocator: Rc<RefCell<NameAllocator>>,
-  reg_allocator: NameAllocator,
-  label_allocator: NameAllocator,
-  queue: Queue<QueuedFunction>,
+  pub definition: Vec<String>,
+  pub definition_allocator: Rc<RefCell<NameAllocator>>,
+  pub reg_allocator: NameAllocator,
+  pub label_allocator: NameAllocator,
+  pub queue: Queue<QueuedFunction>,
 }
 
 impl FunctionCompiler {
@@ -364,9 +364,8 @@ impl FunctionCompiler {
         },
         Some(expr) => {
           let mut expression_compiler = ExpressionCompiler {
-            definition: &mut self.definition,
+            fnc: self,
             scope: scope,
-            reg_allocator: &mut self.reg_allocator,
           };
 
           expression_compiler.compile(expr, Some("return".to_string()));
@@ -382,9 +381,8 @@ impl FunctionCompiler {
       Continue(_) => std::panic!("Not implemented: Continue statement"),
       If(if_) => {
         let mut expression_compiler = ExpressionCompiler {
-          definition: &mut self.definition,
+          fnc: self,
           scope: scope,
-          reg_allocator: &mut self.reg_allocator,
         };
 
         let condition = expression_compiler.compile(&*if_.test, None);
@@ -440,9 +438,8 @@ impl FunctionCompiler {
         );
 
         let mut expression_compiler = ExpressionCompiler {
-          definition: &mut self.definition,
+          fnc: self,
           scope: scope,
-          reg_allocator: &mut self.reg_allocator,
         };
 
         let condition = expression_compiler.compile(&*while_.test, None);
@@ -487,9 +484,8 @@ impl FunctionCompiler {
         self.statement(&*do_while.body, false, scope);
         
         let mut expression_compiler = ExpressionCompiler {
-          definition: &mut self.definition,
+          fnc: self,
           scope: scope,
-          reg_allocator: &mut self.reg_allocator,
         };
 
         let condition = expression_compiler.compile(&*do_while.test, None);
@@ -541,9 +537,8 @@ impl FunctionCompiler {
         match &for_.test {
           Some(cond) => {
             let mut ec = ExpressionCompiler {
-              definition: &mut self.definition,
+              fnc: self,
               scope: &for_scope,
-              reg_allocator: &mut self.reg_allocator,
             };
     
             let condition = ec.compile(cond, None);
@@ -625,9 +620,8 @@ impl FunctionCompiler {
       match &decl.init {
         Some(expr) => {
           let mut expr_compiler = ExpressionCompiler {
-            definition: &mut self.definition,
+            fnc: self,
             scope: scope,
-            reg_allocator: &mut self.reg_allocator,
           };
 
           let name = match &decl.name {
@@ -653,9 +647,8 @@ impl FunctionCompiler {
     scope: &Scope,
   ) {
     let mut expression_compiler = ExpressionCompiler {
-      definition: &mut self.definition,
+      fnc: self,
       scope: scope,
-      reg_allocator: &mut self.reg_allocator,
     };
 
     let compiled = expression_compiler.compile(
