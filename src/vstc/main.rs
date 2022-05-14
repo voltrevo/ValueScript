@@ -5,6 +5,7 @@ mod compile;
 mod scope;
 mod name_allocator;
 mod expression_compiler;
+mod function_compiler;
 
 use std::env;
 use std::process::exit;
