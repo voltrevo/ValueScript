@@ -8,10 +8,10 @@ use super::scope::{Scope, MappedName, ScopeTrait};
 
 #[derive(Clone)]
 pub struct QueuedFunction {
-  definition_name: String,
-  fn_name: Option<String>,
-  extra_params: Vec<String>,
-  function: swc_ecma_ast::Function,
+  pub definition_name: String,
+  pub fn_name: Option<String>,
+  pub extra_params: Vec<String>,
+  pub function: swc_ecma_ast::Function,
 }
 
 pub struct FunctionCompiler {

@@ -1,5 +1,7 @@
+use queues::*;
+
 use super::scope::{Scope, ScopeTrait, MappedName};
-use super::function_compiler::FunctionCompiler;
+use super::function_compiler::{FunctionCompiler, QueuedFunction};
 
 pub struct CompiledExpression {
   pub value_assembly: String,
@@ -29,7 +31,9 @@ impl<'a> ExpressionCompiler<'a> {
       Object(object_exp) => {
         return self.object_expression(object_exp, target_register);
       },
-      Fn(_) => std::panic!("Not implemented: Fn expression"),
+      Fn(fn_) => {
+        return self.fn_expression(fn_, target_register);
+      },
       Unary(un_exp) => {
         return self.unary_expression(un_exp, target_register);
       },
@@ -487,6 +491,31 @@ impl<'a> ExpressionCompiler<'a> {
       value_assembly: dest,
       nested_registers: nested_registers,
     };
+  }
+
+  pub fn fn_expression(
+    &mut self,
+    fn_: &swc_ecma_ast::FnExpr,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let fn_name = fn_.ident.clone().and_then(|ident| Some(ident.sym.to_string()));
+
+    let definition_name = match &fn_name {
+      Some(name) => self.fnc.definition_allocator.borrow_mut().allocate(&name),
+      None => self.fnc.definition_allocator.borrow_mut().allocate_numbered(&"_anon".to_string()),
+    };
+
+    self.fnc.queue.add(QueuedFunction {
+      definition_name: definition_name.clone(),
+      fn_name: fn_name,
+      extra_params: Vec::new(),
+      function: fn_.function.clone(),
+    }).expect("Failed to queue function");
+
+    return self.inline(
+      format!("@{}", definition_name),
+      target_register,
+    );
   }
 
   pub fn literal(
