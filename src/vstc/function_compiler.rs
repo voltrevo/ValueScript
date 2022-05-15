@@ -14,12 +14,18 @@ pub struct QueuedFunction {
   pub function: swc_ecma_ast::Function,
 }
 
+pub struct LoopLabels {
+  pub continue_: String,
+  pub break_: String,
+}
+
 pub struct FunctionCompiler {
   pub definition: Vec<String>,
   pub definition_allocator: Rc<RefCell<NameAllocator>>,
   pub reg_allocator: NameAllocator,
   pub label_allocator: NameAllocator,
   pub queue: Queue<QueuedFunction>,
+  pub loop_labels: Vec<LoopLabels>,
 }
 
 impl FunctionCompiler {
@@ -34,6 +40,7 @@ impl FunctionCompiler {
       reg_allocator: reg_allocator,
       label_allocator: NameAllocator::default(),
       queue: Queue::new(),
+      loop_labels: vec![],
     };
   }
 
@@ -377,8 +384,33 @@ impl FunctionCompiler {
       },
 
       Labeled(_) => std::panic!("Not implemented: Labeled statement"),
-      Break(_) => std::panic!("Not implemented: Break statement"),
-      Continue(_) => std::panic!("Not implemented: Continue statement"),
+
+      Break(break_) => {
+        if break_.label.is_some() {
+          std::panic!("Not implemented: labeled break statement");
+        }
+
+        let loop_labels = self.loop_labels.last()
+          .expect("break statement outside loop")
+        ;
+
+        self.definition.push(
+          format!("  jmp :{}", loop_labels.break_)
+        );
+      },
+      Continue(continue_) => {
+        if continue_.label.is_some() {
+          std::panic!("Not implemented: labeled continue statement");
+        }
+
+        let loop_labels = self.loop_labels.last()
+          .expect("continue statement outside loop")
+        ;
+
+        self.definition.push(
+          format!("  jmp :{}", loop_labels.continue_)
+        );
+      },
       If(if_) => {
         let mut expression_compiler = ExpressionCompiler {
           fnc: self,
@@ -433,6 +465,15 @@ impl FunctionCompiler {
           &"while".to_string()
         );
 
+        let end_label = self.label_allocator.allocate_numbered(
+          &"while_end".to_string()
+        );
+
+        self.loop_labels.push(LoopLabels {
+          continue_: start_label.clone(),
+          break_: end_label.clone(),
+        });
+
         self.definition.push(
           std::format!("{}:", start_label)
         );
@@ -457,8 +498,6 @@ impl FunctionCompiler {
           cond_reg,
         ));
 
-        let end_label = self.label_allocator.allocate_numbered(&"while_end".to_string());
-
         let mut jmpif_instr = "  jmpif %".to_string();
         jmpif_instr += &cond_reg;
         jmpif_instr += " :";
@@ -471,11 +510,26 @@ impl FunctionCompiler {
         self.definition.push(std::format!("  jmp :{}", start_label));
 
         self.definition.push(std::format!("{}:", end_label));
+
+        self.loop_labels.pop();
       },
       DoWhile(do_while) => {
         let start_label = self.label_allocator.allocate_numbered(
           &"do_while".to_string()
         );
+
+        let continue_label = self.label_allocator.allocate_numbered(
+          &"do_while_continue".to_string()
+        );
+
+        let end_label = self.label_allocator.allocate_numbered(
+          &"do_while_end".to_string()
+        );
+
+        self.loop_labels.push(LoopLabels {
+          continue_: continue_label.clone(),
+          break_: end_label.clone(),
+        });
 
         self.definition.push(
           std::format!("{}:", start_label)
@@ -494,11 +548,21 @@ impl FunctionCompiler {
           self.reg_allocator.release(&reg);
         }
 
+        self.definition.push(
+          format!("{}:", continue_label)
+        );
+
         let mut jmpif_instr = "  jmpif ".to_string();
         jmpif_instr += &condition.value_assembly;
         jmpif_instr += " :";
         jmpif_instr += &start_label;
         self.definition.push(jmpif_instr);
+
+        self.definition.push(
+          format!("{}:", end_label)
+        );
+
+        self.loop_labels.pop();
       },
       For(for_) => {
         let for_scope = scope.nest();
@@ -526,13 +590,22 @@ impl FunctionCompiler {
           &"for_test".to_string()
         );
 
-        self.definition.push(
-          format!("{}:", &for_test_label)
+        let for_continue_label = self.label_allocator.allocate_numbered(
+          &"for_continue".to_string()
         );
 
         let for_end_label = self.label_allocator.allocate_numbered(
           &"for_end".to_string()
         );
+
+        self.definition.push(
+          format!("{}:", &for_test_label)
+        );
+
+        self.loop_labels.push(LoopLabels {
+          continue_: for_continue_label.clone(),
+          break_: for_end_label.clone(),
+        });
 
         match &for_.test {
           Some(cond) => {
@@ -569,6 +642,10 @@ impl FunctionCompiler {
 
         self.statement(&for_.body, false, &for_scope);
 
+        self.definition.push(
+          format!("{}:", for_continue_label)
+        );
+
         match &for_.update {
           Some(update) => self.expression(update, &for_scope),
           None => {},
@@ -581,6 +658,8 @@ impl FunctionCompiler {
         self.definition.push(
           format!("{}:", for_end_label)
         );
+
+        self.loop_labels.pop();
       },
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
       ForOf(_) => std::panic!("Not implemented: ForOf statement"),
