@@ -37,7 +37,9 @@ impl<'a> ExpressionCompiler<'a> {
       Unary(un_exp) => {
         return self.unary_expression(un_exp, target_register);
       },
-      Update(_) => std::panic!("Not implemented: Update expression"),
+      Update(update_exp) => {
+        return self.update_expression(update_exp, target_register);
+      },
       Bin(bin_exp) => {
         return self.binary_expression(bin_exp, target_register);
       },
@@ -441,6 +443,70 @@ impl<'a> ExpressionCompiler<'a> {
     return CompiledExpression {
       value_assembly: dest,
       nested_registers: nested_registers,
+    };
+  }
+
+  pub fn update_expression(
+    &mut self,
+    update_exp: &swc_ecma_ast::UpdateExpr,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let name = match &*update_exp.arg {
+      swc_ecma_ast::Expr::Ident(ident) => ident.sym.to_string(),
+      _ => std::panic!("Not implemented: "),
+    };
+
+    let name_reg = match self.scope.get(&name) {
+      None => panic!("Unresolved name: {}", &name),
+      Some(MappedName::Definition(_)) => panic!("Invalid: update definition"),
+      Some(MappedName::Register(reg)) => reg,
+    };
+
+    let op_str = match update_exp.op {
+      swc_ecma_ast::UpdateOp::PlusPlus => "op++",
+      swc_ecma_ast::UpdateOp::MinusMinus => "op--",
+    };
+
+    return match update_exp.prefix {
+      true => {
+        self.fnc.definition.push(format!(
+          "  {} %{}",
+          op_str,
+          &name_reg,
+        ));
+
+        return self.inline(format!("%{}", name_reg), target_register);
+      },
+      false => {
+        let mut nested_registers = Vec::<String>::new();
+
+        let old_value_reg = match target_register {
+          Some(tr) => tr,
+          None => {
+            let res = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+            nested_registers.push(res.clone());
+
+            res
+          }
+        };
+
+        self.fnc.definition.push(format!(
+          "  mov %{} %{}",
+          &name_reg,
+          &old_value_reg,
+        ));
+
+        self.fnc.definition.push(format!(
+          "  {} %{}",
+          op_str,
+          &name_reg,
+        ));
+
+        CompiledExpression {
+          value_assembly: format!("%{}", &old_value_reg),
+          nested_registers: nested_registers,
+        }
+      },
     };
   }
 
