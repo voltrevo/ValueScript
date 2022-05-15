@@ -209,7 +209,7 @@ impl<'a> ExpressionCompiler<'a> {
     };
 
     let rhs = self.compile(
-      &*assign_exp.right,
+      &assign_exp.right,
       Some(assign_register.clone()),
     );
 
@@ -218,20 +218,7 @@ impl<'a> ExpressionCompiler<'a> {
     // returning any nested registers when there's a target.
     assert_eq!(rhs.nested_registers.len(), 0);
 
-    if target_register.is_some() {
-      let tr = target_register.unwrap();
-
-      let mut instr = "  mov %".to_string();
-      instr += &assign_register;
-      instr += " %";
-      instr += &tr;
-      self.fnc.definition.push(instr);
-    }
-
-    return CompiledExpression {
-      value_assembly: "%".to_string() + &assign_register,
-      nested_registers: Vec::new(),
-    };
+    return self.inline("%".to_string() + &assign_register, target_register);
   }
 
   pub fn array_expression(
