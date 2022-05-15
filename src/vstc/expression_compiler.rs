@@ -188,12 +188,11 @@ impl<'a> ExpressionCompiler<'a> {
     assign_exp: &swc_ecma_ast::AssignExpr,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    if assign_exp.op != swc_ecma_ast::AssignOp::Assign {
-      std::panic!("Not implemented: compound assignment");
-    }
-
     let assign_name = match &assign_exp.left {
-      swc_ecma_ast::PatOrExpr::Expr(_) => std::panic!("Not implemented: assign to expr"),
+      swc_ecma_ast::PatOrExpr::Expr(expr) => match &**expr {
+        swc_ecma_ast::Expr::Ident(ident) => ident.sym.to_string(),
+        _ => std::panic!("Not implemented: assign to non-identifier expression"),
+      },
       swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
         swc_ecma_ast::Pat::Ident(ident) => ident.id.sym.to_string(),
         _ => std::panic!("Not implemented: destructuring"),
@@ -208,17 +207,44 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let rhs = self.compile(
-      &assign_exp.right,
-      Some(assign_register.clone()),
-    );
+    let assign_op_str = get_assign_op_str(assign_exp.op);
 
-    // TODO: Consider making two variations of compile, one that takes a target
-    // register and one that doesn't. This may simplify things eg by not
-    // returning any nested registers when there's a target.
+    let rhs = match assign_op_str {
+      None => self.compile(
+        &assign_exp.right,
+        Some(assign_register.clone()),
+      ),
+      Some(op_str) => {
+        let tmp_reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        let pre_rhs = self.compile(&assign_exp.right, Some(tmp_reg.clone()));
+
+        // TODO: Consider making two variations of compile, one that takes a target
+        // register and one that doesn't. This may simplify things eg by not
+        // returning any nested registers when there's a target.
+        assert_eq!(pre_rhs.nested_registers.len(), 0);
+
+        self.fnc.definition.push(
+          format!(
+            "  {} %{} %{} %{}",
+            op_str,
+            &assign_register,
+            &tmp_reg,
+            &assign_register,
+          )
+        );
+
+        self.fnc.reg_allocator.release(&tmp_reg);
+
+        CompiledExpression {
+          value_assembly: format!("%{}", &assign_register),
+          nested_registers: Vec::new(),
+        }
+      },
+    };
+
     assert_eq!(rhs.nested_registers.len(), 0);
 
-    return self.inline("%".to_string() + &assign_register, target_register);
+    return self.inline(format!("%{}", &assign_register), target_register);
   }
 
   pub fn array_expression(
@@ -613,5 +639,28 @@ pub fn get_unary_op_str(op: swc_ecma_ast::UnaryOp) -> &'static str {
     TypeOf => "typeof",
     Void => std::panic!("No matching instruction"),
     Delete => std::panic!("No matching instruction"),
+  };
+}
+
+pub fn get_assign_op_str(op: swc_ecma_ast::AssignOp) -> Option<&'static str> {
+  use swc_ecma_ast::AssignOp::*;
+
+  return match op {
+    Assign => None,
+    AddAssign => Some("op+"),
+    SubAssign => Some("op-"),
+    MulAssign => Some("op*"),
+    DivAssign => Some("op/"),
+    ModAssign => Some("op%"),
+    LShiftAssign => Some("op<<"),
+    RShiftAssign => Some("op>>"),
+    ZeroFillRShiftAssign => Some("op>>>"),
+    BitOrAssign => Some("op|"),
+    BitXorAssign => Some("op^"),
+    BitAndAssign => Some("op&"),
+    ExpAssign => Some("op**"),
+    AndAssign => Some("op&&"),
+    OrAssign => Some("op||"),
+    NullishAssign => Some("op??"),
   };
 }
