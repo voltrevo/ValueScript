@@ -291,7 +291,21 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
         Some(i) => i,
       };
 
-      Rc::make_mut(array_data)[subscript_index] = value;
+      let array_data_mut = Rc::make_mut(array_data);
+
+      if subscript_index < array_data_mut.len() {
+        array_data_mut[subscript_index] = value;
+      } else {
+        if subscript_index - array_data_mut.len() > 100 {
+          std::panic!("Not implemented: Sparse arrays");
+        }
+
+        while subscript_index > array_data_mut.len() {
+          array_data_mut.push(Val::Void);
+        }
+
+        array_data_mut.push(value);
+      }
     },
     Val::Object(object_data) => {
       Rc::make_mut(object_data).insert(subscript.val_to_string(), value);
