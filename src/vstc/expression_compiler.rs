@@ -843,6 +843,8 @@ impl TargetAccessor {
         for reg in &nta.subscript.nested_registers {
           ec.fnc.reg_allocator.release(reg);
         }
+
+        nta.obj.packup(ec);
       },
     }
   }
