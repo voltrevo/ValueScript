@@ -34,6 +34,7 @@ impl ValTrait for VsPointer {
 
     return match bd.decode_type() {
       BytecodeType::End => std::panic!("Invalid: pointer to end"),
+      BytecodeType::Void => std::panic!("Invalid: pointer to void"),
       BytecodeType::Undefined => VsType::Undefined,
       BytecodeType::Null => VsType::Null,
       BytecodeType::False => VsType::Bool,

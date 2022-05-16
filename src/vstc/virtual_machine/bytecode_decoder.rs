@@ -17,6 +17,7 @@ pub struct BytecodeDecoder {
 #[derive(PartialEq)]
 pub enum BytecodeType {
   End = 0x00,
+  Void = 0x01,
   Undefined = 0x02,
   Null = 0x03,
   False = 0x04,
@@ -37,6 +38,7 @@ impl BytecodeType {
 
     return match byte {
       0x00 => End,
+      0x01 => Void,
       0x02 => Undefined,
       0x03 => Null,
       0x04 => False,
@@ -77,6 +79,7 @@ impl BytecodeDecoder {
   pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
     return match self.decode_type() {
       BytecodeType::End => std::panic!("Cannot decode end"),
+      BytecodeType::Void => Val::Void,
       BytecodeType::Undefined => Val::Undefined,
       BytecodeType::Null => Val::Null,
       BytecodeType::False => Val::Bool(false),

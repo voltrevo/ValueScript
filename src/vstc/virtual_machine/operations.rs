@@ -260,7 +260,12 @@ pub fn op_sub(left: Val, right: Val) -> Val {
         return Val::Undefined;
       }
 
-      return array_data[right_index].clone();
+      let res = array_data[right_index].clone();
+
+      return match res {
+        Val::Void => Val::Undefined,
+        _ => res,
+      };
     },
     Val::Object(object_data) => {
       return object_data
