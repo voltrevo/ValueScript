@@ -248,7 +248,16 @@ impl VirtualMachine {
 
       Sub => frame.apply_binary_op(operations::op_sub),
 
-      SubMov => std::panic!("Instruction not implemented: SubMov"),
+      SubMov => {
+        let subscript = frame.decoder.decode_val(&frame.registers);
+        let value = frame.decoder.decode_val(&frame.registers);
+    
+        let register_index = frame.decoder.decode_register_index().unwrap();
+        let mut target = frame.registers[register_index].clone(); // TODO: Lift
+
+        operations::op_submov(&mut target, subscript, value);
+        frame.registers[register_index] = target;
+      },
 
       SubCall => std::panic!("Instruction not implemented: SubCall"),
 

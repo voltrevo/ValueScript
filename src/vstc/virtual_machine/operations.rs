@@ -271,3 +271,31 @@ pub fn op_sub(left: Val, right: Val) -> Val {
     Val::Custom(custom_data) => op_sub(custom_data.resolve(), right),
   }
 }
+
+pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
+  match target {
+    Val::Void => std::panic!("Shouldn't happen"),
+    Val::Undefined => std::panic!("Not implemented: exceptions"),
+    Val::Null => std::panic!("Not implemented: exceptions"),
+    Val::Bool(_) => std::panic!("Not implemented: exceptions"),
+    Val::Number(_) => std::panic!("Not implemented: exceptions"),
+    Val::String(_) => std::panic!("Not implemented: exceptions"),
+    Val::Array(array_data) => {
+      let subscript_index = match subscript.to_index() {
+        None => std::panic!("Not implemented: non-uint array subscript assignment"),
+        Some(i) => i,
+      };
+
+      Rc::make_mut(array_data)[subscript_index] = value;
+    },
+    Val::Object(object_data) => {
+      Rc::make_mut(object_data).insert(subscript.to_string(), value);
+    },
+    Val::Function(_) => std::panic!("Not implemented: function subscript assignment"),
+    Val::Custom(custom_data) => {
+      let mut resolved_target = custom_data.resolve();
+      op_submov(&mut resolved_target, subscript, value);
+      *target = resolved_target;
+    },
+  }
+}
