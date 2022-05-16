@@ -451,31 +451,54 @@ impl<'a> ExpressionCompiler<'a> {
     update_exp: &swc_ecma_ast::UpdateExpr,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    let name = match &*update_exp.arg {
-      swc_ecma_ast::Expr::Ident(ident) => ident.sym.to_string(),
-      _ => std::panic!("Not implemented: "),
-    };
-
-    let name_reg = match self.scope.get(&name) {
-      None => panic!("Unresolved name: {}", &name),
-      Some(MappedName::Definition(_)) => panic!("Invalid: update definition"),
-      Some(MappedName::Register(reg)) => reg,
-    };
+    let target = TargetAccessor::compile(self, &update_exp.arg);
 
     let op_str = match update_exp.op {
       swc_ecma_ast::UpdateOp::PlusPlus => "op++",
       swc_ecma_ast::UpdateOp::MinusMinus => "op--",
     };
 
-    return match update_exp.prefix {
+    let res = match update_exp.prefix {
       true => {
         self.fnc.definition.push(format!(
           "  {} %{}",
           op_str,
-          &name_reg,
+          &target.register(),
         ));
 
-        return self.inline(format!("%{}", name_reg), target_register);
+        let mut nested_registers = Vec::<String>::new();
+
+        let result_reg = match &target {
+          TargetAccessor::Register(reg) => reg.clone(),
+          TargetAccessor::Nested(nta) => match target_register {
+            Some(tr) => {
+              self.fnc.definition.push(format!(
+                "  mov %{} %{}",
+                nta.register,
+                tr,
+              ));
+
+              tr
+            },
+            None => {
+              let res = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+              nested_registers.push(res.clone());
+
+              self.fnc.definition.push(format!(
+                "  mov %{} %{}",
+                nta.register,
+                res,
+              ));
+
+              res
+            },
+          },
+        };
+
+        CompiledExpression {
+          value_assembly: format!("%{}", result_reg),
+          nested_registers: nested_registers,
+        }
       },
       false => {
         let mut nested_registers = Vec::<String>::new();
@@ -492,14 +515,14 @@ impl<'a> ExpressionCompiler<'a> {
 
         self.fnc.definition.push(format!(
           "  mov %{} %{}",
-          &name_reg,
+          &target.register(),
           &old_value_reg,
         ));
 
         self.fnc.definition.push(format!(
           "  {} %{}",
           op_str,
-          &name_reg,
+          &target.register(),
         ));
 
         CompiledExpression {
@@ -508,6 +531,10 @@ impl<'a> ExpressionCompiler<'a> {
         }
       },
     };
+
+    target.packup(self);
+
+    return res;
   }
 
   pub fn call_expression(
@@ -729,4 +756,94 @@ pub fn get_assign_op_str(op: swc_ecma_ast::AssignOp) -> Option<&'static str> {
     OrAssign => Some("op||"),
     NullishAssign => Some("op??"),
   };
+}
+
+struct NestedTargetAccess {
+  obj: Box<TargetAccessor>,
+  subscript: CompiledExpression,
+  register: String,
+}
+
+enum TargetAccessor {
+  Register(String),
+  Nested(NestedTargetAccess),
+}
+
+impl TargetAccessor {
+  fn compile(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> TargetAccessor {
+    use swc_ecma_ast::Expr::*;
+
+    return match expr {
+      Ident(ident) => match ec.scope.get(&ident.sym.to_string()) {
+        None => std::panic!("Unresolved identifier"),
+        Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
+        Some(MappedName::Register(reg)) => TargetAccessor::Register(reg),
+      },
+      This(_) => TargetAccessor::Register("this".to_string()),
+      Member(member) => {
+        let obj = TargetAccessor::compile(ec, &member.obj);
+
+        let subscript = match &member.prop {
+          swc_ecma_ast::MemberProp::Ident(ident) => CompiledExpression {
+            value_assembly: format!("\"{}\"", ident.sym.to_string()),
+            nested_registers: Vec::new(),
+          },
+          swc_ecma_ast::MemberProp::Computed(computed) => {
+            ec.compile(&computed.expr, None)
+          },
+          swc_ecma_ast::MemberProp::PrivateName(_) => {
+            std::panic!("Not implemented: private name");
+          },
+        };
+
+        let register = ec.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+
+        ec.fnc.definition.push(format!(
+          "  sub %{} {} %{}",
+          obj.register(),
+          subscript.value_assembly,
+          register,
+        ));
+
+        TargetAccessor::Nested(NestedTargetAccess {
+          obj: Box::new(obj),
+          subscript: subscript,
+          register: register,
+        })
+      },
+      SuperProp(_) => std::panic!("Not implemented: SuperProp"),
+      _ => std::panic!("Invalid lvalue expression"),
+    };
+  }
+
+  fn register(&self) -> String {
+    use TargetAccessor::*;
+
+    return match self {
+      Register(reg) => reg.clone(),
+      Nested(nta) => nta.register.clone(),
+    };
+  }
+
+  fn packup(&self, ec: &mut ExpressionCompiler) {
+    use TargetAccessor::*;
+
+    match self {
+      Register(_) => {},
+      Nested(nta) => {
+        ec.fnc.definition.push(format!(
+          "  submov {} %{} %{}",
+          &nta.subscript.value_assembly,
+          &nta.register,
+          nta.obj.register(),
+        ));
+        
+        ec.fnc.reg_allocator.release(&nta.register);
+        
+        for reg in &nta.subscript.nested_registers {
+          ec.fnc.reg_allocator.release(reg);
+        }
+      },
+    }
+  }
 }
