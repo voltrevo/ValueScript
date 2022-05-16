@@ -73,7 +73,7 @@ impl ValTrait for Val {
     use Val::*;
 
     return match self {
-      Void => "undefined".to_string(),
+      Void => "".to_string(),
       Undefined => "undefined".to_string(),
       Null => "null".to_string(),
       Bool(b) => b.to_string(),
