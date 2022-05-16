@@ -190,33 +190,121 @@ impl<'a> ExpressionCompiler<'a> {
     assign_exp: &swc_ecma_ast::AssignExpr,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    let assign_name = match &assign_exp.left {
-      swc_ecma_ast::PatOrExpr::Expr(expr) => match &**expr {
-        swc_ecma_ast::Expr::Ident(ident) => ident.sym.to_string(),
-        _ => std::panic!("Not implemented: assign to non-identifier expression"),
+    match get_assign_op_str(assign_exp.op) {
+      None => {
+        enum AssignTarget {
+          Register(String),
+          Member(TargetAccessor, swc_ecma_ast::MemberProp),
+        }
+
+        impl AssignTarget {
+          fn from_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> AssignTarget {
+            return match expr {
+              swc_ecma_ast::Expr::Ident(ident) => match ec.scope.get(&ident.sym.to_string()) {
+                None => std::panic!("Unresolved identifier"),
+                Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
+                Some(MappedName::Register(reg)) => AssignTarget::Register(reg),
+              },
+              swc_ecma_ast::Expr::This(_) => AssignTarget::Register("this".to_string()),
+              swc_ecma_ast::Expr::Member(member) => AssignTarget::Member(
+                TargetAccessor::compile(ec, &member.obj),
+                member.prop.clone(),
+              ),
+              swc_ecma_ast::Expr::SuperProp(_) => std::panic!("Not implemented: SuperProp"),
+              _ => std::panic!("Invalid lvalue expression"),
+            };
+          }
+
+          fn from_ident(ec: &mut ExpressionCompiler, ident: &swc_ecma_ast::Ident) -> AssignTarget {
+            return match ec.scope.get(&ident.sym.to_string()) {
+              None => std::panic!("Unresolved identifier"),
+              Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
+              Some(MappedName::Register(reg)) => AssignTarget::Register(reg),
+            };
+          }
+        }
+
+        let at = match &assign_exp.left {
+          swc_ecma_ast::PatOrExpr::Expr(expr) => AssignTarget::from_expr(self, expr),
+          swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
+            swc_ecma_ast::Pat::Ident(ident) => AssignTarget::from_ident(self, &ident.id),
+            swc_ecma_ast::Pat::Expr(expr) => AssignTarget::from_expr(self, expr),
+            _ => std::panic!("Invalid left hand side of assignment"),
+          },
+        };
+
+        match at {
+          AssignTarget::Register(treg) => {
+            self.compile(&assign_exp.right, Some(treg.clone()));
+
+            return CompiledExpression {
+              value_assembly: format!("%{}", treg),
+              nested_registers: vec![],
+            };
+          },
+          AssignTarget::Member(obj_accessor, prop) => {
+            let subscript = match prop {
+              swc_ecma_ast::MemberProp::Ident(ident) => CompiledExpression {
+                value_assembly: format!("\"{}\"", ident.sym.to_string()),
+                nested_registers: vec![],
+              },
+              swc_ecma_ast::MemberProp::Computed(computed) =>
+                self.compile(&computed.expr, None)
+              ,
+              swc_ecma_ast::MemberProp::PrivateName(_) => {
+                std::panic!("Not implemented: private name");
+              },
+            };
+
+            let rhs = self.compile(&assign_exp.right, None);
+
+            self.fnc.definition.push(format!(
+              "  submov {} {} %{}",
+              subscript.value_assembly,
+              rhs.value_assembly,
+              obj_accessor.register(),
+            ));
+
+            obj_accessor.packup(self);
+
+            for reg in subscript.nested_registers {
+              self.fnc.reg_allocator.release(&reg);
+            }
+
+            for reg in rhs.nested_registers {
+              self.fnc.reg_allocator.release(&reg);
+            }
+
+            let res_reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+
+            self.fnc.definition.push(format!(
+              "  mov {} %{}",
+              rhs.value_assembly,
+              res_reg,
+            ));
+
+            return CompiledExpression {
+              value_assembly: format!("%{}", res_reg),
+              nested_registers: vec![res_reg],
+            };
+          },
+        };
       },
-      swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
-        swc_ecma_ast::Pat::Ident(ident) => ident.id.sym.to_string(),
-        _ => std::panic!("Not implemented: destructuring"),
-      },
-    };
-
-    let assign_register = match self.scope.get(&assign_name) {
-      None => std::panic!("Unresolved reference"),
-      Some(mapping) => match mapping {
-        MappedName::Definition(_) => std::panic!("Invalid: assignment to definition"),
-        MappedName::Register(reg_name) => reg_name,
-      }
-    };
-
-    let assign_op_str = get_assign_op_str(assign_exp.op);
-
-    let rhs = match assign_op_str {
-      None => self.compile(
-        &assign_exp.right,
-        Some(assign_register.clone()),
-      ),
       Some(op_str) => {
+        let target = match &assign_exp.left {
+          swc_ecma_ast::PatOrExpr::Expr(expr) => TargetAccessor::compile(self, &expr),
+          swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
+            swc_ecma_ast::Pat::Ident(ident) => TargetAccessor::Register(
+              match self.scope.get(&ident.id.sym.to_string()) {
+                None => std::panic!("Unresolved identifier"),
+                Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
+                Some(MappedName::Register(reg)) => reg,
+              }
+            ),
+            _ => std::panic!("Invalid left hand side of compound assignment"),
+          },
+        };
+
         let tmp_reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
         let pre_rhs = self.compile(&assign_exp.right, Some(tmp_reg.clone()));
 
@@ -229,24 +317,60 @@ impl<'a> ExpressionCompiler<'a> {
           format!(
             "  {} %{} %{} %{}",
             op_str,
-            &assign_register,
-            &tmp_reg,
-            &assign_register,
+            target.register(),
+            tmp_reg,
+            target.register(),
           )
         );
 
         self.fnc.reg_allocator.release(&tmp_reg);
 
-        CompiledExpression {
-          value_assembly: format!("%{}", &assign_register),
-          nested_registers: Vec::new(),
-        }
+        let mut nested_registers = Vec::<String>::new();
+
+        let result_reg = match &target {
+          TargetAccessor::Register(treg) => {
+            match target_register {
+              None => {},
+              Some(tr) => {
+                self.fnc.definition.push(format!(
+                  "  mov %{} %{}",
+                  treg,
+                  tr,
+                ));
+              },
+            }
+
+            treg.clone()
+          },
+          TargetAccessor::Nested(nta) => {
+            let res_reg = match target_register {
+              None => {
+                let reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+                nested_registers.push(reg.clone());
+
+                reg
+              },
+              Some(tr) => tr,
+            };
+
+            self.fnc.definition.push(format!(
+              "  mov %{} %{}",
+              nta.register,
+              res_reg,
+            ));
+
+            res_reg
+          },
+        };
+
+        target.packup(self);
+
+        return CompiledExpression {
+          value_assembly: format!("%{}", result_reg),
+          nested_registers: nested_registers,
+        };
       },
     };
-
-    assert_eq!(rhs.nested_registers.len(), 0);
-
-    return self.inline(format!("%{}", &assign_register), target_register);
   }
 
   pub fn array_expression(
