@@ -294,7 +294,7 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
       Rc::make_mut(array_data)[subscript_index] = value;
     },
     Val::Object(object_data) => {
-      Rc::make_mut(object_data).insert(subscript.to_string(), value);
+      Rc::make_mut(object_data).insert(subscript.val_to_string(), value);
     },
     Val::Function(_) => std::panic!("Not implemented: function subscript assignment"),
     Val::Custom(custom_data) => {
