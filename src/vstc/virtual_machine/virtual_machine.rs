@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
-use super::vs_value::Val;
-use super::vs_value::ValTrait;
+use super::vs_value::{Val, ValTrait, LoadFunctionResult};
 use super::operations;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::bytecode_decoder::BytecodeType;
@@ -57,7 +56,11 @@ impl VirtualMachine {
     };
 
     let main_fn = bd.decode_val(&Vec::new());
-    let mut frame = main_fn.make_frame().expect("bytecode does start with function");
+
+    let mut frame = match main_fn.load_function() {
+      LoadFunctionResult::StackFrame(f) => f,
+      _ => std::panic!("bytecode does start with function"),
+    };
 
     let mut reg_i = frame.param_start;
     let mut param_i = 0;
@@ -175,49 +178,66 @@ impl VirtualMachine {
 
       Call => {
         let fn_ = frame.decoder.decode_val(&frame.registers);
-        let maybe_new_frame = fn_.make_frame();
 
-        if maybe_new_frame.is_none() {
-          std::panic!("Not implemented: throw exception (fn_ is not a function)");
-        }
-
-        let mut new_frame = maybe_new_frame.unwrap();
-        load_parameters(&mut frame, &mut new_frame);
-
-        frame.return_target = frame.decoder.decode_register_index();
-        frame.this_target = None;
-
-        self.stack.push(new_frame);
+        match fn_.load_function() {
+          LoadFunctionResult::NotAFunction => 
+            std::panic!("Not implemented: throw exception (fn_ is not a function)")
+          ,
+          LoadFunctionResult::StackFrame(mut new_frame) => {
+            transfer_parameters(&mut frame, &mut new_frame);
+    
+            frame.return_target = frame.decoder.decode_register_index();
+            frame.this_target = None;
+    
+            self.stack.push(new_frame);
+          },
+          LoadFunctionResult::NativeFunction(native_fn) => {
+            let res = native_fn(
+              &mut Val::Undefined,
+              get_parameters(&mut frame),
+            );
+            
+            match frame.decoder.decode_register_index() {
+              Some(return_target) => {
+                frame.registers[return_target] = res;
+              },
+              None => {},
+            };
+          },
+        };
       }
 
       Apply => {
         let fn_ = frame.decoder.decode_val(&frame.registers);
-        let maybe_new_frame = fn_.make_frame();
 
-        if maybe_new_frame.is_none() {
-          std::panic!("Not implemented: throw exception (fn_ is not a function)");
+        match fn_.load_function() {
+          LoadFunctionResult::NotAFunction => 
+            std::panic!("Not implemented: throw exception (fn_ is not a function)")
+          ,
+          LoadFunctionResult::StackFrame(mut new_frame) => {
+            if frame.decoder.peek_type() == BytecodeType::Register {
+              frame.decoder.decode_type();
+              let this_target = frame.decoder.decode_register_index();
+              frame.this_target = this_target;
+    
+              if this_target.is_some() {
+                new_frame.registers[1] = frame.registers[this_target.unwrap()].clone();
+              }
+            } else {
+              frame.this_target = None;
+              new_frame.registers[1] = frame.decoder.decode_val(&frame.registers);
+            }
+    
+            transfer_parameters(&mut frame, &mut new_frame);
+    
+            frame.return_target = frame.decoder.decode_register_index();
+    
+            self.stack.push(new_frame);
+          },
+          LoadFunctionResult::NativeFunction(native_fn) => {
+            std::panic!("Not implemented");
+          },
         }
-
-        let mut new_frame = maybe_new_frame.unwrap();
-
-        if frame.decoder.peek_type() == BytecodeType::Register {
-          frame.decoder.decode_type();
-          let this_target = frame.decoder.decode_register_index();
-          frame.this_target = this_target;
-
-          if this_target.is_some() {
-            new_frame.registers[1] = frame.registers[this_target.unwrap()].clone();
-          }
-        } else {
-          frame.this_target = None;
-          new_frame.registers[1] = frame.decoder.decode_val(&frame.registers);
-        }
-
-        load_parameters(&mut frame, &mut new_frame);
-
-        frame.return_target = frame.decoder.decode_register_index();
-
-        self.stack.push(new_frame);
       }
 
       Bind => {
@@ -294,7 +314,27 @@ impl VirtualMachine {
   }
 }
 
-fn load_parameters(
+fn get_parameters(
+  frame: &mut StackFrame,
+) -> Vec<Val> {
+  let mut res = Vec::<Val>::new();
+
+  let bytecode_type = frame.decoder.decode_type();
+
+  if bytecode_type != BytecodeType::Array {
+    std::panic!("Not implemented: call instruction not using inline array");
+  }
+
+  while frame.decoder.peek_type() != BytecodeType::End {
+    res.push(frame.decoder.decode_val(&frame.registers));
+  }
+
+  frame.decoder.decode_type(); // End (TODO: assert)
+
+  return res;
+}
+
+fn transfer_parameters(
   frame: &mut StackFrame,
   new_frame: &mut StackFrame,
 ) {

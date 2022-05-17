@@ -29,7 +29,7 @@ impl VsFunction {
     };
   }
 
-  pub fn make_frame(&self) -> Option<StackFrame> {
+  pub fn make_frame(&self) -> StackFrame {
     let mut registers: Vec<Val> = Vec::with_capacity(self.register_count - 1);
 
     registers.push(Val::Undefined);
@@ -43,7 +43,7 @@ impl VsFunction {
       registers.push(Val::Undefined);
     }
 
-    return Some(StackFrame {
+    return StackFrame {
       decoder: BytecodeDecoder {
         data: self.bytecode.clone(),
         pos: self.start,
@@ -53,6 +53,6 @@ impl VsFunction {
       param_end: self.parameter_count + 2,
       this_target: None,
       return_target: None,
-    });
+    };
   }
 }

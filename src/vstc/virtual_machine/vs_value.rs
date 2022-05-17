@@ -31,6 +31,12 @@ pub enum VsType {
   Function,
 }
 
+pub enum LoadFunctionResult {
+  NotAFunction,
+  StackFrame(StackFrame),
+  NativeFunction(fn(this: &mut Val, params: Vec<Val>) -> Val),
+}
+
 pub trait ValTrait {
   fn typeof_(&self) -> VsType;
   fn val_to_string(&self) -> String;
@@ -48,7 +54,7 @@ pub trait ValTrait {
   fn as_array_data(&self) -> Option<Rc<Vec<Val>>>;
   fn as_object_data(&self) -> Option<Rc<BTreeMap<String, Val>>>;
 
-  fn make_frame(&self) -> Option<StackFrame>;
+  fn load_function(&self) -> LoadFunctionResult;
 }
 
 impl ValTrait for Val {
@@ -239,14 +245,14 @@ impl ValTrait for Val {
     }
   }
 
-  fn make_frame(&self) -> Option<StackFrame> {
+  fn load_function(&self) -> LoadFunctionResult {
     use Val::*;
 
     return match self {
-      Function(f) => f.make_frame(),
-      Custom(val) => val.make_frame(),
+      Function(f) => LoadFunctionResult::StackFrame(f.make_frame()),
+      Custom(val) => val.load_function(),
 
-      _ => None,
+      _ => LoadFunctionResult::NotAFunction,
     }
   }
 }

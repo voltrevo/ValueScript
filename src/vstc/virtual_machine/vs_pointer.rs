@@ -2,12 +2,8 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
-use super::vs_value::Val;
-use super::vs_value::ValTrait;
-use super::vs_value::VsType;
-use super::virtual_machine::StackFrame;
-use super::bytecode_decoder::BytecodeDecoder;
-use super::bytecode_decoder::BytecodeType;
+use super::vs_value::{Val, ValTrait, VsType, LoadFunctionResult};
+use super::bytecode_decoder::{BytecodeDecoder, BytecodeType};
 
 pub struct VsPointer {
   bytecode: Rc<Vec<u8>>,
@@ -120,7 +116,7 @@ impl ValTrait for VsPointer {
     return self.resolve().as_object_data();
   }
 
-  fn make_frame(&self) -> Option<StackFrame> {
-    return self.resolve().make_frame();
+  fn load_function(&self) -> LoadFunctionResult {
+    return self.resolve().load_function();
   }
 }
