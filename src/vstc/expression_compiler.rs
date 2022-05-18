@@ -1,7 +1,7 @@
 use queues::*;
 
 use super::scope::{Scope, ScopeTrait, MappedName, init_scope};
-use super::function_compiler::{FunctionCompiler, QueuedFunction};
+use super::function_compiler::{FunctionCompiler, QueuedFunction, FnOrArrow};
 use super::capture_finder::CaptureFinder;
 
 pub struct CompiledExpression {
@@ -65,7 +65,9 @@ impl<'a> ExpressionCompiler<'a> {
       },
       Tpl(_) => std::panic!("Not implemented: Tpl expression"),
       TaggedTpl(_) => std::panic!("Not implemented: TaggedTpl expression"),
-      Arrow(_) => std::panic!("Not implemented: Arrow expression"),
+      Arrow(arrow) => {
+        return self.arrow_expression(arrow, target_register)
+      },
       Class(_) => std::panic!("Not implemented: Class expression"),
       Yield(_) => std::panic!("Not implemented: Yield expression"),
       MetaProp(_) => std::panic!("Not implemented: MetaProp expression"),
@@ -746,7 +748,7 @@ impl<'a> ExpressionCompiler<'a> {
       definition_name: definition_name.clone(),
       fn_name: fn_name.clone(),
       capture_params: cf.ordered_names.clone(),
-      function: fn_.function.clone(),
+      fn_or_arrow: FnOrArrow::Fn(fn_.function.clone()),
     }).expect("Failed to queue function");
 
     if cf.ordered_names.len() == 0 {
@@ -758,6 +760,43 @@ impl<'a> ExpressionCompiler<'a> {
 
     return self.capturing_fn_ref(
       fn_name,
+      &definition_name,
+      &cf.ordered_names,
+      target_register,
+    );
+  }
+
+  pub fn arrow_expression(
+    &mut self,
+    arrow_expr: &swc_ecma_ast::ArrowExpr,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let definition_name = self
+      .fnc
+      .definition_allocator
+      .borrow_mut()
+      .allocate_numbered(&"_anon".to_string())
+    ;
+
+    let mut cf = CaptureFinder::new(self.scope.clone());
+    cf.arrow_expr(&init_scope(), arrow_expr);
+
+    self.fnc.queue.add(QueuedFunction {
+      definition_name: definition_name.clone(),
+      fn_name: None,
+      capture_params: cf.ordered_names.clone(),
+      fn_or_arrow: FnOrArrow::Arrow(arrow_expr.clone()),
+    }).expect("Failed to queue function");
+
+    if cf.ordered_names.len() == 0 {
+      return self.inline(
+        format!("@{}", definition_name),
+        target_register,
+      );
+    }
+
+    return self.capturing_fn_ref(
+      None,
       &definition_name,
       &cf.ordered_names,
       target_register,

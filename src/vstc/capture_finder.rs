@@ -70,6 +70,30 @@ impl CaptureFinder {
     self.function(&scope, &expr.function);
   }
 
+  pub fn arrow_expr(&mut self, parent_scope: &Scope, arrow: &swc_ecma_ast::ArrowExpr) {
+    let scope = parent_scope.nest();
+
+    for param in &arrow.params {
+      match &param {
+        swc_ecma_ast::Pat::Ident(ident) => scope.set(
+          ident.id.sym.to_string(),
+          MappedName::Register("".to_string()),
+        ),
+        _ => std::panic!("Not implemented: destructuring"),
+      }
+    }
+
+    match &arrow.body {
+      swc_ecma_ast::BlockStmtOrExpr::BlockStmt(block_stmt) => {
+        self.populate_fn_scope(&scope, block_stmt);
+        self.block(&scope, block_stmt);
+      },
+      swc_ecma_ast::BlockStmtOrExpr::Expr(expr) => {
+        self.expr(&scope, expr);
+      },
+    }
+  }
+
   fn function(&mut self, scope: &Scope, fn_: &swc_ecma_ast::Function) {
     for param in &fn_.params {
       match &param.pat {

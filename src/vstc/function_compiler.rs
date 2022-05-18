@@ -9,11 +9,17 @@ use super::scope::{Scope, MappedName, ScopeTrait, init_scope};
 use super::capture_finder::CaptureFinder;
 
 #[derive(Clone, Debug)]
+pub enum FnOrArrow {
+  Fn(swc_ecma_ast::Function),
+  Arrow(swc_ecma_ast::ArrowExpr),
+}
+
+#[derive(Clone, Debug)]
 pub struct QueuedFunction {
   pub definition_name: String,
   pub fn_name: Option<String>,
   pub capture_params: Vec<String>,
-  pub function: swc_ecma_ast::Function,
+  pub fn_or_arrow: FnOrArrow,
 }
 
 pub struct LoopLabels {
@@ -59,16 +65,16 @@ impl FunctionCompiler {
       definition_name: definition_name.clone(),
       fn_name: fn_name,
       capture_params: Vec::new(),
-      function: fn_.clone(),
+      fn_or_arrow: FnOrArrow::Fn(fn_.clone()),
     }).expect("Failed to queue function");
 
     loop {
       match self_.queue.remove() {
-        Ok(qfn) => self_.compile_fn(
+        Ok(qfn) => self_.compile_fn_or_arrow(
           qfn.definition_name,
           qfn.fn_name,
           qfn.capture_params,
-          &qfn.function,
+          &qfn.fn_or_arrow,
           parent_scope,
         ),
         Err(_) => { break; },
@@ -78,12 +84,12 @@ impl FunctionCompiler {
     return self_.definition;
   }
 
-  fn compile_fn(
+  fn compile_fn_or_arrow(
     &mut self,
     definition_name: String,
     fn_name: Option<String>,
     mut capture_params: Vec<String>,
-    fn_: &swc_ecma_ast::Function,
+    fn_or_arrow: &FnOrArrow,
     parent_scope: &Scope,
   ) {
     let scope = parent_scope.nest();
@@ -107,15 +113,26 @@ impl FunctionCompiler {
     let mut params = Vec::<String>::new();
     params.append(&mut capture_params);
 
-    for p in &fn_.params {
-      match &p.pat {
-        swc_ecma_ast::Pat::Ident(binding_ident) => {
-          let param_name = binding_ident.id.sym.to_string();
-          params.push(param_name);
-        },
-        _ => std::panic!("Not implemented: parameter destructuring"),
-      }
-    }
+    let mut handle_param_pat = |pat: &swc_ecma_ast::Pat| match pat {
+      swc_ecma_ast::Pat::Ident(binding_ident) => {
+        let param_name = binding_ident.id.sym.to_string();
+        params.push(param_name);
+      },
+      _ => std::panic!("Not implemented: parameter destructuring"),
+    };
+
+    match fn_or_arrow {
+      FnOrArrow::Fn(fn_) => {
+        for p in &fn_.params {
+          handle_param_pat(&p.pat);
+        }
+      },
+      FnOrArrow::Arrow(arrow) => {
+        for p in &arrow.params {
+          handle_param_pat(p);
+        }
+      },
+    };
 
     for i in 0..params.len() {
       let reg = self.reg_allocator.allocate(&params[i]);
@@ -137,18 +154,39 @@ impl FunctionCompiler {
 
     self.definition.push(heading);
 
-    let body = fn_.body.as_ref()
-      .expect("Not implemented: function without body");
-    
-    self.populate_fn_scope(body, &scope);
-    self.populate_block_scope(body, &scope);
+    let mut handle_block_body = |block: &swc_ecma_ast::BlockStmt| {
+      self.populate_fn_scope(block, &scope);
+      self.populate_block_scope(block, &scope);
+  
+      for i in 0..block.stmts.len() {
+        self.statement(
+          &block.stmts[i],
+          i == block.stmts.len() - 1,
+          &scope,
+        );
+      }
+    };
 
-    for i in 0..body.stmts.len() {
-      self.statement(
-        &body.stmts[i],
-        i == body.stmts.len() - 1,
-        &scope,
-      );
+    match fn_or_arrow {
+      FnOrArrow::Fn(fn_) => {
+        let block = fn_.body.as_ref()
+          .expect("Not implemented: function without body");
+
+        handle_block_body(block);
+      },
+      FnOrArrow::Arrow(arrow) => match &arrow.body {
+        swc_ecma_ast::BlockStmtOrExpr::BlockStmt(block) => {
+          handle_block_body(block);
+        },
+        swc_ecma_ast::BlockStmtOrExpr::Expr(expr) => {
+          let mut expression_compiler = ExpressionCompiler {
+            fnc: self,
+            scope: &scope,
+          };
+
+          expression_compiler.compile(expr, Some("return".to_string()));
+        }
+      },
     }
 
     self.definition.push("}".to_string());
@@ -368,7 +406,7 @@ impl FunctionCompiler {
         definition_name: definition_name,
         fn_name: Some(fn_name.clone()),
         capture_params: full_captures,
-        function: fn_.function.clone(),
+        fn_or_arrow: FnOrArrow::Fn(fn_.function.clone()),
       };
 
       scope.set(
