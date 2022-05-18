@@ -86,6 +86,9 @@ impl FunctionCompiler {
   ) {
     let scope = parent_scope.nest();
 
+    // TODO: Use a new FunctionCompiler per function instead of this hack
+    self.reg_allocator = NameAllocator::default();
+
     match fn_name {
       // TODO: Capture propagation when using this name recursively
       Some(fn_name_) => scope.set(

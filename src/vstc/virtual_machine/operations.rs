@@ -68,11 +68,18 @@ pub fn op_triple_eq(left: Val, right: Val) -> Val {
 }
 
 pub fn op_triple_ne(left: Val, right: Val) -> Val {
-  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
-    std::panic!("Not implemented");
+  let type_ = left.typeof_();
+
+  if right.typeof_() != type_ {
+    return Val::Bool(true);
   }
 
-  return Val::Bool(left.to_number() != right.to_number());
+  return Val::Bool(match type_ {
+    VsType::Undefined => false,
+    VsType::Null => false,
+    VsType::Number => left.to_number() != right.to_number(),
+    _ => std::panic!("Not implemented"),
+  });
 }
 
 pub fn op_and(left: Val, right: Val) -> Val {

@@ -1,7 +1,8 @@
 use queues::*;
 
-use super::scope::{Scope, ScopeTrait, MappedName};
+use super::scope::{Scope, ScopeTrait, MappedName, init_scope};
 use super::function_compiler::{FunctionCompiler, QueuedFunction};
+use super::capture_finder::CaptureFinder;
 
 pub struct CompiledExpression {
   pub value_assembly: String,
@@ -229,7 +230,7 @@ impl<'a> ExpressionCompiler<'a> {
           swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
             swc_ecma_ast::Pat::Ident(ident) => AssignTarget::from_ident(self, &ident.id),
             swc_ecma_ast::Pat::Expr(expr) => AssignTarget::from_expr(self, expr),
-            _ => std::panic!("Invalid left hand side of assignment"),
+            _ => std::panic!("Not implemented: destructuring"),
           },
         };
 
@@ -735,17 +736,62 @@ impl<'a> ExpressionCompiler<'a> {
       None => self.fnc.definition_allocator.borrow_mut().allocate_numbered(&"_anon".to_string()),
     };
 
+    let mut cf = CaptureFinder::new(self.scope.clone());
+    cf.fn_expr(&init_scope(), fn_);
+
     self.fnc.queue.add(QueuedFunction {
       definition_name: definition_name.clone(),
-      fn_name: fn_name,
-      extra_params: Vec::new(),
+      fn_name: fn_name.clone(),
+      extra_params: cf.ordered_names.clone(),
       function: fn_.function.clone(),
     }).expect("Failed to queue function");
 
-    return self.inline(
-      format!("@{}", definition_name),
-      target_register,
-    );
+    if cf.ordered_names.len() == 0 {
+      return self.inline(
+        format!("@{}", definition_name),
+        target_register,
+      );
+    }
+
+    let mut nested_registers = Vec::<String>::new();
+
+    let reg = match target_register {
+      None => {
+        let alloc_reg = match &fn_name {
+          Some(name) => self.fnc.reg_allocator.allocate(&name),
+          None => self.fnc.reg_allocator.allocate_numbered(&"_anon".to_string()),
+        };
+
+        nested_registers.push(alloc_reg.clone());
+
+        alloc_reg
+      },
+      Some(tr) => tr.clone(),
+    };
+
+    let mut bind_instr = format!("  bind @{} [", definition_name);
+
+    for i in 0..cf.ordered_names.len() {
+      let captured_name = &cf.ordered_names[i];
+
+      if i > 0 {
+        bind_instr += ", ";
+      }
+
+      bind_instr += &match self.scope.get(captured_name) {
+        None => std::panic!(""),
+        Some(MappedName::Definition(_)) => std::panic!(""),
+        Some(MappedName::Register(cap_reg)) => format!("%{}", cap_reg),
+      };
+    }
+
+    bind_instr += &format!("] %{}", reg);
+    self.fnc.definition.push(bind_instr);
+
+    return CompiledExpression {
+      value_assembly: format!("%{}", reg),
+      nested_registers: nested_registers,
+    };
   }
 
   pub fn literal(
@@ -787,6 +833,10 @@ impl<'a> ExpressionCompiler<'a> {
     target_register: Option<String>,
   ) -> CompiledExpression {
     let ident_string = ident.sym.to_string();
+
+    if ident_string == "undefined" {
+      return self.inline("undefined".to_string(), target_register);
+    }
 
     let mapped = self.scope.get(&ident_string).expect("Identifier not found in scope");
 

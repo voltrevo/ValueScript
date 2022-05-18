@@ -6,6 +6,7 @@ mod scope;
 mod name_allocator;
 mod expression_compiler;
 mod function_compiler;
+mod capture_finder;
 
 use std::env;
 use std::process::exit;
