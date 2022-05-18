@@ -1,16 +1,18 @@
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use queues::*;
 
 use super::name_allocator::NameAllocator;
 use super::expression_compiler::ExpressionCompiler;
-use super::scope::{Scope, MappedName, ScopeTrait};
+use super::scope::{Scope, MappedName, ScopeTrait, init_scope};
+use super::capture_finder::CaptureFinder;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct QueuedFunction {
   pub definition_name: String,
   pub fn_name: Option<String>,
-  pub extra_params: Vec<String>,
+  pub capture_params: Vec<String>,
   pub function: swc_ecma_ast::Function,
 }
 
@@ -56,7 +58,7 @@ impl FunctionCompiler {
     self_.queue.add(QueuedFunction {
       definition_name: definition_name.clone(),
       fn_name: fn_name,
-      extra_params: Vec::new(),
+      capture_params: Vec::new(),
       function: fn_.clone(),
     }).expect("Failed to queue function");
 
@@ -65,7 +67,7 @@ impl FunctionCompiler {
         Ok(qfn) => self_.compile_fn(
           qfn.definition_name,
           qfn.fn_name,
-          qfn.extra_params,
+          qfn.capture_params,
           &qfn.function,
           parent_scope,
         ),
@@ -80,7 +82,7 @@ impl FunctionCompiler {
     &mut self,
     definition_name: String,
     fn_name: Option<String>,
-    mut extra_params: Vec<String>,
+    mut capture_params: Vec<String>,
     fn_: &swc_ecma_ast::Function,
     parent_scope: &Scope,
   ) {
@@ -103,7 +105,7 @@ impl FunctionCompiler {
     heading += " = function(";
 
     let mut params = Vec::<String>::new();
-    params.append(&mut extra_params);
+    params.append(&mut capture_params);
 
     for p in &fn_.params {
       match &p.pat {
@@ -254,6 +256,8 @@ impl FunctionCompiler {
     block: &swc_ecma_ast::BlockStmt,
     scope: &Scope,
   ) {
+    let mut function_decls = Vec::<swc_ecma_ast::FnDecl>::new();
+
     for statement in &block.stmts {
       use swc_ecma_ast::Stmt::*;
 
@@ -280,27 +284,7 @@ impl FunctionCompiler {
   
           match decl {
             Class(_) => std::panic!("Not implemented: Class declaration"),
-            Fn(fn_) => {
-              let fn_name = fn_.ident.sym.to_string();
-
-              let definition_name = self
-                .definition_allocator
-                .borrow_mut()
-                .allocate(&fn_name)
-              ;
-
-              scope.set(
-                fn_name.clone(),
-                MappedName::Definition(definition_name.clone()),
-              );
-
-              self.queue.add(QueuedFunction {
-                definition_name: definition_name,
-                fn_name: Some(fn_name),
-                extra_params: Vec::new(),
-                function: fn_.function.clone(),
-              }).expect("Failed to queue function");
-            },
+            Fn(fn_) => function_decls.push(fn_.clone()),
             Var(var_decl) => self.populate_block_scope_var_decl(var_decl, scope),
             TsInterface(_) => {},
             TsTypeAlias(_) => {},
@@ -310,6 +294,89 @@ impl FunctionCompiler {
         },
         Expr(_) => {},
       };
+    }
+
+    // Create a synth scope where the function decls that can co-mingle are
+    // present but don't signal any nested captures. This allows us to first
+    // construct all the direct captures and use that to find the complete
+    // captures.
+    let synth_scope = scope.nest();
+
+    for fn_ in &function_decls {
+      synth_scope.set(
+        fn_.ident.sym.to_string(),
+        MappedName::Register("".to_string()),
+      );
+    }
+
+    let mut direct_captures_map = HashMap::<String, Vec<String>>::new();
+
+    for fn_ in &function_decls {
+      let mut cf = CaptureFinder::new(synth_scope.clone());
+      cf.fn_decl(&init_scope(), fn_);
+
+      direct_captures_map.insert(
+        fn_.ident.sym.to_string(),
+        cf.ordered_names,
+      );
+    }
+
+    for fn_ in &function_decls {
+      let mut full_captures = Vec::<String>::new();
+      let mut full_captures_set = HashSet::<String>::new();
+
+      let mut cap_queue = Queue::<String>::new();
+
+      for dc in direct_captures_map.get(&fn_.ident.sym.to_string())
+        .expect("direct captures not found")
+      {
+        cap_queue.add(dc.clone())
+          .expect("Failed to add to queue");
+      }
+
+      loop {
+        let cap = match cap_queue.remove() {
+          Ok(c) => c,
+          Err(_) => { break; },
+        };
+
+        let is_new = full_captures_set.insert(cap.clone());
+
+        if !is_new {
+          continue;
+        }
+
+        full_captures.push(cap.clone());
+
+        for nested_caps in direct_captures_map.get(&cap) {
+          for nested_cap in nested_caps {
+            cap_queue.add(nested_cap.clone())
+              .expect("Failed to add to queue");
+          }
+        }
+      }
+
+      let fn_name = fn_.ident.sym.to_string();
+
+      let definition_name = self
+        .definition_allocator
+        .borrow_mut()
+        .allocate(&fn_name)
+      ;
+
+      let qf = QueuedFunction {
+        definition_name: definition_name,
+        fn_name: Some(fn_name.clone()),
+        capture_params: full_captures,
+        function: fn_.function.clone(),
+      };
+
+      scope.set(
+        fn_name.clone(),
+        MappedName::QueuedFunction(qf.clone()),
+      );
+
+      self.queue.add(qf).expect("Failed to queue function");
     }
   }
 
@@ -360,6 +427,7 @@ impl FunctionCompiler {
               self.reg_allocator.release(reg);
             },
             MappedName::Definition(_) => {},
+            MappedName::QueuedFunction(_) => {},
           }
         }
       },

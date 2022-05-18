@@ -204,6 +204,7 @@ impl<'a> ExpressionCompiler<'a> {
               swc_ecma_ast::Expr::Ident(ident) => match ec.scope.get(&ident.sym.to_string()) {
                 None => std::panic!("Unresolved identifier"),
                 Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
+                Some(MappedName::QueuedFunction(_)) => std::panic!("Invalid: assign to declaration"),
                 Some(MappedName::Register(reg)) => AssignTarget::Register(reg),
               },
               swc_ecma_ast::Expr::This(_) => AssignTarget::Register("this".to_string()),
@@ -220,6 +221,7 @@ impl<'a> ExpressionCompiler<'a> {
             return match ec.scope.get(&ident.sym.to_string()) {
               None => std::panic!("Unresolved identifier"),
               Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
+              Some(MappedName::QueuedFunction(_)) => std::panic!("Invalid: assign to declaration"),
               Some(MappedName::Register(reg)) => AssignTarget::Register(reg),
             };
           }
@@ -299,6 +301,7 @@ impl<'a> ExpressionCompiler<'a> {
               match self.scope.get(&ident.id.sym.to_string()) {
                 None => std::panic!("Unresolved identifier"),
                 Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
+                Some(MappedName::QueuedFunction(_)) => std::panic!("Invalid: assign to declaration"),
                 Some(MappedName::Register(reg)) => reg,
               }
             ),
@@ -742,7 +745,7 @@ impl<'a> ExpressionCompiler<'a> {
     self.fnc.queue.add(QueuedFunction {
       definition_name: definition_name.clone(),
       fn_name: fn_name.clone(),
-      extra_params: cf.ordered_names.clone(),
+      capture_params: cf.ordered_names.clone(),
       function: fn_.function.clone(),
     }).expect("Failed to queue function");
 
@@ -753,7 +756,23 @@ impl<'a> ExpressionCompiler<'a> {
       );
     }
 
+    return self.capturing_fn_ref(
+      fn_name,
+      &definition_name,
+      &cf.ordered_names,
+      target_register,
+    );
+  }
+
+  pub fn capturing_fn_ref(
+    &mut self,
+    fn_name: Option<String>,
+    definition_name: &String,
+    captures: &Vec<String>,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
     let mut nested_registers = Vec::<String>::new();
+    let mut sub_nested_registers = Vec::<String>::new();
 
     let reg = match target_register {
       None => {
@@ -771,22 +790,38 @@ impl<'a> ExpressionCompiler<'a> {
 
     let mut bind_instr = format!("  bind @{} [", definition_name);
 
-    for i in 0..cf.ordered_names.len() {
-      let captured_name = &cf.ordered_names[i];
+    for i in 0..captures.len() {
+      let captured_name = &captures[i];
 
       if i > 0 {
         bind_instr += ", ";
       }
 
       bind_instr += &match self.scope.get(captured_name) {
-        None => std::panic!(""),
-        Some(MappedName::Definition(_)) => std::panic!(""),
+        None => std::panic!("Captured names should always be in scope"),
+        Some(MappedName::Definition(_)) => std::panic!("Definitions should never be recorded as captures"),
         Some(MappedName::Register(cap_reg)) => format!("%{}", cap_reg),
+        Some(MappedName::QueuedFunction(qfn)) => {
+          let mut compiled_ref = self.capturing_fn_ref(
+            qfn.fn_name.clone(),
+            &qfn.definition_name,
+            &qfn.capture_params,
+            None,
+          );
+
+          sub_nested_registers.append(&mut compiled_ref.nested_registers);
+
+          compiled_ref.value_assembly
+        },
       };
     }
 
     bind_instr += &format!("] %{}", reg);
     self.fnc.definition.push(bind_instr);
+
+    for reg in sub_nested_registers {
+      self.fnc.reg_allocator.release(&reg);
+    }
 
     return CompiledExpression {
       value_assembly: format!("%{}", reg),
@@ -840,12 +875,16 @@ impl<'a> ExpressionCompiler<'a> {
 
     let mapped = self.scope.get(&ident_string).expect("Identifier not found in scope");
 
-    let value_assembly = match mapped {
-      MappedName::Register(reg) => "%".to_string() + &reg,
-      MappedName::Definition(def) => "@".to_string() + &def,
+    return match mapped {
+      MappedName::Register(reg) => self.inline("%".to_string() + &reg, target_register),
+      MappedName::Definition(def) => self.inline("@".to_string() + &def, target_register),
+      MappedName::QueuedFunction(qfn) => self.capturing_fn_ref(
+        qfn.fn_name.clone(),
+        &qfn.definition_name,
+        &qfn.capture_params,
+        target_register,
+      ),
     };
-
-    return self.inline(value_assembly, target_register);
   }
 }
 
@@ -951,6 +990,7 @@ impl TargetAccessor {
       Ident(ident) => match ec.scope.get(&ident.sym.to_string()) {
         None => std::panic!("Unresolved identifier"),
         Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
+        Some(MappedName::QueuedFunction(_)) => std::panic!("Invalid: assign to declaration"),
         Some(MappedName::Register(reg)) => TargetAccessor::Register(reg),
       },
       This(_) => TargetAccessor::Register("this".to_string()),

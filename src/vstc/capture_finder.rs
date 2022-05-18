@@ -22,20 +22,31 @@ impl CaptureFinder {
       return;
     }
 
+    let mut insert = |n: &String| {
+      let inserted = self.names.insert(n.clone());
+
+      if inserted {
+        self.ordered_names.push(n.clone());
+      }
+    };
+
     match self.outside_scope.get(&name) {
       None => std::panic!("Unresolved name"),
       Some(MappedName::Definition(_)) => {}, // Not capture - just definition
-      Some(MappedName::Register(_)) => {
-        let inserted = self.names.insert(name.clone());
+      Some(MappedName::Register(_)) => insert(&name),
+      Some(MappedName::QueuedFunction(qfn)) => {
+        for cap in &qfn.capture_params {
+          if scope.get(cap).is_some() {
+            std::panic!("Not implemented: Nested capture edge case");
+          }
 
-        if inserted {
-          self.ordered_names.push(name);
+          insert(cap);
         }
       },
     }
   }
 
-  fn fn_decl(&mut self, parent_scope: &Scope, decl: &swc_ecma_ast::FnDecl) {
+  pub fn fn_decl(&mut self, parent_scope: &Scope, decl: &swc_ecma_ast::FnDecl) {
     let scope = parent_scope.nest();
 
     scope.set(

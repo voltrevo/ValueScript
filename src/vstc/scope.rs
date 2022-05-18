@@ -2,10 +2,13 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 
+use super::function_compiler::QueuedFunction;
+
 #[derive(Clone, Debug)]
 pub enum MappedName {
   Register(String),
   Definition(String),
+  QueuedFunction(QueuedFunction),
 }
 
 pub struct ScopeData {
