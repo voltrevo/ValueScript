@@ -601,7 +601,19 @@ impl<'a> ExpressionCompiler<'a> {
         let mut nested_registers = Vec::<String>::new();
 
         let result_reg = match &target {
-          TargetAccessor::Register(reg) => reg.clone(),
+          TargetAccessor::Register(reg) => {
+            for tr in &target_register {
+              if tr != reg {
+                self.fnc.definition.push(format!(
+                  "  mov %{} %{}",
+                  reg,
+                  tr,
+                ));
+              }
+            }
+
+            reg.clone()
+          },
           TargetAccessor::Nested(nta) => match target_register {
             Some(tr) => {
               self.fnc.definition.push(format!(
