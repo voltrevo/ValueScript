@@ -275,9 +275,13 @@ pub fn op_sub(left: Val, right: Val) -> Val {
       };
     },
     Val::Object(object_data) => {
-      return object_data.string_map
-        .get(&right.val_to_string())
-        .unwrap_or(&Val::Undefined).clone();
+      return match object_data.string_map.get(&right.val_to_string()) {
+        Some(val) => val.clone(),
+        None => match &object_data.prototype {
+          Some(prototype) => op_sub(prototype.clone(), right),
+          None => Val::Undefined,
+        },
+      };
     },
     Val::Function(_) => Val::Undefined,
     Val::Custom(custom_data) => op_sub(custom_data.resolve(), right),
