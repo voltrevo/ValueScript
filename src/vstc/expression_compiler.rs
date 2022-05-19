@@ -63,7 +63,9 @@ impl<'a> ExpressionCompiler<'a> {
       Lit(lit) => {
         return self.literal(lit, target_register);
       },
-      Tpl(_) => std::panic!("Not implemented: Tpl expression"),
+      Tpl(tpl) => {
+        return self.template_literal(tpl, target_register);
+      },
       TaggedTpl(_) => std::panic!("Not implemented: TaggedTpl expression"),
       Arrow(arrow) => {
         return self.arrow_expression(arrow, target_register)
@@ -868,6 +870,86 @@ impl<'a> ExpressionCompiler<'a> {
     };
   }
 
+  pub fn template_literal(
+    &mut self,
+    tpl: &swc_ecma_ast::Tpl,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let len = tpl.exprs.len();
+
+    assert_eq!(tpl.quasis.len(), len + 1);
+
+    if len == 0 {
+      return self.inline(
+        string_literal(&tpl.quasis[0].raw.to_string()),
+        target_register,
+      );
+    }
+
+    let mut nested_registers = Vec::<String>::new();
+
+    let acc_reg = match target_register {
+      Some(tr) => tr,
+      None => {
+        let reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        nested_registers.push(reg.clone());
+
+        reg
+      },
+    };
+
+    let first_expr = self.compile(&tpl.exprs[0], None);
+
+    self.fnc.definition.push(format!(
+      "  op+ {} {} %{}",
+      string_literal(&tpl.quasis[0].raw.to_string()),
+      first_expr.value_assembly,
+      acc_reg,
+    ));
+
+    for reg in first_expr.nested_registers {
+      self.fnc.reg_allocator.release(&reg);
+    }
+
+    for i in 1..len {
+      self.fnc.definition.push(format!(
+        "  op+ %{} {} %{}",
+        acc_reg,
+        string_literal(&tpl.quasis[i].raw.to_string()),
+        acc_reg,
+      ));
+
+      let expr_i = self.compile(&tpl.exprs[i], None);
+
+      self.fnc.definition.push(format!(
+        "  op+ %{} {} %{}",
+        acc_reg,
+        expr_i.value_assembly,
+        acc_reg,
+      ));
+
+      for reg in expr_i.nested_registers {
+        self.fnc.reg_allocator.release(&reg);
+      }
+    }
+
+    let last_str = tpl.quasis[len].raw.to_string();
+
+    if last_str != "" {
+      self.fnc.definition.push(format!(
+        "  op+ %{} {} %{}",
+        acc_reg,
+        string_literal(&last_str),
+        acc_reg,
+      ));
+    }
+
+    return CompiledExpression {
+      value_assembly: format!("%{}", acc_reg),
+      nested_registers: nested_registers,
+    };
+  }
+
   pub fn literal(
     &mut self,
     lit: &swc_ecma_ast::Lit,
@@ -931,7 +1013,7 @@ pub fn compile_literal(lit: &swc_ecma_ast::Lit) -> String {
   use swc_ecma_ast::Lit::*;
 
   return match lit {
-    Str(str_) => std::format!("\"{}\"", str_.value), // TODO: Escaping
+    Str(str_) => string_literal(&str_.value.to_string()),
     Bool(bool_) => bool_.value.to_string(),
     Null(_) => "null".to_string(),
     Num(num) => num.value.to_string(),
@@ -939,6 +1021,10 @@ pub fn compile_literal(lit: &swc_ecma_ast::Lit) -> String {
     Regex(_) => std::panic!("Not implemented: Regex expression"),
     JSXText(_) => std::panic!("Not implemented: JSXText expression"),
   };
+}
+
+pub fn string_literal(str_: &String) -> String {
+  return format!("\"{}\"", str_); // TODO: Escaping
 }
 
 pub fn get_binary_op_str(op: swc_ecma_ast::BinaryOp) -> &'static str {
