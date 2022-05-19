@@ -6,6 +6,7 @@ use super::vs_value::ValTrait;
 use super::vs_pointer::VsPointer;
 use super::vs_function::VsFunction;
 use super::instruction::Instruction;
+use super::vs_object::VsObject;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -116,7 +117,7 @@ impl BytecodeDecoder {
 
         self.decode_type(); // End (TODO: assert)
 
-        Val::Object(Rc::new(obj))
+        Val::Object(Rc::new(VsObject { string_map: obj, prototype: None }))
       },
       BytecodeType::Function => self.decode_function_header(),
       BytecodeType::Pointer => self.decode_pointer(),

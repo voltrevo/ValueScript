@@ -1,9 +1,9 @@
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::collections::BTreeMap;
 
 use super::vs_value::{Val, ValTrait, VsType, LoadFunctionResult};
 use super::bytecode_decoder::{BytecodeDecoder, BytecodeType};
+use super::vs_object::VsObject;
 
 pub struct VsPointer {
   bytecode: Rc<Vec<u8>>,
@@ -112,7 +112,7 @@ impl ValTrait for VsPointer {
     return self.resolve().as_array_data();
   }
 
-  fn as_object_data(&self) -> Option<Rc<BTreeMap<String, Val>>> {
+  fn as_object_data(&self) -> Option<Rc<VsObject>> {
     return self.resolve().as_object_data();
   }
 

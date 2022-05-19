@@ -1,9 +1,9 @@
 use std::rc::Rc;
-use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use super::vs_function::VsFunction;
 use super::virtual_machine::StackFrame;
+use super::vs_object::VsObject;
 
 #[derive(Clone)]
 pub enum Val {
@@ -14,7 +14,7 @@ pub enum Val {
   Number(f64),
   String(Rc<String>),
   Array(Rc<Vec<Val>>),
-  Object(Rc<BTreeMap<String, Val>>),
+  Object(Rc<VsObject>),
   Function(Rc<VsFunction>),
   Custom(Rc<dyn ValTrait>),
 }
@@ -52,7 +52,7 @@ pub trait ValTrait {
   fn bind(&self, params: Vec<Val>) -> Option<Val>;
 
   fn as_array_data(&self) -> Option<Rc<Vec<Val>>>;
-  fn as_object_data(&self) -> Option<Rc<BTreeMap<String, Val>>>;
+  fn as_object_data(&self) -> Option<Rc<VsObject>>;
 
   fn load_function(&self) -> LoadFunctionResult;
 }
@@ -234,7 +234,7 @@ impl ValTrait for Val {
     }
   }
 
-  fn as_object_data(&self) -> Option<Rc<BTreeMap<String, Val>>> {
+  fn as_object_data(&self) -> Option<Rc<VsObject>> {
     use Val::*;
 
     return match self {

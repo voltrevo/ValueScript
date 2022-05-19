@@ -275,7 +275,7 @@ pub fn op_sub(left: Val, right: Val) -> Val {
       };
     },
     Val::Object(object_data) => {
-      return object_data
+      return object_data.string_map
         .get(&right.val_to_string())
         .unwrap_or(&Val::Undefined).clone();
     },
@@ -315,7 +315,7 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
       }
     },
     Val::Object(object_data) => {
-      Rc::make_mut(object_data).insert(subscript.val_to_string(), value);
+      Rc::make_mut(object_data).string_map.insert(subscript.val_to_string(), value);
     },
     Val::Function(_) => std::panic!("Not implemented: function subscript assignment"),
     Val::Custom(custom_data) => {
