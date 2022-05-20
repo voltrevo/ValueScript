@@ -19,6 +19,11 @@ pub struct StackFrame {
   pub return_target: Option<usize>,
 }
 
+enum ThisArg {
+  Register(usize),
+  Val(Val),
+}
+
 impl StackFrame {
   pub fn apply_unary_op(
     &mut self,
@@ -279,7 +284,71 @@ impl VirtualMachine {
         frame.registers[register_index] = target;
       },
 
-      SubCall => std::panic!("Instruction not implemented: SubCall"),
+      SubCall => {
+        let mut obj = match frame.decoder.peek_type() {
+          BytecodeType::Register => {
+            frame.decoder.decode_type();
+
+            ThisArg::Register(
+              frame.decoder.decode_register_index().unwrap()
+            )
+          },
+          _ => ThisArg::Val(frame.decoder.decode_val(&frame.registers)),
+        };
+
+        let subscript = frame.decoder.decode_val(&frame.registers);
+
+        let fn_ = operations::op_sub(
+          match &obj {
+            ThisArg::Register(reg_i) => frame.registers[reg_i.clone()].clone(),
+            ThisArg::Val(val) => val.clone(),
+          },
+          subscript,
+        );
+
+        match fn_.load_function() {
+          LoadFunctionResult::NotAFunction => 
+            std::panic!("Not implemented: throw exception (fn_ is not a function)")
+          ,
+          LoadFunctionResult::StackFrame(mut new_frame) => {
+            transfer_parameters(&mut frame, &mut new_frame);
+    
+            frame.return_target = frame.decoder.decode_register_index();
+
+            frame.this_target = match obj {
+              ThisArg::Register(reg_i) => Some(reg_i),
+              ThisArg::Val(_) => None,
+            };
+    
+            self.stack.push(new_frame);
+          },
+          LoadFunctionResult::NativeFunction(native_fn) => {
+            let params = get_parameters(&mut frame);
+
+            let res = match &mut obj {
+              ThisArg::Register(reg_i) => {
+                native_fn(
+                  frame.registers.get_mut(reg_i.clone()).unwrap(),
+                  params,
+                )
+              },
+              ThisArg::Val(val) => {
+                native_fn(
+                  val,
+                  params,
+                )
+              },
+            };
+            
+            match frame.decoder.decode_register_index() {
+              Some(return_target) => {
+                frame.registers[return_target] = res;
+              },
+              None => {},
+            };
+          },
+        };
+      },
 
       Jmp => {
         let dst = frame.decoder.decode_pos();
