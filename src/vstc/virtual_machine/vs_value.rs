@@ -17,6 +17,7 @@ pub enum Val {
   Array(Rc<VsArray>),
   Object(Rc<VsObject>),
   Function(Rc<VsFunction>),
+  Static(&'static dyn StaticValTrait),
   Custom(Rc<dyn ValTrait>),
 }
 
@@ -58,6 +59,12 @@ pub trait ValTrait {
   fn load_function(&self) -> LoadFunctionResult;
 }
 
+pub trait StaticValExtraTrait {
+  fn sub(&self, key: Val) -> Val;
+}
+
+pub trait StaticValTrait: ValTrait + StaticValExtraTrait {}
+
 impl ValTrait for Val {
   fn typeof_(&self) -> VsType {
     use Val::*;
@@ -72,6 +79,7 @@ impl ValTrait for Val {
       Array(_) => VsType::Array,
       Object(_) => VsType::Object,
       Function(_) => VsType::Function,
+      Static(val) => val.typeof_(),
       Custom(val) => val.typeof_(),
     };
   }
@@ -105,6 +113,7 @@ impl ValTrait for Val {
       },
       Object(_) => "[object Object]".to_string(),
       Function(_) => "[function]".to_string(),
+      Static(val) => val.val_to_string(),
       Custom(val) => val.val_to_string(),
     };
   }
@@ -126,6 +135,7 @@ impl ValTrait for Val {
       },
       Object(_) => f64::NAN,
       Function(_) => f64::NAN,
+      Static(val) => val.to_number(),
       Custom(val) => val.to_number(),
     };
   }
@@ -146,6 +156,7 @@ impl ValTrait for Val {
       Array(vals) => None,
       Object(_) => None,
       Function(_) => None,
+      Static(val) => val.to_index(),
       Custom(val) => val.to_index(),
     };
   }
@@ -163,6 +174,7 @@ impl ValTrait for Val {
       Array(_) => false,
       Object(_) => false,
       Function(_) => false,
+      Static(val) => val.is_primitive(), // TODO: false?
       Custom(val) => val.is_primitive(),
     }
   }
@@ -188,6 +200,7 @@ impl ValTrait for Val {
       Array(_) => true,
       Object(_) => true,
       Function(_) => true,
+      Static(val) => val.is_truthy(), // TODO: true?
       Custom(val) => val.is_truthy(),
     };
   }
@@ -205,6 +218,7 @@ impl ValTrait for Val {
       Array(_) => false,
       Object(_) => false,
       Function(_) => false,
+      Static(_) => false,
       Custom(val) => val.is_nullish(),
     };
   }
