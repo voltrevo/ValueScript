@@ -312,6 +312,11 @@ impl VirtualMachine {
           ,
           LoadFunctionResult::StackFrame(mut new_frame) => {
             transfer_parameters(&mut frame, &mut new_frame);
+
+            new_frame.registers[1] = match &obj {
+              ThisArg::Register(reg_i) => frame.registers[reg_i.clone()].clone(),
+              ThisArg::Val(val) => val.clone(),
+            };
     
             frame.return_target = frame.decoder.decode_register_index();
 
