@@ -41,4 +41,8 @@ impl ValTrait for NativeFunction {
   fn submov(&mut self, _key: Val, _value: Val) {
     std::panic!("Not implemented: exceptions");
   }
+
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "\x1b[36m[Function]\x1b[39m")
+  }
 }

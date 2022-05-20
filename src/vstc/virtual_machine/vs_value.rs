@@ -59,6 +59,8 @@ pub trait ValTrait {
 
   fn sub(&self, key: Val) -> Val;
   fn submov(&mut self, key: Val, value: Val);
+
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
 }
 
 impl ValTrait for Val {
@@ -149,7 +151,7 @@ impl ValTrait for Val {
         Ok(x) => number_to_index(x),
         Err(_) => None,
       },
-      Array(vals) => None,
+      Array(_) => None,
       Object(_) => None,
       Function(_) => None,
       Static(val) => val.to_index(),
@@ -272,11 +274,72 @@ impl ValTrait for Val {
   fn submov(&mut self, key: Val, value: Val) {
     op_submov(self, key, value);
   }
+
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::fmt::Display::fmt(self, f)
+  }
 }
 
 impl std::fmt::Display for Val {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.val_to_string())
+    match self {
+      Val::Void => write!(f, "void"),
+      Val::Undefined => write!(f, "\x1b[90mundefined\x1b[39m"),
+      Val::Null => write!(f, "\x1b[1mnull\x1b[22m"),
+      Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
+      Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
+      Val::String(_) => write!(f, "\x1b[32m'{}'\x1b[39m", self.val_to_string()),
+      Val::Array(array) => {
+        if array.elements.len() == 0 {
+          return write!(f, "[]");
+        }
+
+        write!(f, "[ ");
+
+        let mut first = true;
+
+        for elem in &array.elements {
+          if first {
+            first = false;
+          } else {
+            write!(f, ", ");
+          }
+
+          write!(f, "{}", elem);
+        }
+
+        write!(f, " ]")
+      },
+      Val::Object(object) => {
+        if object.string_map.len() == 0 {
+          return f.write_str("{}");
+        }
+
+        match f.write_str("{ ") {
+          Ok(_) => {},
+          Err(e) => { return Err(e); },
+        };
+
+        let mut first = true;
+
+        for (k, v) in &object.string_map {
+          if first {
+            first = false;
+          } else {
+            write!(f, ", ");
+          }
+
+          write!(f, "{}: {}", k, v);
+        }
+
+        f.write_str(" }")
+      },
+      Val::Function(_) => write!(f, "\x1b[36m[Function]\x1b[39m"),
+
+      // TODO: Improve printing these
+      Val::Static(s) => s.fmt(f),
+      Val::Custom(c) => c.fmt(f),
+    }
   }
 }
 
