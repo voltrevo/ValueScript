@@ -8,6 +8,7 @@ use super::vs_value::{
 };
 use super::vs_object::VsObject;
 use super::native_function::NativeFunction;
+use super::operations::op_triple_eq_impl;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -53,6 +54,7 @@ impl ValTrait for ArrayPrototype {
   fn sub(&self, key: Val) -> Val {
     match key.val_to_string().as_str() {
       "push" => Val::Static(&PUSH),
+      "includes" => Val::Static(&INCLUDES),
       _ => Val::Undefined,
     }
   }
@@ -77,6 +79,25 @@ static PUSH: NativeFunction = NativeFunction {
         }
 
         return Val::Number(array_data_mut.elements.len() as f64);
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static INCLUDES: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
+
+        for elem in &array_data.elements {
+          if op_triple_eq_impl(elem.clone(), search_param.clone()) {
+            return Val::Bool(true);
+          }
+        }
+
+        return Val::Bool(false);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
     };

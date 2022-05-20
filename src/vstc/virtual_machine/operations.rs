@@ -59,27 +59,27 @@ pub fn op_ne(left: Val, right: Val) -> Val {
   return Val::Bool(left.to_number() != right.to_number());
 }
 
-pub fn op_triple_eq(left: Val, right: Val) -> Val {
-  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
-    std::panic!("Not implemented");
-  }
-
-  return Val::Bool(left.to_number() == right.to_number());
-}
-
-pub fn op_triple_ne(left: Val, right: Val) -> Val {
+pub fn op_triple_eq_impl(left: Val, right: Val) -> bool {
   let type_ = left.typeof_();
 
   if right.typeof_() != type_ {
-    return Val::Bool(true);
+    return false;
   }
 
-  return Val::Bool(match type_ {
-    VsType::Undefined => false,
-    VsType::Null => false,
-    VsType::Number => left.to_number() != right.to_number(),
+  return match type_ {
+    VsType::Undefined => true,
+    VsType::Null => true,
+    VsType::Number => left.to_number() == right.to_number(),
     _ => std::panic!("Not implemented"),
-  });
+  };
+}
+
+pub fn op_triple_eq(left: Val, right: Val) -> Val {
+  return Val::Bool(op_triple_eq_impl(left, right));
+}
+
+pub fn op_triple_ne(left: Val, right: Val) -> Val {
+  return Val::Bool(!op_triple_eq_impl(left, right));
 }
 
 pub fn op_and(left: Val, right: Val) -> Val {
