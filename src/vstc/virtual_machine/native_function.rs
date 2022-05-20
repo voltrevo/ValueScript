@@ -10,7 +10,7 @@ use super::vs_object::VsObject;
 use super::vs_array::VsArray;
 
 pub struct NativeFunction {
-  fn_: fn(this: &mut Val, params: Vec<Val>) -> Val,
+  pub fn_: fn(this: &mut Val, params: Vec<Val>) -> Val,
 }
 
 impl ValTrait for NativeFunction {

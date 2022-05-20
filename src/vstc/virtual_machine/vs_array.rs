@@ -7,6 +7,7 @@ use super::vs_value::{
   LoadFunctionResult,
 };
 use super::vs_object::VsObject;
+use super::native_function::NativeFunction;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -51,11 +52,29 @@ impl ValTrait for ArrayPrototype {
 
   fn sub(&self, key: Val) -> Val {
     match key.val_to_string().as_str() {
+      "push" => Val::Static(&PUSH),
       _ => Val::Undefined,
     }
   }
 
-  fn submov(&mut self, key: Val, value: Val) {
+  fn submov(&mut self, _key: Val, _value: Val) {
     std::panic!("Not implemented: exceptions");
   }
 }
+
+static PUSH: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        let array_data_mut = Rc::make_mut(array_data);
+
+        for p in params {
+          array_data_mut.elements.push(p);
+        }
+
+        return Val::Number(array_data_mut.elements.len() as f64);
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};

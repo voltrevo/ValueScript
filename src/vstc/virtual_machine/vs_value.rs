@@ -257,6 +257,7 @@ impl ValTrait for Val {
 
     return match self {
       Function(f) => LoadFunctionResult::StackFrame(f.make_frame()),
+      Static(s) => s.load_function(),
       Custom(val) => val.load_function(),
 
       _ => LoadFunctionResult::NotAFunction,
