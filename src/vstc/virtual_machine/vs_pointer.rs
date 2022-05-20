@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use super::vs_value::{Val, ValTrait, VsType, LoadFunctionResult};
 use super::bytecode_decoder::{BytecodeDecoder, BytecodeType};
 use super::vs_object::VsObject;
+use super::vs_array::VsArray;
 
 pub struct VsPointer {
   bytecode: Rc<Vec<u8>>,
@@ -108,7 +109,7 @@ impl ValTrait for VsPointer {
     return self.resolve().is_nullish();
   }
 
-  fn as_array_data(&self) -> Option<Rc<Vec<Val>>> {
+  fn as_array_data(&self) -> Option<Rc<VsArray>> {
     return self.resolve().as_array_data();
   }
 

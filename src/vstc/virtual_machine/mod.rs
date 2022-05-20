@@ -6,5 +6,6 @@ mod bytecode_decoder;
 mod virtual_machine;
 mod instruction;
 mod vs_object;
+mod vs_array;
 
 pub use virtual_machine::VirtualMachine;

@@ -253,7 +253,7 @@ impl VirtualMachine {
           std::panic!("bind params should always be array")
         }
 
-        let bound_fn = fn_val.bind((*params_array.unwrap()).clone());
+        let bound_fn = fn_val.bind((*params_array.unwrap()).elements.clone());
 
         if bound_fn.is_none() {
           // Not sure this needs to be an exception in future since compiled

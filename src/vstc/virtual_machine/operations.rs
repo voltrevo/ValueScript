@@ -263,11 +263,11 @@ pub fn op_sub(left: Val, right: Val) -> Val {
         Some(i) => i,
       };
 
-      if right_index >= array_data.len() {
-        return Val::Undefined;
+      if right_index >= array_data.elements.len() {
+        return array_data.object.sub(right);
       }
 
-      let res = array_data[right_index].clone();
+      let res = array_data.elements[right_index].clone();
 
       return match res {
         Val::Void => Val::Undefined,
@@ -275,13 +275,7 @@ pub fn op_sub(left: Val, right: Val) -> Val {
       };
     },
     Val::Object(object_data) => {
-      return match object_data.string_map.get(&right.val_to_string()) {
-        Some(val) => val.clone(),
-        None => match &object_data.prototype {
-          Some(prototype) => op_sub(prototype.clone(), right),
-          None => Val::Undefined,
-        },
-      };
+      return object_data.sub(right);
     },
     Val::Function(_) => Val::Undefined,
     Val::Custom(custom_data) => op_sub(custom_data.resolve(), right),
@@ -304,18 +298,18 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
 
       let array_data_mut = Rc::make_mut(array_data);
 
-      if subscript_index < array_data_mut.len() {
-        array_data_mut[subscript_index] = value;
+      if subscript_index < array_data_mut.elements.len() {
+        array_data_mut.elements[subscript_index] = value;
       } else {
-        if subscript_index - array_data_mut.len() > 100 {
+        if subscript_index - array_data_mut.elements.len() > 100 {
           std::panic!("Not implemented: Sparse arrays");
         }
 
-        while subscript_index > array_data_mut.len() {
-          array_data_mut.push(Val::Void);
+        while subscript_index > array_data_mut.elements.len() {
+          array_data_mut.elements.push(Val::Void);
         }
 
-        array_data_mut.push(value);
+        array_data_mut.elements.push(value);
       }
     },
     Val::Object(object_data) => {

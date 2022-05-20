@@ -7,6 +7,7 @@ use super::vs_pointer::VsPointer;
 use super::vs_function::VsFunction;
 use super::instruction::Instruction;
 use super::vs_object::VsObject;
+use super::vs_array::VsArray;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -103,7 +104,7 @@ impl BytecodeDecoder {
 
         self.decode_type(); // End (TODO: assert)
 
-        Val::Array(Rc::new(vals))
+        Val::Array(Rc::new(VsArray::from(vals)))
       },
       BytecodeType::Object => {
         let mut obj: BTreeMap<String, Val> = BTreeMap::new();

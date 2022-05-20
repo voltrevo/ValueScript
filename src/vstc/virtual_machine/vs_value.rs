@@ -4,6 +4,7 @@ use std::str::FromStr;
 use super::vs_function::VsFunction;
 use super::virtual_machine::StackFrame;
 use super::vs_object::VsObject;
+use super::vs_array::VsArray;
 
 #[derive(Clone)]
 pub enum Val {
@@ -13,7 +14,7 @@ pub enum Val {
   Bool(bool),
   Number(f64),
   String(Rc<String>),
-  Array(Rc<Vec<Val>>),
+  Array(Rc<VsArray>),
   Object(Rc<VsObject>),
   Function(Rc<VsFunction>),
   Custom(Rc<dyn ValTrait>),
@@ -51,7 +52,7 @@ pub trait ValTrait {
 
   fn bind(&self, params: Vec<Val>) -> Option<Val>;
 
-  fn as_array_data(&self) -> Option<Rc<Vec<Val>>>;
+  fn as_array_data(&self) -> Option<Rc<VsArray>>;
   fn as_object_data(&self) -> Option<Rc<VsObject>>;
 
   fn load_function(&self) -> LoadFunctionResult;
@@ -86,12 +87,12 @@ impl ValTrait for Val {
       Number(x) => x.to_string(), // TODO: Match js's number string format
       String(s) => s.to_string(),
       Array(vals) => {
-        if vals.len() == 0 {
+        if vals.elements.len() == 0 {
           "".to_string()
-        } else if vals.len() == 1 {
-          vals[0].val_to_string()
+        } else if vals.elements.len() == 1 {
+          vals.elements[0].val_to_string()
         } else {
-          let mut iter = vals.iter();
+          let mut iter = vals.elements.iter();
           let mut res = iter.next().unwrap().val_to_string();
 
           for val in iter {
@@ -118,9 +119,9 @@ impl ValTrait for Val {
       Bool(b) => *b as u8 as f64,
       Number(x) => *x,
       String(s) => f64::from_str(s).unwrap_or(f64::NAN),
-      Array(vals) => match vals.len() {
+      Array(vals) => match vals.elements.len() {
         0 => 0_f64,
-        1 => vals[0].to_number(),
+        1 => vals.elements[0].to_number(),
         _ => f64::NAN,
       },
       Object(_) => f64::NAN,
@@ -223,7 +224,7 @@ impl ValTrait for Val {
     }
   }
 
-  fn as_array_data(&self) -> Option<Rc<Vec<Val>>> {
+  fn as_array_data(&self) -> Option<Rc<VsArray>> {
     use Val::*;
 
     return match self {
