@@ -54,6 +54,9 @@ impl ValTrait for ArrayPrototype {
   fn sub(&self, key: Val) -> Val {
     match key.val_to_string().as_str() {
       "push" => Val::Static(&PUSH),
+      "unshift" => Val::Static(&UNSHIFT),
+      "pop" => Val::Static(&POP),
+      "shift" => Val::Static(&SHIFT),
       "includes" => Val::Static(&INCLUDES),
       _ => Val::Undefined,
     }
@@ -79,6 +82,60 @@ static PUSH: NativeFunction = NativeFunction {
         }
 
         return Val::Number(array_data_mut.elements.len() as f64);
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static UNSHIFT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        let array_data_mut = Rc::make_mut(array_data);
+
+        let mut i = 0;
+
+        for p in params {
+          array_data_mut.elements.insert(i, p);
+          i += 1;
+        }
+
+        return Val::Number(array_data_mut.elements.len() as f64);
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static POP: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        if array_data.elements.len() == 0 {
+          return Val::Undefined;
+        }
+
+        let array_data_mut = Rc::make_mut(array_data);
+
+        return array_data_mut.elements.remove(array_data_mut.elements.len() - 1);
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static SHIFT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        if array_data.elements.len() == 0 {
+          return Val::Undefined;
+        }
+
+        let array_data_mut = Rc::make_mut(array_data);
+
+        return array_data_mut.elements.remove(0);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
     };
