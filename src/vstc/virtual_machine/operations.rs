@@ -259,12 +259,12 @@ pub fn op_sub(left: Val, right: Val) -> Val {
     },
     Val::Array(array_data) => {
       let right_index = match right.to_index() {
-        None => { return Val::Undefined }
+        None => { return array_data.object.sub(right) }
         Some(i) => i,
       };
 
       if right_index >= array_data.elements.len() {
-        return array_data.object.sub(right);
+        return Val::Undefined;
       }
 
       let res = array_data.elements[right_index].clone();
