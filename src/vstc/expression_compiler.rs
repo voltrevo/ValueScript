@@ -53,7 +53,17 @@ impl<'a> ExpressionCompiler<'a> {
       SuperProp(_) => std::panic!("Not implemented: SuperProp expression"),
       Cond(_) => std::panic!("Not implemented: Cond expression"),
       Call(call_exp) => {
-        return self.call_expression(call_exp, target_register);
+        return match &call_exp.callee {
+          swc_ecma_ast::Callee::Expr(callee_expr) => match &**callee_expr {
+            swc_ecma_ast::Expr::Member(member_expr) => self.method_call_expression(
+              &member_expr,
+              &call_exp.args,
+              target_register,
+            ),
+            _ => self.call_expression(call_exp, target_register)
+          },
+          _ => std::panic!("Not implemented: non-expression callee"),
+        };
       },
       New(_) => std::panic!("Not implemented: New expression"),
       Seq(_) => std::panic!("Not implemented: Seq expression"),
@@ -521,6 +531,26 @@ impl<'a> ExpressionCompiler<'a> {
     };
   }
 
+  pub fn member_prop(
+    &mut self,
+    member_prop: &swc_ecma_ast::MemberProp,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    return match member_prop {
+      swc_ecma_ast::MemberProp::Ident(ident) => self.inline(
+        string_literal(&ident.sym.to_string()),
+        target_register,
+      ),
+      swc_ecma_ast::MemberProp::Computed(computed) => self.compile(
+        &computed.expr,
+        target_register,
+      ),
+      swc_ecma_ast::MemberProp::PrivateName(_) => {
+        std::panic!("Not implemented: private name");
+      },
+    };
+  }
+
   pub fn member_expression(
     &mut self,
     member_exp: &swc_ecma_ast::MemberExpr,
@@ -531,18 +561,7 @@ impl<'a> ExpressionCompiler<'a> {
     let mut sub_instr = "  sub ".to_string();
     sub_instr += &compiled_obj.value_assembly;
 
-    let compiled_prop = match &member_exp.prop {
-      swc_ecma_ast::MemberProp::Ident(ident) => CompiledExpression {
-        value_assembly: format!("\"{}\"", ident.sym.to_string()),
-        nested_registers: Vec::new(),
-      },
-      swc_ecma_ast::MemberProp::Computed(computed) => {
-        self.compile(&computed.expr, None)
-      },
-      swc_ecma_ast::MemberProp::PrivateName(_) => {
-        std::panic!("Not implemented: private name");
-      },
-    };
+    let compiled_prop = self.member_prop(&member_exp.prop, None);
 
     sub_instr += " ";
     sub_instr += &compiled_prop.value_assembly;
@@ -713,6 +732,71 @@ impl<'a> ExpressionCompiler<'a> {
       instr += &compiled_arg.value_assembly;
 
       if i != call_exp.args.len() - 1 {
+        instr += ", ";
+      }
+    }
+
+    instr += "] ";
+
+    let dest = match &target_register {
+      Some(tr) => ("%".to_string() + &tr),
+      None => {
+        let reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        nested_registers.push(reg.clone());
+
+        "%".to_string() + &reg
+      },
+    };
+
+    instr += &dest;
+
+    self.fnc.definition.push(instr);
+
+    for reg in sub_nested_registers {
+      self.fnc.reg_allocator.release(&reg);
+    }
+
+    return CompiledExpression {
+      value_assembly: dest,
+      nested_registers: nested_registers,
+    };
+  }
+
+  pub fn method_call_expression(
+    &mut self,
+    callee_expr: &swc_ecma_ast::MemberExpr,
+    args: &Vec<swc_ecma_ast::ExprOrSpread>,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    let mut nested_registers = Vec::<String>::new();
+    let mut sub_nested_registers = Vec::<String>::new();
+
+    // TODO: Allow expressions that can't be mutated (currently fails because
+    // TargetAccessor assumes modification is needed)
+    let obj = TargetAccessor::compile(self, &callee_expr.obj);
+    let mut prop = self.member_prop(&callee_expr.prop, None);
+
+    sub_nested_registers.append(&mut prop.nested_registers);
+
+    let mut instr = format!(
+      "  subcall %{} {} [",
+      obj.register(),
+      prop.value_assembly,
+    );
+
+    for i in 0..args.len() {
+      let arg = &args[i];
+
+      if arg.spread.is_some() {
+        std::panic!("Not implemented: argument spreading");
+      }
+
+      let mut compiled_arg = self.compile(&*arg.expr, None);
+      sub_nested_registers.append(&mut compiled_arg.nested_registers);
+
+      instr += &compiled_arg.value_assembly;
+
+      if i != args.len() - 1 {
         instr += ", ";
       }
     }
@@ -1133,19 +1217,7 @@ impl TargetAccessor {
       This(_) => TargetAccessor::Register("this".to_string()),
       Member(member) => {
         let obj = TargetAccessor::compile(ec, &member.obj);
-
-        let subscript = match &member.prop {
-          swc_ecma_ast::MemberProp::Ident(ident) => CompiledExpression {
-            value_assembly: format!("\"{}\"", ident.sym.to_string()),
-            nested_registers: Vec::new(),
-          },
-          swc_ecma_ast::MemberProp::Computed(computed) => {
-            ec.compile(&computed.expr, None)
-          },
-          swc_ecma_ast::MemberProp::PrivateName(_) => {
-            std::panic!("Not implemented: private name");
-          },
-        };
+        let subscript = ec.member_prop(&member.prop, None);
 
         let register = ec.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
 
