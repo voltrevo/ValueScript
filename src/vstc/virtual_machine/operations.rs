@@ -279,7 +279,7 @@ pub fn op_sub(left: Val, right: Val) -> Val {
     },
     Val::Function(_) => Val::Undefined,
     Val::Static(s) => s.sub(right),
-    Val::Custom(custom_data) => op_sub(custom_data.resolve(), right),
+    Val::Custom(custom_data) => custom_data.sub(right),
   }
 }
 
@@ -318,10 +318,6 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
     },
     Val::Function(_) => std::panic!("Not implemented: function subscript assignment"),
     Val::Static(_) => std::panic!("Not implemented: exceptions"),
-    Val::Custom(custom_data) => {
-      let mut resolved_target = custom_data.resolve();
-      op_submov(&mut resolved_target, subscript, value);
-      *target = resolved_target;
-    },
+    Val::Custom(_) => std::panic!("Not implemented"),
   }
 }

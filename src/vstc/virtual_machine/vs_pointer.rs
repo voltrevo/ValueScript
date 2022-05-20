@@ -20,6 +20,27 @@ impl VsPointer {
       resolved: RefCell::new(None),
     }));
   }
+
+  fn resolve(&self) -> Val {
+    let mut resolved = self.resolved.borrow_mut();
+
+    if resolved.is_some() {
+      return resolved.clone().unwrap();
+    }
+
+    let mut bd = BytecodeDecoder {
+      data: self.bytecode.clone(),
+      pos: self.pos,
+    };
+
+    let val = bd.decode_val(&Vec::new());
+
+    // TODO: Check that this actually inserts into the cell and not just a copy
+    // somehow
+    *resolved = Some(val.clone());
+
+    return val;
+  }
 }
 
 impl ValTrait for VsPointer {
@@ -76,27 +97,6 @@ impl ValTrait for VsPointer {
     return self.resolve().to_primitive();
   }
 
-  fn resolve(&self) -> Val {
-    let mut resolved = self.resolved.borrow_mut();
-
-    if resolved.is_some() {
-      return resolved.clone().unwrap();
-    }
-
-    let mut bd = BytecodeDecoder {
-      data: self.bytecode.clone(),
-      pos: self.pos,
-    };
-
-    let val = bd.decode_val(&Vec::new());
-
-    // TODO: Check that this actually inserts into the cell and not just a copy
-    // somehow
-    *resolved = Some(val.clone());
-
-    return val;
-  }
-
   fn bind(&self, params: Vec<Val>) -> Option<Val> {
     return self.resolve().bind(params);
   }
@@ -119,5 +119,13 @@ impl ValTrait for VsPointer {
 
   fn load_function(&self) -> LoadFunctionResult {
     return self.resolve().load_function();
+  }
+
+  fn sub(&self, subscript: Val) -> Val {
+    return self.resolve().sub(subscript);
+  }
+
+  fn submov(&mut self, subscript: Val, value: Val) {
+    std::panic!("Not implemented");
   }
 }

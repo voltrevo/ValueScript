@@ -5,6 +5,7 @@ use super::vs_function::VsFunction;
 use super::virtual_machine::StackFrame;
 use super::vs_object::VsObject;
 use super::vs_array::VsArray;
+use super::operations::{op_sub, op_submov};
 
 #[derive(Clone)]
 pub enum Val {
@@ -17,7 +18,7 @@ pub enum Val {
   Array(Rc<VsArray>),
   Object(Rc<VsObject>),
   Function(Rc<VsFunction>),
-  Static(&'static dyn StaticValTrait),
+  Static(&'static dyn ValTrait),
   Custom(Rc<dyn ValTrait>),
 }
 
@@ -49,21 +50,16 @@ pub trait ValTrait {
   fn is_truthy(&self) -> bool;
   fn is_nullish(&self) -> bool;
 
-  fn resolve(&self) -> Val;
-
   fn bind(&self, params: Vec<Val>) -> Option<Val>;
 
   fn as_array_data(&self) -> Option<Rc<VsArray>>;
   fn as_object_data(&self) -> Option<Rc<VsObject>>;
 
   fn load_function(&self) -> LoadFunctionResult;
-}
 
-pub trait StaticValExtraTrait {
   fn sub(&self, key: Val) -> Val;
+  fn submov(&mut self, key: Val, value: Val);
 }
-
-pub trait StaticValTrait: ValTrait + StaticValExtraTrait {}
 
 impl ValTrait for Val {
   fn typeof_(&self) -> VsType {
@@ -223,10 +219,6 @@ impl ValTrait for Val {
     };
   }
 
-  fn resolve(&self) -> Val {
-    std::panic!("Unexpected resolve call on plain Val")
-  }
-
   fn bind(&self, params: Vec<Val>) -> Option<Val> {
     use Val::*;
 
@@ -269,6 +261,15 @@ impl ValTrait for Val {
 
       _ => LoadFunctionResult::NotAFunction,
     }
+  }
+
+  fn sub(&self, key: Val) -> Val {
+    // TODO: Avoid cloning?
+    return op_sub(self.clone(), key);
+  }
+
+  fn submov(&mut self, key: Val, value: Val) {
+    op_submov(self, key, value);
   }
 }
 
