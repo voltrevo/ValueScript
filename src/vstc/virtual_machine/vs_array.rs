@@ -90,6 +90,22 @@ fn to_unchecked_wrapping_index(index: &Val, len: usize) -> isize {
   return floored_index as isize;
 }
 
+fn to_wrapping_index_clamped(index: &Val, len: usize) -> isize {
+  let wrapping_index = to_unchecked_wrapping_index(index, len);
+
+  if wrapping_index < 0 {
+    return 0;
+  }
+
+  if wrapping_index > len as isize {
+    // len-1 would be a mistake. The end of the array is a meaningful index even
+    // though there is no data there.
+    return len as isize;
+  }
+
+  return wrapping_index;
+}
+
 fn to_wrapping_index(index: Option<&Val>, len: usize) -> Option<usize> {
   let unchecked = match index {
     None => { return None; }
@@ -157,19 +173,19 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 
         let mut target = match params.get(0) {
           None => 0,
-          Some(p) => to_unchecked_wrapping_index(p, ulen),
+          Some(p) => to_wrapping_index_clamped(p, ulen),
         };
 
         let mut start = match params.get(1) {
           None => 0,
-          Some(p) => to_unchecked_wrapping_index(p, ulen),
+          Some(p) => to_wrapping_index_clamped(p, ulen),
         };
 
         let ilen = ulen as isize;
 
         let mut end = match params.get(2) {
           None => ilen,
-          Some(p) => to_unchecked_wrapping_index(p, ulen),
+          Some(p) => to_wrapping_index_clamped(p, ulen),
         };
 
         if target < 0 {
