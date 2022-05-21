@@ -793,7 +793,7 @@ impl FunctionCompiler {
       Fn(_) => {},
       Var(var_decl) => self.var_declaration(var_decl, scope),
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
-      TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
+      TsTypeAlias(_) => {},
       TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
       TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
     };
