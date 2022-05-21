@@ -63,7 +63,7 @@ function BinaryTree() {
 }
 
 function cat(left: number[], right: number[]) {
-  for (let i = 0; right[i] !== undefined; i++) {
+  for (let i = 0; i < right.length; i++) {
     left.push(right[i]);
   }
 

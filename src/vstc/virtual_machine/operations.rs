@@ -259,7 +259,15 @@ pub fn op_sub(left: Val, right: Val) -> Val {
     },
     Val::Array(array_data) => {
       let right_index = match right.to_index() {
-        None => { return array_data.object.sub(right) }
+        None => {
+          // FIXME: Inefficient val_to_string() that gets duplicated
+          // when subscripting the object
+          if right.val_to_string() == "length" {
+            return Val::Number(array_data.elements.len() as f64);
+          }
+
+          return array_data.object.sub(right);
+        }
         Some(i) => i,
       };
 
