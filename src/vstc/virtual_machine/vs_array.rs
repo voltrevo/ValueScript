@@ -56,6 +56,7 @@ impl ValTrait for ArrayPrototype {
       "at" => Val::Static(&AT),
       "concat" => Val::Static(&CONCAT),
       "copyWithin" => Val::Static(&COPY_WITHIN),
+      "fill" => Val::Static(&FILL),
       "push" => Val::Static(&PUSH),
       "unshift" => Val::Static(&UNSHIFT),
       "pop" => Val::Static(&POP),
@@ -188,11 +189,6 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
           Some(p) => to_wrapping_index_clamped(p, ulen),
         };
 
-        if target < 0 {
-          start += -target;
-          target = 0;
-        }
-
         let copy_len = end - start;
 
         if copy_len <= 0 {
@@ -229,6 +225,36 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
             target -= 1;
             end -= 1;
           }
+        }
+
+        return this.clone();
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static FILL: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        let array_data_mut = Rc::make_mut(array_data);
+        let len = array_data_mut.elements.len();
+
+        let fill_val = params.get(0).unwrap_or(&Val::Undefined);
+
+        let start = match params.get(1) {
+          None => 0,
+          Some(v) => to_wrapping_index_clamped(v, len),
+        };
+
+        let end = match params.get(2) {
+          None => len as isize,
+          Some(v) => to_wrapping_index_clamped(v, len),
+        };
+
+        for i in start..end {
+          array_data_mut.elements[i as usize] = fill_val.clone();
         }
 
         return this.clone();
