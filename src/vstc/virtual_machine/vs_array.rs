@@ -57,6 +57,7 @@ impl ValTrait for ArrayPrototype {
       "concat" => Val::Static(&CONCAT),
       "copyWithin" => Val::Static(&COPY_WITHIN),
       "fill" => Val::Static(&FILL),
+      "flat" => Val::Static(&FLAT),
       "push" => Val::Static(&PUSH),
       "unshift" => Val::Static(&UNSHIFT),
       "pop" => Val::Static(&POP),
@@ -186,6 +187,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 
         let mut end = match params.get(2) {
           None => ilen,
+          // FIXME: undefined -> len (and others in this file)
           Some(p) => to_wrapping_index_clamped(p, ulen),
         };
 
@@ -258,6 +260,36 @@ static FILL: NativeFunction = NativeFunction {
         }
 
         return this.clone();
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static FLAT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        if params.len() > 0 {
+          std::panic!("Not implemented: .flat depth parameter");
+        }
+
+        let mut new_elems = Vec::<Val>::new();
+
+        for el in &array_data.elements {
+          match &el.as_array_data() {
+            None => {
+              new_elems.push(el.clone());
+            },
+            Some(p_array_data) => {
+              for elem in &p_array_data.elements {
+                new_elems.push(elem.clone());
+              }
+            },
+          }
+        }
+
+        return Val::Array(Rc::new(VsArray::from(new_elems)));
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
     };
