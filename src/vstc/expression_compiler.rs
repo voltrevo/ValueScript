@@ -817,6 +817,8 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.definition.push(instr);
 
+    obj.packup(self);
+
     for reg in sub_nested_registers {
       self.fnc.reg_allocator.release(&reg);
     }
