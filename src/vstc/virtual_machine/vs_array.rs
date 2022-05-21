@@ -149,21 +149,27 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
     match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
-        let len = array_data_mut.elements.len();
+        let ulen = array_data_mut.elements.len();
+
+        if ulen > isize::MAX as usize {
+          std::panic!("Not implemented: array len exceeds isize");
+        }
 
         let mut target = match params.get(0) {
           None => 0,
-          Some(p) => to_unchecked_wrapping_index(p, len),
+          Some(p) => to_unchecked_wrapping_index(p, ulen),
         };
 
         let mut start = match params.get(1) {
           None => 0,
-          Some(p) => to_unchecked_wrapping_index(p, len),
+          Some(p) => to_unchecked_wrapping_index(p, ulen),
         };
 
-        let end = match params.get(2) {
-          None => len as isize,
-          Some(p) => to_unchecked_wrapping_index(p, len),
+        let ilen = ulen as isize;
+
+        let mut end = match params.get(2) {
+          None => ilen,
+          Some(p) => to_unchecked_wrapping_index(p, ulen),
         };
 
         if target < 0 {
@@ -177,16 +183,8 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
           return this.clone();
         }
 
-        if target > start && target < end {
-          // Tricky case - make sure we don't read from things we've written
-          std::panic!("Not implemented");
-
-          //  1, 2, 3, 4, 5, 6, 7
-          //        ^--------^
-          //           ^
-        } else {
-          // Easy case - no overlap between read and write
-          while target < len as isize && start < end {
+        if target <= start || target >= end {
+          while target < ilen && start < end {
             array_data_mut.elements[target as usize] =
               array_data_mut.elements[start as usize].clone()
             ;
@@ -194,8 +192,29 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
             target += 1;
             start += 1;
           }
+        } else {
+          // The target is after the start. If we copied from start to target
+          // and worked forwards we'd overwrite the values we needed later.
+          // Instead we simply do the copies in the reverse order.
+
+          target += copy_len - 1;
+          end -= 1;
+
+          if target >= ilen {
+            end -= target - ilen + 1;
+            target = ilen - 1;
+          }
+
+          while target >= 0 && end >= start {
+            array_data_mut.elements[target as usize] =
+              array_data_mut.elements[end as usize].clone()
+            ;
+
+            target -= 1;
+            end -= 1;
+          }
         }
-        
+
         return this.clone();
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
