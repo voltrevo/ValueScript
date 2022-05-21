@@ -53,6 +53,7 @@ impl ValTrait for ArrayPrototype {
 
   fn sub(&self, key: Val) -> Val {
     match key.val_to_string().as_str() {
+      "at" => Val::Static(&AT),
       "push" => Val::Static(&PUSH),
       "unshift" => Val::Static(&UNSHIFT),
       "pop" => Val::Static(&POP),
@@ -70,6 +71,40 @@ impl ValTrait for ArrayPrototype {
     write!(f, "\x1b[36m[Array Prototype]\x1b[39m")
   }
 }
+
+static AT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        let index = match params.get(0) {
+          None => 0_f64,
+          Some(v) => v.to_number(),
+        };
+
+        let abs_index = index.abs();
+
+        if abs_index == f64::INFINITY {
+          return Val::Undefined;
+        }
+
+        let mut floored_index = index.signum() * abs_index.floor();
+
+        let f64_len = array_data.elements.len() as f64;
+
+        if floored_index < 0_f64 {
+          floored_index += f64_len;
+        }
+
+        if floored_index < 0_f64 || floored_index >= f64_len {
+          return Val::Undefined;
+        }
+
+        return array_data.elements[floored_index as usize].clone();
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
 
 static PUSH: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
