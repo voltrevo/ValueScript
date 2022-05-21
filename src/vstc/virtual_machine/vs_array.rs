@@ -55,6 +55,7 @@ impl ValTrait for ArrayPrototype {
     match key.val_to_string().as_str() {
       "at" => Val::Static(&AT),
       "concat" => Val::Static(&CONCAT),
+      "copyWithin" => Val::Static(&COPY_WITHIN),
       "push" => Val::Static(&PUSH),
       "unshift" => Val::Static(&UNSHIFT),
       "pop" => Val::Static(&POP),
@@ -73,37 +74,47 @@ impl ValTrait for ArrayPrototype {
   }
 }
 
+fn to_unchecked_wrapping_index(index: &Val, len: usize) -> isize {
+  let index_num = index.to_number();
+
+  let abs_index = index_num.abs();
+  let mut floored_index = index_num.signum() * abs_index.floor();
+  let f64_len = len as f64;
+
+  if floored_index < 0_f64 {
+    floored_index += f64_len;
+  }
+
+  // TODO: Investigate potential pitfalls for arrays with length exceeding max
+  // isize.
+  return floored_index as isize;
+}
+
+fn to_wrapping_index(index: Option<&Val>, len: usize) -> Option<usize> {
+  let unchecked = match index {
+    None => { return None; }
+    Some(i) => to_unchecked_wrapping_index(i, len),
+  };
+
+  if unchecked < 0 || unchecked as usize >= len {
+    return None;
+  }
+
+  return Some(unchecked as usize);
+}
+
 static AT: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Array(array_data) => {
-        let index = match params.get(0) {
-          None => 0_f64,
-          Some(v) => v.to_number(),
-        };
-
-        let abs_index = index.abs();
-
-        if abs_index == f64::INFINITY {
-          return Val::Undefined;
-        }
-
-        let mut floored_index = index.signum() * abs_index.floor();
-
-        let f64_len = array_data.elements.len() as f64;
-
-        if floored_index < 0_f64 {
-          floored_index += f64_len;
-        }
-
-        if floored_index < 0_f64 || floored_index >= f64_len {
-          return Val::Undefined;
-        }
-
-        return array_data.elements[floored_index as usize].clone();
+      Val::Array(array_data) => match to_wrapping_index(
+        params.get(0),
+        array_data.elements.len(),
+      ) {
+        None => Val::Undefined,
+        Some(i) => array_data.elements[i].clone(),
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
-    };
+    }
   }
 };
 
@@ -127,6 +138,65 @@ static CONCAT: NativeFunction = NativeFunction {
         }
 
         return Val::Array(Rc::new(new_array));
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static COPY_WITHIN: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        let array_data_mut = Rc::make_mut(array_data);
+        let len = array_data_mut.elements.len();
+
+        let mut target = match params.get(0) {
+          None => 0,
+          Some(p) => to_unchecked_wrapping_index(p, len),
+        };
+
+        let mut start = match params.get(1) {
+          None => 0,
+          Some(p) => to_unchecked_wrapping_index(p, len),
+        };
+
+        let end = match params.get(2) {
+          None => len as isize,
+          Some(p) => to_unchecked_wrapping_index(p, len),
+        };
+
+        if target < 0 {
+          start += -target;
+          target = 0;
+        }
+
+        let copy_len = end - start;
+
+        if copy_len <= 0 {
+          return this.clone();
+        }
+
+        if target > start && target < end {
+          // Tricky case - make sure we don't read from things we've written
+          std::panic!("Not implemented");
+
+          //  1, 2, 3, 4, 5, 6, 7
+          //        ^--------^
+          //           ^
+        } else {
+          // Easy case - no overlap between read and write
+          while target < len as isize && start < end {
+            array_data_mut.elements[target as usize] =
+              array_data_mut.elements[start as usize].clone()
+            ;
+
+            target += 1;
+            start += 1;
+          }
+        }
+        
+        return this.clone();
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
     };
