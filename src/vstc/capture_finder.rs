@@ -18,6 +18,10 @@ impl CaptureFinder {
   }
 
   fn ref_(&mut self, scope: &Scope, name: String) {
+    if name == "undefined" {
+      return;
+    }
+
     if scope.get(&name).is_some() {
       return;
     }
@@ -127,11 +131,7 @@ impl CaptureFinder {
       Empty(_) => {},
       Debugger(_) => {},
       With(_) => std::panic!("Not supported: With statement"),
-      Return(return_) => {
-        for arg in &return_.arg {
-          self.expr(scope, arg);
-        }
-      },
+      Return(_) => {},
       Labeled(_) => std::panic!("Not implemented: Labeled statement"),
       Break(_) => {},
       Continue(_) => {},
@@ -296,7 +296,11 @@ impl CaptureFinder {
       Empty(_) => {},
       Debugger(_) => {},
       With(_) => std::panic!("Not supported: With statement"),
-      Return(_) => {},
+      Return(return_) => {
+        for arg in &return_.arg {
+          self.expr(scope, arg);
+        }
+      },
       Labeled(_) => std::panic!("Not implemented: Labeled statement"),
       Break(_) => {},
       Continue(_) => {},
