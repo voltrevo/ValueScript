@@ -54,6 +54,7 @@ impl ValTrait for ArrayPrototype {
   fn sub(&self, key: Val) -> Val {
     match key.val_to_string().as_str() {
       "at" => Val::Static(&AT),
+      "concat" => Val::Static(&CONCAT),
       "push" => Val::Static(&PUSH),
       "unshift" => Val::Static(&UNSHIFT),
       "pop" => Val::Static(&POP),
@@ -100,6 +101,32 @@ static AT: NativeFunction = NativeFunction {
         }
 
         return array_data.elements[floored_index as usize].clone();
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static CONCAT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        let mut new_array = array_data.as_ref().clone();
+
+        for p in params {
+          match &p.as_array_data() {
+            None => {
+              new_array.elements.push(p);
+            },
+            Some(p_array_data) => {
+              for elem in &p_array_data.elements {
+                new_array.elements.push(elem.clone());
+              }
+            },
+          }
+        }
+
+        return Val::Array(Rc::new(new_array));
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
     };
