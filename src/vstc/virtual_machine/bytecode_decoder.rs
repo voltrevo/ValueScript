@@ -169,7 +169,7 @@ impl BytecodeDecoder {
   pub fn decode_pos(&mut self) -> usize {
     // TODO: the number of bytes to represent a position should be based on the
     // size of the bytecode
-    return self.decode_byte() as usize;
+    return self.decode_byte() as usize + 256 * self.decode_byte() as usize;
   }
 
   pub fn decode_register_index(&mut self) -> Option<usize> {

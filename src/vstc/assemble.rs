@@ -61,7 +61,8 @@ impl LocationMapper for LocationMap {
       .or_default()
       .push(output.len());
 
-    output.push(0xff); // TODO: Support >255
+    output.push(0xff);
+    output.push(0xff); // TODO: Support >65535
   }
 
   fn resolve(&self, output: &mut Vec<u8>) {
@@ -79,7 +80,8 @@ impl LocationMapper for LocationMap {
       let location = location_optional.unwrap();
 
       for ref_location in ref_locations {
-        output[*ref_location] = *location as u8; // TODO: Support >255
+        output[*ref_location] = (*location % 256) as u8;
+        output[*ref_location + 1] = (*location / 256) as u8; // TODO: Support >65535
       }
     }
   }
