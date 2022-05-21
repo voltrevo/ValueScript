@@ -58,11 +58,11 @@ impl ValTrait for ArrayPrototype {
       "copyWithin" => Val::Static(&COPY_WITHIN),
       "fill" => Val::Static(&FILL),
       "flat" => Val::Static(&FLAT),
-      "push" => Val::Static(&PUSH),
-      "unshift" => Val::Static(&UNSHIFT),
-      "pop" => Val::Static(&POP),
-      "shift" => Val::Static(&SHIFT),
       "includes" => Val::Static(&INCLUDES),
+      "pop" => Val::Static(&POP),
+      "push" => Val::Static(&PUSH),
+      "shift" => Val::Static(&SHIFT),
+      "unshift" => Val::Static(&UNSHIFT),
       _ => Val::Undefined,
     }
   }
@@ -296,37 +296,19 @@ static FLAT: NativeFunction = NativeFunction {
   }
 };
 
-static PUSH: NativeFunction = NativeFunction {
+static INCLUDES: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
       Val::Array(array_data) => {
-        let array_data_mut = Rc::make_mut(array_data);
+        let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
-        for p in params {
-          array_data_mut.elements.push(p);
+        for elem in &array_data.elements {
+          if op_triple_eq_impl(elem.clone(), search_param.clone()) {
+            return Val::Bool(true);
+          }
         }
 
-        return Val::Number(array_data_mut.elements.len() as f64);
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
-    };
-  }
-};
-
-static UNSHIFT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(array_data) => {
-        let array_data_mut = Rc::make_mut(array_data);
-
-        let mut i = 0;
-
-        for p in params {
-          array_data_mut.elements.insert(i, p);
-          i += 1;
-        }
-
-        return Val::Number(array_data_mut.elements.len() as f64);
+        return Val::Bool(false);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
     };
@@ -350,6 +332,23 @@ static POP: NativeFunction = NativeFunction {
   }
 };
 
+static PUSH: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(array_data) => {
+        let array_data_mut = Rc::make_mut(array_data);
+
+        for p in params {
+          array_data_mut.elements.push(p);
+        }
+
+        return Val::Number(array_data_mut.elements.len() as f64);
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
 static SHIFT: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
     match this {
@@ -367,19 +366,20 @@ static SHIFT: NativeFunction = NativeFunction {
   }
 };
 
-static INCLUDES: NativeFunction = NativeFunction {
+static UNSHIFT: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
       Val::Array(array_data) => {
-        let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
+        let array_data_mut = Rc::make_mut(array_data);
 
-        for elem in &array_data.elements {
-          if op_triple_eq_impl(elem.clone(), search_param.clone()) {
-            return Val::Bool(true);
-          }
+        let mut i = 0;
+
+        for p in params {
+          array_data_mut.elements.insert(i, p);
+          i += 1;
         }
 
-        return Val::Bool(false);
+        return Val::Number(array_data_mut.elements.len() as f64);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
     };
