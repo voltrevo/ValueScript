@@ -476,10 +476,21 @@ static KEYS: NativeFunction = NativeFunction {
 };
 
 static LAST_INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: LAST_INDEX_OF");
+      Val::Array(array_data) => {
+        let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
+
+        for i in (0..array_data.elements.len()).rev() {
+          if op_triple_eq_impl(
+            array_data.elements[i].clone(),
+            search_param.clone(),
+          ) {
+            return Val::Number(i as f64);
+          }
+        }
+
+        return Val::Number(-1_f64);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
