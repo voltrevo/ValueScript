@@ -405,10 +405,21 @@ static INCLUDES: NativeFunction = NativeFunction {
 };
 
 static INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: INDEX_OF");
+      Val::Array(array_data) => {
+        let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
+
+        for i in 0..array_data.elements.len() {
+          if op_triple_eq_impl(
+            array_data.elements[i].clone(),
+            search_param.clone(),
+          ) {
+            return Val::Number(i as f64);
+          }
+        }
+
+        return Val::Number(-1_f64);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
@@ -416,10 +427,37 @@ static INDEX_OF: NativeFunction = NativeFunction {
 };
 
 static JOIN: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: JOIN");
+      Val::Array(vals) => {
+        if vals.elements.len() == 0 {
+          return Val::String(Rc::new("".to_string()));
+        }
+        
+        if vals.elements.len() == 1 {
+          return Val::String(Rc::new(vals.elements[0].val_to_string()));
+        }
+
+        let separator = params.get(0).unwrap_or(&Val::Undefined);
+
+        let separator_str = match separator.typeof_() {
+          VsType::Undefined => ",".to_string(),
+          _ => separator.val_to_string(),
+        };
+
+        let mut iter = vals.elements.iter();
+        let mut res = iter.next().unwrap().val_to_string();
+
+        for val in iter {
+          res += &separator_str;
+
+          match val.typeof_() {
+            VsType::Undefined => {},
+            _ => { res += &val.val_to_string(); },
+          };
+        }
+
+        return Val::String(Rc::new(res));
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
