@@ -647,10 +647,20 @@ static SOME: NativeFunction = NativeFunction {
 };
 
 static SORT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: SORT");
+      Val::Array(array_data) => {
+        if params.len() > 0 {
+          std::panic!("Not implemented: custom comparison fn");
+        }
+
+        let array_data_mut = Rc::make_mut(array_data);
+
+        array_data_mut.elements.sort_by(|a, b|
+          a.val_to_string().cmp(&b.val_to_string())
+        );
+
+        return this.clone();
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
