@@ -47,6 +47,7 @@ impl CaptureFinder {
           insert(cap);
         }
       },
+      Some(MappedName::Builtin(_)) => {},
     }
   }
 

@@ -5,10 +5,22 @@ use std::cell::RefCell;
 use super::function_compiler::QueuedFunction;
 
 #[derive(Clone, Debug)]
+pub enum Builtin {
+  Math,
+}
+
+impl std::fmt::Display for Builtin {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    write!(f, "{:?}", self)
+  }
+}
+
+#[derive(Clone, Debug)]
 pub enum MappedName {
   Register(String),
   Definition(String),
   QueuedFunction(QueuedFunction),
+  Builtin(Builtin),
 }
 
 pub struct ScopeData {
@@ -54,6 +66,15 @@ impl ScopeTrait for Scope {
 pub fn init_scope() -> Scope {
   return Rc::new(RefCell::new(ScopeData {
     name_map: Default::default(),
+    parent: None,
+  }));
+}
+
+pub fn init_std_scope() -> Scope {
+  return Rc::new(RefCell::new(ScopeData {
+    name_map: HashMap::from([
+      ("Math".to_string(), MappedName::Builtin(Builtin::Math)),
+    ]),
     parent: None,
   }));
 }

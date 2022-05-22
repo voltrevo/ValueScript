@@ -1,6 +1,6 @@
 use queues::*;
 
-use super::scope::{Scope, ScopeTrait, MappedName, init_scope};
+use super::scope::{Scope, ScopeTrait, MappedName, init_std_scope};
 use super::function_compiler::{FunctionCompiler, QueuedFunction, FnOrArrow};
 use super::capture_finder::CaptureFinder;
 
@@ -220,6 +220,7 @@ impl<'a> ExpressionCompiler<'a> {
                 Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
                 Some(MappedName::QueuedFunction(_)) => std::panic!("Invalid: assign to declaration"),
                 Some(MappedName::Register(reg)) => AssignTarget::Register(reg),
+                Some(MappedName::Builtin(_)) => std::panic!("Invalid: assign to builtin"),
               },
               swc_ecma_ast::Expr::This(_) => AssignTarget::Register("this".to_string()),
               swc_ecma_ast::Expr::Member(member) => AssignTarget::Member(
@@ -239,6 +240,7 @@ impl<'a> ExpressionCompiler<'a> {
               Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
               Some(MappedName::QueuedFunction(_)) => std::panic!("Invalid: assign to declaration"),
               Some(MappedName::Register(reg)) => AssignTarget::Register(reg),
+              Some(MappedName::Builtin(_)) => std::panic!("Invalid: assign to builtin"),
             };
           }
         }
@@ -321,6 +323,7 @@ impl<'a> ExpressionCompiler<'a> {
                 Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
                 Some(MappedName::QueuedFunction(_)) => std::panic!("Invalid: assign to declaration"),
                 Some(MappedName::Register(reg)) => reg,
+                Some(MappedName::Builtin(_)) => std::panic!("Invalid: assign to builtin"),
               }
             ),
             _ => std::panic!("Invalid left hand side of compound assignment"),
@@ -867,7 +870,7 @@ impl<'a> ExpressionCompiler<'a> {
     };
 
     let mut cf = CaptureFinder::new(self.scope.clone());
-    cf.fn_expr(&init_scope(), fn_);
+    cf.fn_expr(&init_std_scope(), fn_);
 
     self.fnc.queue.add(QueuedFunction {
       definition_name: definition_name.clone(),
@@ -904,7 +907,7 @@ impl<'a> ExpressionCompiler<'a> {
     ;
 
     let mut cf = CaptureFinder::new(self.scope.clone());
-    cf.arrow_expr(&init_scope(), arrow_expr);
+    cf.arrow_expr(&init_std_scope(), arrow_expr);
 
     self.fnc.queue.add(QueuedFunction {
       definition_name: definition_name.clone(),
@@ -977,6 +980,7 @@ impl<'a> ExpressionCompiler<'a> {
 
           compiled_ref.value_assembly
         },
+        Some(MappedName::Builtin(_)) => std::panic!("Builtins should never be recorded as captures"),
       };
     }
 
@@ -1128,6 +1132,7 @@ impl<'a> ExpressionCompiler<'a> {
         &qfn.capture_params,
         target_register,
       ),
+      MappedName::Builtin(builtin) => self.inline(format!("${}", builtin), target_register),
     };
   }
 }
@@ -1240,6 +1245,7 @@ impl TargetAccessor {
         Some(MappedName::Definition(_)) => None,
         Some(MappedName::QueuedFunction(_)) => None,
         Some(MappedName::Register(reg)) => Some(TargetAccessor::Register(reg)),
+        Some(MappedName::Builtin(_)) => None,
       },
       This(_) => Some(TargetAccessor::Register("this".to_string())),
       Member(member) => {

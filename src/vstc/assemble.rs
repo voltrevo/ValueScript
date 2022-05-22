@@ -473,6 +473,11 @@ impl<'a> Assembler<'a> {
         let definition_name = self.parse_identifier();
         self.definitions_map.add_unresolved(&definition_name, &mut self.output);
       },
+      Some('$') => {
+        self.parse_exact("$");
+        self.output.push(ValueType::Builtin as u8);
+        self.assemble_builtin();
+      },
       Some('[') => {
         self.assemble_array();
       },
@@ -560,6 +565,13 @@ impl<'a> Assembler<'a> {
     let register_name = self.parse_identifier();
     let register_index = self.get_register_index(register_name.as_str());
     self.output.push(register_index);
+  }
+
+  fn assemble_builtin(&mut self) {
+    match self.parse_one_of(&["Math"]).as_str() {
+      "Math" => self.write_varsize_uint(0),
+      _ => std::panic!("Shouldn't happen"),
+    }
   }
 
   fn test_label(&self) -> Option<String> {
@@ -881,6 +893,7 @@ enum ValueType {
   Pointer = 0x0d,
   Register = 0x0e,
   External = 0x0f,
+  Builtin = 0x10,
 }
 
 fn advance_chars(iter: &mut std::iter::Peekable<std::str::Chars>, len: usize) {

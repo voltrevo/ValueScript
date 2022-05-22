@@ -12,7 +12,7 @@ use swc_common::{
 };
 use swc_ecma_parser::{TsConfig, Syntax};
 
-use super::scope::{Scope, MappedName, init_scope, ScopeTrait};
+use super::scope::{Scope, MappedName, init_std_scope, ScopeTrait};
 use super::name_allocator::NameAllocator;
 use super::function_compiler::FunctionCompiler;
 
@@ -103,7 +103,7 @@ impl Compiler {
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
-    let scope = init_scope();
+    let scope = init_std_scope();
 
     use swc_ecma_ast::ModuleItem;
     use swc_ecma_ast::ModuleDecl;

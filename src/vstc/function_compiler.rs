@@ -5,7 +5,7 @@ use queues::*;
 
 use super::name_allocator::NameAllocator;
 use super::expression_compiler::ExpressionCompiler;
-use super::scope::{Scope, MappedName, ScopeTrait, init_scope};
+use super::scope::{Scope, MappedName, ScopeTrait, init_std_scope};
 use super::capture_finder::CaptureFinder;
 
 #[derive(Clone, Debug)]
@@ -351,7 +351,7 @@ impl FunctionCompiler {
 
     for fn_ in &function_decls {
       let mut cf = CaptureFinder::new(synth_scope.clone());
-      cf.fn_decl(&init_scope(), fn_);
+      cf.fn_decl(&init_std_scope(), fn_);
 
       direct_captures_map.insert(
         fn_.ident.sym.to_string(),
@@ -466,6 +466,7 @@ impl FunctionCompiler {
             },
             MappedName::Definition(_) => {},
             MappedName::QueuedFunction(_) => {},
+            MappedName::Builtin(_) => {},
           }
         }
       },

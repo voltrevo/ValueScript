@@ -8,5 +8,7 @@ mod instruction;
 mod vs_object;
 mod vs_array;
 mod native_function;
+mod builtins;
+mod math;
 
 pub use virtual_machine::VirtualMachine;

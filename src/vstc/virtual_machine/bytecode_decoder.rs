@@ -8,6 +8,7 @@ use super::vs_function::VsFunction;
 use super::instruction::Instruction;
 use super::vs_object::VsObject;
 use super::vs_array::VsArray;
+use super::builtins::get_builtin;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -32,6 +33,7 @@ pub enum BytecodeType {
   Function = 0x0b,
   Pointer = 0x0d,
   Register = 0x0e,
+  Builtin = 0x10,
 }
 
 impl BytecodeType {
@@ -53,6 +55,7 @@ impl BytecodeType {
       0x0b => Function,
       0x0d => Pointer,
       0x0e => Register,
+      0x10 => Builtin,
 
       _ => std::panic!("Unrecognized BytecodeType"),
     };
@@ -123,6 +126,7 @@ impl BytecodeDecoder {
       BytecodeType::Function => self.decode_function_header(),
       BytecodeType::Pointer => self.decode_pointer(),
       BytecodeType::Register => registers[self.decode_register_index().unwrap()].clone(),
+      BytecodeType::Builtin => Val::Static(get_builtin(self.decode_varsize_uint())),
     }
   }
 

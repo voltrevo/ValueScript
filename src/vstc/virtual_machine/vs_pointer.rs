@@ -65,6 +65,7 @@ impl ValTrait for VsPointer {
       BytecodeType::Function => VsType::Function,
       BytecodeType::Pointer => std::panic!("Invalid: pointer to pointer"),
       BytecodeType::Register => std::panic!("Invalid: pointer to register"),
+      BytecodeType::Builtin => std::panic!("Invalid: pointer to builtin"),
     }
   }
 
