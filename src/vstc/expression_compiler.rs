@@ -782,8 +782,6 @@ impl<'a> ExpressionCompiler<'a> {
       CompiledExpression(CompiledExpression),
     }
 
-    // TODO: Allow expressions that can't be mutated (currently fails because
-    // TargetAccessor assumes modification is needed)
     let obj = match TargetAccessor::compile(self, &callee_expr.obj) {
       None => TargetAccessorOrCompiledExpression::CompiledExpression(self.compile(&callee_expr.obj, None)),
       Some(ta) => TargetAccessorOrCompiledExpression::TargetAccessor(ta),
