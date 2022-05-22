@@ -94,7 +94,7 @@ struct AssemblerFnData {
   labels_map: LocationMap,
 }
 
-struct AssemblerData<'a> {
+struct Assembler<'a> {
   content: &'a str,
   pos: std::iter::Peekable<std::str::Chars<'a>>,
   output: Vec<u8>,
@@ -102,36 +102,7 @@ struct AssemblerData<'a> {
   definitions_map: LocationMap,
 }
 
-trait Assembler {
-  fn run(&mut self);
-  fn get_pos_index(&self) -> usize;
-  fn test_chars(&self, chars: &str) -> bool;
-  fn parse_optional_whitespace(&mut self);
-  fn assemble_definition(&mut self);
-  fn parse_instruction_word(&mut self) -> Instruction;
-  fn test_instruction_word(&self, word: &str) -> bool;
-  fn test_identifier(&self) -> Option<String>;
-  fn parse_identifier(&mut self) -> String;
-  fn parse_exact(&mut self, chars: &str);
-  fn parse_optional_exact(&mut self, chars: &str) -> bool;
-  fn parse_one_of(&mut self, options: &[&str]) -> String;
-  fn parse_string_literal(&mut self) -> String;
-  fn assemble_function(&mut self);
-  fn assemble_instruction(&mut self);
-  fn assemble_value(&mut self);
-  fn assemble_array(&mut self);
-  fn assemble_register(&mut self);
-  fn test_label(&self) -> Option<String>;
-  fn assemble_label(&mut self, label_name: String);
-  fn assemble_label_read(&mut self);
-  fn assemble_number(&mut self);
-  fn assemble_string(&mut self);
-  fn assemble_object(&mut self);
-  fn get_register_index(&mut self, register_name: &str) -> u8;
-  fn write_varsize_uint(&mut self, value: usize);
-}
-
-impl<'a> Assembler for AssemblerData<'a> {
+impl<'a> Assembler<'a> {
   fn run(&mut self) {
     loop {
       self.parse_optional_whitespace();
@@ -755,7 +726,7 @@ impl<'a> Assembler for AssemblerData<'a> {
 }
 
 pub fn assemble(content: &str) -> Rc<Vec<u8>> {
-  let mut assembler = AssemblerData {
+  let mut assembler = Assembler {
     content: content,
     pos: content.chars().peekable(),
     output: Vec::new(),
