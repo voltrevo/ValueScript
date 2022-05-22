@@ -30,6 +30,13 @@ impl ValTrait for Math {
   fn sub(&self, key: Val) -> Val {
     match key.val_to_string().as_str() {
       "E" => Val::Number(std::f64::consts::E),
+      "LN10" => Val::Number(std::f64::consts::LN_10),
+      "LN2" => Val::Number(std::f64::consts::LN_2),
+      "LOG10E" => Val::Number(std::f64::consts::LOG10_E),
+      "LOG2E" => Val::Number(std::f64::consts::LOG2_E),
+      "PI" => Val::Number(std::f64::consts::PI),
+      "SQRT1_2" => Val::Number(std::f64::consts::FRAC_1_SQRT_2),
+      "SQRT2" => Val::Number(std::f64::consts::SQRT_2),
       _ => Val::Undefined,
     }
   }
