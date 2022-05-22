@@ -103,7 +103,11 @@ impl ValTrait for Val {
 
           for val in iter {
             res += ",";
-            res += val.val_to_string().as_str();
+
+            match val.typeof_() {
+              VsType::Undefined => {},
+              _ => { res += &val.val_to_string(); },
+            };
           }
 
           res
