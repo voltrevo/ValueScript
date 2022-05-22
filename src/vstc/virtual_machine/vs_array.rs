@@ -691,12 +691,7 @@ static TO_LOCALE_STRING: NativeFunction = NativeFunction {
 
 static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: TO_STRING");
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
-    };
+    return Val::String(Rc::new(this.val_to_string()));
   }
 };
 
