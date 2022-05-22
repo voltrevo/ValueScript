@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::cmp::{min, max};
 
 use super::vs_value::{
   Val,
@@ -668,10 +669,76 @@ static SORT: NativeFunction = NativeFunction {
 };
 
 static SPLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: SPLICE");
+      Val::Array(array_data) => {
+        let array_data_mut = Rc::make_mut(array_data);
+        let len = array_data_mut.elements.len();
+
+        let start = match params.get(0) {
+          None => 0,
+          Some(v) => to_wrapping_index_clamped(v, len),
+        } as usize;
+
+        let delete_count_f64 = match params.get(1) {
+          None => len as f64,
+          Some(v) => match v.typeof_() {
+            VsType::Undefined => len as f64,
+            _ => v.to_number(),
+          },
+        };
+
+        let delete_count = match delete_count_f64 < 0_f64 {
+          true => 0,
+          false => min(delete_count_f64.floor() as usize, len - start),
+        };
+
+        let mut deleted_elements = Vec::<Val>::new();
+
+        for i in 0..delete_count {
+          deleted_elements.push(array_data_mut.elements[start + i].clone());
+        }
+
+        let insert_len = max(2, params.len()) - 2;
+        let replace_len = min(insert_len, delete_count);
+
+        if insert_len > replace_len {
+          for i in 0..replace_len {
+            array_data_mut.elements[start + i] = params[i + 2].clone();
+          }
+
+          let gap = insert_len - replace_len;
+          
+          for _ in 0..gap {
+            array_data_mut.elements.push(Val::Void);
+          }
+
+          for i in ((start + replace_len)..len).rev() {
+            array_data_mut.elements[i + gap] = array_data_mut.elements[i].clone();
+          }
+
+          for i in replace_len..insert_len {
+            array_data_mut.elements[start + i] = params[i + 2].clone();
+          }
+        } else {
+          for i in 0..insert_len {
+            array_data_mut.elements[start + i] = params[i + 2].clone();
+          }
+
+          let gap = delete_count - insert_len;
+
+          if gap != 0 {
+            for i in (start + insert_len)..(len - gap) {
+              array_data_mut.elements[i] = array_data_mut.elements[i + gap].clone();
+            }
+
+            for _ in 0..gap {
+              array_data_mut.elements.pop();
+            }
+          }
+        }
+
+        return Val::Array(Rc::new(VsArray::from(deleted_elements)));
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
