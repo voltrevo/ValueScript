@@ -56,13 +56,36 @@ impl ValTrait for ArrayPrototype {
       "at" => Val::Static(&AT),
       "concat" => Val::Static(&CONCAT),
       "copyWithin" => Val::Static(&COPY_WITHIN),
+      "entries" => Val::Static(&ENTRIES),
+      "every" => Val::Static(&EVERY),
       "fill" => Val::Static(&FILL),
+      "filter" => Val::Static(&FILTER),
+      "find" => Val::Static(&FIND),
+      "findIndex" => Val::Static(&FIND_INDEX),
       "flat" => Val::Static(&FLAT),
+      "flatMap" => Val::Static(&FLAT_MAP),
+      // forEach: Not included because it cannot work as expected in ValueScript
+      // (Use a for..of loop)
       "includes" => Val::Static(&INCLUDES),
+      "indexOf" => Val::Static(&INDEX_OF),
+      "join" => Val::Static(&JOIN),
+      "keys" => Val::Static(&KEYS),
+      "lastIndexOf" => Val::Static(&LAST_INDEX_OF),
+      "map" => Val::Static(&MAP),
       "pop" => Val::Static(&POP),
       "push" => Val::Static(&PUSH),
+      "reduce" => Val::Static(&REDUCE),
+      "reduceRight" => Val::Static(&REDUCE_RIGHT),
+      "reverse" => Val::Static(&REVERSE),
       "shift" => Val::Static(&SHIFT),
+      "slice" => Val::Static(&SLICE),
+      "some" => Val::Static(&SOME),
+      "sort" => Val::Static(&SORT),
+      "splice" => Val::Static(&SPLICE),
+      "toLocaleString" => Val::Static(&TO_LOCALE_STRING),
+      "toString" => Val::Static(&TO_STRING),
       "unshift" => Val::Static(&UNSHIFT),
+      "values" => Val::Static(&VALUES),
       _ => Val::Undefined,
     }
   }
@@ -236,6 +259,28 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
   }
 };
 
+static ENTRIES: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: ENTRIES");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static EVERY: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: EVERY");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
 static FILL: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
@@ -262,6 +307,39 @@ static FILL: NativeFunction = NativeFunction {
         return this.clone();
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static FILTER: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: FILTER");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static FIND: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: FIND");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static FIND_INDEX: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: FIND_INDEX");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
   }
 };
@@ -296,6 +374,17 @@ static FLAT: NativeFunction = NativeFunction {
   }
 };
 
+static FLAT_MAP: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: FLAT_MAP");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
 static INCLUDES: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
@@ -311,6 +400,61 @@ static INCLUDES: NativeFunction = NativeFunction {
         return Val::Bool(false);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static INDEX_OF: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: INDEX_OF");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static JOIN: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: JOIN");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static KEYS: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: KEYS");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static LAST_INDEX_OF: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: LAST_INDEX_OF");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static MAP: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: MAP");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
   }
 };
@@ -349,6 +493,39 @@ static PUSH: NativeFunction = NativeFunction {
   }
 };
 
+static REDUCE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: REDUCE");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static REDUCE_RIGHT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: REDUCE_RIGHT");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static REVERSE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: REVERSE");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
 static SHIFT: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
     match this {
@@ -362,6 +539,72 @@ static SHIFT: NativeFunction = NativeFunction {
         return array_data_mut.elements.remove(0);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static SLICE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: SLICE");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static SOME: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: SOME");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static SORT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: SORT");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static SPLICE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: SPLICE");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static TO_LOCALE_STRING: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: TO_LOCALE_STRING");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
+    };
+  }
+};
+
+static TO_STRING: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: TO_STRING");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
   }
 };
@@ -382,6 +625,17 @@ static UNSHIFT: NativeFunction = NativeFunction {
         return Val::Number(array_data_mut.elements.len() as f64);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
+    };
+  }
+};
+
+static VALUES: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Array(_array_data) => {
+        std::panic!("Not implemented: VALUES");
+      },
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
   }
 };
