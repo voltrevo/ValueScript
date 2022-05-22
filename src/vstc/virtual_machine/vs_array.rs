@@ -567,8 +567,24 @@ static REDUCE_RIGHT: NativeFunction = NativeFunction {
 static REVERSE: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
     match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: REVERSE");
+      Val::Array(array_data) => {
+        if array_data.elements.len() == 0 {
+          // Treating this as an edge case because rust protects us from
+          // underflow when computing last below.
+          return this.clone();
+        }
+
+        let array_data_mut = Rc::make_mut(array_data);
+
+        let last = array_data_mut.elements.len() - 1;
+
+        for i in 0..(array_data_mut.elements.len() / 2) {
+          let tmp = array_data_mut.elements[i].clone();
+          array_data_mut.elements[i] = array_data_mut.elements[last - i].clone();
+          array_data_mut.elements[last - i] = tmp;
+        }
+
+        return this.clone();
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
