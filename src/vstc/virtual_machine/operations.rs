@@ -161,7 +161,7 @@ fn to_i32(x: f64) -> i32 {
   return int1 as i32;
 }
 
-fn to_u32(x: f64) -> u32 {
+pub fn to_u32(x: f64) -> u32 {
   if x == f64::INFINITY {
     return 0;
   }

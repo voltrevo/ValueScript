@@ -4,6 +4,7 @@ use super::vs_value::{Val, VsType, ValTrait, LoadFunctionResult};
 use super::vs_array::VsArray;
 use super::vs_object::VsObject;
 use super::native_function::NativeFunction;
+use super::operations::to_u32;
 
 pub struct Math {}
 
@@ -100,206 +101,245 @@ fn param_to_number(param: Option<&Val>) -> f64 {
 static ABS: NativeFunction = NativeFunction {
   fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
     let x = param_to_number(params.get(0));
-
     return Val::Number(x.abs());
   }
 };
 
 static ACOS: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: ACOS");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.acos());
   }
 };
 
 static ACOSH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: ACOSH");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.acosh());
   }
 };
 
 static ASIN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: ASIN");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.asin());
   }
 };
 
 static ASINH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: ASINH");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.sinh());
   }
 };
 
 static ATAN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: ATAN");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.atan());
   }
 };
 
 static ATAN2: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: ATAN2");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    let y = param_to_number(params.get(1));
+
+    return Val::Number(x.atan2(y));
   }
 };
 
 static ATANH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: ATANH");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.atanh());
   }
 };
 
 static CBRT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: CBRT");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.cbrt());
   }
 };
 
 static CEIL: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: CEIL");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.ceil());
   }
 };
 
 static CLZ32: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: CLZ32");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(to_u32(x).leading_zeros() as f64);
   }
 };
 
 static COS: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: COS");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.cos());
   }
 };
 
 static COSH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: COSH");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.cosh());
   }
 };
 
 static EXP: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: EXP");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.exp());
   }
 };
 
 static EXPM1: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: EXPM1");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.exp_m1());
   }
 };
 
 static FLOOR: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: FLOOR");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.floor());
   }
 };
 
 static FROUND: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: FROUND");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x as f32 as f64);
   }
 };
 
 static HYPOT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: HYPOT");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    let y = param_to_number(params.get(1));
+    return Val::Number(x.hypot(y));
   }
 };
 
 static IMUL: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: IMUL");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    let y = param_to_number(params.get(1));
+    return Val::Number((to_u32(x) * to_u32(y)) as i32 as f64);
   }
 };
 
 static LOG: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: LOG");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.ln());
   }
 };
 
 static LOG10: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: LOG10");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.log10());
   }
 };
 
 static LOG1P: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: LOG1P");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.ln_1p());
   }
 };
 
 static LOG2: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: LOG2");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.log2());
   }
 };
 
 static MAX: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: MAX");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    let y = param_to_number(params.get(1));
+    return Val::Number(x.max(y));
   }
 };
 
 static MIN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: MIN");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    let y = param_to_number(params.get(1));
+    return Val::Number(x.min(y));
   }
 };
 
 static POW: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: POW");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    let y = param_to_number(params.get(1));
+    return Val::Number(x.powf(y));
   }
 };
 
 static ROUND: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: ROUND");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.round());
   }
 };
 
 static SIGN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: SIGN");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.signum());
   }
 };
 
 static SIN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: SIN");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.sin());
   }
 };
 
 static SINH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: SINH");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.sinh());
   }
 };
 
 static SQRT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: SQRT");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.sqrt());
   }
 };
 
 static TAN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: TAN");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.tan());
   }
 };
 
 static TANH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: TANH");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    return Val::Number(x.tanh());
   }
 };
 
 static TRUNC: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, _params: Vec<Val>| -> Val {
-    std::panic!("Not implemented: TRUNC");
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+    let x = param_to_number(params.get(0));
+    // TODO: Use trunc to simplify signum * abs elsewhere
+    return Val::Number(x.trunc());
   }
 };
-
