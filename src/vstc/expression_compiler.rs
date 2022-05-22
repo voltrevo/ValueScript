@@ -223,7 +223,9 @@ impl<'a> ExpressionCompiler<'a> {
               },
               swc_ecma_ast::Expr::This(_) => AssignTarget::Register("this".to_string()),
               swc_ecma_ast::Expr::Member(member) => AssignTarget::Member(
-                TargetAccessor::compile(ec, &member.obj),
+                TargetAccessor::compile(ec, &member.obj)
+                  .expect("Invalid lvalue in assignment")
+                ,
                 member.prop.clone(),
               ),
               swc_ecma_ast::Expr::SuperProp(_) => std::panic!("Not implemented: SuperProp"),
@@ -309,7 +311,9 @@ impl<'a> ExpressionCompiler<'a> {
       },
       Some(op_str) => {
         let target = match &assign_exp.left {
-          swc_ecma_ast::PatOrExpr::Expr(expr) => TargetAccessor::compile(self, &expr),
+          swc_ecma_ast::PatOrExpr::Expr(expr) => TargetAccessor::compile(self, &expr)
+            .expect("Invalid lvalue in compound assignment")
+          ,
           swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
             swc_ecma_ast::Pat::Ident(ident) => TargetAccessor::Register(
               match self.scope.get(&ident.id.sym.to_string()) {
@@ -602,7 +606,9 @@ impl<'a> ExpressionCompiler<'a> {
     update_exp: &swc_ecma_ast::UpdateExpr,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    let target = TargetAccessor::compile(self, &update_exp.arg);
+    let target = TargetAccessor::compile(self, &update_exp.arg)
+      .expect("Invalid lvalue in update expression")
+    ;
 
     let op_str = match update_exp.op {
       swc_ecma_ast::UpdateOp::PlusPlus => "op++",
@@ -771,16 +777,28 @@ impl<'a> ExpressionCompiler<'a> {
     let mut nested_registers = Vec::<String>::new();
     let mut sub_nested_registers = Vec::<String>::new();
 
+    enum TargetAccessorOrCompiledExpression {
+      TargetAccessor(TargetAccessor),
+      CompiledExpression(CompiledExpression),
+    }
+
     // TODO: Allow expressions that can't be mutated (currently fails because
     // TargetAccessor assumes modification is needed)
-    let obj = TargetAccessor::compile(self, &callee_expr.obj);
+    let obj = match TargetAccessor::compile(self, &callee_expr.obj) {
+      None => TargetAccessorOrCompiledExpression::CompiledExpression(self.compile(&callee_expr.obj, None)),
+      Some(ta) => TargetAccessorOrCompiledExpression::TargetAccessor(ta),
+    };
+
     let mut prop = self.member_prop(&callee_expr.prop, None);
 
     sub_nested_registers.append(&mut prop.nested_registers);
 
     let mut instr = format!(
-      "  subcall %{} {} [",
-      obj.register(),
+      "  subcall {} {} [",
+      match &obj {
+        TargetAccessorOrCompiledExpression::TargetAccessor(ta) => format!("%{}", ta.register()),
+        TargetAccessorOrCompiledExpression::CompiledExpression(ce) => ce.value_assembly.clone(),
+      },
       prop.value_assembly,
     );
 
@@ -817,7 +835,16 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.definition.push(instr);
 
-    obj.packup(self);
+    match &obj {
+      TargetAccessorOrCompiledExpression::TargetAccessor(ta) => {
+        ta.packup(self);
+      },
+      TargetAccessorOrCompiledExpression::CompiledExpression(ce) => {
+        for reg in &ce.nested_registers {
+          self.fnc.reg_allocator.release(&reg);
+        }
+      },
+    }
 
     for reg in sub_nested_registers {
       self.fnc.reg_allocator.release(&reg);
@@ -1206,19 +1233,23 @@ enum TargetAccessor {
 }
 
 impl TargetAccessor {
-  fn compile(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> TargetAccessor {
+  fn compile(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> Option<TargetAccessor> {
     use swc_ecma_ast::Expr::*;
 
     return match expr {
       Ident(ident) => match ec.scope.get(&ident.sym.to_string()) {
         None => std::panic!("Unresolved identifier"),
-        Some(MappedName::Definition(_)) => std::panic!("Invalid: definition mutation"),
-        Some(MappedName::QueuedFunction(_)) => std::panic!("Invalid: assign to declaration"),
-        Some(MappedName::Register(reg)) => TargetAccessor::Register(reg),
+        Some(MappedName::Definition(_)) => None,
+        Some(MappedName::QueuedFunction(_)) => None,
+        Some(MappedName::Register(reg)) => Some(TargetAccessor::Register(reg)),
       },
-      This(_) => TargetAccessor::Register("this".to_string()),
+      This(_) => Some(TargetAccessor::Register("this".to_string())),
       Member(member) => {
-        let obj = TargetAccessor::compile(ec, &member.obj);
+        let obj = match TargetAccessor::compile(ec, &member.obj) {
+          None => { return None; },
+          Some(ta) => ta,
+        };
+
         let subscript = ec.member_prop(&member.prop, None);
 
         let register = ec.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
@@ -1230,14 +1261,14 @@ impl TargetAccessor {
           register,
         ));
 
-        TargetAccessor::Nested(NestedTargetAccess {
+        Some(TargetAccessor::Nested(NestedTargetAccess {
           obj: Box::new(obj),
           subscript: subscript,
           register: register,
-        })
+        }))
       },
       SuperProp(_) => std::panic!("Not implemented: SuperProp"),
-      _ => std::panic!("Invalid lvalue expression"),
+      _ => None,
     };
   }
 
