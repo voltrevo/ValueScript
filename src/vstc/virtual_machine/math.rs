@@ -339,7 +339,6 @@ static TANH: NativeFunction = NativeFunction {
 static TRUNC: NativeFunction = NativeFunction {
   fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
     let x = param_to_number(params.get(0));
-    // TODO: Use trunc to simplify signum * abs elsewhere
     return Val::Number(x.trunc());
   }
 };

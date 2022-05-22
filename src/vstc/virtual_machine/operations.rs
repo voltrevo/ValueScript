@@ -156,7 +156,7 @@ fn to_i32(x: f64) -> i32 {
     return 0;
   }
 
-  let int1 = ((x.signum() * x.abs().floor()) as i64) & 0xffffffff;
+  let int1 = (x.trunc() as i64) & 0xffffffff;
 
   return int1 as i32;
 }
@@ -166,7 +166,7 @@ pub fn to_u32(x: f64) -> u32 {
     return 0;
   }
 
-  let int1 = ((x.signum() * x.abs().floor()) as i64) & 0xffffffff;
+  let int1 = (x.trunc() as i64) & 0xffffffff;
 
   return int1 as u32;
 }

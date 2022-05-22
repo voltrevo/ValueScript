@@ -103,8 +103,7 @@ impl ValTrait for ArrayPrototype {
 fn to_unchecked_wrapping_index(index: &Val, len: usize) -> isize {
   let index_num = index.to_number();
 
-  let abs_index = index_num.abs();
-  let mut floored_index = index_num.signum() * abs_index.floor();
+  let mut floored_index = index_num.trunc();
   let f64_len = len as f64;
 
   if floored_index < 0_f64 {
