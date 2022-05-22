@@ -609,10 +609,26 @@ static SHIFT: NativeFunction = NativeFunction {
 };
 
 static SLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: SLICE");
+      Val::Array(array_data) => {
+        let mut new_elems = Vec::<Val>::new();
+
+        let start = match params.get(0) {
+          None => 0,
+          Some(v) => to_wrapping_index_clamped(v, array_data.elements.len()),
+        };
+
+        let end = match params.get(1) {
+          None => array_data.elements.len() as isize,
+          Some(v) => to_wrapping_index_clamped(v, array_data.elements.len()),
+        };
+
+        for i in start..end {
+          new_elems.push(array_data.elements[i as usize].clone());
+        }
+
+        return Val::Array(Rc::new(VsArray::from(new_elems)));
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
