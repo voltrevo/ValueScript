@@ -8,6 +8,7 @@ use super::vs_function::VsFunction;
 use super::instruction::Instruction;
 use super::vs_object::VsObject;
 use super::vs_array::VsArray;
+use super::vs_class::VsClass;
 use super::builtins::get_builtin;
 
 pub struct BytecodeDecoder {
@@ -34,6 +35,7 @@ pub enum BytecodeType {
   Pointer = 0x0d,
   Register = 0x0e,
   Builtin = 0x10,
+  Class = 0x11,
 }
 
 impl BytecodeType {
@@ -127,6 +129,10 @@ impl BytecodeDecoder {
       BytecodeType::Pointer => self.decode_pointer(),
       BytecodeType::Register => registers[self.decode_register_index().unwrap()].clone(),
       BytecodeType::Builtin => Val::Static(get_builtin(self.decode_varsize_uint())),
+      BytecodeType::Class => Val::Class(Rc::new(VsClass {
+        constructor: self.decode_val(registers),
+        instance_prototype: self.decode_val(registers),
+      }))
     }
   }
 
