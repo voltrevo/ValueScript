@@ -97,6 +97,7 @@ impl Instruction {
       0x28 => JmpIf,
       0x29 => UnaryPlus,
       0x2a => UnaryMinus,
+      0x2b => New,
 
       _ => std::panic!("Unrecognized instruction: {}", byte),
     };
