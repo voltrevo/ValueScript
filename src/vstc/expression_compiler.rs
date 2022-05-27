@@ -65,7 +65,9 @@ impl<'a> ExpressionCompiler<'a> {
           _ => std::panic!("Not implemented: non-expression callee"),
         };
       },
-      New(_) => std::panic!("Not implemented: New expression"),
+      New(new_exp) => {
+        return self.new_expression(new_exp, target_register);
+      },
       Seq(_) => std::panic!("Not implemented: Seq expression"),
       Ident(ident) => {
         return self.identifier(ident, target_register);
@@ -742,6 +744,69 @@ impl<'a> ExpressionCompiler<'a> {
 
       if i != call_exp.args.len() - 1 {
         instr += ", ";
+      }
+    }
+
+    instr += "] ";
+
+    let dest = match &target_register {
+      Some(tr) => ("%".to_string() + &tr),
+      None => {
+        let reg = self.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
+        nested_registers.push(reg.clone());
+
+        "%".to_string() + &reg
+      },
+    };
+
+    instr += &dest;
+
+    self.fnc.definition.push(instr);
+
+    for reg in sub_nested_registers {
+      self.fnc.reg_allocator.release(&reg);
+    }
+
+    return CompiledExpression {
+      value_assembly: dest,
+      nested_registers: nested_registers,
+    };
+  }
+
+  pub fn new_expression(
+    &mut self,
+    new_exp: &swc_ecma_ast::NewExpr,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    // TODO: Try to deduplicate with call_expression
+
+    let mut nested_registers = Vec::<String>::new();
+    let mut sub_nested_registers = Vec::<String>::new();
+
+    let mut callee = self.compile(&new_exp.callee, None);
+
+    sub_nested_registers.append(&mut callee.nested_registers);
+
+    let mut instr = "  new ".to_string();
+    instr += &callee.value_assembly;
+    instr += " [";
+
+    for args in &new_exp.args {
+      for i in 0..args.len() {
+        let arg = &args[i];
+  
+        if arg.spread.is_some() {
+          std::panic!("Not implemented: argument spreading");
+        }
+  
+        let mut compiled_arg = self.compile(&*arg.expr, None);
+        sub_nested_registers.append(&mut compiled_arg.nested_registers);
+  
+        instr += &compiled_arg.value_assembly;
+  
+        if i != args.len() - 1 {
+          instr += ", ";
+        }
       }
     }
 
