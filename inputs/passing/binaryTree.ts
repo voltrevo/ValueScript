@@ -41,7 +41,7 @@ function BinaryTree() {
       }
     },
     toArray: function() {
-      let res = [];
+      let res: number[] = [];
 
       if (this.data.left) {
         res = cat(res, this.data.left.toArray());
