@@ -167,6 +167,8 @@ impl<'a> Assembler<'a> {
 
     if c == 'f' {
       self.assemble_function();
+    } else if c == 'c' {
+      self.assemble_class();
     } else {
       self.assemble_value();
     }
@@ -443,6 +445,23 @@ impl<'a> Assembler<'a> {
     self.output[self.fn_data.register_count_pos] = self.fn_data.register_map.len() as u8;
 
     self.fn_data.labels_map.resolve(&mut self.output);
+  }
+
+  fn assemble_class(&mut self) {
+    self.parse_exact("class(");
+    self.output.push(ValueType::Class as u8);
+    self.parse_optional_whitespace();
+
+    self.assemble_value();
+    self.parse_optional_whitespace();
+
+    self.parse_exact(",");
+    self.parse_optional_whitespace();
+
+    self.assemble_value();
+    self.parse_optional_whitespace();
+
+    self.parse_exact(")");
   }
 
   fn assemble_instruction(&mut self) {
@@ -897,6 +916,7 @@ enum ValueType {
   Register = 0x0e,
   External = 0x0f,
   Builtin = 0x10,
+  Class = 0x11,
 }
 
 fn advance_chars(iter: &mut std::iter::Peekable<std::str::Chars>, len: usize) {
