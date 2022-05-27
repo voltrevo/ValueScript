@@ -15,6 +15,7 @@ use swc_ecma_parser::{TsConfig, Syntax};
 use super::scope::{Scope, MappedName, init_std_scope, ScopeTrait};
 use super::name_allocator::NameAllocator;
 use super::function_compiler::{FunctionCompiler, Functionish};
+use super::expression_compiler::{string_literal};
 
 pub fn command(args: &Vec<String>) {
   if args.len() != 3 {
@@ -394,11 +395,48 @@ impl Compiler {
     ));
 
     for class_member in &class_decl.class.body {
+      use swc_ecma_ast::ClassMember::*;
+
       match class_member {
-        swc_ecma_ast::ClassMember::Constructor(_) => {},
-        _ => {
-          defn.push("  todo".to_string());
+        Constructor(_) => {},
+        Method(method) => {
+          let name = match &method.key {
+            swc_ecma_ast::PropName::Ident(ident) => ident.sym.to_string(),
+            _ => std::panic!("Not implemented: Non-identifier method name"),
+          };
+
+          let method_defn_name = definition_allocator.borrow_mut().allocate(
+            &format!("{}_{}", defn_name, name),
+          );
+
+          self.compile_fn(
+            method_defn_name.clone(),
+            None,
+            Functionish::Fn(method.function.clone()),
+            definition_allocator.clone(),
+            parent_scope,
+          );
+
+          defn.push(format!(
+            "  {}: @{},",
+            string_literal(&name),
+            method_defn_name,
+          ));
         },
+        PrivateMethod(_) => std::panic!("Not implemented: PrivateMethod"),
+        ClassProp(prop) => {
+          if prop.value.is_some() {
+            std::panic!("Not implemented: class property initializers");
+          }
+        },
+        PrivateProp(prop) => {
+          if prop.value.is_some() {
+            std::panic!("Not implemented: class property initializers");
+          }
+        },
+        TsIndexSignature(_) => {},
+        Empty(_) => {},
+        StaticBlock(_) => std::panic!("Not implemented: StaticBlock"),
       }
     }
 
