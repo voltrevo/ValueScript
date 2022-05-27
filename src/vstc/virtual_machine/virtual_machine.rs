@@ -377,31 +377,43 @@ impl VirtualMachine {
           prototype: Some(class.instance_prototype.clone()),
         }));
 
-        match class.constructor.load_function() {
-          LoadFunctionResult::NotAFunction => 
-            std::panic!("Not implemented: throw exception (class.constructor is not a function)")
-          ,
-          LoadFunctionResult::StackFrame(mut new_frame) => {
-            transfer_parameters(&mut self.frame, &mut new_frame);
-            new_frame.registers[1] = instance;
-    
-            self.frame.return_target = None;
-            self.frame.this_target = self.frame.decoder.decode_register_index();
-    
-            self.push(new_frame);
-          },
-          LoadFunctionResult::NativeFunction(native_fn) => {
-            native_fn(
-              &mut instance,
-              get_parameters(&mut self.frame),
-            );
-            
-            match self.frame.decoder.decode_register_index() {
-              Some(target) => {
-                self.frame.registers[target] = instance;
-              },
+        match class.constructor {
+          Val::Void => {
+            // Ignore parameters
+            self.frame.decoder.decode_val(&self.frame.registers);
+            let target_register = self.frame.decoder.decode_register_index();
+
+            match target_register {
               None => {},
+              Some(tr) => self.frame.registers[tr] = instance,
             };
+          },
+          _ => match class.constructor.load_function() {
+            LoadFunctionResult::NotAFunction => 
+              std::panic!("Not implemented: throw exception (class.constructor is not a function)")
+            ,
+            LoadFunctionResult::StackFrame(mut new_frame) => {
+              transfer_parameters(&mut self.frame, &mut new_frame);
+              new_frame.registers[1] = instance;
+  
+              self.frame.return_target = None;
+              self.frame.this_target = self.frame.decoder.decode_register_index();
+  
+              self.push(new_frame);
+            },
+            LoadFunctionResult::NativeFunction(native_fn) => {
+              native_fn(
+                &mut instance,
+                get_parameters(&mut self.frame),
+              );
+              
+              match self.frame.decoder.decode_register_index() {
+                Some(target) => {
+                  self.frame.registers[target] = instance;
+                },
+                None => {},
+              };
+            },
           },
         };
       }
