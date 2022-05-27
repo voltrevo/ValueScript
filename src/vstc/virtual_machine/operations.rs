@@ -218,9 +218,10 @@ pub fn op_typeof(input: Val) -> Val {
     Array => "object".to_string(),
     Object => "object".to_string(),
     Function => "function".to_string(),
+    Class => "function".to_string(),
   }));
 }
-
+ 
 pub fn op_instance_of(_left: Val, _right: Val) -> Val {
   std::panic!("Not implemented: op_instance_of");
 }
@@ -286,6 +287,7 @@ pub fn op_sub(left: Val, right: Val) -> Val {
       return object_data.sub(right);
     },
     Val::Function(_) => Val::Undefined,
+    Val::Class(_) => Val::Undefined,
     Val::Static(s) => s.sub(right),
     Val::Custom(custom_data) => custom_data.sub(right),
   }
@@ -325,6 +327,7 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
       Rc::make_mut(object_data).string_map.insert(subscript.val_to_string(), value);
     },
     Val::Function(_) => std::panic!("Not implemented: function subscript assignment"),
+    Val::Class(_) => std::panic!("Not implemented: class subscript assignment"),
     Val::Static(_) => std::panic!("Not implemented: exceptions"),
     Val::Custom(_) => std::panic!("Not implemented"),
   }

@@ -5,6 +5,7 @@ use super::vs_value::{Val, ValTrait, VsType, LoadFunctionResult};
 use super::bytecode_decoder::{BytecodeDecoder, BytecodeType};
 use super::vs_object::VsObject;
 use super::vs_array::VsArray;
+use super::vs_class::VsClass;
 
 pub struct VsPointer {
   bytecode: Rc<Vec<u8>>,
@@ -116,6 +117,10 @@ impl ValTrait for VsPointer {
 
   fn as_object_data(&self) -> Option<Rc<VsObject>> {
     return self.resolve().as_object_data();
+  }
+
+  fn as_class_data(&self) -> Option<Rc<VsClass>> {
+    return self.resolve().as_class_data();
   }
 
   fn load_function(&self) -> LoadFunctionResult {

@@ -8,6 +8,7 @@ use super::vs_value::{
 };
 use super::vs_object::VsObject;
 use super::vs_array::VsArray;
+use super::vs_class::VsClass;
 
 pub struct NativeFunction {
   pub fn_: fn(this: &mut Val, params: Vec<Val>) -> Val,
@@ -29,6 +30,7 @@ impl ValTrait for NativeFunction {
 
   fn as_array_data(&self) -> Option<Rc<VsArray>> { None }
   fn as_object_data(&self) -> Option<Rc<VsObject>> { None }
+  fn as_class_data(&self) -> Option<Rc<VsClass>> { None }
 
   fn load_function(&self) -> LoadFunctionResult {
     LoadFunctionResult::NativeFunction(self.fn_)

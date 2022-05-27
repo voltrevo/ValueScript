@@ -5,7 +5,7 @@ use super::vs_function::VsFunction;
 use super::virtual_machine::StackFrame;
 use super::vs_object::VsObject;
 use super::vs_array::VsArray;
-// use super::vs_class::VsClass;
+use super::vs_class::VsClass;
 use super::operations::{op_sub, op_submov};
 
 #[derive(Clone)]
@@ -19,7 +19,7 @@ pub enum Val {
   Array(Rc<VsArray>),
   Object(Rc<VsObject>),
   Function(Rc<VsFunction>),
-  // Class(Rc<VsClass>),
+  Class(Rc<VsClass>),
   Static(&'static dyn ValTrait),
   Custom(Rc<dyn ValTrait>),
 }
@@ -34,6 +34,7 @@ pub enum VsType {
   Array,
   Object,
   Function,
+  Class,
 }
 
 pub enum LoadFunctionResult {
@@ -56,6 +57,7 @@ pub trait ValTrait {
 
   fn as_array_data(&self) -> Option<Rc<VsArray>>;
   fn as_object_data(&self) -> Option<Rc<VsObject>>;
+  fn as_class_data(&self) -> Option<Rc<VsClass>>;
 
   fn load_function(&self) -> LoadFunctionResult;
 
@@ -79,6 +81,7 @@ impl ValTrait for Val {
       Array(_) => VsType::Array,
       Object(_) => VsType::Object,
       Function(_) => VsType::Function,
+      Class(_) => VsType::Class,
       Static(val) => val.typeof_(),
       Custom(val) => val.typeof_(),
     };
@@ -117,6 +120,7 @@ impl ValTrait for Val {
       },
       Object(_) => "[object Object]".to_string(),
       Function(_) => "[function]".to_string(),
+      Class(_) => "[class]".to_string(),
       Static(val) => val.val_to_string(),
       Custom(val) => val.val_to_string(),
     };
@@ -139,6 +143,7 @@ impl ValTrait for Val {
       },
       Object(_) => f64::NAN,
       Function(_) => f64::NAN,
+      Class(_) => f64::NAN,
       Static(val) => val.to_number(),
       Custom(val) => val.to_number(),
     };
@@ -160,6 +165,7 @@ impl ValTrait for Val {
       Array(_) => None,
       Object(_) => None,
       Function(_) => None,
+      Class(_) => None,
       Static(val) => val.to_index(),
       Custom(val) => val.to_index(),
     };
@@ -178,6 +184,7 @@ impl ValTrait for Val {
       Array(_) => false,
       Object(_) => false,
       Function(_) => false,
+      Class(_) => false,
       Static(val) => val.is_primitive(), // TODO: false?
       Custom(val) => val.is_primitive(),
     }
@@ -204,6 +211,7 @@ impl ValTrait for Val {
       Array(_) => true,
       Object(_) => true,
       Function(_) => true,
+      Class(_) => true,
       Static(val) => val.is_truthy(), // TODO: true?
       Custom(val) => val.is_truthy(),
     };
@@ -222,6 +230,7 @@ impl ValTrait for Val {
       Array(_) => false,
       Object(_) => false,
       Function(_) => false,
+      Class(_) => false,
       Static(_) => false,
       Custom(val) => val.is_nullish(),
     };
@@ -235,7 +244,7 @@ impl ValTrait for Val {
       Custom(val) => val.bind(params),
 
       _ => None,
-    }
+    };
   }
 
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
@@ -246,7 +255,7 @@ impl ValTrait for Val {
       Custom(val) => val.as_array_data(),
 
       _ => None,
-    }
+    };
   }
 
   fn as_object_data(&self) -> Option<Rc<VsObject>> {
@@ -257,7 +266,18 @@ impl ValTrait for Val {
       Custom(val) => val.as_object_data(),
 
       _ => None,
-    }
+    };
+  }
+
+  fn as_class_data(&self) -> Option<Rc<VsClass>> {
+    use Val::*;
+
+    return match self {
+      Class(class) => Some(class.clone()),
+      Custom(val) => val.as_class_data(),
+
+      _ => None,
+    };
   }
 
   fn load_function(&self) -> LoadFunctionResult {
@@ -269,7 +289,7 @@ impl ValTrait for Val {
       Custom(val) => val.load_function(),
 
       _ => LoadFunctionResult::NotAFunction,
-    }
+    };
   }
 
   fn sub(&self, key: Val) -> Val {
@@ -341,6 +361,7 @@ impl std::fmt::Display for Val {
         f.write_str(" }")
       },
       Val::Function(_) => write!(f, "\x1b[36m[Function]\x1b[39m"),
+      Val::Class(_) => write!(f, "\x1b[36m[Class]\x1b[39m"),
 
       // TODO: Improve printing these
       Val::Static(s) => s.fmt(f),

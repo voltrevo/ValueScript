@@ -8,6 +8,7 @@ use super::vs_value::{
   LoadFunctionResult,
 };
 use super::vs_object::VsObject;
+use super::vs_class::VsClass;
 use super::native_function::NativeFunction;
 use super::operations::op_triple_eq_impl;
 
@@ -47,6 +48,7 @@ impl ValTrait for ArrayPrototype {
 
   fn as_array_data(&self) -> Option<Rc<VsArray>> { None }
   fn as_object_data(&self) -> Option<Rc<VsObject>> { None }
+  fn as_class_data(&self) -> Option<Rc<VsClass>> { None }
 
   fn load_function(&self) -> LoadFunctionResult {
     LoadFunctionResult::NotAFunction

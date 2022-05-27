@@ -3,6 +3,7 @@ use std::rc::Rc;
 use super::vs_value::{Val, VsType, ValTrait, LoadFunctionResult};
 use super::vs_array::VsArray;
 use super::vs_object::VsObject;
+use super::vs_class::VsClass;
 use super::native_function::NativeFunction;
 use super::operations::to_u32;
 
@@ -24,6 +25,7 @@ impl ValTrait for Math {
 
   fn as_array_data(&self) -> Option<Rc<VsArray>> { None }
   fn as_object_data(&self) -> Option<Rc<VsObject>> { None }
+  fn as_class_data(&self) -> Option<Rc<VsClass>> { None }
 
   fn load_function(&self) -> LoadFunctionResult {
     LoadFunctionResult::NotAFunction
