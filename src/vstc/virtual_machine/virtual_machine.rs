@@ -7,6 +7,7 @@ use super::bytecode_decoder::BytecodeType;
 use super::instruction::Instruction;
 
 pub struct VirtualMachine {
+  pub frame: StackFrame,
   pub stack: Vec<StackFrame>,
 }
 
@@ -77,134 +78,127 @@ impl VirtualMachine {
       param_i += 1;
     }
 
-    self.stack.push(frame);
+    self.push(frame);
 
-    while self.stack.len() > 1 {
+    while self.stack.len() > 0 {
       self.step();
     }
 
-    return self.stack[0].registers[0].clone();
+    return self.frame.registers[0].clone();
   }
 
   pub fn new() -> VirtualMachine {
-    let mut vm = VirtualMachine {
-      stack: Default::default(),
-    };
-
     let mut registers: Vec<Val> = Vec::with_capacity(2);
     registers.push(Val::Undefined);
     registers.push(Val::Undefined);
 
-    let frame = StackFrame {
-      decoder: BytecodeDecoder {
-        data: Rc::new(Vec::new()),
-        pos: 0,
+    return VirtualMachine {
+      frame: StackFrame {
+        decoder: BytecodeDecoder {
+          data: Rc::new(Vec::new()),
+          pos: 0,
+        },
+        registers: registers,
+        param_start: 2,
+        param_end: 2,
+        return_target: Some(0),
+        this_target: Some(1),
       },
-      registers: registers,
-      param_start: 2,
-      param_end: 2,
-      return_target: Some(0),
-      this_target: Some(1),
+      stack: Default::default(),
     };
-
-    vm.stack.push(frame);
-
-    return vm;
   }
 
   pub fn step(&mut self) {
     use Instruction::*;
 
-    let mut frame = self.stack.last_mut().unwrap();
-
-    match frame.decoder.decode_instruction() {
+    match self.frame.decoder.decode_instruction() {
       End => {
         self.pop();
       },
 
       Mov => {
-        let val = frame.decoder.decode_val(&frame.registers);
-        let register_index = frame.decoder.decode_register_index();
+        let val = self.frame.decoder.decode_val(&self.frame.registers);
+        let register_index = self.frame.decoder.decode_register_index();
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = val;
+          self.frame.registers[register_index.unwrap()] = val;
         }
       },
 
       OpInc => {
-        let register_index = frame.decoder.decode_register_index().unwrap();
-        let mut val = frame.registers[register_index].clone();
+        let register_index = self.frame.decoder.decode_register_index().unwrap();
+        let mut val = self.frame.registers[register_index].clone();
         val = operations::op_plus(val, Val::Number(1_f64));
-        frame.registers[register_index] = val;
+        self.frame.registers[register_index] = val;
       },
 
       OpDec => {
-        let register_index = frame.decoder.decode_register_index().unwrap();
-        let mut val = frame.registers[register_index].clone();
+        let register_index = self.frame.decoder.decode_register_index().unwrap();
+        let mut val = self.frame.registers[register_index].clone();
         val = operations::op_minus(val, Val::Number(1_f64));
-        frame.registers[register_index] = val;
+        self.frame.registers[register_index] = val;
       },
 
-      OpPlus => frame.apply_binary_op(operations::op_plus),
-      OpMinus => frame.apply_binary_op(operations::op_minus),
-      OpMul => frame.apply_binary_op(operations::op_mul),
-      OpDiv => frame.apply_binary_op(operations::op_div),
-      OpMod => frame.apply_binary_op(operations::op_mod),
-      OpExp => frame.apply_binary_op(operations::op_exp),
-      OpEq => frame.apply_binary_op(operations::op_eq),
-      OpNe => frame.apply_binary_op(operations::op_ne),
-      OpTripleEq => frame.apply_binary_op(operations::op_triple_eq),
-      OpTripleNe => frame.apply_binary_op(operations::op_triple_ne),
-      OpAnd => frame.apply_binary_op(operations::op_and),
-      OpOr => frame.apply_binary_op(operations::op_or),
+      OpPlus => self.frame.apply_binary_op(operations::op_plus),
+      OpMinus => self.frame.apply_binary_op(operations::op_minus),
+      OpMul => self.frame.apply_binary_op(operations::op_mul),
+      OpDiv => self.frame.apply_binary_op(operations::op_div),
+      OpMod => self.frame.apply_binary_op(operations::op_mod),
+      OpExp => self.frame.apply_binary_op(operations::op_exp),
+      OpEq => self.frame.apply_binary_op(operations::op_eq),
+      OpNe => self.frame.apply_binary_op(operations::op_ne),
+      OpTripleEq => self.frame.apply_binary_op(operations::op_triple_eq),
+      OpTripleNe => self.frame.apply_binary_op(operations::op_triple_ne),
+      OpAnd => self.frame.apply_binary_op(operations::op_and),
+      OpOr => self.frame.apply_binary_op(operations::op_or),
 
-      OpNot => frame.apply_unary_op(operations::op_not),
+      OpNot => self.frame.apply_unary_op(operations::op_not),
 
-      OpLess => frame.apply_binary_op(operations::op_less),
-      OpLessEq => frame.apply_binary_op(operations::op_less_eq),
-      OpGreater => frame.apply_binary_op(operations::op_greater),
-      OpGreaterEq => frame.apply_binary_op(operations::op_greater_eq),
-      OpNullishCoalesce => frame.apply_binary_op(operations::op_nullish_coalesce),
-      OpOptionalChain => frame.apply_binary_op(operations::op_optional_chain),
-      OpBitAnd => frame.apply_binary_op(operations::op_bit_and),
-      OpBitOr => frame.apply_binary_op(operations::op_bit_or),
+      OpLess => self.frame.apply_binary_op(operations::op_less),
+      OpLessEq => self.frame.apply_binary_op(operations::op_less_eq),
+      OpGreater => self.frame.apply_binary_op(operations::op_greater),
+      OpGreaterEq => self.frame.apply_binary_op(operations::op_greater_eq),
+      OpNullishCoalesce => self.frame.apply_binary_op(operations::op_nullish_coalesce),
+      OpOptionalChain => self.frame.apply_binary_op(operations::op_optional_chain),
+      OpBitAnd => self.frame.apply_binary_op(operations::op_bit_and),
+      OpBitOr => self.frame.apply_binary_op(operations::op_bit_or),
 
-      OpBitNot => frame.apply_unary_op(operations::op_bit_not),
+      OpBitNot => self.frame.apply_unary_op(operations::op_bit_not),
 
-      OpBitXor => frame.apply_binary_op(operations::op_bit_xor),
-      OpLeftShift => frame.apply_binary_op(operations::op_left_shift),
-      OpRightShift => frame.apply_binary_op(operations::op_right_shift),
-      OpRightShiftUnsigned => frame.apply_binary_op(operations::op_right_shift_unsigned),
+      OpBitXor => self.frame.apply_binary_op(operations::op_bit_xor),
+      OpLeftShift => self.frame.apply_binary_op(operations::op_left_shift),
+      OpRightShift => self.frame.apply_binary_op(operations::op_right_shift),
+      OpRightShiftUnsigned => self.frame.apply_binary_op(operations::op_right_shift_unsigned),
 
-      TypeOf => frame.apply_unary_op(operations::op_typeof),
+      TypeOf => self.frame.apply_unary_op(operations::op_typeof),
 
-      InstanceOf => frame.apply_binary_op(operations::op_instance_of),
-      In => frame.apply_binary_op(operations::op_in),
+      InstanceOf => self.frame.apply_binary_op(operations::op_instance_of),
+      In => self.frame.apply_binary_op(operations::op_in),
 
       Call => {
-        let fn_ = frame.decoder.decode_val(&frame.registers);
+        let fn_ = self.frame.decoder.decode_val(&self.frame.registers);
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => 
             std::panic!("Not implemented: throw exception (fn_ is not a function)")
           ,
           LoadFunctionResult::StackFrame(mut new_frame) => {
-            transfer_parameters(&mut frame, &mut new_frame);
+            transfer_parameters(&mut self.frame, &mut new_frame);
     
-            frame.return_target = frame.decoder.decode_register_index();
-            frame.this_target = None;
+            self.frame.return_target = self.frame.decoder.decode_register_index();
+            self.frame.this_target = None;
     
-            self.stack.push(new_frame);
+            self.push(new_frame);
           },
           LoadFunctionResult::NativeFunction(native_fn) => {
             let res = native_fn(
               &mut Val::Undefined,
-              get_parameters(&mut frame),
+              get_parameters(&mut self.frame),
             );
             
-            match frame.decoder.decode_register_index() {
+            match self.frame.decoder.decode_register_index() {
               Some(return_target) => {
-                frame.registers[return_target] = res;
+                self.frame.registers[return_target] = res;
               },
               None => {},
             };
@@ -213,31 +207,31 @@ impl VirtualMachine {
       }
 
       Apply => {
-        let fn_ = frame.decoder.decode_val(&frame.registers);
+        let fn_ = self.frame.decoder.decode_val(&self.frame.registers);
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => 
             std::panic!("Not implemented: throw exception (fn_ is not a function)")
           ,
           LoadFunctionResult::StackFrame(mut new_frame) => {
-            if frame.decoder.peek_type() == BytecodeType::Register {
-              frame.decoder.decode_type();
-              let this_target = frame.decoder.decode_register_index();
-              frame.this_target = this_target;
+            if self.frame.decoder.peek_type() == BytecodeType::Register {
+              self.frame.decoder.decode_type();
+              let this_target = self.frame.decoder.decode_register_index();
+              self.frame.this_target = this_target;
     
               if this_target.is_some() {
-                new_frame.registers[1] = frame.registers[this_target.unwrap()].clone();
+                new_frame.registers[1] = self.frame.registers[this_target.unwrap()].clone();
               }
             } else {
-              frame.this_target = None;
-              new_frame.registers[1] = frame.decoder.decode_val(&frame.registers);
+              self.frame.this_target = None;
+              new_frame.registers[1] = self.frame.decoder.decode_val(&self.frame.registers);
             }
     
-            transfer_parameters(&mut frame, &mut new_frame);
+            transfer_parameters(&mut self.frame, &mut new_frame);
     
-            frame.return_target = frame.decoder.decode_register_index();
+            self.frame.return_target = self.frame.decoder.decode_register_index();
     
-            self.stack.push(new_frame);
+            self.push(new_frame);
           },
           LoadFunctionResult::NativeFunction(native_fn) => {
             std::panic!("Not implemented");
@@ -246,9 +240,9 @@ impl VirtualMachine {
       }
 
       Bind => {
-        let fn_val = frame.decoder.decode_val(&frame.registers);
-        let params = frame.decoder.decode_val(&frame.registers);
-        let register_index = frame.decoder.decode_register_index();
+        let fn_val = self.frame.decoder.decode_val(&self.frame.registers);
+        let params = self.frame.decoder.decode_val(&self.frame.registers);
+        let register_index = self.frame.decoder.decode_register_index();
 
         let params_array = params.as_array_data();
 
@@ -267,40 +261,40 @@ impl VirtualMachine {
         }
 
         if register_index.is_some() {
-          frame.registers[register_index.unwrap()] = bound_fn.unwrap();
+          self.frame.registers[register_index.unwrap()] = bound_fn.unwrap();
         }
       },
 
-      Sub => frame.apply_binary_op(operations::op_sub),
+      Sub => self.frame.apply_binary_op(operations::op_sub),
 
       SubMov => {
-        let subscript = frame.decoder.decode_val(&frame.registers);
-        let value = frame.decoder.decode_val(&frame.registers);
+        let subscript = self.frame.decoder.decode_val(&self.frame.registers);
+        let value = self.frame.decoder.decode_val(&self.frame.registers);
     
-        let register_index = frame.decoder.decode_register_index().unwrap();
-        let mut target = frame.registers[register_index].clone(); // TODO: Lift
+        let register_index = self.frame.decoder.decode_register_index().unwrap();
+        let mut target = self.frame.registers[register_index].clone(); // TODO: Lift
 
         operations::op_submov(&mut target, subscript, value);
-        frame.registers[register_index] = target;
+        self.frame.registers[register_index] = target;
       },
 
       SubCall => {
-        let mut obj = match frame.decoder.peek_type() {
+        let mut obj = match self.frame.decoder.peek_type() {
           BytecodeType::Register => {
-            frame.decoder.decode_type();
+            self.frame.decoder.decode_type();
 
             ThisArg::Register(
-              frame.decoder.decode_register_index().unwrap()
+              self.frame.decoder.decode_register_index().unwrap()
             )
           },
-          _ => ThisArg::Val(frame.decoder.decode_val(&frame.registers)),
+          _ => ThisArg::Val(self.frame.decoder.decode_val(&self.frame.registers)),
         };
 
-        let subscript = frame.decoder.decode_val(&frame.registers);
+        let subscript = self.frame.decoder.decode_val(&self.frame.registers);
 
         let fn_ = operations::op_sub(
           match &obj {
-            ThisArg::Register(reg_i) => frame.registers[reg_i.clone()].clone(),
+            ThisArg::Register(reg_i) => self.frame.registers[reg_i.clone()].clone(),
             ThisArg::Val(val) => val.clone(),
           },
           subscript,
@@ -311,29 +305,29 @@ impl VirtualMachine {
             std::panic!("Not implemented: throw exception (fn_ is not a function)")
           ,
           LoadFunctionResult::StackFrame(mut new_frame) => {
-            transfer_parameters(&mut frame, &mut new_frame);
+            transfer_parameters(&mut self.frame, &mut new_frame);
 
             new_frame.registers[1] = match &obj {
-              ThisArg::Register(reg_i) => frame.registers[reg_i.clone()].clone(),
+              ThisArg::Register(reg_i) => self.frame.registers[reg_i.clone()].clone(),
               ThisArg::Val(val) => val.clone(),
             };
     
-            frame.return_target = frame.decoder.decode_register_index();
+            self.frame.return_target = self.frame.decoder.decode_register_index();
 
-            frame.this_target = match obj {
+            self.frame.this_target = match obj {
               ThisArg::Register(reg_i) => Some(reg_i),
               ThisArg::Val(_) => None,
             };
     
-            self.stack.push(new_frame);
+            self.push(new_frame);
           },
           LoadFunctionResult::NativeFunction(native_fn) => {
-            let params = get_parameters(&mut frame);
+            let params = get_parameters(&mut self.frame);
 
             let res = match &mut obj {
               ThisArg::Register(reg_i) => {
                 native_fn(
-                  frame.registers.get_mut(reg_i.clone()).unwrap(),
+                  self.frame.registers.get_mut(reg_i.clone()).unwrap(),
                   params,
                 )
               },
@@ -345,9 +339,9 @@ impl VirtualMachine {
               },
             };
             
-            match frame.decoder.decode_register_index() {
+            match self.frame.decoder.decode_register_index() {
               Some(return_target) => {
-                frame.registers[return_target] = res;
+                self.frame.registers[return_target] = res;
               },
               None => {},
             };
@@ -356,36 +350,42 @@ impl VirtualMachine {
       },
 
       Jmp => {
-        let dst = frame.decoder.decode_pos();
-        frame.decoder.pos = dst;
+        let dst = self.frame.decoder.decode_pos();
+        self.frame.decoder.pos = dst;
       }
 
       JmpIf => {
-        let cond = frame.decoder.decode_val(&frame.registers);
-        let dst = frame.decoder.decode_pos();
+        let cond = self.frame.decoder.decode_val(&self.frame.registers);
+        let dst = self.frame.decoder.decode_pos();
 
         if cond.is_truthy() {
-          frame.decoder.pos = dst;
+          self.frame.decoder.pos = dst;
         }
       }
 
-      UnaryPlus => frame.apply_unary_op(operations::op_unary_plus),
-      UnaryMinus => frame.apply_unary_op(operations::op_unary_minus),
+      UnaryPlus => self.frame.apply_unary_op(operations::op_unary_plus),
+      UnaryMinus => self.frame.apply_unary_op(operations::op_unary_minus),
 
       New => std::panic!("Not implemented"),
     };
   }
 
-  pub fn pop(&mut self) {
-    let old_frame = self.stack.pop().unwrap();
-    let frame = self.stack.last_mut().unwrap();
+  pub fn push(&mut self, mut frame: StackFrame) {
+    std::mem::swap(&mut self.frame, &mut frame);
+    self.stack.push(frame);
+  }
 
-    if frame.return_target.is_some() {
-      frame.registers[frame.return_target.unwrap()] = old_frame.registers[0].clone();
+  pub fn pop(&mut self) {
+    // This name is accurate after the swap
+    let mut old_frame = self.stack.pop().unwrap();
+    std::mem::swap(&mut self.frame, &mut old_frame);
+
+    for return_target in self.frame.return_target {
+      self.frame.registers[return_target] = old_frame.registers[0].clone();
     }
 
-    if frame.this_target.is_some() {
-      frame.registers[frame.this_target.unwrap()] = old_frame.registers[1].clone();
+    for this_target in self.frame.this_target {
+      self.frame.registers[this_target] = old_frame.registers[1].clone();
     }
   }
 }
