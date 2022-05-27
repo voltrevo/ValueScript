@@ -386,11 +386,11 @@ impl Compiler {
     }
 
     defn.push(format!(
-      "@{} = class(@{}, {{",
+      "@{} = class({}, {{",
       defn_name,
       match constructor_defn_name {
         None => "void".to_string(),
-        Some(d) => d,
+        Some(d) => format!("@{}", d),
       },
     ));
 
