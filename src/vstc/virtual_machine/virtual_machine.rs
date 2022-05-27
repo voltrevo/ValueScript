@@ -371,6 +371,8 @@ impl VirtualMachine {
 
       UnaryPlus => frame.apply_unary_op(operations::op_unary_plus),
       UnaryMinus => frame.apply_unary_op(operations::op_unary_minus),
+
+      New => std::panic!("Not implemented"),
     };
   }
 

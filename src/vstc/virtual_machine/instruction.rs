@@ -46,6 +46,7 @@ pub enum Instruction {
   JmpIf = 0x28,
   UnaryPlus = 0x29,
   UnaryMinus = 0x2a,
+  New = 0x2b,
 }
 
 impl Instruction {

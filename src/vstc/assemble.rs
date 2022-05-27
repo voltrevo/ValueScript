@@ -217,6 +217,7 @@ impl<'a> Assembler<'a> {
       ("jmpif", Instruction::JmpIf),
       ("unary+", Instruction::UnaryPlus),
       ("unary-", Instruction::UnaryMinus),
+      ("new", Instruction::New),
     ]);
 
     for (word, instruction) in instruction_word_map {
@@ -800,6 +801,7 @@ enum Instruction {
   JmpIf = 0x28,
   UnaryPlus = 0x29,
   UnaryMinus = 0x2a,
+  New = 0x2b,
 }
 
 enum InstructionArg {
@@ -856,6 +858,7 @@ fn get_instruction_layout(instruction: Instruction) -> Vec<InstructionArg> {
     JmpIf => Vec::from([Value, Label]),
     UnaryPlus => Vec::from([Value, Register]),
     UnaryMinus => Vec::from([Value, Register]),
+    New => Vec::from([Value, Value, Register]),
   };
 }
 

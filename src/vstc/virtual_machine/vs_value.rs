@@ -5,6 +5,7 @@ use super::vs_function::VsFunction;
 use super::virtual_machine::StackFrame;
 use super::vs_object::VsObject;
 use super::vs_array::VsArray;
+// use super::vs_class::VsClass;
 use super::operations::{op_sub, op_submov};
 
 #[derive(Clone)]
@@ -18,6 +19,7 @@ pub enum Val {
   Array(Rc<VsArray>),
   Object(Rc<VsObject>),
   Function(Rc<VsFunction>),
+  // Class(Rc<VsClass>),
   Static(&'static dyn ValTrait),
   Custom(Rc<dyn ValTrait>),
 }

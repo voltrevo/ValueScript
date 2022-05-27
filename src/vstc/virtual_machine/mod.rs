@@ -10,5 +10,6 @@ mod vs_array;
 mod native_function;
 mod builtins;
 mod math;
+mod vs_class;
 
 pub use virtual_machine::VirtualMachine;
