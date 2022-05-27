@@ -1,1 +1,5 @@
 /target
+/foo.*
+/bar.*
+/baz.*
+/out.*
