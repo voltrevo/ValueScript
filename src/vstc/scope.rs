@@ -32,6 +32,7 @@ pub type Scope = Rc<RefCell<ScopeData>>;
 
 pub trait ScopeTrait {
   fn get(&self, name: &String) -> Option<MappedName>;
+  fn get_defn(&self, name: &String) -> Option<String>;
   fn set(&self, name: String, mapped_name: MappedName);
   fn nest(&self) -> Rc<RefCell<ScopeData>>;
 }
@@ -45,6 +46,15 @@ impl ScopeTrait for Scope {
         None => None,
       },
     }
+  }
+
+  fn get_defn(&self, name: &String) -> Option<String> {
+    let get_result = self.get(name);
+    
+    return match get_result {
+      Some(MappedName::Definition(d)) => Some(d.clone()),
+      _ => None,
+    };
   }
 
   fn set(&self, name: String, mapped_name: MappedName) {
@@ -76,5 +86,5 @@ pub fn init_std_scope() -> Scope {
       ("Math".to_string(), MappedName::Builtin(Builtin::Math)),
     ]),
     parent: None,
-  }));
+  })).nest();
 }

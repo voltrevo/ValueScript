@@ -9,9 +9,10 @@ use super::scope::{Scope, MappedName, ScopeTrait, init_std_scope};
 use super::capture_finder::CaptureFinder;
 
 #[derive(Clone, Debug)]
-pub enum FnOrArrow {
+pub enum Functionish {
   Fn(swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
+  Constructor(swc_ecma_ast::Constructor),
 }
 
 #[derive(Clone, Debug)]
@@ -19,7 +20,7 @@ pub struct QueuedFunction {
   pub definition_name: String,
   pub fn_name: Option<String>,
   pub capture_params: Vec<String>,
-  pub fn_or_arrow: FnOrArrow,
+  pub functionish: Functionish,
 }
 
 pub struct LoopLabels {
@@ -55,7 +56,7 @@ impl FunctionCompiler {
   pub fn compile(
     definition_name: String,
     fn_name: Option<String>,
-    fn_: &swc_ecma_ast::Function,
+    functionish: Functionish,
     definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) -> Vec<String> {
@@ -65,16 +66,16 @@ impl FunctionCompiler {
       definition_name: definition_name.clone(),
       fn_name: fn_name,
       capture_params: Vec::new(),
-      fn_or_arrow: FnOrArrow::Fn(fn_.clone()),
+      functionish: functionish,
     }).expect("Failed to queue function");
 
     loop {
       match self_.queue.remove() {
-        Ok(qfn) => self_.compile_fn_or_arrow(
+        Ok(qfn) => self_.compile_functionish(
           qfn.definition_name,
           qfn.fn_name,
           qfn.capture_params,
-          &qfn.fn_or_arrow,
+          &qfn.functionish,
           parent_scope,
         ),
         Err(_) => { break; },
@@ -84,12 +85,12 @@ impl FunctionCompiler {
     return self_.definition;
   }
 
-  fn compile_fn_or_arrow(
+  fn compile_functionish(
     &mut self,
     definition_name: String,
     fn_name: Option<String>,
     mut capture_params: Vec<String>,
-    fn_or_arrow: &FnOrArrow,
+    functionish: &Functionish,
     parent_scope: &Scope,
   ) {
     let scope = parent_scope.nest();
@@ -121,17 +122,29 @@ impl FunctionCompiler {
       _ => std::panic!("Not implemented: parameter destructuring"),
     };
 
-    match fn_or_arrow {
-      FnOrArrow::Fn(fn_) => {
+    match functionish {
+      Functionish::Fn(fn_) => {
         for p in &fn_.params {
           handle_param_pat(&p.pat);
         }
       },
-      FnOrArrow::Arrow(arrow) => {
+      Functionish::Arrow(arrow) => {
         for p in &arrow.params {
           handle_param_pat(p);
         }
       },
+      Functionish::Constructor(constructor) => {
+        for potspp in &constructor.params {
+          match potspp {
+            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
+              std::panic!("Not implemented (TODO: what is this?)")
+            },
+            swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
+              handle_param_pat(&p.pat);
+            },
+          }
+        }
+      }
     };
 
     for i in 0..params.len() {
@@ -167,14 +180,14 @@ impl FunctionCompiler {
       }
     };
 
-    match fn_or_arrow {
-      FnOrArrow::Fn(fn_) => {
+    match functionish {
+      Functionish::Fn(fn_) => {
         let block = fn_.body.as_ref()
           .expect("Not implemented: function without body");
 
         handle_block_body(block);
       },
-      FnOrArrow::Arrow(arrow) => match &arrow.body {
+      Functionish::Arrow(arrow) => match &arrow.body {
         swc_ecma_ast::BlockStmtOrExpr::BlockStmt(block) => {
           handle_block_body(block);
         },
@@ -186,6 +199,12 @@ impl FunctionCompiler {
 
           expression_compiler.compile(expr, Some("return".to_string()));
         }
+      },
+      Functionish::Constructor(constructor) => {
+        let block = constructor.body.as_ref()
+          .expect("Not implemented: constructor without body");
+        
+        handle_block_body(block);
       },
     }
 
@@ -406,7 +425,7 @@ impl FunctionCompiler {
         definition_name: definition_name,
         fn_name: Some(fn_name.clone()),
         capture_params: full_captures,
-        fn_or_arrow: FnOrArrow::Fn(fn_.function.clone()),
+        functionish: Functionish::Fn(fn_.function.clone()),
       };
 
       scope.set(

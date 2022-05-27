@@ -1,7 +1,7 @@
 use queues::*;
 
 use super::scope::{Scope, ScopeTrait, MappedName, init_std_scope};
-use super::function_compiler::{FunctionCompiler, QueuedFunction, FnOrArrow};
+use super::function_compiler::{FunctionCompiler, QueuedFunction, Functionish};
 use super::capture_finder::CaptureFinder;
 
 pub struct CompiledExpression {
@@ -876,7 +876,7 @@ impl<'a> ExpressionCompiler<'a> {
       definition_name: definition_name.clone(),
       fn_name: fn_name.clone(),
       capture_params: cf.ordered_names.clone(),
-      fn_or_arrow: FnOrArrow::Fn(fn_.function.clone()),
+      functionish: Functionish::Fn(fn_.function.clone()),
     }).expect("Failed to queue function");
 
     if cf.ordered_names.len() == 0 {
@@ -913,7 +913,7 @@ impl<'a> ExpressionCompiler<'a> {
       definition_name: definition_name.clone(),
       fn_name: None,
       capture_params: cf.ordered_names.clone(),
-      fn_or_arrow: FnOrArrow::Arrow(arrow_expr.clone()),
+      functionish: Functionish::Arrow(arrow_expr.clone()),
     }).expect("Failed to queue function");
 
     if cf.ordered_names.len() == 0 {

@@ -14,7 +14,7 @@ use swc_ecma_parser::{TsConfig, Syntax};
 
 use super::scope::{Scope, MappedName, init_std_scope, ScopeTrait};
 use super::name_allocator::NameAllocator;
-use super::function_compiler::FunctionCompiler;
+use super::function_compiler::{FunctionCompiler, Functionish};
 
 pub fn command(args: &Vec<String>) {
   if args.len() != 3 {
@@ -171,7 +171,14 @@ impl Compiler {
           Stmt::ForOf(_) => std::panic!("Not implemented: module level ForOf statement"),
           Stmt::Decl(decl) => {
             match decl {
-              Decl::Class(_) => std::panic!("Not implemented: module level Class declaration"),
+              Decl::Class(class) => {
+                scope.set(
+                  class.ident.sym.to_string(),
+                  MappedName::Definition(
+                    self.definition_allocator.borrow_mut().allocate(&class.ident.sym.to_string()),
+                  ),
+                );
+              },
               Decl::Fn(fn_) => {
                 scope.set(
                   fn_.ident.sym.to_string(),
@@ -279,8 +286,18 @@ impl Compiler {
     use swc_ecma_ast::Decl::*;
 
     match decl {
-      Class(_) => std::panic!("Not implemented: Class declaration"),
-      Fn(fn_) => self.compile_fn(fn_.ident.sym.to_string(), &fn_.function, self.definition_allocator.clone(), scope),
+      Class(class) => self.compile_class_decl(class, self.definition_allocator.clone(), scope),
+      Fn(fn_) => {
+        let fn_name = fn_.ident.sym.to_string();
+
+        self.compile_fn(
+          scope.get_defn(&fn_name).expect("Definition should have been in scope"),
+          Some(fn_.ident.sym.to_string()),
+          Functionish::Fn(fn_.function.clone()),
+          self.definition_allocator.clone(),
+          scope,
+        )
+      },
       Var(_) => std::panic!("Not implemented: Var declaration"),
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
       TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
@@ -300,8 +317,9 @@ impl Compiler {
 
     match &edd.decl {
       Fn(fn_) => self.compile_fn(
-        fn_name,
-        &fn_.function,
+        scope.get_defn(&fn_name).expect("Definition should have been in scope"),
+        Some(fn_name),
+        Functionish::Fn(fn_.function.clone()),
         definition_allocator,
         scope,
       ),
@@ -311,19 +329,81 @@ impl Compiler {
 
   fn compile_fn(
     &mut self,
-    fn_name: String,
-    fn_: &swc_ecma_ast::Function,
+    defn_name: String,
+    fn_name: Option<String>,
+    functionish: Functionish,
     definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) {
     self.definitions.push(
       FunctionCompiler::compile(
-        fn_name.clone(),
-        Some(fn_name),
-        fn_,
+        defn_name,
+        fn_name,
+        functionish,
         definition_allocator,
         parent_scope,
       ),
     );
+  }
+
+  fn compile_class_decl(
+    &mut self,
+    class_decl: &swc_ecma_ast::ClassDecl,
+    definition_allocator: Rc<RefCell<NameAllocator>>,
+    parent_scope: &Scope,
+  ) {
+    let mut defn = Vec::<String>::new();
+
+    let class_name = class_decl.ident.sym.to_string();
+
+    let defn_name = match parent_scope.get(&class_name) {
+      Some(MappedName::Definition(d)) => d,
+      _ => std::panic!("Definition name should have been in scope")
+    };
+
+    let mut constructor_defn_name: Option<String> = None;
+
+    for class_member in &class_decl.class.body {
+      match class_member {
+        swc_ecma_ast::ClassMember::Constructor(constructor) => {
+          let ctor_defn_name = definition_allocator.borrow_mut().allocate(
+            &format!("{}_constructor", class_name),
+          );
+
+          self.compile_fn(
+            ctor_defn_name.clone(),
+            None,
+            Functionish::Constructor(constructor.clone()),
+            definition_allocator.clone(),
+            parent_scope,
+          );
+
+          constructor_defn_name = Some(ctor_defn_name);
+        },
+        _ => {},
+      }
+    }
+
+    defn.push(format!(
+      "@{} = class(@{}, {{",
+      defn_name,
+      match constructor_defn_name {
+        None => "void".to_string(),
+        Some(d) => d,
+      },
+    ));
+
+    for class_member in &class_decl.class.body {
+      match class_member {
+        swc_ecma_ast::ClassMember::Constructor(_) => {},
+        _ => {
+          defn.push("  todo".to_string());
+        },
+      }
+    }
+
+    defn.push("})".to_string());
+
+    self.definitions.push(defn);
   }
 }
