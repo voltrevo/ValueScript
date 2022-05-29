@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use super::vs_value::{Val, ValTrait, LoadFunctionResult};
 use super::bytecode_decoder::BytecodeDecoder;
-use super::stack_frame_trait::{StackFrameTrait, FrameStepResult};
+use super::stack_frame::{StackFrame, FrameStepResult};
 use super::first_stack_frame::FirstStackFrame;
 
 pub struct VirtualMachine {
-  pub frame: Box<dyn StackFrameTrait>,
-  pub stack: Vec<Box<dyn StackFrameTrait>>,
+  pub frame: StackFrame,
+  pub stack: Vec<StackFrame>,
 }
 
 impl VirtualMachine {
@@ -61,7 +61,7 @@ impl VirtualMachine {
     };
   }
 
-  pub fn push(&mut self, mut frame: Box<dyn StackFrameTrait>) {
+  pub fn push(&mut self, mut frame: StackFrame) {
     std::mem::swap(&mut self.frame, &mut frame);
     self.stack.push(frame);
   }

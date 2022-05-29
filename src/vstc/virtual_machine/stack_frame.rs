@@ -1,5 +1,7 @@
 use super::vs_value::Val;
 
+pub type StackFrame = Box<dyn StackFrameTrait>;
+
 #[derive(Clone)]
 pub struct CallResult {
   pub return_: Val,
@@ -9,7 +11,7 @@ pub struct CallResult {
 pub enum FrameStepResult {
   Continue,
   Pop(CallResult),
-  Push(Box<dyn StackFrameTrait>),
+  Push(StackFrame),
 }
 
 pub trait StackFrameTrait {

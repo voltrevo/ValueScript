@@ -1,4 +1,4 @@
-use super::stack_frame_trait::{StackFrameTrait, FrameStepResult, CallResult};
+use super::stack_frame::{StackFrameTrait, FrameStepResult, CallResult};
 use super::vs_value::Val;
 
 pub struct FirstStackFrame {

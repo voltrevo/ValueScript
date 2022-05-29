@@ -6,7 +6,7 @@ use super::vs_object::VsObject;
 use super::vs_array::VsArray;
 use super::vs_class::VsClass;
 use super::operations::{op_sub, op_submov};
-use super::stack_frame_trait::StackFrameTrait;
+use super::stack_frame::StackFrame;
 
 #[derive(Clone)]
 pub enum Val {
@@ -39,7 +39,7 @@ pub enum VsType {
 
 pub enum LoadFunctionResult {
   NotAFunction,
-  StackFrame(Box<dyn StackFrameTrait>),
+  StackFrame(StackFrame),
   NativeFunction(fn(this: &mut Val, params: Vec<Val>) -> Val),
 }
 

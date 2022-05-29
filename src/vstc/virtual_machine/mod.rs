@@ -12,7 +12,7 @@ mod builtins;
 mod math;
 mod vs_class;
 mod bytecode_stack_frame;
-mod stack_frame_trait;
+mod stack_frame;
 mod first_stack_frame;
 
 pub use virtual_machine::VirtualMachine;

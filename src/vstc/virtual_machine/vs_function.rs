@@ -3,7 +3,7 @@ use std::rc::Rc;
 use super::vs_value::Val;
 use super::bytecode_stack_frame::BytecodeStackFrame;
 use super::bytecode_decoder::BytecodeDecoder;
-use super::stack_frame_trait::StackFrameTrait;
+use super::stack_frame::StackFrame;
 
 pub struct VsFunction {
   pub bytecode: Rc<Vec<u8>>,
@@ -30,7 +30,7 @@ impl VsFunction {
     };
   }
 
-  pub fn make_frame(&self) -> Box<dyn StackFrameTrait> {
+  pub fn make_frame(&self) -> StackFrame {
     let mut registers: Vec<Val> = Vec::with_capacity(self.register_count - 1);
 
     registers.push(Val::Undefined);

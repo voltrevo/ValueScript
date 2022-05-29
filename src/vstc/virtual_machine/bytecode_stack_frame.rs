@@ -6,7 +6,7 @@ use super::operations;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::bytecode_decoder::BytecodeType;
 use super::instruction::Instruction;
-use super::stack_frame_trait::{StackFrameTrait, FrameStepResult, CallResult};
+use super::stack_frame::{StackFrame, StackFrameTrait, FrameStepResult, CallResult};
 
 pub struct BytecodeStackFrame {
   pub decoder: BytecodeDecoder,
@@ -47,7 +47,7 @@ impl BytecodeStackFrame {
 
   pub fn transfer_parameters(
     &mut self,
-    new_frame: &mut Box<dyn StackFrameTrait>,
+    new_frame: &mut StackFrame,
   ) {
     let bytecode_type = self.decoder.decode_type();
   
