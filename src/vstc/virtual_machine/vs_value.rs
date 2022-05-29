@@ -2,11 +2,11 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use super::vs_function::VsFunction;
-use super::virtual_machine::StackFrame;
 use super::vs_object::VsObject;
 use super::vs_array::VsArray;
 use super::vs_class::VsClass;
 use super::operations::{op_sub, op_submov};
+use super::stack_frame_trait::StackFrameTrait;
 
 #[derive(Clone)]
 pub enum Val {
@@ -39,7 +39,7 @@ pub enum VsType {
 
 pub enum LoadFunctionResult {
   NotAFunction,
-  StackFrame(StackFrame),
+  StackFrame(Box<dyn StackFrameTrait>),
   NativeFunction(fn(this: &mut Val, params: Vec<Val>) -> Val),
 }
 
@@ -320,7 +320,7 @@ impl std::fmt::Display for Val {
           return write!(f, "[]");
         }
 
-        write!(f, "[ ");
+        write!(f, "[ ").expect("Failed to write");
 
         let mut first = true;
 
@@ -328,10 +328,10 @@ impl std::fmt::Display for Val {
           if first {
             first = false;
           } else {
-            write!(f, ", ");
+            write!(f, ", ").expect("Failed to write");
           }
 
-          write!(f, "{}", elem);
+          write!(f, "{}", elem).expect("Failed to write");
         }
 
         write!(f, " ]")
@@ -352,10 +352,10 @@ impl std::fmt::Display for Val {
           if first {
             first = false;
           } else {
-            write!(f, ", ");
+            write!(f, ", ").expect("Failed to write");
           }
 
-          write!(f, "{}: {}", k, v);
+          write!(f, "{}: {}", k, v).expect("Failed to write");
         }
 
         f.write_str(" }")

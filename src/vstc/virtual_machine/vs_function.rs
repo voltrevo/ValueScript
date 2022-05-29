@@ -1,8 +1,9 @@
 use std::rc::Rc;
 
 use super::vs_value::Val;
-use super::virtual_machine::StackFrame;
+use super::plain_stack_frame::PlainStackFrame;
 use super::bytecode_decoder::BytecodeDecoder;
+use super::stack_frame_trait::StackFrameTrait;
 
 pub struct VsFunction {
   pub bytecode: Rc<Vec<u8>>,
@@ -29,7 +30,7 @@ impl VsFunction {
     };
   }
 
-  pub fn make_frame(&self) -> StackFrame {
+  pub fn make_frame(&self) -> Box<dyn StackFrameTrait> {
     let mut registers: Vec<Val> = Vec::with_capacity(self.register_count - 1);
 
     registers.push(Val::Undefined);
@@ -43,7 +44,7 @@ impl VsFunction {
       registers.push(Val::Undefined);
     }
 
-    return StackFrame {
+    return Box::new(PlainStackFrame {
       decoder: BytecodeDecoder {
         data: self.bytecode.clone(),
         pos: self.start,
@@ -53,6 +54,6 @@ impl VsFunction {
       param_end: self.parameter_count + 2,
       this_target: None,
       return_target: None,
-    };
+    });
   }
 }

@@ -85,14 +85,15 @@ impl ValTrait for VsPointer {
 
   fn is_primitive(&self) -> bool {
     return match self.typeof_() {
-      Undefined => true,
-      Null => true,
-      Bool => true,
-      Number => true,
-      String => true,
-      Array => false,
-      Object => false,
-      Function => false,
+      VsType::Undefined => true,
+      VsType::Null => true,
+      VsType::Bool => true,
+      VsType::Number => true,
+      VsType::String => true,
+      VsType::Array => false,
+      VsType::Object => false,
+      VsType::Function => false,
+      VsType::Class => false,
     }
   }
 

@@ -304,15 +304,6 @@ impl<'a> Assembler<'a> {
     }
   }
 
-  fn parse_optional_exact(&mut self, chars: &str) -> bool {
-    if self.test_chars(chars) {
-      advance_chars(&mut self.pos, chars.len());
-      return true;
-    }
-
-    return false;
-  }
-
   fn parse_one_of(&mut self, options: &[&str]) -> String {
     for opt in options {
       if self.test_chars(opt) {
@@ -911,10 +902,10 @@ enum ValueType {
   Array = 0x09,
   Object = 0x0a,
   Function = 0x0b,
-  Instance = 0x0c,
+  // Instance = 0x0c,
   Pointer = 0x0d,
   Register = 0x0e,
-  External = 0x0f,
+  // External = 0x0f,
   Builtin = 0x10,
   Class = 0x11,
 }

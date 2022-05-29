@@ -11,15 +11,15 @@
       "cargo": {
         "args": [
           "build",
-          "--bin=value_script",
+          "--bin=vstc",
           "--package=value_script"
         ],
         "filter": {
-          "name": "value_script",
+          "name": "vstc",
           "kind": "bin"
         }
       },
-      "args": [],
+      "args": ["run", "foo.ts"],
       "cwd": "${workspaceFolder}"
     },
     {

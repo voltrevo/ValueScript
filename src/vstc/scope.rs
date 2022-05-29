@@ -73,7 +73,7 @@ impl ScopeTrait for Scope {
   }
 }
 
-pub fn init_scope() -> Scope {
+pub fn _init_scope() -> Scope {
   return Rc::new(RefCell::new(ScopeData {
     name_map: Default::default(),
     parent: None,
