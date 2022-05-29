@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use super::vs_value::Val;
-use super::plain_stack_frame::PlainStackFrame;
+use super::bytecode_stack_frame::BytecodeStackFrame;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::stack_frame_trait::StackFrameTrait;
 
@@ -44,7 +44,7 @@ impl VsFunction {
       registers.push(Val::Undefined);
     }
 
-    return Box::new(PlainStackFrame {
+    return Box::new(BytecodeStackFrame {
       decoder: BytecodeDecoder {
         data: self.bytecode.clone(),
         pos: self.start,

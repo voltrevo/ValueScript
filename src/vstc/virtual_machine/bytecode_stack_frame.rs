@@ -8,7 +8,7 @@ use super::bytecode_decoder::BytecodeType;
 use super::instruction::Instruction;
 use super::stack_frame_trait::{StackFrameTrait, FrameStepResult, CallResult};
 
-pub struct PlainStackFrame {
+pub struct BytecodeStackFrame {
   pub decoder: BytecodeDecoder,
   pub registers: Vec<Val>,
   pub param_start: usize,
@@ -17,7 +17,7 @@ pub struct PlainStackFrame {
   pub return_target: Option<usize>,
 }
 
-impl PlainStackFrame {
+impl BytecodeStackFrame {
   pub fn apply_unary_op(
     &mut self,
     op: fn(input: Val) -> Val,
@@ -84,7 +84,7 @@ impl PlainStackFrame {
   }
 }
 
-impl StackFrameTrait for PlainStackFrame {
+impl StackFrameTrait for BytecodeStackFrame {
   fn write_this(&mut self, this: Val) {
     self.registers[1] = this;
   }
@@ -429,7 +429,7 @@ impl StackFrameTrait for PlainStackFrame {
   }
 
   fn get_call_result(&mut self) -> CallResult {
-    std::panic!("Not appropriate for PlainStackFrame")
+    std::panic!("Not appropriate for BytecodeStackFrame")
   }
 }
 

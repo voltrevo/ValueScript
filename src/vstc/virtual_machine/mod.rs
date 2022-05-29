@@ -11,7 +11,7 @@ mod native_function;
 mod builtins;
 mod math;
 mod vs_class;
-mod plain_stack_frame;
+mod bytecode_stack_frame;
 mod stack_frame_trait;
 mod first_stack_frame;
 
