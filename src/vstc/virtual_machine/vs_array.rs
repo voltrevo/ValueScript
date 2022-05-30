@@ -15,6 +15,7 @@ use super::array_higher_functions::array_map::MAP;
 use super::array_higher_functions::array_every::EVERY;
 use super::array_higher_functions::array_some::SOME;
 use super::array_higher_functions::array_filter::FILTER;
+use super::array_higher_functions::array_find::FIND;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -302,17 +303,6 @@ static FILL: NativeFunction = NativeFunction {
         return this.clone();
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
-    };
-  }
-};
-
-static FIND: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: FIND");
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
   }
 };
