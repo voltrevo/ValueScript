@@ -1,97 +1,28 @@
 use std::rc::Rc;
 
-use super::super::vs_value::{Val, ValTrait, LoadFunctionResult};
+use super::super::vs_value::{Val};
 use super::super::vs_array::VsArray;
 use super::super::native_frame_function::NativeFrameFunction;
-use super::super::stack_frame::{StackFrameTrait, FrameStepResult, CallResult};
+use super::array_mapping_frame::{ArrayMappingState, ArrayMappingFrame};
 
 pub static MAP: NativeFrameFunction = NativeFrameFunction {
-  make_frame: || Box::new(MapFrame {
-    this: None,
-    this_arg: Val::Undefined,
-    mapper: Val::Void,
-    param_i: 0,
-    map_results: Vec::new(),
-  }),
+  make_frame: || Box::new(ArrayMappingFrame::new(Box::new(MapState::default()))),
 };
 
-struct MapFrame {
-  this: Option<Rc<VsArray>>,
-  this_arg: Val,
-  mapper: Val,
-  param_i: usize,
+#[derive(Default)]
+struct MapState {
   map_results: Vec<Val>,
 }
 
-impl StackFrameTrait for MapFrame {
-  fn write_this(&mut self, this: Val) {
-    self.this = this.as_array_data();
+impl ArrayMappingState for MapState {
+  fn process(&mut self, _i: usize, _element: &Val, mapped: Val) -> Option<Val> {
+    self.map_results.push(mapped);
+    return None;
   }
 
-  fn write_param(&mut self, param: Val) {
-    match self.param_i {
-      0 => { self.mapper = param; }
-      1 => { self.this_arg = param; }
-      _ => {},
-    };
-
-    self.param_i += 1;
-  }
-
-  fn step(&mut self) -> FrameStepResult {
-    let array_data = match &self.this {
-      None => std::panic!("Not implemented: exception: map called on non-array"),
-      Some(ad) => ad,
-    };
-
-    match array_data.elements.get(self.map_results.len()) {
-      Some(el) => match el {
-        Val::Void => {
-          self.map_results.push(Val::Void);
-          return FrameStepResult::Continue;
-        },
-        _ => match self.mapper.load_function() {
-          LoadFunctionResult::NotAFunction =>
-            std::panic!("Not implemented: exception: map fn is not a function")
-          ,
-          LoadFunctionResult::NativeFunction(native_fn) => {
-            self.map_results.push(native_fn(
-              &mut self.this_arg.clone(),
-              vec![
-                el.clone(),
-                Val::Number(self.map_results.len() as f64),
-                Val::Array(array_data.clone()),
-              ],
-            ));
-  
-            return FrameStepResult::Continue;
-          },
-          LoadFunctionResult::StackFrame(mut new_frame) => {
-            new_frame.write_this(self.this_arg.clone());
-            new_frame.write_param(el.clone());
-            new_frame.write_param(Val::Number(self.map_results.len() as f64));
-            new_frame.write_param(Val::Array(array_data.clone()));
-            return FrameStepResult::Push(new_frame);
-          },
-        },
-      },
-      None => {
-        let mut return_elements = Vec::new();
-        std::mem::swap(&mut return_elements, &mut self.map_results);
-  
-        return FrameStepResult::Pop(CallResult {
-          return_: Val::Array(Rc::new(VsArray::from(return_elements))),
-          this: Val::Array(array_data.clone()),
-        });
-      },
-    };
-  }
-
-  fn apply_call_result(&mut self, call_result: CallResult) {
-    self.map_results.push(call_result.return_);
-  }
-
-  fn get_call_result(&mut self) -> CallResult {
-    std::panic!("Not appropriate for MapFrame")
+  fn finish(&mut self) -> Val {
+    let mut map_results = Vec::new();
+    std::mem::swap(&mut self.map_results, &mut map_results);
+    return Val::Array(Rc::new(VsArray::from(map_results)));
   }
 }
