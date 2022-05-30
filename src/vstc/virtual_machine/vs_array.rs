@@ -11,6 +11,7 @@ use super::vs_object::VsObject;
 use super::vs_class::VsClass;
 use super::native_function::NativeFunction;
 use super::operations::op_triple_eq_impl;
+use super::array_higher_functions::array_map::MAP;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -493,17 +494,6 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
         }
 
         return Val::Number(-1_f64);
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
-    };
-  }
-};
-
-static MAP: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: MAP");
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };

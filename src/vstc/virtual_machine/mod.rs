@@ -14,5 +14,7 @@ mod vs_class;
 mod bytecode_stack_frame;
 mod stack_frame;
 mod first_stack_frame;
+mod array_higher_functions;
+mod native_frame_function;
 
 pub use virtual_machine::VirtualMachine;
