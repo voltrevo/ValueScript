@@ -41,21 +41,27 @@ impl StackFrameTrait for MapFrame {
     };
 
     match array_data.elements.get(self.map_results.len()) {
-      Some(el) => match self.mapper.load_function() {
-        LoadFunctionResult::NotAFunction =>
-          std::panic!("Not implemented: exception: map fn is not a function")
-        ,
-        LoadFunctionResult::NativeFunction(native_fn) => {
-          self.map_results.push(native_fn(
-            &mut Val::Undefined,
-            vec![el.clone()],
-          ));
-
+      Some(el) => match el {
+        Val::Void => {
+          self.map_results.push(Val::Void);
           return FrameStepResult::Continue;
         },
-        LoadFunctionResult::StackFrame(mut new_frame) => {
-          new_frame.write_param(el.clone());
-          return FrameStepResult::Push(new_frame);
+        _ => match self.mapper.load_function() {
+          LoadFunctionResult::NotAFunction =>
+            std::panic!("Not implemented: exception: map fn is not a function")
+          ,
+          LoadFunctionResult::NativeFunction(native_fn) => {
+            self.map_results.push(native_fn(
+              &mut Val::Undefined,
+              vec![el.clone()],
+            ));
+  
+            return FrameStepResult::Continue;
+          },
+          LoadFunctionResult::StackFrame(mut new_frame) => {
+            new_frame.write_param(el.clone());
+            return FrameStepResult::Push(new_frame);
+          },
         },
       },
       None => {
