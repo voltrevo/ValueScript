@@ -18,6 +18,7 @@ use super::array_higher_functions::array_filter::FILTER;
 use super::array_higher_functions::array_find::FIND;
 use super::array_higher_functions::array_find_index::FIND_INDEX;
 use super::array_higher_functions::array_flat_map::FLAT_MAP;
+use super::array_higher_functions::array_reduce::REDUCE;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -461,7 +462,14 @@ static POP: NativeFunction = NativeFunction {
 
         let array_data_mut = Rc::make_mut(array_data);
 
-        return array_data_mut.elements.remove(array_data_mut.elements.len() - 1);
+        let removed_el = array_data_mut.elements.remove(
+          array_data_mut.elements.len() - 1,
+        );
+
+        return match removed_el {
+          Val::Void => Val::Undefined,
+          _ => removed_el,
+        };
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
     };
@@ -481,17 +489,6 @@ static PUSH: NativeFunction = NativeFunction {
         return Val::Number(array_data_mut.elements.len() as f64);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
-    };
-  }
-};
-
-static REDUCE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: REDUCE");
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
   }
 };

@@ -7,3 +7,4 @@ pub mod array_filter;
 pub mod array_find;
 pub mod array_find_index;
 pub mod array_flat_map;
+pub mod array_reduce;
