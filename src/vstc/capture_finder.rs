@@ -380,7 +380,9 @@ impl CaptureFinder {
               use swc_ecma_ast::Prop::*;
 
               match &**p {
-                Shorthand(_) => std::panic!("Not implemented: Shorthand prop"),
+                Shorthand(ident) => {
+                  self.ref_(scope, ident.sym.to_string());
+                },
                 KeyValue(kv) => {
                   match &kv.key {
                     swc_ecma_ast::PropName::Ident(_) => {},

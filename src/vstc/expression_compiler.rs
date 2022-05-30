@@ -467,7 +467,14 @@ impl<'a> ExpressionCompiler<'a> {
           std::panic!("Not implemented: spread expression");
         },
         swc_ecma_ast::PropOrSpread::Prop(prop) => match &**prop {
-          swc_ecma_ast::Prop::Shorthand(_) => std::panic!("Not implemented: Shorthand prop"),
+          swc_ecma_ast::Prop::Shorthand(ident) => {
+            value_assembly += &std::format!("\"{}\"", ident.sym.to_string());
+            value_assembly += ": ";
+
+            let mut compiled_value = self.identifier(ident, None);
+            sub_nested_registers.append(&mut compiled_value.nested_registers);
+            value_assembly += &compiled_value.value_assembly;
+          },
           swc_ecma_ast::Prop::KeyValue(kv) => {
             let key_assembly = match &kv.key {
               swc_ecma_ast::PropName::Ident(ident) =>
