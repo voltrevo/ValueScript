@@ -188,7 +188,11 @@ impl Compiler {
                   ),
                 );
               },
-              Decl::Var(_) => std::panic!("Not implemented: module level Var declaration"),
+              Decl::Var(var_decl) => {
+                if !var_decl.declare {
+                  std::panic!("Not implemented: non-declare module level var declaration");
+                }
+              },
               Decl::TsInterface(_) => std::panic!("Not implemented: module level TsInterface declaration"),
               Decl::TsTypeAlias(_) => std::panic!("Not implemented: module level TsTypeAlias declaration"),
               Decl::TsEnum(_) => std::panic!("Not implemented: module level TsEnum declaration"),
@@ -299,7 +303,11 @@ impl Compiler {
           scope,
         )
       },
-      Var(_) => std::panic!("Not implemented: Var declaration"),
+      Var(var_decl) => {
+        if !var_decl.declare {
+          std::panic!("Not implemented: non-declare module level var declaration");
+        }
+      },
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
       TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
       TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
