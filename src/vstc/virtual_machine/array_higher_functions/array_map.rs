@@ -8,6 +8,7 @@ use super::super::stack_frame::{StackFrameTrait, FrameStepResult, CallResult};
 pub static MAP: NativeFrameFunction = NativeFrameFunction {
   make_frame: || Box::new(MapFrame {
     this: None,
+    this_arg: Val::Undefined,
     mapper: Val::Void,
     param_i: 0,
     map_results: Vec::new(),
@@ -16,6 +17,7 @@ pub static MAP: NativeFrameFunction = NativeFrameFunction {
 
 struct MapFrame {
   this: Option<Rc<VsArray>>,
+  this_arg: Val,
   mapper: Val,
   param_i: usize,
   map_results: Vec<Val>,
@@ -27,9 +29,11 @@ impl StackFrameTrait for MapFrame {
   }
 
   fn write_param(&mut self, param: Val) {
-    if self.param_i == 0 {
-      self.mapper = param;
-    }
+    match self.param_i {
+      0 => { self.mapper = param; }
+      1 => { self.this_arg = param; }
+      _ => {},
+    };
 
     self.param_i += 1;
   }
@@ -52,14 +56,16 @@ impl StackFrameTrait for MapFrame {
           ,
           LoadFunctionResult::NativeFunction(native_fn) => {
             self.map_results.push(native_fn(
-              &mut Val::Undefined,
-              vec![el.clone()],
+              &mut self.this_arg.clone(),
+              vec![el.clone(), Val::Number(self.map_results.len() as f64)],
             ));
   
             return FrameStepResult::Continue;
           },
           LoadFunctionResult::StackFrame(mut new_frame) => {
+            new_frame.write_this(self.this_arg.clone());
             new_frame.write_param(el.clone());
+            new_frame.write_param(Val::Number(self.map_results.len() as f64));
             return FrameStepResult::Push(new_frame);
           },
         },
