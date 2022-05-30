@@ -19,6 +19,7 @@ use super::array_higher_functions::array_find::FIND;
 use super::array_higher_functions::array_find_index::FIND_INDEX;
 use super::array_higher_functions::array_flat_map::FLAT_MAP;
 use super::array_higher_functions::array_reduce::REDUCE;
+use super::array_higher_functions::array_reduce_right::REDUCE_RIGHT;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -489,17 +490,6 @@ static PUSH: NativeFunction = NativeFunction {
         return Val::Number(array_data_mut.elements.len() as f64);
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
-    };
-  }
-};
-
-static REDUCE_RIGHT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: REDUCE_RIGHT");
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
   }
 };
