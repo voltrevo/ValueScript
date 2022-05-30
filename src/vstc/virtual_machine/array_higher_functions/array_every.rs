@@ -53,10 +53,11 @@ impl StackFrameTrait for EveryFrame {
       });
     }
 
-    let index = Val::Number(self.array_i as f64);
+    let array_i = self.array_i;
+    let index = Val::Number(array_i as f64);
     self.array_i += 1;
 
-    match array_data.elements.get(self.array_i) {
+    match array_data.elements.get(array_i) {
       Some(el) => match el {
         Val::Void => {
           return FrameStepResult::Continue;
