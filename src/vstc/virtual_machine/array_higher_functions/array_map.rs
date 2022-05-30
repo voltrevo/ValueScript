@@ -57,7 +57,11 @@ impl StackFrameTrait for MapFrame {
           LoadFunctionResult::NativeFunction(native_fn) => {
             self.map_results.push(native_fn(
               &mut self.this_arg.clone(),
-              vec![el.clone(), Val::Number(self.map_results.len() as f64)],
+              vec![
+                el.clone(),
+                Val::Number(self.map_results.len() as f64),
+                Val::Array(array_data.clone()),
+              ],
             ));
   
             return FrameStepResult::Continue;
@@ -66,6 +70,7 @@ impl StackFrameTrait for MapFrame {
             new_frame.write_this(self.this_arg.clone());
             new_frame.write_param(el.clone());
             new_frame.write_param(Val::Number(self.map_results.len() as f64));
+            new_frame.write_param(Val::Array(array_data.clone()));
             return FrameStepResult::Push(new_frame);
           },
         },
