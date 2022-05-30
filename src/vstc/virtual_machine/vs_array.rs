@@ -16,6 +16,8 @@ use super::array_higher_functions::array_every::EVERY;
 use super::array_higher_functions::array_some::SOME;
 use super::array_higher_functions::array_filter::FILTER;
 use super::array_higher_functions::array_find::FIND;
+use super::array_higher_functions::array_find_index::FIND_INDEX;
+use super::array_higher_functions::array_flat_map::FLAT_MAP;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -307,17 +309,6 @@ static FILL: NativeFunction = NativeFunction {
   }
 };
 
-static FIND_INDEX: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: FIND_INDEX");
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
-    };
-  }
-};
-
 static FLAT: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
@@ -344,17 +335,6 @@ static FLAT: NativeFunction = NativeFunction {
         return Val::Array(Rc::new(VsArray::from(new_elems)));
       },
       _ => std::panic!("Not implemented: exceptions/array indirection")
-    };
-  }
-};
-
-static FLAT_MAP: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: FLAT_MAP");
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
   }
 };

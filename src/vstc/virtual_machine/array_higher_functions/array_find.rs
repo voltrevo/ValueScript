@@ -12,8 +12,8 @@ struct FindState {}
 impl ArrayMappingState for FindState {
   fn process(&mut self, _i: usize, element: &Val, mapped: Val) -> Option<Val> {
     match mapped.is_truthy() {
-      true => None,
-      false => Some(element.clone()),
+      true => Some(element.clone()),
+      false => None,
     }
   }
 
