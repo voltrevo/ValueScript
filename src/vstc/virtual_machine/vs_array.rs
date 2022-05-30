@@ -13,6 +13,7 @@ use super::native_function::NativeFunction;
 use super::operations::op_triple_eq_impl;
 use super::array_higher_functions::array_map::MAP;
 use super::array_higher_functions::array_every::EVERY;
+use super::array_higher_functions::array_some::SOME;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -611,17 +612,6 @@ static SLICE: NativeFunction = NativeFunction {
         }
 
         return Val::Array(Rc::new(VsArray::from(new_elems)));
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
-    };
-  }
-};
-
-static SOME: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: SOME");
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
