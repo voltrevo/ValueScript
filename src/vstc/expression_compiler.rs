@@ -96,8 +96,12 @@ impl<'a> ExpressionCompiler<'a> {
       JSXFragment(_) => std::panic!("Not implemented: JSXFragment expression"),
       TsTypeAssertion(_) => std::panic!("Not implemented: TsTypeAssertion expression"),
       TsConstAssertion(_) => std::panic!("Not implemented: TsConstAssertion expression"),
-      TsNonNull(_) => std::panic!("Not implemented: TsNonNull expression"),
-      TsAs(_) => std::panic!("Not implemented: TsAs expression"),
+      TsNonNull(ts_non_null_exp) => {
+        return self.compile(&ts_non_null_exp.expr, target_register);
+      },
+      TsAs(ts_as_exp) => {
+        return self.compile(&ts_as_exp.expr, target_register);
+      },
       TsInstantiation(_) => std::panic!("Not implemented: TsInstantiation expression"),
       PrivateName(_) => std::panic!("Not implemented: PrivateName expression"),
       OptChain(_) => std::panic!("Not implemented: OptChain expression"),

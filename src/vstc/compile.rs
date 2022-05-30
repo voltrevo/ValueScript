@@ -193,8 +193,8 @@ impl Compiler {
                   std::panic!("Not implemented: non-declare module level var declaration");
                 }
               },
-              Decl::TsInterface(_) => std::panic!("Not implemented: module level TsInterface declaration"),
-              Decl::TsTypeAlias(_) => std::panic!("Not implemented: module level TsTypeAlias declaration"),
+              Decl::TsInterface(_) => {},
+              Decl::TsTypeAlias(_) => {},
               Decl::TsEnum(_) => std::panic!("Not implemented: module level TsEnum declaration"),
               Decl::TsModule(_) => std::panic!("Not implemented: module level TsModule declaration"),
             };
@@ -308,8 +308,8 @@ impl Compiler {
           std::panic!("Not implemented: non-declare module level var declaration");
         }
       },
-      TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
-      TsTypeAlias(_) => std::panic!("Not implemented: TsTypeAlias declaration"),
+      TsInterface(_) => {},
+      TsTypeAlias(_) => {},
       TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
       TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
     };

@@ -66,10 +66,16 @@ pub fn op_triple_eq_impl(left: Val, right: Val) -> bool {
     return false;
   }
 
-  return match type_ {
-    VsType::Undefined => true,
-    VsType::Null => true,
-    VsType::Number => left.to_number() == right.to_number(),
+  match type_ {
+    VsType::Undefined | VsType::Null => {
+      return true;
+    }
+    _ => {},
+  };
+
+  return match (left, right) {
+    (Val::Number(lnum), Val::Number(rnum)) => lnum == rnum,
+    (Val::String(lstr), Val::String(rstr)) => lstr == rstr,
     _ => std::panic!("Not implemented"),
   };
 }

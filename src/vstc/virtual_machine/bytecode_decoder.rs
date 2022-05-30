@@ -203,7 +203,10 @@ impl BytecodeDecoder {
     let pos = self.decode_pos();
     
     if pos < from_pos {
-      if self.clone_at(pos).decode_type() != BytecodeType::Function {
+      if
+        self.clone_at(pos).decode_type() != BytecodeType::Function &&
+        self.clone_at(pos).decode_type() != BytecodeType::Class
+      {
         std::panic!("Invalid: non-function pointer that points backwards");
       }
     }

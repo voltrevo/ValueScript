@@ -24,7 +24,7 @@ pub enum Val {
   Custom(Rc<dyn ValTrait>),
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum VsType {
   Undefined,
   Null,
