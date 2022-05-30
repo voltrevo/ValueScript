@@ -20,6 +20,7 @@ use super::array_higher_functions::array_find_index::FIND_INDEX;
 use super::array_higher_functions::array_flat_map::FLAT_MAP;
 use super::array_higher_functions::array_reduce::REDUCE;
 use super::array_higher_functions::array_reduce_right::REDUCE_RIGHT;
+use super::array_higher_functions::array_sort::SORT;
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -559,27 +560,6 @@ static SLICE: NativeFunction = NativeFunction {
         }
 
         return Val::Array(Rc::new(VsArray::from(new_elems)));
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
-    };
-  }
-};
-
-static SORT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
-      Val::Array(array_data) => {
-        if params.len() > 0 {
-          std::panic!("Not implemented: custom comparison fn");
-        }
-
-        let array_data_mut = Rc::make_mut(array_data);
-
-        array_data_mut.elements.sort_by(|a, b|
-          a.val_to_string().cmp(&b.val_to_string())
-        );
-
-        return this.clone();
       },
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
