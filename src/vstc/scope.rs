@@ -7,6 +7,7 @@ use super::function_compiler::QueuedFunction;
 #[derive(Clone, Debug)]
 pub enum Builtin {
   Math,
+  Debug,
 }
 
 impl std::fmt::Display for Builtin {
@@ -84,6 +85,7 @@ pub fn init_std_scope() -> Scope {
   return Rc::new(RefCell::new(ScopeData {
     name_map: HashMap::from([
       ("Math".to_string(), MappedName::Builtin(Builtin::Math)),
+      ("Debug".to_string(), MappedName::Builtin(Builtin::Debug)),
     ]),
     parent: None,
   })).nest();

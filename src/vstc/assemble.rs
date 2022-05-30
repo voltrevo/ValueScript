@@ -579,8 +579,9 @@ impl<'a> Assembler<'a> {
   }
 
   fn assemble_builtin(&mut self) {
-    match self.parse_one_of(&["Math"]).as_str() {
+    match self.parse_one_of(&["Math", "Debug"]).as_str() {
       "Math" => self.write_varsize_uint(0),
+      "Debug" => self.write_varsize_uint(1),
       _ => std::panic!("Shouldn't happen"),
     }
   }

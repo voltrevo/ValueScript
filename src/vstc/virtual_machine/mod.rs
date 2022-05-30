@@ -16,5 +16,6 @@ mod stack_frame;
 mod first_stack_frame;
 mod array_higher_functions;
 mod native_frame_function;
+mod debug;
 
 pub use virtual_machine::VirtualMachine;
