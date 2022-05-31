@@ -245,7 +245,12 @@ pub fn op_sub(left: Val, right: Val) -> Val {
     Val::Number(_) => Val::Undefined, // TODO: toString etc
     Val::String(string_data) => {
       let right_index = match right.to_index() {
-        None => { return Val::Undefined }
+        None => {
+          return match right.val_to_string().as_str() == "length" {
+            true => Val::Number(string_data.len() as f64),
+            false => Val::Undefined,
+          }
+        },
         Some(i) => i,
       };
 
