@@ -109,7 +109,14 @@ pub fn op_not(input: Val) -> Val {
 }
 
 pub fn op_less(left: Val, right: Val) -> Val {
-  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
+  let left_type = left.typeof_();
+  let right_type = right.typeof_();
+
+  if left_type == VsType::Undefined || right_type == VsType::Undefined {
+    return Val::Bool(false);
+  }
+
+  if left_type != VsType::Number || right_type != VsType::Number {
     std::panic!("Not implemented");
   }
 
