@@ -155,7 +155,7 @@ type T = (typeof a.value);
 </details>
 
 <details>
-<summary>Concurrency<summary>
+<summary>Concurrency</summary>
 By using value semantics, ValueScript ensures that a function, called with the
 same arguments, always returns the same value. This includes instance methods by
 considering the instance data to be one of the arguments.
