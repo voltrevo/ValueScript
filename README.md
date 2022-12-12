@@ -78,10 +78,15 @@ Additionally, ValueScript has benefits that make it a suitable target for second
 
 <details>
 <summary>Eliminate mutation bugs</summary>
+
+Mutating things across your program is frequently intended, but it's also frequently unintended, causing bugs.
+
 This is why you are usually encouraged not to mutate function arguments, among other things. Sometimes you'll see workaround like `const a = [...b];`. In ValueScript, just write it the natural way.
 </details>
+
 <details>
 <summary>`const` means what you think it does</summary>
+
 Ever felt weird about using `const` in situations like this?
 
 ```ts
@@ -99,6 +104,7 @@ In ValueScript, it's not the same array, because arrays don't change. Instead, i
 
 <details>
 <summary>Testable code</summary>
+
 Testing code is all about being able to draw a boundary around something that can be given inputs so that you can check its outputs against your expectations.
 
 Being able to draw these boundaries is usually challenging in real-world systems, because by default everything wants to connect to something tangible to serve its purpose as directly as possible. Most things that matter to you become untested because of their coupling to externalities that are too difficult to meaningfully replicate in a test case. Testing degrades into an inauthentic add-on that focuses on trivialities.
@@ -110,6 +116,7 @@ A ValueScript program is always a function that, when called with the same input
 
 <details>
 <summary>No garbage collection</summary>
+
 In ValueScript, it's impossible to create data that circularly references itself. This isn't because something is keeping watch and producing an error if you do it accidentally. Rather, it's just an inherent consequence of how ValueScript works:
 
 ```ts
@@ -124,6 +131,7 @@ Circular references are the whole reason why garbage collectors are needed (assu
 
 <details>
 <summary>Persistence</summary>
+
 In a traditional mutable program, the important entities in that program often can't be stored authentically without also capturing the state of the entire program that contains them. Even when that isn't true, the entity needs to be translated into a form that can be stored in a process we know and love called *serialization*.
 
 ValueScript is different. Everything can be persisted as its direct contents and a recursive inclusion of its dependencies. This includes functions and class instances (and the methods on those class instances). In ValueScript, everything is plain data.
@@ -133,6 +141,7 @@ In fact, because ValueScript doesn't require garbage collection, it's also possi
 
 <details>
 <summary>Make use of TypeScript's type checking</summary>
+
 ValueScript is similar enough to TypeScript that the type checker correctly identifies type errors in ValueScript.
 
 In fact, when the differences matter, the type checker often actually favors ValueScript, not TypeScript.
@@ -156,6 +165,7 @@ type T = (typeof a.value);
 
 <details>
 <summary>Concurrency</summary>
+
 By using value semantics, ValueScript ensures that a function, called with the
 same arguments, always returns the same value. This includes instance methods by
 considering the instance data to be one of the arguments.
@@ -192,6 +202,7 @@ On the surface, `vs.thread` simply returns the function that is provided to it, 
 
 <details>
 <summary>Static Analysis & Optimization</summary>
+
 ValueScript dramatically expands the cases where program behavior can be determined statically. In traditional languages, inferences about data in variables are quickly lost because it is impossible to know whether some other code might modify that data.
 
 A relatively simple application of this is tree-shaking. ValueScript analyzers will be able to determine much more accurately what code is actually used, and only include that code for distribution. During development you can also get a lot more feedback like 'this statement has no effect'.
