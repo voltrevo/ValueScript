@@ -4,8 +4,7 @@ import files from "./files.ts";
 import assert from "./helpers/assert.ts";
 import nil from "./helpers/nil.ts";
 import notNil from "./helpers/notNil.ts";
-
-import "./testing.ts";
+import { initVslib } from "./vslib/index.ts";
 
 function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
@@ -16,6 +15,7 @@ const editorEl = domQuery("#editor");
 const selectEl = domQuery<HTMLSelectElement>("#file-location select");
 const filePreviousEl = domQuery("#file-previous");
 const fileNextEl = domQuery("#file-next");
+const vsmEl = domQuery("#vsm");
 
 for (const filename of Object.keys(files)) {
   const option = document.createElement("option");
@@ -27,7 +27,12 @@ let currentFile = "";
 
 editorEl.innerHTML = "";
 
-monacoPromise.then((monaco) => {
+(async () => {
+  const [vslib, monaco] = await Promise.all([
+    initVslib(),
+    monacoPromise,
+  ]);
+
   const editor = monaco.editor.create(editorEl, {
     theme: "vs-dark",
     value: "",
@@ -104,6 +109,6 @@ monacoPromise.then((monaco) => {
   });
 
   function handleUpdate() {
-    console.log("TODO: handle update");
+    vsmEl.textContent = vslib.compile(model.getValue());
   }
-});
+})();
