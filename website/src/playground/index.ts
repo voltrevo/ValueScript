@@ -109,6 +109,12 @@ editorEl.innerHTML = "";
   });
 
   function handleUpdate() {
-    vsmEl.textContent = vslib.compile(model.getValue());
+    try {
+      vsmEl.textContent = vslib.compile(model.getValue());
+      vsmEl.classList.remove("error");
+    } catch (_error) {
+      vsmEl.textContent = "Compilation failed";
+      vsmEl.classList.add("error");
+    }
   }
 })();

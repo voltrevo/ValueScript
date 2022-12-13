@@ -208,3 +208,7 @@ input[type=text] {
   cursor: pointer;
   user-select: none;
 }
+
+#vsm.error {
+  background-color: hsla(0, 100%, 50%, 0.05);
+}
