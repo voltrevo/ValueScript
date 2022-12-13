@@ -4,6 +4,7 @@ use std::path::Path;
 use std::ffi::OsStr;
 
 use super::assemble::assemble;
+use super::compile::full_compile_raw;
 use super::compile::parse;
 use super::compile::compile;
 use super::virtual_machine::VirtualMachine;
@@ -40,6 +41,16 @@ pub fn command(args: &Vec<String>) {
   let result = vm.run(&bytecode, &args[argpos..]);
 
   println!("{}", result);
+}
+
+pub fn full_run_raw(source: &str) -> String {
+  let vsm = full_compile_raw(source);
+  let bytecode = assemble(vsm.as_str());
+
+  let mut vm = VirtualMachine::new();
+  let result = vm.run(&bytecode, &[]);
+
+  return format!("{}", result);
 }
 
 enum RunFormat {

@@ -1,7 +1,8 @@
 export async function initVslib() {
-  const wasm = (await WebAssembly.instantiateStreaming(
+  // deno-lint-ignore no-explicit-any
+  const wasm: Record<string, any> = (await WebAssembly.instantiateStreaming(
     fetch("/value_script_bg.wasm"),
-  )).instance.exports as Record<string, any>;
+  )).instance.exports;
 
   let WASM_VECTOR_LEN = 0;
 
@@ -106,7 +107,29 @@ export async function initVslib() {
     }
   }
 
+  function run(source: string) {
+    let r0, r1;
+
+    try {
+      const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+      const ptr0 = passStringToWasm0(
+        source,
+        wasm.__wbindgen_malloc,
+        wasm.__wbindgen_realloc,
+      );
+      const len0 = WASM_VECTOR_LEN;
+      wasm.run(retptr, ptr0, len0);
+      r0 = getInt32Memory0()[retptr / 4 + 0];
+      r1 = getInt32Memory0()[retptr / 4 + 1];
+      return getStringFromWasm0(r0, r1);
+    } finally {
+      wasm.__wbindgen_add_to_stack_pointer(16);
+      wasm.__wbindgen_free(r0, r1);
+    }
+  }
+
   return {
     compile,
+    run,
   };
 }

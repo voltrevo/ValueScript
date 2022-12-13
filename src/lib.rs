@@ -12,3 +12,8 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub fn compile(source: &str) -> String {
     return vstc::compile::full_compile_raw(source);
 }
+
+#[wasm_bindgen]
+pub fn run(source: &str) -> String {
+    return vstc::run::full_run_raw(source);
+}

@@ -15,6 +15,7 @@ const editorEl = domQuery("#editor");
 const selectEl = domQuery<HTMLSelectElement>("#file-location select");
 const filePreviousEl = domQuery("#file-previous");
 const fileNextEl = domQuery("#file-next");
+const outcomeEl = domQuery("#outcome");
 const vsmEl = domQuery("#vsm");
 
 for (const filename of Object.keys(files)) {
@@ -32,6 +33,8 @@ editorEl.innerHTML = "";
     initVslib(),
     monacoPromise,
   ]);
+
+  (window as any).vslib = vslib;
 
   const editor = monaco.editor.create(editorEl, {
     theme: "vs-dark",
@@ -113,8 +116,20 @@ editorEl.innerHTML = "";
       vsmEl.textContent = vslib.compile(model.getValue());
       vsmEl.classList.remove("error");
     } catch (_error) {
-      vsmEl.textContent = "Compilation failed";
-      vsmEl.classList.add("error");
+      for (const el of [vsmEl, outcomeEl]) {
+        el.textContent = "Compilation failed";
+        el.classList.add("error");
+      }
+
+      return;
+    }
+
+    try {
+      outcomeEl.textContent = vslib.run(model.getValue());
+      outcomeEl.classList.remove("error");
+    } catch (error) {
+      outcomeEl.textContent = error.message;
+      outcomeEl.classList.add("error");
     }
   }
 })();
