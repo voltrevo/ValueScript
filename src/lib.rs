@@ -1,3 +1,5 @@
+mod vstc;
+
 use wasm_bindgen::prelude::*;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -8,5 +10,5 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
 pub fn compile(source: &str) -> String {
-    return format!("TODO (source len: {})", source.len());
+    return vstc::compile::full_compile_raw(source);
 }

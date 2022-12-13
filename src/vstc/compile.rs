@@ -5,6 +5,8 @@ use std::io::prelude::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
+use swc_common::FileName;
+use swc_common::errors::{Emitter, DiagnosticBuilder};
 use swc_ecma_ast::{EsVersion};
 use swc_common::{
     errors::{ColorConfig, Handler},
@@ -44,8 +46,22 @@ fn show_help() {
   println!("    vstc compile <entry point>");
 }
 
+struct VsEmitter {}
+
+impl Emitter for VsEmitter {
+  fn emit(&mut self, db: &DiagnosticBuilder<'_>) {
+    // TODO
+  }
+}
+
 pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
   let source_map = Arc::<SourceMap>::default();
+
+  Handler::with_emitter(
+    true,
+    false,
+    Box::new(VsEmitter{}),
+  );
 
   let handler = Handler::with_tty_emitter(
       ColorConfig::Auto,
@@ -85,6 +101,36 @@ pub fn compile(program: &swc_ecma_ast::Program) -> Vec<String> {
   }
 
   return lines;
+}
+
+pub fn full_compile_raw(source: &str) -> String {
+  let source_map = Arc::<SourceMap>::default();
+
+  let handler = Handler::with_emitter(
+    true,
+    false,
+    Box::new(VsEmitter{}),
+  );
+
+  let swc_compiler = swc::Compiler::new(source_map.clone());
+
+  let file = source_map
+      .new_source_file(FileName::Anon, source.into());
+
+  let result = swc_compiler.parse_js(
+      file,
+      &handler,
+      EsVersion::Es2022,
+      Syntax::Typescript(TsConfig::default()),
+      swc::config::IsModule::Bool(true),
+      None,
+  );
+
+  let program = result.expect("Parse failed");
+
+  let lines = compile(&program);
+
+  return lines.join("\n");
 }
 
 #[derive(Default)]
