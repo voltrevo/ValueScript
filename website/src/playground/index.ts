@@ -5,6 +5,8 @@ import assert from "./helpers/assert.ts";
 import nil from "./helpers/nil.ts";
 import notNil from "./helpers/notNil.ts";
 
+import "./testing.ts";
+
 function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
 }
