@@ -1,0 +1,13 @@
+{
+  "editor.rulers": [80],
+  "editor.codeActionsOnSave": {
+    "source.fixAll": true
+  },
+  "editor.tabSize": 2,
+  "deno.enable": true,
+  "deno.lint": true,
+  "deno.unstable": true,
+  "deno.config": "./.vscode/deno.jsonc",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "denoland.vscode-deno"
+}

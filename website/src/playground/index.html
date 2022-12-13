@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name=viewport content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="styles.scss" />
+  </head>
+  <body>
+    <div id="editor">
+      <div id="editor-loading"></div>
+    </div>
+    <div id="file-selector">
+      <div id="file-previous">&lt;</div>
+      <div id="file-location">
+        <select></select>
+      </div>
+      <div id="file-next">&gt;</div>
+    </div>
+
+    <div id="display">
+      <div class="display-title">Outcome</div>
+      <div id="outcome">"The playground is loading"</div>
+
+      <div class="display-title">Stats</div>
+      <div id="stats"><div class="table-wrap"><table
+      >
+          <tr>
+            <td>Steps</td><td></td><td id="steps"></td><td></td>
+          </tr>
+          <tr>
+            <td>Step Limit</td><td class="clickable" id="steps-dec">-</td><td id="stepLimit">100000</td><td class="clickable" id="steps-inc">+</td>
+          </tr>
+          <tr>
+            <td>Characters</td><td></td><td id="chars"></td><td></td>
+          </tr>
+        </table
+      ></div></div>
+
+      <div class="display-title">Notes</div>
+      <div id="notes"></div>
+
+      <div class="display-title">Assembly</div>
+      <div id="vasm">@main = function() {
+  mov "The playground is loading" %return
+}</div>
+    </div>
+
+    <script src="index.ts" defer></script>
+  </body>
+</html>
