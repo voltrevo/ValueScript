@@ -94,7 +94,7 @@ const files: Record<string, string | nil> = {
 
   "tutorial/binaryTree.ts": blockTrim(`
     export default function main() {
-      let tree = BinaryTree();
+      let tree = new BinaryTree<number>();
 
       tree.insert(2);
       tree.insert(5);
@@ -108,61 +108,43 @@ const files: Record<string, string | nil> = {
       return [treeSnapshot.toArray(), tree.toArray()];
     }
 
-    function BinaryTree() {
-      type BinaryTree = {
-        data: {
-          value?: number,
-          left?: BinaryTree,
-          right?: BinaryTree,
-        },
-        insert(this: BinaryTree, newValue: number): void,
-        toArray(this: BinaryTree): number[],
-      };
+    class BinaryTree<T> {
+      left?: BinaryTree<T>;
+      value?: T;
+      right?: BinaryTree<T>;
 
-      let tree: BinaryTree = {
-        data: {},
-        insert: function(newValue) {
-          if (this.data.value === undefined) {
-            this.data.value = newValue;
-            return;
-          }
+      insert(newValue: T) {
+        if (this.value === undefined) {
+          this.value = newValue;
+          return;
+        }
 
-          if (newValue < this.data.value) {
-            this.data.left ??= BinaryTree();
-            this.data.left.insert(newValue);
-          } else {
-            this.data.right ??= BinaryTree();
-            this.data.right.insert(newValue);
-          }
-        },
-        toArray: function() {
-          let res: number[] = [];
-
-          if (this.data.left) {
-            res = cat(res, this.data.left.toArray());
-          }
-
-          if (this.data.value !== undefined) {
-            res.push(this.data.value);
-          }
-
-          if (this.data.right) {
-            res = cat(res, this.data.right.toArray());
-          }
-
-          return res;
-        },
-      };
-
-      return tree;
-    }
-
-    function cat(left: number[], right: number[]) {
-      for (let i = 0; i < right.length; i++) {
-        left.push(right[i]);
+        if (newValue < this.value) {
+          this.left ??= new BinaryTree();
+          this.left.insert(newValue);
+        } else {
+          this.right ??= new BinaryTree();
+          this.right.insert(newValue);
+        }
       }
 
-      return left;
+      toArray() {
+        let res: T[] = [];
+
+        if (this.left) {
+          res = res.concat(this.left.toArray());
+        }
+
+        if (this.value !== undefined) {
+          res.push(this.value);
+        }
+
+        if (this.right) {
+          res = res.concat(this.right.toArray());
+        }
+
+        return res;
+      }
     }
   `),
 };
