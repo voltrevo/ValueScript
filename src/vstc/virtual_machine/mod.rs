@@ -19,3 +19,4 @@ mod native_frame_function;
 mod debug;
 
 pub use virtual_machine::VirtualMachine;
+pub use vs_value::ValTrait;

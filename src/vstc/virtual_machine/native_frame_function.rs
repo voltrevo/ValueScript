@@ -48,4 +48,8 @@ impl ValTrait for NativeFrameFunction {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Function]\x1b[39m")
   }
+
+  fn codify(&self) -> String {
+    "function() { [native code] }".into()
+  }
 }

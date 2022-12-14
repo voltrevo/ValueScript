@@ -8,6 +8,7 @@ use super::compile::full_compile_raw;
 use super::compile::parse;
 use super::compile::compile;
 use super::virtual_machine::VirtualMachine;
+use super::virtual_machine::ValTrait;
 
 pub fn command(args: &Vec<String>) {
   if args.len() < 3 {
@@ -50,7 +51,7 @@ pub fn full_run_raw(source: &str) -> String {
   let mut vm = VirtualMachine::new();
   let result = vm.run(&bytecode, &[]);
 
-  return format!("{}", result);
+  return result.codify();
 }
 
 enum RunFormat {

@@ -45,6 +45,10 @@ impl ValTrait for Debug {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Debug]\x1b[39m")
   }
+
+  fn codify(&self) -> String {
+    "Debug".into()
+  }
 }
 
 static LOG: NativeFunction = NativeFunction {

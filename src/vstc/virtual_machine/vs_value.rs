@@ -65,6 +65,7 @@ pub trait ValTrait {
   fn submov(&mut self, key: Val, value: Val);
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+  fn codify(&self) -> String;
 }
 
 impl ValTrait for Val {
@@ -304,6 +305,65 @@ impl ValTrait for Val {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     std::fmt::Display::fmt(self, f)
   }
+
+  fn codify(&self) -> String {
+    match self {
+      Val::Void => "".into(),
+      Val::Undefined => "undefined".into(),
+      Val::Null => "null".into(),
+      Val::Bool(_) => self.val_to_string(),
+      Val::Number(_) => self.val_to_string(),
+      Val::String(str) => stringify_string(str),
+      Val::Array(vals) => {
+        if vals.elements.len() == 0 {
+          "[]".to_string()
+        } else if vals.elements.len() == 1 {
+          "[".to_string() + vals.elements[0].codify().as_str() + "]"
+        } else {
+          let mut iter = vals.elements.iter();
+          let mut res: String = "[".into();
+          res += iter.next().unwrap().codify().as_str();
+
+          for val in iter {
+            res += ",";
+            res += &val.codify();
+          }
+
+          res += "]";
+
+          res
+        }
+      },
+      Val::Object(object) => {
+        if object.string_map.len() == 0 {
+          return "{}".into();
+        }
+
+        let mut res = "{".into();
+        let mut first = true;
+
+        for (k, v) in &object.string_map {
+          if first {
+            first = false;
+          } else {
+            res += ",";
+          }
+
+          res += stringify_string(k).as_str();
+          res += ":";
+          res += v.codify().as_str();
+        }
+
+        res += "}";
+
+        res
+      },
+      Val::Function(_) => "() => { [unavailable] }".to_string(),
+      Val::Class(_) => "class { [unavailable] }".to_string(),
+      Val::Static(val) => val.codify(),
+      Val::Custom(val) => val.codify(),
+    }
+  }
 }
 
 impl std::fmt::Display for Val {
@@ -314,7 +374,7 @@ impl std::fmt::Display for Val {
       Val::Null => write!(f, "\x1b[1mnull\x1b[22m"),
       Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
       Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
-      Val::String(_) => write!(f, "\x1b[32m'{}'\x1b[39m", self.val_to_string()),
+      Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.codify()),
       Val::Array(array) => {
         if array.elements.len() == 0 {
           return write!(f, "[]");
@@ -376,4 +436,27 @@ fn number_to_index(x: f64) -> Option<usize> {
   }
 
   return Some(x as usize);
+}
+
+fn stringify_string(str: &String) -> String {
+  let mut res: String = "\"".into();
+
+  for c in str.chars() {
+    let escape_seq = match c {
+      '\r' => Some("\\r"),
+      '\n' => Some("\\n"),
+      '\t' => Some("\\t"),
+      '"' => Some("\\\""),
+      _ => None,
+    };
+
+    match escape_seq {
+      Some(seq) => { res += seq; },
+      None => { res.push(c); }
+    };
+  }
+
+  res += "\"";
+
+  res
 }

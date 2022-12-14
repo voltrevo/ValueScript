@@ -110,6 +110,10 @@ impl ValTrait for ArrayPrototype {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Array Prototype]\x1b[39m")
   }
+
+  fn codify(&self) -> String {
+    "Array.prototype".into()
+  }
 }
 
 fn to_unchecked_wrapping_index(index: &Val, len: usize) -> isize {

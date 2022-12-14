@@ -140,4 +140,8 @@ impl ValTrait for VsPointer {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     self.resolve().fmt(f)
   }
+
+  fn codify(&self) -> String {
+    self.resolve().codify()
+  }
 }
