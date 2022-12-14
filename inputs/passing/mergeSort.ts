@@ -1,5 +1,5 @@
 export default function main() {
-  let x = [7, 18, 9, 11, 16, 3, 8, 2, 5, 4, 6, 14, 15, 17, 10, 12, 1, 13];
+  const x = [7, 18, 9, 11, 16, 3, 8, 2, 5, 4, 6, 14, 15, 17, 10, 12, 1, 13];
 
   return mergeSort(x, (a, b) => a - b);
 }
