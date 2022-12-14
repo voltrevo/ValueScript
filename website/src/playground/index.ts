@@ -108,7 +108,7 @@ editorEl.innerHTML = "";
     files[currentFile] = model.getValue();
     clearTimeout(timerId);
 
-    timerId = setTimeout(handleUpdate, 200);
+    timerId = setTimeout(handleUpdate, 100);
   });
 
   function handleUpdate() {
