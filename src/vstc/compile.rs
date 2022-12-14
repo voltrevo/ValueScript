@@ -93,8 +93,15 @@ pub fn compile(program: &swc_ecma_ast::Program) -> Vec<String> {
   compiler.compile_program(&program);
 
   let mut lines = Vec::<String>::new();
+  let mut first = true;
 
   for def in compiler.definitions {
+    if first {
+      first = false;
+    } else {
+      lines.push("".to_string());
+    }
+
     for line in def {
       lines.push(line);
     }
