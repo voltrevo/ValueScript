@@ -23,7 +23,7 @@ h1, h3 {
 }
 
 #heading {
-  font-size: 4em;
+  font-size: calc(min(4em, 15vw));
   margin: 0;
 }
 
