@@ -21,7 +21,9 @@ export default class WorkerPool {
   }
 
   async use<T>(fn: (worker: Worker, terminate: () => void) => T): Promise<T> {
-    return await this.#semaphore.use(async () => {
+    const release = await this.#semaphore.acquire();
+
+    try {
       let bestSlot = this.#slots[0];
 
       for (let i = 1; i < this.size; i++) {
@@ -48,7 +50,14 @@ export default class WorkerPool {
         );
       }
 
-      return await bestSlot.use(fn);
-    });
+      return await bestSlot.use((worker, terminate) => {
+        return fn(worker, () => {
+          terminate();
+          release();
+        });
+      });
+    } finally {
+      release();
+    }
   }
 }
