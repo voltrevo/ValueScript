@@ -124,7 +124,10 @@ editorEl.innerHTML = "";
     compileJob = vslibPool.compile(source);
     runJob = vslibPool.run(source);
 
-    {
+    renderJob(compileJob, vsmEl);
+    renderJob(runJob, outcomeEl);
+
+    function renderJob(job: Job<string>, el: HTMLElement) {
       const loadingTimerId = setTimeout(() => {
         if (currentUpdateId === updateId) {
           vsmEl.textContent = "Loading...";
@@ -133,9 +136,8 @@ editorEl.innerHTML = "";
 
       (async () => {
         try {
-          // debugger;
-          vsmEl.textContent = await compileJob.wait();
-          vsmEl.classList.remove("error");
+          el.textContent = await job.wait();
+          el.classList.remove("error");
         } catch (err) {
           if (!(err instanceof Error)) {
             // deno-lint-ignore no-ex-assign
@@ -143,35 +145,8 @@ editorEl.innerHTML = "";
           }
 
           if (err.message !== "Canceled") {
-            vsmEl.textContent = err.message;
-            vsmEl.classList.add("error");
-          }
-        } finally {
-          clearTimeout(loadingTimerId);
-        }
-      })();
-    }
-
-    {
-      const loadingTimerId = setTimeout(() => {
-        if (currentUpdateId === updateId) {
-          outcomeEl.textContent = "Loading...";
-        }
-      }, 100);
-
-      (async () => {
-        try {
-          outcomeEl.textContent = await runJob.wait();
-          outcomeEl.classList.remove("error");
-        } catch (err) {
-          if (!(err instanceof Error)) {
-            // deno-lint-ignore no-ex-assign
-            err = new Error(`Non-error exception ${err}`);
-          }
-
-          if (err.message !== "Canceled") {
-            outcomeEl.textContent = err.message;
-            outcomeEl.classList.add("error");
+            el.textContent = err.message;
+            el.classList.add("error");
           }
         } finally {
           clearTimeout(loadingTimerId);
