@@ -4,8 +4,7 @@ import files from "./files.ts";
 import assert from "./helpers/assert.ts";
 import nil from "./helpers/nil.ts";
 import notNil from "./helpers/notNil.ts";
-import { initVslib } from "./vslib/index.ts";
-import VslibPool from "./vslib/VslibPool.ts";
+import VslibPool, { Job } from "./vslib/VslibPool.ts";
 
 function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
@@ -30,13 +29,10 @@ let currentFile = "";
 editorEl.innerHTML = "";
 
 (async () => {
-  const [vslib, monaco] = await Promise.all([
-    initVslib(),
-    monacoPromise,
-  ]);
+  const vslibPool = new VslibPool();
+  const monaco = await monacoPromise;
 
-  (window as any).vslib = vslib;
-  (window as any).vslibPool = new VslibPool();
+  (window as any).vslibPool = vslibPool;
 
   const editor = monaco.editor.create(editorEl, {
     theme: "vs-dark",
@@ -113,25 +109,74 @@ editorEl.innerHTML = "";
     timerId = setTimeout(handleUpdate, 100);
   });
 
-  function handleUpdate() {
-    try {
-      vsmEl.textContent = vslib.compile(model.getValue());
-      vsmEl.classList.remove("error");
-    } catch (_error) {
-      for (const el of [vsmEl, outcomeEl]) {
-        el.textContent = "Compilation failed";
-        el.classList.add("error");
-      }
+  let compileJob: Job<string> | nil = nil;
+  let runJob: Job<string> | nil = nil;
+  let updateId = 0;
 
-      return;
+  function handleUpdate() {
+    updateId++;
+    const currentUpdateId = updateId;
+    compileJob?.cancel();
+    runJob?.cancel();
+
+    const source = model.getValue();
+
+    compileJob = vslibPool.compile(source);
+    runJob = vslibPool.run(source);
+
+    {
+      const loadingTimerId = setTimeout(() => {
+        if (currentUpdateId === updateId) {
+          vsmEl.textContent = "Loading...";
+        }
+      }, 100);
+
+      (async () => {
+        try {
+          // debugger;
+          vsmEl.textContent = await compileJob.wait();
+          vsmEl.classList.remove("error");
+        } catch (err) {
+          if (!(err instanceof Error)) {
+            // deno-lint-ignore no-ex-assign
+            err = new Error(`Non-error exception ${err}`);
+          }
+
+          if (err.message !== "Canceled") {
+            vsmEl.textContent = err.message;
+            vsmEl.classList.add("error");
+          }
+        } finally {
+          clearTimeout(loadingTimerId);
+        }
+      })();
     }
 
-    try {
-      outcomeEl.textContent = vslib.run(model.getValue());
-      outcomeEl.classList.remove("error");
-    } catch (error) {
-      outcomeEl.textContent = error.message;
-      outcomeEl.classList.add("error");
+    {
+      const loadingTimerId = setTimeout(() => {
+        if (currentUpdateId === updateId) {
+          outcomeEl.textContent = "Loading...";
+        }
+      }, 100);
+
+      (async () => {
+        try {
+          outcomeEl.textContent = await runJob.wait();
+          outcomeEl.classList.remove("error");
+        } catch (err) {
+          if (!(err instanceof Error)) {
+            // deno-lint-ignore no-ex-assign
+            err = new Error(`Non-error exception ${err}`);
+          }
+
+          if (err.message !== "Canceled") {
+            outcomeEl.textContent = err.message;
+            outcomeEl.classList.add("error");
+          }
+        } finally {
+          clearTimeout(loadingTimerId);
+        }
+      })();
     }
   }
 })();

@@ -1,1 +1,1 @@
-export * as valuescript from "https://esm.sh/valuescript@0.0.3";
+export * as valuescript from "https://esm.sh/valuescript@0.0.4?dev";

@@ -36,7 +36,7 @@ const workerUrl = URL.createObjectURL(
   new Blob([workerScript], { type: "application/javascript" }),
 );
 
-type Job<T> = {
+export type Job<T> = {
   wait: () => Promise<T>;
   cancel: () => void;
 };
