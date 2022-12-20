@@ -1,7 +1,7 @@
 export async function initVslib() {
   // deno-lint-ignore no-explicit-any
   const wasm: Record<string, any> = (await WebAssembly.instantiateStreaming(
-    fetch("/value_script_bg.wasm"),
+    fetch(`${location.origin}/value_script_bg.wasm`),
   )).instance.exports;
 
   let WASM_VECTOR_LEN = 0;

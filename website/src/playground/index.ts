@@ -5,6 +5,7 @@ import assert from "./helpers/assert.ts";
 import nil from "./helpers/nil.ts";
 import notNil from "./helpers/notNil.ts";
 import { initVslib } from "./vslib/index.ts";
+import VslibPool from "./vslib/VslibPool.ts";
 
 function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
@@ -35,6 +36,7 @@ editorEl.innerHTML = "";
   ]);
 
   (window as any).vslib = vslib;
+  (window as any).vslibPool = new VslibPool();
 
   const editor = monaco.editor.create(editorEl, {
     theme: "vs-dark",
