@@ -128,9 +128,13 @@ editorEl.innerHTML = "";
     renderJob(runJob, outcomeEl);
 
     function renderJob(job: Job<string>, el: HTMLElement) {
-      const loadingTimerId = setTimeout(() => {
+      const startTime = Date.now();
+
+      const loadingInterval = setInterval(() => {
         if (currentUpdateId === updateId) {
-          vsmEl.textContent = "Loading...";
+          el.textContent = `Loading... ${
+            ((Date.now() - startTime) / 1000).toFixed(1)
+          }s`;
         }
       }, 100);
 
@@ -149,7 +153,7 @@ editorEl.innerHTML = "";
             el.classList.add("error");
           }
         } finally {
-          clearTimeout(loadingTimerId);
+          clearInterval(loadingInterval);
         }
       })();
     }
