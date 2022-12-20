@@ -1,0 +1,17 @@
+{
+  "name": "valuescript",
+  "version": "0.0.1",
+  "description": "A dialect of TypeScript with value semantics",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Andrew Morris",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "wait-your-turn": "^1.0.1"
+  }
+}
