@@ -27,9 +27,9 @@ export default class WorkerPool {
       for (let i = 1; i < this.size; i++) {
         const slot = this.#slots[i];
   
-        if (this.#slots[i].useCount < this.#slots[i].useCount) {
+        if (slot.useCount < bestSlot.useCount) {
           bestSlot = slot;
-        } else if (this.#slots[i].useCount === this.#slots[i].useCount) {
+        } else if (slot.useCount === bestSlot.useCount) {
           const stateScoreMap = {
             empty: 0,
             starting: 1,
