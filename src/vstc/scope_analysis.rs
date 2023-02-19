@@ -36,10 +36,22 @@ pub struct Name {
   captures: Vec<Capture>,
 }
 
+enum DiagnosticLevel {
+  Lint,
+  Error,
+}
+
+pub struct Diagnostic {
+  level: DiagnosticLevel,
+  message: String,
+  span: swc_common::Span,
+}
+
 #[derive(Default)]
 pub struct ScopeAnalysis {
   pub names: HashMap<NameId, Name>,
   pub captures: HashMap<OwnerId, HashSet<swc_common::Span>>,
+  pub diagnostics: Vec<Diagnostic>,
 }
 
 impl ScopeAnalysis {
@@ -67,14 +79,26 @@ impl ScopeAnalysis {
             sa.expr(&scope, &ede.expr);
           }
           ModuleDecl::ExportAll(_) => {}
-          ModuleDecl::TsImportEquals(_) => {
-            std::panic!("Not supported: TsImportEquals module declaration")
+          ModuleDecl::TsImportEquals(ts_import_equals) => {
+            sa.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::Error,
+              message: "TsImportEquals is not supported".to_string(),
+              span: ts_import_equals.span,
+            });
           }
-          ModuleDecl::TsExportAssignment(_) => {
-            std::panic!("Not supported: TsExportAssignment module declaration")
+          ModuleDecl::TsExportAssignment(ts_export_assignment) => {
+            sa.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::Error,
+              message: "TsExportAssignment is not supported".to_string(),
+              span: ts_export_assignment.span,
+            });
           }
-          ModuleDecl::TsNamespaceExport(_) => {
-            std::panic!("Not supported: TsNamespaceExport module declaration")
+          ModuleDecl::TsNamespaceExport(ts_namespace_export) => {
+            sa.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::Error,
+              message: "TsNamespaceExport is not supported".to_string(),
+              span: ts_namespace_export.span,
+            });
           }
         },
         ModuleItem::Stmt(stmt) => {
@@ -167,11 +191,19 @@ impl ScopeAnalysis {
       }
       Decl::TsInterface(_) => {}
       Decl::TsTypeAlias(_) => {}
-      Decl::TsEnum(_) => {
-        std::panic!("Not implemented: TsEnum declaration (TODO)")
+      Decl::TsEnum(ts_enum) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "TsEnum declaration is not implemented (TODO)".to_string(),
+          span: ts_enum.span,
+        });
       }
-      Decl::TsModule(_) => {
-        std::panic!("Not supported: TsModule declaration")
+      Decl::TsModule(ts_module) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "TsModule declaration is not supported".to_string(),
+          span: ts_module.span,
+        });
       }
     }
   }
@@ -255,11 +287,19 @@ impl ScopeAnalysis {
         self.var_declarator_pat(scope, type_, &assign.left);
         self.expr(scope, &assign.right);
       }
-      Pat::Invalid(_) => {
-        std::panic!("Invalid pattern");
+      Pat::Invalid(invalid) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Invalid pattern (TODO: is this possible?)".to_string(),
+          span: invalid.span,
+        });
       }
-      Pat::Expr(_) => {
-        std::panic!("Not implemented: pattern expression (TODO: what is this?)");
+      Pat::Expr(expr) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Pattern expressions are not implemented (TODO: what are these?)".to_string(),
+          span: get_expr_span(expr),
+        });
       }
     }
   }
@@ -452,8 +492,12 @@ impl ScopeAnalysis {
           self.expr(scope, arg);
         }
       }
-      Expr::Await(_) => {
-        std::panic!("Not supported: await")
+      Expr::Await(await_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "await is not supported".to_string(),
+          span: await_.span,
+        });
       }
       Expr::Member(member) => {
         self.expr(scope, &member.obj);
@@ -1031,4 +1075,58 @@ fn init_std_scope() -> XScope {
     parent: None,
   }))
   .nest(None);
+}
+
+fn get_expr_span(expr: &swc_ecma_ast::Expr) -> swc_common::Span {
+  use swc_ecma_ast::Expr;
+
+  match expr {
+    Expr::This(this) => this.span,
+    Expr::Ident(ident) => ident.span,
+    Expr::Lit(lit) => match lit {
+      swc_ecma_ast::Lit::Str(str_lit) => str_lit.span,
+      swc_ecma_ast::Lit::Bool(bool_lit) => bool_lit.span,
+      swc_ecma_ast::Lit::Null(null_lit) => null_lit.span,
+      swc_ecma_ast::Lit::Num(num_lit) => num_lit.span,
+      swc_ecma_ast::Lit::BigInt(big_int_lit) => big_int_lit.span,
+      swc_ecma_ast::Lit::Regex(regex_lit) => regex_lit.span,
+      swc_ecma_ast::Lit::JSXText(jsx_text_lit) => jsx_text_lit.span,
+    },
+    Expr::Array(array) => array.span,
+    Expr::Object(object) => object.span,
+    Expr::Fn(fn_expr) => fn_expr.function.span,
+    Expr::Unary(unary) => unary.span,
+    Expr::Update(update) => update.span,
+    Expr::Bin(bin) => bin.span,
+    Expr::Assign(assign) => assign.span,
+    Expr::Member(member) => member.span,
+    Expr::Cond(cond) => cond.span,
+    Expr::Call(call) => call.span,
+    Expr::New(new) => new.span,
+    Expr::Seq(seq) => seq.span,
+    Expr::Paren(paren) => paren.span,
+    Expr::Yield(yield_expr) => yield_expr.span,
+    Expr::Await(await_expr) => await_expr.span,
+    Expr::MetaProp(meta_prop) => meta_prop.span,
+    Expr::Tpl(tpl) => tpl.span,
+    Expr::TaggedTpl(tagged_tpl) => tagged_tpl.span,
+    Expr::Arrow(arrow) => arrow.span,
+    Expr::Class(class) => class.class.span,
+    Expr::Invalid(invalid) => invalid.span,
+    Expr::JSXMember(_) => std::panic!("TODO: span of JSXMember"),
+    Expr::JSXNamespacedName(_) => {
+      std::panic!("TODO: span of JSXNamespacedName")
+    }
+    Expr::JSXEmpty(jsx_empty) => jsx_empty.span,
+    Expr::JSXElement(jsx_element) => jsx_element.span,
+    Expr::JSXFragment(jsx_fragment) => jsx_fragment.span,
+    Expr::TsTypeAssertion(ts_type_assertion) => ts_type_assertion.span,
+    Expr::TsConstAssertion(ts_const_assertion) => ts_const_assertion.span,
+    Expr::TsNonNull(ts_non_null) => ts_non_null.span,
+    Expr::OptChain(opt_chain) => opt_chain.span,
+    Expr::SuperProp(super_prop) => super_prop.span,
+    Expr::TsAs(ts_as) => ts_as.span,
+    Expr::PrivateName(private_name) => private_name.span,
+    Expr::TsInstantiation(ts_instantiation) => ts_instantiation.span,
+  }
 }
