@@ -5,6 +5,7 @@ mod compile;
 mod scope;
 mod name_allocator;
 mod expression_compiler;
+mod scope_analysis;
 mod function_compiler;
 mod capture_finder;
 

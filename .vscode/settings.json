@@ -7,7 +7,7 @@
   "deno.enable": true,
   "deno.lint": true,
   "deno.unstable": true,
-  "editor.formatOnSave": false,
+  "editor.formatOnSave": true,
   "editor.defaultFormatter": "denoland.vscode-deno",
   "rust-analyzer.inlayHints.bindingModeHints.enable": false,
   "rust-analyzer.inlayHints.chainingHints.enable": false,
@@ -16,5 +16,8 @@
   "rust-analyzer.inlayHints.lifetimeElisionHints.enable": "never",
   "rust-analyzer.inlayHints.parameterHints.enable": false,
   "rust-analyzer.inlayHints.reborrowHints.enable": "never",
-  "rust-analyzer.inlayHints.typeHints.enable": false
+  "rust-analyzer.inlayHints.typeHints.enable": false,
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
+  }
 }

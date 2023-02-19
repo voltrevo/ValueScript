@@ -1,23 +1,24 @@
-use std::process::exit;
-use std::{path::Path, sync::Arc};
+use std::cell::RefCell;
 use std::fs::File;
 use std::io::prelude::*;
+use std::process::exit;
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::{path::Path, sync::Arc};
 
+use swc_common::errors::{DiagnosticBuilder, Emitter};
 use swc_common::FileName;
-use swc_common::errors::{Emitter, DiagnosticBuilder};
-use swc_ecma_ast::{EsVersion};
 use swc_common::{
-    errors::{ColorConfig, Handler},
-    SourceMap,
+  errors::{ColorConfig, Handler},
+  SourceMap,
 };
-use swc_ecma_parser::{TsConfig, Syntax};
+use swc_ecma_ast::EsVersion;
+use swc_ecma_parser::{Syntax, TsConfig};
 
-use super::scope::{Scope, MappedName, init_std_scope, ScopeTrait};
-use super::name_allocator::NameAllocator;
+use super::expression_compiler::string_literal;
 use super::function_compiler::{FunctionCompiler, Functionish};
-use super::expression_compiler::{string_literal};
+use super::name_allocator::NameAllocator;
+use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
+use super::scope_analysis::ScopeAnalysis;
 
 pub fn command(args: &Vec<String>) {
   if args.len() != 3 {
@@ -32,7 +33,9 @@ pub fn command(args: &Vec<String>) {
   let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
 
   for line in assembly {
-    file.write_all(line.as_bytes()).expect("Failed to write line");
+    file
+      .write_all(line.as_bytes())
+      .expect("Failed to write line");
     file.write_all(b"\n").expect("Failed to write line");
   }
 }
@@ -57,32 +60,23 @@ impl Emitter for VsEmitter {
 pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
   let source_map = Arc::<SourceMap>::default();
 
-  Handler::with_emitter(
-    true,
-    false,
-    Box::new(VsEmitter{}),
-  );
+  Handler::with_emitter(true, false, Box::new(VsEmitter {}));
 
-  let handler = Handler::with_tty_emitter(
-      ColorConfig::Auto,
-      true,
-      false,
-      Some(source_map.clone()),
-  );
+  let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(source_map.clone()));
 
   let swc_compiler = swc::Compiler::new(source_map.clone());
 
   let file = source_map
-      .load_file(Path::new(&file_path))
-      .expect("failed to load file");
+    .load_file(Path::new(&file_path))
+    .expect("failed to load file");
 
   let result = swc_compiler.parse_js(
-      file,
-      &handler,
-      EsVersion::Es2022,
-      Syntax::Typescript(TsConfig::default()),
-      swc::config::IsModule::Bool(true),
-      None,
+    file,
+    &handler,
+    EsVersion::Es2022,
+    Syntax::Typescript(TsConfig::default()),
+    swc::config::IsModule::Bool(true),
+    None,
   );
 
   return result.expect("Parse failed");
@@ -113,24 +107,19 @@ pub fn compile(program: &swc_ecma_ast::Program) -> Vec<String> {
 pub fn full_compile_raw(source: &str) -> String {
   let source_map = Arc::<SourceMap>::default();
 
-  let handler = Handler::with_emitter(
-    true,
-    false,
-    Box::new(VsEmitter{}),
-  );
+  let handler = Handler::with_emitter(true, false, Box::new(VsEmitter {}));
 
   let swc_compiler = swc::Compiler::new(source_map.clone());
 
-  let file = source_map
-      .new_source_file(FileName::Anon, source.into());
+  let file = source_map.new_source_file(FileName::Anon, source.into());
 
   let result = swc_compiler.parse_js(
-      file,
-      &handler,
-      EsVersion::Es2022,
-      Syntax::Typescript(TsConfig::default()),
-      swc::config::IsModule::Bool(true),
-      None,
+    file,
+    &handler,
+    EsVersion::Es2022,
+    Syntax::Typescript(TsConfig::default()),
+    swc::config::IsModule::Bool(true),
+    None,
   );
 
   let program = result.expect("Parse failed");
@@ -157,12 +146,13 @@ impl Compiler {
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
+    let scope_analysis = ScopeAnalysis::run(module);
     let scope = init_std_scope();
 
-    use swc_ecma_ast::ModuleItem;
-    use swc_ecma_ast::ModuleDecl;
-    use swc_ecma_ast::Stmt;
     use swc_ecma_ast::Decl;
+    use swc_ecma_ast::ModuleDecl;
+    use swc_ecma_ast::ModuleItem;
+    use swc_ecma_ast::Stmt;
 
     let mut default_export_name = None;
 
@@ -171,39 +161,52 @@ impl Compiler {
       match module_item {
         ModuleItem::ModuleDecl(module_decl) => match module_decl {
           ModuleDecl::Import(_) => std::panic!("Not implemented: Import module declaration"),
-          ModuleDecl::ExportDecl(_) => std::panic!("Not implemented: ExportDecl module declaration"),
-          ModuleDecl::ExportNamed(_) => std::panic!("Not implemented: ExportNamed module declaration"),
+          ModuleDecl::ExportDecl(_) => {
+            std::panic!("Not implemented: ExportDecl module declaration")
+          }
+          ModuleDecl::ExportNamed(_) => {
+            std::panic!("Not implemented: ExportNamed module declaration")
+          }
           ModuleDecl::ExportDefaultDecl(edd) => {
             match &edd.decl {
               swc_ecma_ast::DefaultDecl::Fn(fn_) => {
                 match &fn_.ident {
                   Some(id) => {
-                    let allocated_name = self.definition_allocator.borrow_mut().allocate(
-                      &id.sym.to_string()
-                    );
+                    let allocated_name = self
+                      .definition_allocator
+                      .borrow_mut()
+                      .allocate(&id.sym.to_string());
 
                     default_export_name = Some(allocated_name.clone());
 
-                    scope.set(
-                      id.sym.to_string(),
-                      MappedName::Definition(allocated_name),
-                    );
-                  },
+                    scope.set(id.sym.to_string(), MappedName::Definition(allocated_name));
+                  }
                   None => {
                     default_export_name = Some(
-                      self.definition_allocator.borrow_mut().allocate_numbered(&"_anon".to_string())
+                      self
+                        .definition_allocator
+                        .borrow_mut()
+                        .allocate_numbered(&"_anon".to_string()),
                     );
-                  },
+                  }
                 };
-              },
+              }
               _ => std::panic!("Not implemented: Non-function default export"),
             };
-          },
-          ModuleDecl::ExportDefaultExpr(_) => std::panic!("Not implemented: ExportDefaultExpr module declaration"),
+          }
+          ModuleDecl::ExportDefaultExpr(_) => {
+            std::panic!("Not implemented: ExportDefaultExpr module declaration")
+          }
           ModuleDecl::ExportAll(_) => std::panic!("Not implemented: ExportAll module declaration"),
-          ModuleDecl::TsImportEquals(_) => std::panic!("Not implemented: TsImportEquals module declaration"),
-          ModuleDecl::TsExportAssignment(_) => std::panic!("Not implemented: TsExportAssignment module declaration"),
-          ModuleDecl::TsNamespaceExport(_) => std::panic!("Not implemented: TsNamespaceExport module declaration"),
+          ModuleDecl::TsImportEquals(_) => {
+            std::panic!("Not implemented: TsImportEquals module declaration")
+          }
+          ModuleDecl::TsExportAssignment(_) => {
+            std::panic!("Not implemented: TsExportAssignment module declaration")
+          }
+          ModuleDecl::TsNamespaceExport(_) => {
+            std::panic!("Not implemented: TsNamespaceExport module declaration")
+          }
         },
         ModuleItem::Stmt(stmt) => match stmt {
           Stmt::Block(_) => std::panic!("Not implemented: module level Block statement"),
@@ -229,29 +232,37 @@ impl Compiler {
                 scope.set(
                   class.ident.sym.to_string(),
                   MappedName::Definition(
-                    self.definition_allocator.borrow_mut().allocate(&class.ident.sym.to_string()),
+                    self
+                      .definition_allocator
+                      .borrow_mut()
+                      .allocate(&class.ident.sym.to_string()),
                   ),
                 );
-              },
+              }
               Decl::Fn(fn_) => {
                 scope.set(
                   fn_.ident.sym.to_string(),
                   MappedName::Definition(
-                    self.definition_allocator.borrow_mut().allocate(&fn_.ident.sym.to_string()),
+                    self
+                      .definition_allocator
+                      .borrow_mut()
+                      .allocate(&fn_.ident.sym.to_string()),
                   ),
                 );
-              },
+              }
               Decl::Var(var_decl) => {
                 if !var_decl.declare {
                   std::panic!("Not implemented: non-declare module level var declaration");
                 }
-              },
-              Decl::TsInterface(_) => {},
-              Decl::TsTypeAlias(_) => {},
+              }
+              Decl::TsInterface(_) => {}
+              Decl::TsTypeAlias(_) => {}
               Decl::TsEnum(_) => std::panic!("Not implemented: module level TsEnum declaration"),
-              Decl::TsModule(_) => std::panic!("Not implemented: module level TsModule declaration"),
+              Decl::TsModule(_) => {
+                std::panic!("Not implemented: module level TsModule declaration")
+              }
             };
-          },
+          }
           Stmt::Expr(_) => std::panic!("Not implemented: module level Expr statement"),
         },
       };
@@ -260,35 +271,30 @@ impl Compiler {
     // First compile default
     for module_item in &module.body {
       match module_item {
-        ModuleItem::ModuleDecl(
-          ModuleDecl::ExportDefaultDecl(edd)
-        ) => self.compile_export_default_decl(
-          edd,
-          // FIXME: clone() shouldn't be necessary here (we want to move)
-          default_export_name.clone().expect("Default export name should have been set"),
-          self.definition_allocator.clone(),
-          &scope,
-        ),
-        _ => {},
+        ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(edd)) => self
+          .compile_export_default_decl(
+            edd,
+            // FIXME: clone() shouldn't be necessary here (we want to move)
+            default_export_name
+              .clone()
+              .expect("Default export name should have been set"),
+            self.definition_allocator.clone(),
+            &scope,
+          ),
+        _ => {}
       }
     }
 
     // Then compile others
     for module_item in &module.body {
       match module_item {
-        ModuleItem::ModuleDecl(
-          ModuleDecl::ExportDefaultDecl(_)
-        ) => {},
+        ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(_)) => {}
         _ => self.compile_module_item(module_item, &scope),
       }
     }
   }
 
-  fn compile_module_item(
-    &mut self,
-    module_item: &swc_ecma_ast::ModuleItem,
-    scope: &Scope,
-  ) {
+  fn compile_module_item(&mut self, module_item: &swc_ecma_ast::ModuleItem, scope: &Scope) {
     use swc_ecma_ast::ModuleItem::*;
 
     match module_item {
@@ -297,11 +303,7 @@ impl Compiler {
     }
   }
 
-  fn compile_module_decl(
-    &mut self,
-    module_decl: &swc_ecma_ast::ModuleDecl,
-    _scope: &Scope,
-  ) {
+  fn compile_module_decl(&mut self, module_decl: &swc_ecma_ast::ModuleDecl, _scope: &Scope) {
     use swc_ecma_ast::ModuleDecl::*;
 
     match module_decl {
@@ -310,11 +312,7 @@ impl Compiler {
     }
   }
 
-  fn compile_module_statement(
-    &mut self,
-    stmt: &swc_ecma_ast::Stmt,
-    scope: &Scope,
-  ) {
+  fn compile_module_statement(&mut self, stmt: &swc_ecma_ast::Stmt, scope: &Scope) {
     use swc_ecma_ast::Stmt::*;
 
     match stmt {
@@ -349,20 +347,22 @@ impl Compiler {
         let fn_name = fn_.ident.sym.to_string();
 
         self.compile_fn(
-          scope.get_defn(&fn_name).expect("Definition should have been in scope"),
+          scope
+            .get_defn(&fn_name)
+            .expect("Definition should have been in scope"),
           Some(fn_.ident.sym.to_string()),
           Functionish::Fn(fn_.function.clone()),
           self.definition_allocator.clone(),
           scope,
         )
-      },
+      }
       Var(var_decl) => {
         if !var_decl.declare {
           std::panic!("Not implemented: non-declare module level var declaration");
         }
-      },
-      TsInterface(_) => {},
-      TsTypeAlias(_) => {},
+      }
+      TsInterface(_) => {}
+      TsTypeAlias(_) => {}
       TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
       TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
     };
@@ -379,7 +379,9 @@ impl Compiler {
 
     match &edd.decl {
       Fn(fn_) => self.compile_fn(
-        scope.get_defn(&fn_name).expect("Definition should have been in scope"),
+        scope
+          .get_defn(&fn_name)
+          .expect("Definition should have been in scope"),
         Some(fn_name),
         Functionish::Fn(fn_.function.clone()),
         definition_allocator,
@@ -397,15 +399,13 @@ impl Compiler {
     definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) {
-    self.definitions.push(
-      FunctionCompiler::compile(
-        defn_name,
-        fn_name,
-        functionish,
-        definition_allocator,
-        parent_scope,
-      ),
-    );
+    self.definitions.push(FunctionCompiler::compile(
+      defn_name,
+      fn_name,
+      functionish,
+      definition_allocator,
+      parent_scope,
+    ));
   }
 
   fn compile_class_decl(
@@ -420,7 +420,7 @@ impl Compiler {
 
     let defn_name = match parent_scope.get(&class_name) {
       Some(MappedName::Definition(d)) => d,
-      _ => std::panic!("Definition name should have been in scope")
+      _ => std::panic!("Definition name should have been in scope"),
     };
 
     let mut constructor_defn_name: Option<String> = None;
@@ -428,9 +428,9 @@ impl Compiler {
     for class_member in &class_decl.class.body {
       match class_member {
         swc_ecma_ast::ClassMember::Constructor(constructor) => {
-          let ctor_defn_name = definition_allocator.borrow_mut().allocate(
-            &format!("{}_constructor", class_name),
-          );
+          let ctor_defn_name = definition_allocator
+            .borrow_mut()
+            .allocate(&format!("{}_constructor", class_name));
 
           self.compile_fn(
             ctor_defn_name.clone(),
@@ -441,8 +441,8 @@ impl Compiler {
           );
 
           constructor_defn_name = Some(ctor_defn_name);
-        },
-        _ => {},
+        }
+        _ => {}
       }
     }
 
@@ -459,16 +459,16 @@ impl Compiler {
       use swc_ecma_ast::ClassMember::*;
 
       match class_member {
-        Constructor(_) => {},
+        Constructor(_) => {}
         Method(method) => {
           let name = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => ident.sym.to_string(),
             _ => std::panic!("Not implemented: Non-identifier method name"),
           };
 
-          let method_defn_name = definition_allocator.borrow_mut().allocate(
-            &format!("{}_{}", defn_name, name),
-          );
+          let method_defn_name = definition_allocator
+            .borrow_mut()
+            .allocate(&format!("{}_{}", defn_name, name));
 
           self.compile_fn(
             method_defn_name.clone(),
@@ -483,20 +483,20 @@ impl Compiler {
             string_literal(&name),
             method_defn_name,
           ));
-        },
+        }
         PrivateMethod(_) => std::panic!("Not implemented: PrivateMethod"),
         ClassProp(prop) => {
           if prop.value.is_some() {
             std::panic!("Not implemented: class property initializers");
           }
-        },
+        }
         PrivateProp(prop) => {
           if prop.value.is_some() {
             std::panic!("Not implemented: class property initializers");
           }
-        },
-        TsIndexSignature(_) => {},
-        Empty(_) => {},
+        }
+        TsIndexSignature(_) => {}
+        Empty(_) => {}
         StaticBlock(_) => std::panic!("Not implemented: StaticBlock"),
       }
     }

@@ -1,6 +1,7 @@
 pub mod virtual_machine;
 pub mod compile;
 pub mod run;
+pub mod scope_analysis;
 mod scope;
 mod name_allocator;
 mod function_compiler;

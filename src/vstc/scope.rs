@@ -1,10 +1,10 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 use super::function_compiler::QueuedFunction;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Builtin {
   Math,
   Debug,
@@ -51,7 +51,7 @@ impl ScopeTrait for Scope {
 
   fn get_defn(&self, name: &String) -> Option<String> {
     let get_result = self.get(name);
-    
+
     return match get_result {
       Some(MappedName::Definition(d)) => Some(d.clone()),
       _ => None,
@@ -88,5 +88,6 @@ pub fn init_std_scope() -> Scope {
       ("Debug".to_string(), MappedName::Builtin(Builtin::Debug)),
     ]),
     parent: None,
-  })).nest();
+  }))
+  .nest();
 }
