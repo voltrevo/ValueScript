@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
 use super::scope::Builtin;
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum NameId {
   Span(swc_common::Span),
   Builtin(Builtin),
@@ -131,20 +131,27 @@ impl ScopeAnalysis {
     );
   }
 
-  fn insert_capture(&mut self, captor_id: &OwnerId, name_id: &NameId, ref_: &swc_common::Span) {
+  fn insert_capture(&mut self, captor_id: &OwnerId, name_id: &NameId, ref_: swc_common::Span) {
     self
       .captures
       .entry(captor_id.clone())
       .or_insert_with(HashSet::new)
-      .insert(ref_.clone());
+      .insert(ref_);
 
-    let name = self
-      .names
-      .get_mut(name_id)
-      .expect("Internal: expected name_id in names");
+    let name = match self.names.get_mut(name_id) {
+      Some(name) => name,
+      None => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: format!("Internal: expected name_id in names: {:?}", name_id),
+          span: ref_,
+        });
+        return;
+      }
+    };
 
     name.captures.push(Capture {
-      ref_: ref_.clone(),
+      ref_,
       captor_id: captor_id.clone(),
     });
   }
@@ -898,25 +905,48 @@ impl ScopeAnalysis {
   }
 
   fn mutate_ident(&mut self, ident: &swc_ecma_ast::Ident) {
-    let name = self
-      .names
-      .get_mut(&NameId::Span(ident.span)) // TODO: clone?
-      .expect("Unresolved reference");
+    let name = match self.names.get_mut(&NameId::Span(ident.span)) {
+      Some(name) => name,
+      None => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Unresolved reference".to_string(),
+          span: ident.span,
+        });
+        return;
+      }
+    };
 
-    // TODO: .clone?
     name.mutations.push(ident.span);
   }
 
   fn ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
-    let name_id = scope.get(&ident.sym).expect("Unresolved reference");
+    let name_id = match scope.get(&ident.sym) {
+      Some(name_id) => name_id,
+      None => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Unresolved reference".to_string(),
+          span: ident.span,
+        });
+        return;
+      }
+    };
 
-    let name = self
-      .names
-      .get(&name_id)
-      .expect("Internal: expected name_id in names");
+    let name = match self.names.get(&name_id) {
+      Some(name) => name,
+      None => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "Internal: expected name_id in names".to_string(),
+          span: ident.span,
+        });
+        return;
+      }
+    };
 
     if &name.owner_id != &scope.borrow().owner_id {
-      self.insert_capture(&scope.borrow().owner_id, &name_id, &ident.span);
+      self.insert_capture(&scope.borrow().owner_id, &name_id, ident.span);
     }
   }
 
