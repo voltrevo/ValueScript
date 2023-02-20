@@ -121,39 +121,44 @@ impl FunctionCompiler {
     let mut params = Vec::<String>::new();
     params.append(&mut capture_params);
 
-    let mut handle_param_pat = |pat: &swc_ecma_ast::Pat| match pat {
-      swc_ecma_ast::Pat::Ident(binding_ident) => {
-        let param_name = binding_ident.id.sym.to_string();
-        params.push(param_name);
-      }
-      _ => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: parameter destructuring".to_string(),
-          span: pat.span(),
-        });
-      }
-    };
+    let mut handle_param_pat =
+      |pat: &swc_ecma_ast::Pat, diagnostics: &mut Vec<Diagnostic>| match pat {
+        swc_ecma_ast::Pat::Ident(binding_ident) => {
+          let param_name = binding_ident.id.sym.to_string();
+          params.push(param_name);
+        }
+        _ => {
+          diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: parameter destructuring".to_string(),
+            span: pat.span(),
+          });
+        }
+      };
 
     match functionish {
       Functionish::Fn(fn_) => {
         for p in &fn_.params {
-          handle_param_pat(&p.pat);
+          handle_param_pat(&p.pat, &mut self.diagnostics);
         }
       }
       Functionish::Arrow(arrow) => {
         for p in &arrow.params {
-          handle_param_pat(p);
+          handle_param_pat(p, &mut self.diagnostics);
         }
       }
       Functionish::Constructor(constructor) => {
         for potspp in &constructor.params {
           match potspp {
-            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
-              std::panic!("Not implemented (TODO: what is this?)")
+            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "TODO: TypeScript parameter properties (what are these?)".to_string(),
+                span: ts_param_prop.span(),
+              });
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              handle_param_pat(&p.pat);
+              handle_param_pat(&p.pat, &mut self.diagnostics);
             }
           }
         }
@@ -236,9 +241,21 @@ impl FunctionCompiler {
       }
       Empty(_) => {}
       Debugger(_) => {}
-      With(_) => std::panic!("Not supported: With statement"),
+      With(with) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Not supported: With statement".to_string(),
+          span: with.span(),
+        });
+      }
       Return(_) => {}
-      Labeled(_) => std::panic!("Not implemented: Labeled statement"),
+      Labeled(labeled) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Labeled statement".to_string(),
+          span: labeled.span(),
+        });
+      }
       Break(_) => {}
       Continue(_) => {}
       If(if_) => {
@@ -248,9 +265,21 @@ impl FunctionCompiler {
           self.populate_fn_scope_statement(stmt, scope);
         }
       }
-      Switch(_) => std::panic!("Not implemented: Switch statement"),
+      Switch(switch) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Switch statement".to_string(),
+          span: switch.span,
+        });
+      }
       Throw(_) => {}
-      Try(_) => std::panic!("Not implemented: Try statement"),
+      Try(try_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Try statement".to_string(),
+          span: try_.span,
+        });
+      }
       While(while_) => {
         self.populate_fn_scope_statement(&while_.body, scope);
       }
@@ -267,19 +296,49 @@ impl FunctionCompiler {
 
         self.populate_fn_scope_statement(&for_.body, scope);
       }
-      ForIn(_) => std::panic!("Not implemented: ForIn statement"),
-      ForOf(_) => std::panic!("Not implemented: ForOf statement"),
+      ForIn(for_in) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: ForIn statement".to_string(),
+          span: for_in.span,
+        });
+      }
+      ForOf(for_of) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: ForOf statement".to_string(),
+          span: for_of.span,
+        });
+      }
       Decl(decl) => {
         use swc_ecma_ast::Decl::*;
 
         match decl {
-          Class(_) => std::panic!("Not implemented: Class declaration"),
+          Class(class) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: Class declaration".to_string(),
+              span: class.span(),
+            });
+          }
           Fn(_) => {}
           Var(var_decl) => self.populate_fn_scope_var_decl(var_decl, scope),
           TsInterface(_) => {}
           TsTypeAlias(_) => {}
-          TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
-          TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
+          TsEnum(ts_enum) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: TsEnum declaration".to_string(),
+              span: ts_enum.span,
+            });
+          }
+          TsModule(ts_module) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: TsModule declaration".to_string(),
+              span: ts_module.span,
+            });
+          }
         }
       }
       Expr(_) => {}
@@ -301,7 +360,13 @@ impl FunctionCompiler {
             MappedName::Register(self.reg_allocator.allocate(&name)),
           );
         }
-        _ => std::panic!("Not implemented: destructuring"),
+        _ => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: destructuring".to_string(),
+            span: var_decl.span(),
+          });
+        }
       }
     }
   }
@@ -316,9 +381,21 @@ impl FunctionCompiler {
         Block(_) => {}
         Empty(_) => {}
         Debugger(_) => {}
-        With(_) => std::panic!("Not supported: With statement"),
+        With(_) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: With statement".to_string(),
+            span: statement.span(),
+          });
+        }
         Return(_) => {}
-        Labeled(_) => std::panic!("Not implemented: Labeled statement"),
+        Labeled(_) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: Labeled statement".to_string(),
+            span: statement.span(),
+          });
+        }
         Break(_) => {}
         Continue(_) => {}
         If(_) => {}
@@ -334,12 +411,24 @@ impl FunctionCompiler {
           use swc_ecma_ast::Decl::*;
 
           match decl {
-            Class(_) => std::panic!("Not implemented: Class declaration"),
+            Class(class) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "TODO: Class declaration".to_string(),
+                span: class.span(),
+              });
+            }
             Fn(fn_) => function_decls.push(fn_.clone()),
             Var(var_decl) => self.populate_block_scope_var_decl(var_decl, scope),
             TsInterface(_) => {}
             TsTypeAlias(_) => {}
-            TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
+            TsEnum(ts_enum) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "TODO: TsEnum declaration".to_string(),
+                span: ts_enum.span,
+              });
+            }
             TsModule(_) => {}
           }
         }
@@ -439,7 +528,13 @@ impl FunctionCompiler {
             MappedName::Register(self.reg_allocator.allocate(&name)),
           );
         }
-        _ => std::panic!("Not implemented: destructuring"),
+        _ => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: destructuring".to_string(),
+            span: decl.span(),
+          });
+        }
       }
     }
   }
@@ -468,8 +563,20 @@ impl FunctionCompiler {
         }
       }
       Empty(_) => {}
-      Debugger(_) => std::panic!("Not implemented: Debugger statement"),
-      With(_) => std::panic!("Not supported: With statement"),
+      Debugger(debugger) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Debugger statement".to_string(),
+          span: debugger.span,
+        });
+      }
+      With(with) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Not supported: With statement".to_string(),
+          span: with.span,
+        });
+      }
 
       Return(ret_stmt) => match &ret_stmt.arg {
         None => {
@@ -490,11 +597,23 @@ impl FunctionCompiler {
         }
       },
 
-      Labeled(_) => std::panic!("Not implemented: Labeled statement"),
+      Labeled(labeled) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Labeled statement".to_string(),
+          span: labeled.span,
+        });
+      }
 
       Break(break_) => {
         if break_.label.is_some() {
-          std::panic!("Not implemented: labeled break statement");
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: labeled break statement".to_string(),
+            span: break_.span,
+          });
+
+          return;
         }
 
         let loop_labels = self
@@ -508,7 +627,13 @@ impl FunctionCompiler {
       }
       Continue(continue_) => {
         if continue_.label.is_some() {
-          std::panic!("Not implemented: labeled continue statement");
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: labeled continue statement".to_string(),
+            span: continue_.span,
+          });
+
+          return;
         }
 
         let loop_labels = self
@@ -570,9 +695,27 @@ impl FunctionCompiler {
           }
         }
       }
-      Switch(_) => std::panic!("Not implemented: Switch statement"),
-      Throw(_) => std::panic!("Not implemented: Throw statement"),
-      Try(_) => std::panic!("Not implemented: Try statement"),
+      Switch(switch) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Switch statement".to_string(),
+          span: switch.span,
+        });
+      }
+      Throw(throw) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Throw statement".to_string(),
+          span: throw.span,
+        });
+      }
+      Try(try_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Try statement".to_string(),
+          span: try_.span,
+        });
+      }
       While(while_) => {
         let start_label = self.label_allocator.allocate_numbered(&"while".to_string());
 
@@ -756,8 +899,16 @@ impl FunctionCompiler {
 
         self.loop_labels.pop();
       }
-      ForIn(_) => std::panic!("Not implemented: ForIn statement"),
-      ForOf(_) => std::panic!("Not implemented: ForOf statement"),
+      ForIn(for_in) => self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: "TODO: ForIn statement".to_string(),
+        span: for_in.span,
+      }),
+      ForOf(for_of) => self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: "TODO: ForOf statement".to_string(),
+        span: for_of.span,
+      }),
       Decl(decl) => {
         self.declaration(decl, scope);
       }
@@ -771,13 +922,29 @@ impl FunctionCompiler {
     use swc_ecma_ast::Decl::*;
 
     match decl {
-      Class(_) => std::panic!("Not implemented: Class declaration"),
+      Class(class) => self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: "TODO: Class declaration".to_string(),
+        span: class.span(),
+      }),
       Fn(_) => {}
       Var(var_decl) => self.var_declaration(var_decl, scope),
-      TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
+      TsInterface(interface_decl) => self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: "TODO: TsInterface declaration".to_string(),
+        span: interface_decl.span,
+      }),
       TsTypeAlias(_) => {}
-      TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
-      TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
+      TsEnum(ts_enum) => self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: "TODO: TsEnum declaration".to_string(),
+        span: ts_enum.span,
+      }),
+      TsModule(ts_module) => self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: "TODO: TsModule declaration".to_string(),
+        span: ts_module.span,
+      }),
     };
   }
 
@@ -792,12 +959,28 @@ impl FunctionCompiler {
 
           let name = match &decl.name {
             swc_ecma_ast::Pat::Ident(ident) => ident.id.sym.to_string(),
-            _ => std::panic!("Not implemented: destructuring"),
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "TODO: destructuring".to_string(),
+                span: decl.span(),
+              });
+
+              return;
+            }
           };
 
           let target_register = match scope.get(&name) {
             Some(MappedName::Register(reg_name)) => reg_name,
-            _ => std::panic!("var decl should always get mapped to a register during scan"),
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "var decl should always get mapped to a register during scan".to_string(),
+                span: decl.span(),
+              });
+
+              return;
+            }
           };
 
           expr_compiler.compile(expr, Some(target_register));
