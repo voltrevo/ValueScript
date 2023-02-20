@@ -1,12 +1,13 @@
-use std::rc::Rc;
+use queues::*;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use queues::*;
+use std::rc::Rc;
 
-use super::name_allocator::NameAllocator;
-use super::expression_compiler::ExpressionCompiler;
-use super::scope::{Scope, MappedName, ScopeTrait, init_std_scope};
 use super::capture_finder::CaptureFinder;
+use super::diagnostic::Diagnostic;
+use super::expression_compiler::ExpressionCompiler;
+use super::name_allocator::NameAllocator;
+use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
@@ -35,6 +36,7 @@ pub struct FunctionCompiler {
   pub label_allocator: NameAllocator,
   pub queue: Queue<QueuedFunction>,
   pub loop_labels: Vec<LoopLabels>,
+  pub diagnostics: Vec<Diagnostic>,
 }
 
 impl FunctionCompiler {
@@ -50,6 +52,7 @@ impl FunctionCompiler {
       label_allocator: NameAllocator::default(),
       queue: Queue::new(),
       loop_labels: vec![],
+      diagnostics: vec![],
     };
   }
 
@@ -59,15 +62,18 @@ impl FunctionCompiler {
     functionish: Functionish,
     definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
-  ) -> Vec<String> {
+  ) -> (Vec<String>, Vec<Diagnostic>) {
     let mut self_ = FunctionCompiler::new(definition_allocator);
 
-    self_.queue.add(QueuedFunction {
-      definition_name: definition_name.clone(),
-      fn_name: fn_name,
-      capture_params: Vec::new(),
-      functionish: functionish,
-    }).expect("Failed to queue function");
+    self_
+      .queue
+      .add(QueuedFunction {
+        definition_name: definition_name.clone(),
+        fn_name: fn_name,
+        capture_params: Vec::new(),
+        functionish: functionish,
+      })
+      .expect("Failed to queue function");
 
     loop {
       match self_.queue.remove() {
@@ -78,11 +84,13 @@ impl FunctionCompiler {
           &qfn.functionish,
           parent_scope,
         ),
-        Err(_) => { break; },
+        Err(_) => {
+          break;
+        }
       }
     }
 
-    return self_.definition;
+    return (self_.definition, self_.diagnostics);
   }
 
   fn compile_functionish(
@@ -100,11 +108,8 @@ impl FunctionCompiler {
 
     match fn_name {
       // TODO: Capture propagation when using this name recursively
-      Some(fn_name_) => scope.set(
-        fn_name_,
-        MappedName::Definition(definition_name.clone()),
-      ),
-      None => {},
+      Some(fn_name_) => scope.set(fn_name_, MappedName::Definition(definition_name.clone())),
+      None => {}
     }
 
     let mut heading = "@".to_string();
@@ -118,8 +123,10 @@ impl FunctionCompiler {
       swc_ecma_ast::Pat::Ident(binding_ident) => {
         let param_name = binding_ident.id.sym.to_string();
         params.push(param_name);
-      },
-      _ => std::panic!("Not implemented: parameter destructuring"),
+      }
+      _ => {
+        std::panic!("Not implemented: parameter destructuring");
+      }
     };
 
     match functionish {
@@ -127,21 +134,21 @@ impl FunctionCompiler {
         for p in &fn_.params {
           handle_param_pat(&p.pat);
         }
-      },
+      }
       Functionish::Arrow(arrow) => {
         for p in &arrow.params {
           handle_param_pat(p);
         }
-      },
+      }
       Functionish::Constructor(constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
               std::panic!("Not implemented (TODO: what is this?)")
-            },
+            }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
               handle_param_pat(&p.pat);
-            },
+            }
           }
         }
       }
@@ -153,10 +160,7 @@ impl FunctionCompiler {
       heading += "%";
       heading += &reg;
 
-      scope.set(
-        params[i].clone(),
-        MappedName::Register(reg),
-      );
+      scope.set(params[i].clone(), MappedName::Register(reg));
 
       if i != params.len() - 1 {
         heading += ", ";
@@ -170,27 +174,25 @@ impl FunctionCompiler {
     let mut handle_block_body = |block: &swc_ecma_ast::BlockStmt| {
       self.populate_fn_scope(block, &scope);
       self.populate_block_scope(block, &scope);
-  
+
       for i in 0..block.stmts.len() {
-        self.statement(
-          &block.stmts[i],
-          i == block.stmts.len() - 1,
-          &scope,
-        );
+        self.statement(&block.stmts[i], i == block.stmts.len() - 1, &scope);
       }
     };
 
     match functionish {
       Functionish::Fn(fn_) => {
-        let block = fn_.body.as_ref()
+        let block = fn_
+          .body
+          .as_ref()
           .expect("Not implemented: function without body");
 
         handle_block_body(block);
-      },
+      }
       Functionish::Arrow(arrow) => match &arrow.body {
         swc_ecma_ast::BlockStmtOrExpr::BlockStmt(block) => {
           handle_block_body(block);
-        },
+        }
         swc_ecma_ast::BlockStmtOrExpr::Expr(expr) => {
           let mut expression_compiler = ExpressionCompiler {
             fnc: self,
@@ -201,70 +203,64 @@ impl FunctionCompiler {
         }
       },
       Functionish::Constructor(constructor) => {
-        let block = constructor.body.as_ref()
+        let block = constructor
+          .body
+          .as_ref()
           .expect("Not implemented: constructor without body");
-        
+
         handle_block_body(block);
-      },
+      }
     }
 
     self.definition.push("}".to_string());
   }
 
-  fn populate_fn_scope(
-    &mut self,
-    block: &swc_ecma_ast::BlockStmt,
-    scope: &Scope,
-  ) {
+  fn populate_fn_scope(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
     for statement in &block.stmts {
       self.populate_fn_scope_statement(statement, scope);
     }
   }
 
-  fn populate_fn_scope_statement(
-    &mut self,
-    statement: &swc_ecma_ast::Stmt,
-    scope: &Scope,
-  ) {
+  fn populate_fn_scope_statement(&mut self, statement: &swc_ecma_ast::Stmt, scope: &Scope) {
     use swc_ecma_ast::Stmt::*;
 
     match statement {
       Block(nested_block) => {
         self.populate_fn_scope(nested_block, scope);
-      },
-      Empty(_) => {},
-      Debugger(_) => {},
+      }
+      Empty(_) => {}
+      Debugger(_) => {}
       With(_) => std::panic!("Not supported: With statement"),
-      Return(_) => {},
+      Return(_) => {}
       Labeled(_) => std::panic!("Not implemented: Labeled statement"),
-      Break(_) => {},
-      Continue(_) => {},
+      Break(_) => {}
+      Continue(_) => {}
       If(if_) => {
         self.populate_fn_scope_statement(&if_.cons, scope);
 
         for stmt in &if_.alt {
           self.populate_fn_scope_statement(stmt, scope);
         }
-      },
+      }
       Switch(_) => std::panic!("Not implemented: Switch statement"),
-      Throw(_) => {},
+      Throw(_) => {}
       Try(_) => std::panic!("Not implemented: Try statement"),
       While(while_) => {
         self.populate_fn_scope_statement(&while_.body, scope);
-      },
+      }
       DoWhile(do_while) => {
         self.populate_fn_scope_statement(&do_while.body, scope);
-      },
+      }
       For(for_) => {
         match &for_.init {
           Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) => {
             self.populate_fn_scope_var_decl(var_decl, scope);
-          },
-          _ => {},
+          }
+          _ => {}
         };
 
         self.populate_fn_scope_statement(&for_.body, scope);
-      },
+      }
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
       ForOf(_) => std::panic!("Not implemented: ForOf statement"),
       Decl(decl) => {
@@ -272,23 +268,19 @@ impl FunctionCompiler {
 
         match decl {
           Class(_) => std::panic!("Not implemented: Class declaration"),
-          Fn(_) => {},
+          Fn(_) => {}
           Var(var_decl) => self.populate_fn_scope_var_decl(var_decl, scope),
-          TsInterface(_) => {},
-          TsTypeAlias(_) => {},
+          TsInterface(_) => {}
+          TsTypeAlias(_) => {}
           TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
           TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
         }
-      },
-      Expr(_) => {},
+      }
+      Expr(_) => {}
     };
   }
 
-  fn populate_fn_scope_var_decl(
-    &mut self,
-    var_decl: &swc_ecma_ast::VarDecl,
-    scope: &Scope,
-  ) {
+  fn populate_fn_scope_var_decl(&mut self, var_decl: &swc_ecma_ast::VarDecl, scope: &Scope) {
     if var_decl.kind != swc_ecma_ast::VarDeclKind::Var {
       return;
     }
@@ -302,54 +294,50 @@ impl FunctionCompiler {
             name.clone(),
             MappedName::Register(self.reg_allocator.allocate(&name)),
           );
-        },
+        }
         _ => std::panic!("Not implemented: destructuring"),
       }
     }
   }
 
-  fn populate_block_scope(
-    &mut self,
-    block: &swc_ecma_ast::BlockStmt,
-    scope: &Scope,
-  ) {
+  fn populate_block_scope(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
     let mut function_decls = Vec::<swc_ecma_ast::FnDecl>::new();
 
     for statement in &block.stmts {
       use swc_ecma_ast::Stmt::*;
 
       match statement {
-        Block(_) => {},
-        Empty(_) => {},
-        Debugger(_) => {},
+        Block(_) => {}
+        Empty(_) => {}
+        Debugger(_) => {}
         With(_) => std::panic!("Not supported: With statement"),
-        Return(_) => {},
+        Return(_) => {}
         Labeled(_) => std::panic!("Not implemented: Labeled statement"),
-        Break(_) => {},
-        Continue(_) => {},
-        If(_) => {},
-        Switch(_) => {},
-        Throw(_) => {},
-        Try(_) => {},
-        While(_) => {},
-        DoWhile(_) => {},
-        For(_) => {},
-        ForIn(_) => {},
-        ForOf(_) => {},
+        Break(_) => {}
+        Continue(_) => {}
+        If(_) => {}
+        Switch(_) => {}
+        Throw(_) => {}
+        Try(_) => {}
+        While(_) => {}
+        DoWhile(_) => {}
+        For(_) => {}
+        ForIn(_) => {}
+        ForOf(_) => {}
         Decl(decl) => {
           use swc_ecma_ast::Decl::*;
-  
+
           match decl {
             Class(_) => std::panic!("Not implemented: Class declaration"),
             Fn(fn_) => function_decls.push(fn_.clone()),
             Var(var_decl) => self.populate_block_scope_var_decl(var_decl, scope),
-            TsInterface(_) => {},
-            TsTypeAlias(_) => {},
+            TsInterface(_) => {}
+            TsTypeAlias(_) => {}
             TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
-            TsModule(_) => {},
+            TsModule(_) => {}
           }
-        },
-        Expr(_) => {},
+        }
+        Expr(_) => {}
       };
     }
 
@@ -372,10 +360,7 @@ impl FunctionCompiler {
       let mut cf = CaptureFinder::new(synth_scope.clone());
       cf.fn_decl(&init_std_scope(), fn_);
 
-      direct_captures_map.insert(
-        fn_.ident.sym.to_string(),
-        cf.ordered_names,
-      );
+      direct_captures_map.insert(fn_.ident.sym.to_string(), cf.ordered_names);
     }
 
     for fn_ in &function_decls {
@@ -384,17 +369,19 @@ impl FunctionCompiler {
 
       let mut cap_queue = Queue::<String>::new();
 
-      for dc in direct_captures_map.get(&fn_.ident.sym.to_string())
+      for dc in direct_captures_map
+        .get(&fn_.ident.sym.to_string())
         .expect("direct captures not found")
       {
-        cap_queue.add(dc.clone())
-          .expect("Failed to add to queue");
+        cap_queue.add(dc.clone()).expect("Failed to add to queue");
       }
 
       loop {
         let cap = match cap_queue.remove() {
           Ok(c) => c,
-          Err(_) => { break; },
+          Err(_) => {
+            break;
+          }
         };
 
         let is_new = full_captures_set.insert(cap.clone());
@@ -407,7 +394,8 @@ impl FunctionCompiler {
 
         for nested_caps in direct_captures_map.get(&cap) {
           for nested_cap in nested_caps {
-            cap_queue.add(nested_cap.clone())
+            cap_queue
+              .add(nested_cap.clone())
               .expect("Failed to add to queue");
           }
         }
@@ -415,11 +403,7 @@ impl FunctionCompiler {
 
       let fn_name = fn_.ident.sym.to_string();
 
-      let definition_name = self
-        .definition_allocator
-        .borrow_mut()
-        .allocate(&fn_name)
-      ;
+      let definition_name = self.definition_allocator.borrow_mut().allocate(&fn_name);
 
       let qf = QueuedFunction {
         definition_name: definition_name,
@@ -428,20 +412,13 @@ impl FunctionCompiler {
         functionish: Functionish::Fn(fn_.function.clone()),
       };
 
-      scope.set(
-        fn_name.clone(),
-        MappedName::QueuedFunction(qf.clone()),
-      );
+      scope.set(fn_name.clone(), MappedName::QueuedFunction(qf.clone()));
 
       self.queue.add(qf).expect("Failed to queue function");
     }
   }
 
-  fn populate_block_scope_var_decl(
-    &mut self,
-    var_decl: &swc_ecma_ast::VarDecl,
-    scope: &Scope,
-  ) {
+  fn populate_block_scope_var_decl(&mut self, var_decl: &swc_ecma_ast::VarDecl, scope: &Scope) {
     if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
       return;
     }
@@ -455,18 +432,13 @@ impl FunctionCompiler {
             name.clone(),
             MappedName::Register(self.reg_allocator.allocate(&name)),
           );
-        },
+        }
         _ => std::panic!("Not implemented: destructuring"),
       }
     }
   }
 
-  fn statement(
-    &mut self,
-    statement: &swc_ecma_ast::Stmt,
-    fn_last: bool,
-    scope: &Scope,
-  ) {
+  fn statement(&mut self, statement: &swc_ecma_ast::Stmt, fn_last: bool, scope: &Scope) {
     use swc_ecma_ast::Stmt::*;
 
     match statement {
@@ -482,14 +454,14 @@ impl FunctionCompiler {
           match mapping {
             MappedName::Register(reg) => {
               self.reg_allocator.release(reg);
-            },
-            MappedName::Definition(_) => {},
-            MappedName::QueuedFunction(_) => {},
-            MappedName::Builtin(_) => {},
+            }
+            MappedName::Definition(_) => {}
+            MappedName::QueuedFunction(_) => {}
+            MappedName::Builtin(_) => {}
           }
         }
-      },
-      Empty(_) => {},
+      }
+      Empty(_) => {}
       Debugger(_) => std::panic!("Not implemented: Debugger statement"),
       With(_) => std::panic!("Not supported: With statement"),
 
@@ -497,7 +469,7 @@ impl FunctionCompiler {
         None => {
           // TODO: Skip if fn_last
           self.definition.push("  end".to_string());
-        },
+        }
         Some(expr) => {
           let mut expression_compiler = ExpressionCompiler {
             fnc: self,
@@ -509,7 +481,7 @@ impl FunctionCompiler {
           if !fn_last {
             self.definition.push("  end".to_string());
           }
-        },
+        }
       },
 
       Labeled(_) => std::panic!("Not implemented: Labeled statement"),
@@ -519,27 +491,29 @@ impl FunctionCompiler {
           std::panic!("Not implemented: labeled break statement");
         }
 
-        let loop_labels = self.loop_labels.last()
-          .expect("break statement outside loop")
-        ;
+        let loop_labels = self
+          .loop_labels
+          .last()
+          .expect("break statement outside loop");
 
-        self.definition.push(
-          format!("  jmp :{}", loop_labels.break_)
-        );
-      },
+        self
+          .definition
+          .push(format!("  jmp :{}", loop_labels.break_));
+      }
       Continue(continue_) => {
         if continue_.label.is_some() {
           std::panic!("Not implemented: labeled continue statement");
         }
 
-        let loop_labels = self.loop_labels.last()
-          .expect("continue statement outside loop")
-        ;
+        let loop_labels = self
+          .loop_labels
+          .last()
+          .expect("continue statement outside loop");
 
-        self.definition.push(
-          format!("  jmp :{}", loop_labels.continue_)
-        );
-      },
+        self
+          .definition
+          .push(format!("  jmp :{}", loop_labels.continue_));
+      }
       If(if_) => {
         let mut expression_compiler = ExpressionCompiler {
           fnc: self,
@@ -576,36 +550,36 @@ impl FunctionCompiler {
         match &if_.alt {
           None => {
             self.definition.push(std::format!("{}:", else_label));
-          },
+          }
           Some(alt) => {
-            let after_else_label = self.label_allocator.allocate_numbered(&"after_else".to_string());
-            self.definition.push(std::format!("  jmp :{}", after_else_label));
+            let after_else_label = self
+              .label_allocator
+              .allocate_numbered(&"after_else".to_string());
+            self
+              .definition
+              .push(std::format!("  jmp :{}", after_else_label));
             self.definition.push(std::format!("{}:", else_label));
             self.statement(&*alt, false, scope);
             self.definition.push(std::format!("{}:", after_else_label));
           }
         }
-      },
+      }
       Switch(_) => std::panic!("Not implemented: Switch statement"),
       Throw(_) => std::panic!("Not implemented: Throw statement"),
       Try(_) => std::panic!("Not implemented: Try statement"),
       While(while_) => {
-        let start_label = self.label_allocator.allocate_numbered(
-          &"while".to_string()
-        );
+        let start_label = self.label_allocator.allocate_numbered(&"while".to_string());
 
-        let end_label = self.label_allocator.allocate_numbered(
-          &"while_end".to_string()
-        );
+        let end_label = self
+          .label_allocator
+          .allocate_numbered(&"while_end".to_string());
 
         self.loop_labels.push(LoopLabels {
           continue_: start_label.clone(),
           break_: end_label.clone(),
         });
 
-        self.definition.push(
-          std::format!("{}:", start_label)
-        );
+        self.definition.push(std::format!("{}:", start_label));
 
         let mut expression_compiler = ExpressionCompiler {
           fnc: self,
@@ -641,31 +615,29 @@ impl FunctionCompiler {
         self.definition.push(std::format!("{}:", end_label));
 
         self.loop_labels.pop();
-      },
+      }
       DoWhile(do_while) => {
-        let start_label = self.label_allocator.allocate_numbered(
-          &"do_while".to_string()
-        );
+        let start_label = self
+          .label_allocator
+          .allocate_numbered(&"do_while".to_string());
 
-        let continue_label = self.label_allocator.allocate_numbered(
-          &"do_while_continue".to_string()
-        );
+        let continue_label = self
+          .label_allocator
+          .allocate_numbered(&"do_while_continue".to_string());
 
-        let end_label = self.label_allocator.allocate_numbered(
-          &"do_while_end".to_string()
-        );
+        let end_label = self
+          .label_allocator
+          .allocate_numbered(&"do_while_end".to_string());
 
         self.loop_labels.push(LoopLabels {
           continue_: continue_label.clone(),
           break_: end_label.clone(),
         });
 
-        self.definition.push(
-          std::format!("{}:", start_label)
-        );
+        self.definition.push(std::format!("{}:", start_label));
 
         self.statement(&*do_while.body, false, scope);
-        
+
         let mut expression_compiler = ExpressionCompiler {
           fnc: self,
           scope: scope,
@@ -677,9 +649,7 @@ impl FunctionCompiler {
           self.reg_allocator.release(&reg);
         }
 
-        self.definition.push(
-          format!("{}:", continue_label)
-        );
+        self.definition.push(format!("{}:", continue_label));
 
         let mut jmpif_instr = "  jmpif ".to_string();
         jmpif_instr += &condition.value_assembly;
@@ -687,49 +657,45 @@ impl FunctionCompiler {
         jmpif_instr += &start_label;
         self.definition.push(jmpif_instr);
 
-        self.definition.push(
-          format!("{}:", end_label)
-        );
+        self.definition.push(format!("{}:", end_label));
 
         self.loop_labels.pop();
-      },
+      }
       For(for_) => {
         let for_scope = scope.nest();
 
         match &for_.init {
           Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) => {
             self.populate_block_scope_var_decl(var_decl, &for_scope);
-          },
-          _ => {},
+          }
+          _ => {}
         }
 
         match &for_.init {
           Some(var_decl_or_expr) => match var_decl_or_expr {
             swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl) => {
               self.var_declaration(var_decl, &for_scope);
-            },
+            }
             swc_ecma_ast::VarDeclOrExpr::Expr(expr) => {
               self.expression(expr, &for_scope);
-            },
+            }
           },
-          None => {},
+          None => {}
         }
 
-        let for_test_label = self.label_allocator.allocate_numbered(
-          &"for_test".to_string()
-        );
+        let for_test_label = self
+          .label_allocator
+          .allocate_numbered(&"for_test".to_string());
 
-        let for_continue_label = self.label_allocator.allocate_numbered(
-          &"for_continue".to_string()
-        );
+        let for_continue_label = self
+          .label_allocator
+          .allocate_numbered(&"for_continue".to_string());
 
-        let for_end_label = self.label_allocator.allocate_numbered(
-          &"for_end".to_string()
-        );
+        let for_end_label = self
+          .label_allocator
+          .allocate_numbered(&"for_end".to_string());
 
-        self.definition.push(
-          format!("{}:", &for_test_label)
-        );
+        self.definition.push(format!("{}:", &for_test_label));
 
         self.loop_labels.push(LoopLabels {
           continue_: for_continue_label.clone(),
@@ -742,9 +708,9 @@ impl FunctionCompiler {
               fnc: self,
               scope: &for_scope,
             };
-    
+
             let condition = ec.compile(cond, None);
-    
+
             for reg in condition.nested_registers {
               self.reg_allocator.release(&reg);
             }
@@ -765,65 +731,51 @@ impl FunctionCompiler {
             self.definition.push(jmpif_instr);
 
             self.reg_allocator.release(&cond_reg);
-          },
-          None => {},
+          }
+          None => {}
         }
 
         self.statement(&for_.body, false, &for_scope);
 
-        self.definition.push(
-          format!("{}:", for_continue_label)
-        );
+        self.definition.push(format!("{}:", for_continue_label));
 
         match &for_.update {
           Some(update) => self.expression(update, &for_scope),
-          None => {},
+          None => {}
         }
 
-        self.definition.push(
-          format!("  jmp :{}", for_test_label)
-        );
+        self.definition.push(format!("  jmp :{}", for_test_label));
 
-        self.definition.push(
-          format!("{}:", for_end_label)
-        );
+        self.definition.push(format!("{}:", for_end_label));
 
         self.loop_labels.pop();
-      },
+      }
       ForIn(_) => std::panic!("Not implemented: ForIn statement"),
       ForOf(_) => std::panic!("Not implemented: ForOf statement"),
       Decl(decl) => {
         self.declaration(decl, scope);
-      },
+      }
       Expr(expr) => {
         self.expression(&expr.expr, scope);
-      },
+      }
     }
   }
 
-  fn declaration(
-    &mut self,
-    decl: &swc_ecma_ast::Decl,
-    scope: &Scope,
-  ) {
+  fn declaration(&mut self, decl: &swc_ecma_ast::Decl, scope: &Scope) {
     use swc_ecma_ast::Decl::*;
 
     match decl {
       Class(_) => std::panic!("Not implemented: Class declaration"),
-      Fn(_) => {},
+      Fn(_) => {}
       Var(var_decl) => self.var_declaration(var_decl, scope),
       TsInterface(_) => std::panic!("Not implemented: TsInterface declaration"),
-      TsTypeAlias(_) => {},
+      TsTypeAlias(_) => {}
       TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
       TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
     };
   }
 
-  fn var_declaration(
-    &mut self,
-    var_decl: &swc_ecma_ast::VarDecl,
-    scope: &Scope,
-  ) {
+  fn var_declaration(&mut self, var_decl: &swc_ecma_ast::VarDecl, scope: &Scope) {
     for decl in &var_decl.decls {
       match &decl.init {
         Some(expr) => {
@@ -843,26 +795,20 @@ impl FunctionCompiler {
           };
 
           expr_compiler.compile(expr, Some(target_register));
-        },
-        None => {},
+        }
+        None => {}
       }
     }
   }
 
-  fn expression(
-    &mut self,
-    expr: &swc_ecma_ast::Expr,
-    scope: &Scope,
-  ) {
+  fn expression(&mut self, expr: &swc_ecma_ast::Expr, scope: &Scope) {
     let mut expression_compiler = ExpressionCompiler {
       fnc: self,
       scope: scope,
     };
 
     let compiled = expression_compiler.compile(
-      expr,
-
-      // FIXME: Specify the ignore register instead
+      expr, // FIXME: Specify the ignore register instead
       None,
     );
 

@@ -768,13 +768,16 @@ impl Compiler {
     definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) {
-    self.definitions.push(FunctionCompiler::compile(
+    let (defn, mut diagnostics) = FunctionCompiler::compile(
       defn_name,
       fn_name,
       functionish,
       definition_allocator,
       parent_scope,
-    ));
+    );
+
+    self.definitions.push(defn);
+    self.diagnostics.append(&mut diagnostics);
   }
 
   fn compile_class_decl(
