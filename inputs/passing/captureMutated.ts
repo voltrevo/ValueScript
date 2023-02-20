@@ -1,9 +1,9 @@
 export default function main() {
   let x = 0;
-  x++;
+  x++; // Should fail compilation due to capture on line 6
 
   function foo() {
-    return x; // Should fail compilation due to capture on line 3
+    return x;
   }
 
   return foo();
