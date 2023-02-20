@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
+use swc_common::Spanned;
+
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::scope::Builtin;
 
@@ -519,7 +521,7 @@ impl ScopeAnalysis {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "Pattern expression not expected in this context".to_string(),
-          span: get_expr_span(expr),
+          span: expr.span(),
         });
       }
       Pat::Invalid(invalid) => {
@@ -597,7 +599,7 @@ impl ScopeAnalysis {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "Pattern expression not expected in declarator".to_string(),
-          span: get_expr_span(expr),
+          span: expr.span(),
         });
       }
     }
@@ -854,14 +856,14 @@ impl ScopeAnalysis {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
-          span: get_expr_span(expr),
+          span: expr.span(),
         });
       }
       Expr::JSXNamespacedName(_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
-          span: get_expr_span(expr),
+          span: expr.span(),
         });
       }
       Expr::JSXEmpty(_) => {}
@@ -1066,7 +1068,7 @@ impl ScopeAnalysis {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
-          span: get_expr_span(expr),
+          span: expr.span(),
         });
       }
       Expr::Yield(yield_) => {
@@ -1087,14 +1089,14 @@ impl ScopeAnalysis {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
-          span: get_expr_span(expr),
+          span: expr.span(),
         });
       }
       Expr::JSXNamespacedName(_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
-          span: get_expr_span(expr),
+          span: expr.span(),
         });
       }
       Expr::JSXEmpty(_) => {}
@@ -1603,58 +1605,4 @@ fn init_std_scope() -> XScope {
     parent: None,
   }))
   .nest(None);
-}
-
-fn get_expr_span(expr: &swc_ecma_ast::Expr) -> swc_common::Span {
-  use swc_ecma_ast::Expr;
-
-  match expr {
-    Expr::This(this) => this.span,
-    Expr::Ident(ident) => ident.span,
-    Expr::Lit(lit) => match lit {
-      swc_ecma_ast::Lit::Str(str_lit) => str_lit.span,
-      swc_ecma_ast::Lit::Bool(bool_lit) => bool_lit.span,
-      swc_ecma_ast::Lit::Null(null_lit) => null_lit.span,
-      swc_ecma_ast::Lit::Num(num_lit) => num_lit.span,
-      swc_ecma_ast::Lit::BigInt(big_int_lit) => big_int_lit.span,
-      swc_ecma_ast::Lit::Regex(regex_lit) => regex_lit.span,
-      swc_ecma_ast::Lit::JSXText(jsx_text_lit) => jsx_text_lit.span,
-    },
-    Expr::Array(array) => array.span,
-    Expr::Object(object) => object.span,
-    Expr::Fn(fn_expr) => fn_expr.function.span,
-    Expr::Unary(unary) => unary.span,
-    Expr::Update(update) => update.span,
-    Expr::Bin(bin) => bin.span,
-    Expr::Assign(assign) => assign.span,
-    Expr::Member(member) => member.span,
-    Expr::Cond(cond) => cond.span,
-    Expr::Call(call) => call.span,
-    Expr::New(new) => new.span,
-    Expr::Seq(seq) => seq.span,
-    Expr::Paren(paren) => paren.span,
-    Expr::Yield(yield_expr) => yield_expr.span,
-    Expr::Await(await_expr) => await_expr.span,
-    Expr::MetaProp(meta_prop) => meta_prop.span,
-    Expr::Tpl(tpl) => tpl.span,
-    Expr::TaggedTpl(tagged_tpl) => tagged_tpl.span,
-    Expr::Arrow(arrow) => arrow.span,
-    Expr::Class(class) => class.class.span,
-    Expr::Invalid(invalid) => invalid.span,
-    Expr::JSXMember(_) => std::panic!("TODO: span of JSXMember"),
-    Expr::JSXNamespacedName(_) => {
-      std::panic!("TODO: span of JSXNamespacedName")
-    }
-    Expr::JSXEmpty(jsx_empty) => jsx_empty.span,
-    Expr::JSXElement(jsx_element) => jsx_element.span,
-    Expr::JSXFragment(jsx_fragment) => jsx_fragment.span,
-    Expr::TsTypeAssertion(ts_type_assertion) => ts_type_assertion.span,
-    Expr::TsConstAssertion(ts_const_assertion) => ts_const_assertion.span,
-    Expr::TsNonNull(ts_non_null) => ts_non_null.span,
-    Expr::OptChain(opt_chain) => opt_chain.span,
-    Expr::SuperProp(super_prop) => super_prop.span,
-    Expr::TsAs(ts_as) => ts_as.span,
-    Expr::PrivateName(private_name) => private_name.span,
-    Expr::TsInstantiation(ts_instantiation) => ts_instantiation.span,
-  }
 }

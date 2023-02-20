@@ -6,10 +6,9 @@ use std::rc::Rc;
 use std::{path::Path, sync::Arc};
 
 use swc_common::errors::{DiagnosticBuilder, Emitter};
-use swc_common::FileName;
 use swc_common::{
   errors::{ColorConfig, Handler},
-  SourceMap,
+  FileName, SourceMap, Spanned,
 };
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
@@ -520,7 +519,7 @@ impl Compiler {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO: non-default module declaration".to_string(),
-          span: get_module_decl_span(module_decl),
+          span: module_decl.span(),
         });
       }
     }
@@ -912,21 +911,5 @@ impl Compiler {
     defn.push("})".to_string());
 
     self.definitions.push(defn);
-  }
-}
-
-fn get_module_decl_span(module_decl: &swc_ecma_ast::ModuleDecl) -> swc_common::Span {
-  use swc_ecma_ast::ModuleDecl::*;
-
-  match module_decl {
-    Import(import) => import.span,
-    ExportAll(export_all) => export_all.span,
-    ExportDecl(export_decl) => export_decl.span,
-    ExportDefaultDecl(export_default_decl) => export_default_decl.span,
-    ExportDefaultExpr(export_default_expr) => export_default_expr.span,
-    ExportNamed(export_named) => export_named.span,
-    TsImportEquals(ts_import_equals) => ts_import_equals.span,
-    TsExportAssignment(ts_export_assignment) => ts_export_assignment.span,
-    TsNamespaceExport(ts_namespace_export) => ts_namespace_export.span,
   }
 }

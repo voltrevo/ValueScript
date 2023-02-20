@@ -3,8 +3,10 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+use swc_common::Spanned;
+
 use super::capture_finder::CaptureFinder;
-use super::diagnostic::Diagnostic;
+use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::expression_compiler::ExpressionCompiler;
 use super::name_allocator::NameAllocator;
 use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
@@ -125,7 +127,11 @@ impl FunctionCompiler {
         params.push(param_name);
       }
       _ => {
-        std::panic!("Not implemented: parameter destructuring");
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: parameter destructuring".to_string(),
+          span: pat.span(),
+        });
       }
     };
 
