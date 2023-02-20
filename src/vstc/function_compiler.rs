@@ -58,6 +58,14 @@ impl FunctionCompiler {
     };
   }
 
+  fn todo(&mut self, span: swc_common::Span, message: &str) {
+    self.diagnostics.push(Diagnostic {
+      level: DiagnosticLevel::InternalError,
+      message: format!("TODO: {}", message),
+      span: span,
+    });
+  }
+
   pub fn compile(
     definition_name: String,
     fn_name: Option<String>,
@@ -150,13 +158,10 @@ impl FunctionCompiler {
       Functionish::Constructor(constructor) => {
         for potspp in &constructor.params {
           match potspp {
-            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "TODO: TypeScript parameter properties (what are these?)".to_string(),
-                span: ts_param_prop.span(),
-              });
-            }
+            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => self.todo(
+              ts_param_prop.span(),
+              "TypeScript parameter properties (what are these?)",
+            ),
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
               handle_param_pat(&p.pat, &mut self.diagnostics);
             }
@@ -197,13 +202,10 @@ impl FunctionCompiler {
           Some(block) => {
             handle_block_body(block);
           }
-          None => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: function without body".to_string(),
-              span: fn_.span(),
-            });
-          }
+          None => self.todo(
+            fn_.span(),
+            "function without body (abstract/interface method?)",
+          ),
         };
       }
       Functionish::Arrow(arrow) => match &arrow.body {
@@ -224,13 +226,7 @@ impl FunctionCompiler {
           Some(block) => {
             handle_block_body(block);
           }
-          None => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: constructor without body".to_string(),
-              span: constructor.span(),
-            });
-          }
+          None => self.todo(constructor.span(), "constructor without body"),
         };
       }
     }
@@ -261,13 +257,7 @@ impl FunctionCompiler {
         });
       }
       Return(_) => {}
-      Labeled(labeled) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Labeled statement".to_string(),
-          span: labeled.span(),
-        });
-      }
+      Labeled(labeled) => self.todo(labeled.span, "Labeled statement"),
       Break(_) => {}
       Continue(_) => {}
       If(if_) => {
@@ -277,21 +267,9 @@ impl FunctionCompiler {
           self.populate_fn_scope_statement(stmt, scope);
         }
       }
-      Switch(switch) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Switch statement".to_string(),
-          span: switch.span,
-        });
-      }
+      Switch(switch) => self.todo(switch.span, "Switch statement"),
       Throw(_) => {}
-      Try(try_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Try statement".to_string(),
-          span: try_.span,
-        });
-      }
+      Try(try_) => self.todo(try_.span, "Try statement"),
       While(while_) => {
         self.populate_fn_scope_statement(&while_.body, scope);
       }
@@ -308,49 +286,19 @@ impl FunctionCompiler {
 
         self.populate_fn_scope_statement(&for_.body, scope);
       }
-      ForIn(for_in) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: ForIn statement".to_string(),
-          span: for_in.span,
-        });
-      }
-      ForOf(for_of) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: ForOf statement".to_string(),
-          span: for_of.span,
-        });
-      }
+      ForIn(for_in) => self.todo(for_in.span, "ForIn statement"),
+      ForOf(for_of) => self.todo(for_of.span, "ForOf statement"),
       Decl(decl) => {
         use swc_ecma_ast::Decl::*;
 
         match decl {
-          Class(class) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: Class declaration".to_string(),
-              span: class.span(),
-            });
-          }
+          Class(class) => self.todo(class.span(), "Class declaration"),
           Fn(_) => {}
           Var(var_decl) => self.populate_fn_scope_var_decl(var_decl, scope),
           TsInterface(_) => {}
           TsTypeAlias(_) => {}
-          TsEnum(ts_enum) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: TsEnum declaration".to_string(),
-              span: ts_enum.span,
-            });
-          }
-          TsModule(ts_module) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: TsModule declaration".to_string(),
-              span: ts_module.span,
-            });
-          }
+          TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
+          TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration"),
         }
       }
       Expr(_) => {}
@@ -372,13 +320,7 @@ impl FunctionCompiler {
             MappedName::Register(self.reg_allocator.allocate(&name)),
           );
         }
-        _ => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: destructuring".to_string(),
-            span: var_decl.span(),
-          });
-        }
+        _ => self.todo(var_decl.span(), "destructuring"),
       }
     }
   }
@@ -395,19 +337,13 @@ impl FunctionCompiler {
         Debugger(_) => {}
         With(_) => {
           self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: With statement".to_string(),
+            level: DiagnosticLevel::Error,
+            message: "Not supported: With statement".to_string(),
             span: statement.span(),
           });
         }
         Return(_) => {}
-        Labeled(_) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: Labeled statement".to_string(),
-            span: statement.span(),
-          });
-        }
+        Labeled(labeled) => self.todo(labeled.span, "Labeled statement"),
         Break(_) => {}
         Continue(_) => {}
         If(_) => {}
@@ -423,24 +359,12 @@ impl FunctionCompiler {
           use swc_ecma_ast::Decl::*;
 
           match decl {
-            Class(class) => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "TODO: Class declaration".to_string(),
-                span: class.span(),
-              });
-            }
+            Class(class) => self.todo(class.span(), "Class declaration"),
             Fn(fn_) => function_decls.push(fn_.clone()),
             Var(var_decl) => self.populate_block_scope_var_decl(var_decl, scope),
             TsInterface(_) => {}
             TsTypeAlias(_) => {}
-            TsEnum(ts_enum) => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "TODO: TsEnum declaration".to_string(),
-                span: ts_enum.span,
-              });
-            }
+            TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
             TsModule(_) => {}
           }
         }
@@ -484,14 +408,11 @@ impl FunctionCompiler {
             cap_queue.add(dc.clone()).expect("Failed to add to queue");
           }
         }
-        None => {
-          // code to add diagnostic below:
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "Direct captures not found".to_string(),
-            span: fn_.ident.span,
-          });
-        }
+        None => self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "Direct captures not found".to_string(),
+          span: fn_.ident.span,
+        }),
       }
 
       loop {
@@ -551,13 +472,7 @@ impl FunctionCompiler {
             MappedName::Register(self.reg_allocator.allocate(&name)),
           );
         }
-        _ => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: destructuring".to_string(),
-            span: decl.span(),
-          });
-        }
+        _ => self.todo(decl.span(), "destructuring"),
       }
     }
   }
@@ -586,13 +501,7 @@ impl FunctionCompiler {
         }
       }
       Empty(_) => {}
-      Debugger(debugger) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Debugger statement".to_string(),
-          span: debugger.span,
-        });
-      }
+      Debugger(debugger) => self.todo(debugger.span, "Debugger statement"),
       With(with) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
@@ -620,21 +529,11 @@ impl FunctionCompiler {
         }
       },
 
-      Labeled(labeled) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Labeled statement".to_string(),
-          span: labeled.span,
-        });
-      }
+      Labeled(labeled) => self.todo(labeled.span, "Labeled statement"),
 
       Break(break_) => {
         if break_.label.is_some() {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: labeled break statement".to_string(),
-            span: break_.span,
-          });
+          self.todo(break_.span, "labeled break statement");
 
           return;
         }
@@ -658,11 +557,7 @@ impl FunctionCompiler {
       }
       Continue(continue_) => {
         if continue_.label.is_some() {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: labeled continue statement".to_string(),
-            span: continue_.span,
-          });
+          self.todo(continue_.span, "labeled continue statement");
 
           return;
         }
@@ -732,27 +627,9 @@ impl FunctionCompiler {
           }
         }
       }
-      Switch(switch) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Switch statement".to_string(),
-          span: switch.span,
-        });
-      }
-      Throw(throw) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Throw statement".to_string(),
-          span: throw.span,
-        });
-      }
-      Try(try_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Try statement".to_string(),
-          span: try_.span,
-        });
-      }
+      Switch(switch) => self.todo(switch.span, "Switch statement"),
+      Throw(throw) => self.todo(throw.span, "Throw statement"),
+      Try(try_) => self.todo(try_.span, "Try statement"),
       While(while_) => {
         let start_label = self.label_allocator.allocate_numbered(&"while".to_string());
 
@@ -936,16 +813,8 @@ impl FunctionCompiler {
 
         self.loop_labels.pop();
       }
-      ForIn(for_in) => self.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: "TODO: ForIn statement".to_string(),
-        span: for_in.span,
-      }),
-      ForOf(for_of) => self.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: "TODO: ForOf statement".to_string(),
-        span: for_of.span,
-      }),
+      ForIn(for_in) => self.todo(for_in.span, "ForIn statement"),
+      ForOf(for_of) => self.todo(for_of.span, "ForOf statement"),
       Decl(decl) => {
         self.declaration(decl, scope);
       }
@@ -959,29 +828,13 @@ impl FunctionCompiler {
     use swc_ecma_ast::Decl::*;
 
     match decl {
-      Class(class) => self.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: "TODO: Class declaration".to_string(),
-        span: class.span(),
-      }),
+      Class(class) => self.todo(class.span(), "Class declaration"),
       Fn(_) => {}
       Var(var_decl) => self.var_declaration(var_decl, scope),
-      TsInterface(interface_decl) => self.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: "TODO: TsInterface declaration".to_string(),
-        span: interface_decl.span,
-      }),
+      TsInterface(interface_decl) => self.todo(interface_decl.span, "TsInterface declaration"),
       TsTypeAlias(_) => {}
-      TsEnum(ts_enum) => self.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: "TODO: TsEnum declaration".to_string(),
-        span: ts_enum.span,
-      }),
-      TsModule(ts_module) => self.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: "TODO: TsModule declaration".to_string(),
-        span: ts_module.span,
-      }),
+      TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
+      TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration"),
     };
   }
 
@@ -997,11 +850,7 @@ impl FunctionCompiler {
           let name = match &decl.name {
             swc_ecma_ast::Pat::Ident(ident) => ident.id.sym.to_string(),
             _ => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "TODO: destructuring".to_string(),
-                span: decl.span(),
-              });
+              self.todo(decl.span(), "destructuring");
 
               return;
             }
@@ -1010,11 +859,10 @@ impl FunctionCompiler {
           let target_register = match scope.get(&name) {
             Some(MappedName::Register(reg_name)) => reg_name,
             _ => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "var decl should always get mapped to a register during scan".to_string(),
-                span: decl.span(),
-              });
+              self.todo(
+                decl.span(),
+                "var decl should always get mapped to a register during scan",
+              );
 
               return;
             }
