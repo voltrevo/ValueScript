@@ -63,6 +63,8 @@ impl ScopeAnalysis {
       );
     }
 
+    sa.module_level_hoists(&scope, module);
+
     for module_item in &module.body {
       sa.module_item(&scope, module_item);
     }
@@ -156,9 +158,7 @@ impl ScopeAnalysis {
 
     match module_item {
       ModuleItem::ModuleDecl(module_decl) => match module_decl {
-        ModuleDecl::Import(import_decl) => {
-          self.import_decl(&scope, import_decl);
-        }
+        ModuleDecl::Import(_) => {}
         ModuleDecl::ExportDecl(ed) => {
           self.decl(&scope, &ed.decl);
         }
@@ -280,6 +280,83 @@ impl ScopeAnalysis {
     }
   }
 
+  fn module_level_hoists(&mut self, scope: &XScope, module: &swc_ecma_ast::Module) {
+    for item in &module.body {
+      self.module_level_hoists_item(scope, item);
+    }
+  }
+
+  fn module_level_hoists_item(&mut self, scope: &XScope, module_item: &swc_ecma_ast::ModuleItem) {
+    use swc_ecma_ast::ModuleDecl;
+    use swc_ecma_ast::ModuleItem;
+
+    match module_item {
+      ModuleItem::ModuleDecl(module_decl) => match module_decl {
+        ModuleDecl::Import(import_decl) => {
+          self.import_decl(&scope, import_decl);
+        }
+        ModuleDecl::ExportDecl(ed) => match &ed.decl {
+          swc_ecma_ast::Decl::Class(class_decl) => {
+            self.insert_name(&scope, NameType::Class, &class_decl.ident);
+          }
+          swc_ecma_ast::Decl::Fn(fn_decl) => {
+            self.insert_name(&scope, NameType::Function, &fn_decl.ident);
+          }
+          swc_ecma_ast::Decl::Var(var_decl) => {
+            let name_type = match var_decl.kind {
+              swc_ecma_ast::VarDeclKind::Const => NameType::Const,
+              swc_ecma_ast::VarDeclKind::Let => NameType::Let,
+              swc_ecma_ast::VarDeclKind::Var => NameType::Var,
+            };
+
+            for decl in &var_decl.decls {
+              for ident in self.get_pat_idents(&decl.name) {
+                self.insert_name(&scope, name_type, &ident);
+              }
+            }
+          }
+          swc_ecma_ast::Decl::TsInterface(_) => {}
+          swc_ecma_ast::Decl::TsTypeAlias(_) => {}
+          swc_ecma_ast::Decl::TsEnum(_) => {
+            // Diagnostic emitted after hoist processing
+          }
+          swc_ecma_ast::Decl::TsModule(_) => {
+            // Diagnostic emitted after hoist processing
+          }
+        },
+        ModuleDecl::ExportNamed(_) => {}
+        ModuleDecl::ExportDefaultDecl(edd) => match &edd.decl {
+          swc_ecma_ast::DefaultDecl::Class(class_decl) => {
+            if let Some(ident) = &class_decl.ident {
+              self.insert_name(&scope, NameType::Class, ident);
+            }
+          }
+          swc_ecma_ast::DefaultDecl::Fn(fn_decl) => {
+            if let Some(ident) = &fn_decl.ident {
+              self.insert_name(&scope, NameType::Function, ident);
+            }
+          }
+          swc_ecma_ast::DefaultDecl::TsInterfaceDecl(_) => {}
+        },
+        ModuleDecl::ExportDefaultExpr(_) => {}
+        ModuleDecl::ExportAll(_) => {}
+        ModuleDecl::TsImportEquals(_) => {
+          // Diagnostic emitted after hoist processing
+        }
+        ModuleDecl::TsExportAssignment(_) => {
+          // Diagnostic emitted after hoist processing
+        }
+        ModuleDecl::TsNamespaceExport(_) => {
+          // Diagnostic emitted after hoist processing
+        }
+      },
+      ModuleItem::Stmt(stmt) => {
+        self.function_level_hoists_stmt(&scope, stmt);
+        self.block_level_hoists_stmt(&scope, stmt);
+      }
+    };
+  }
+
   fn function_level_hoists(&mut self, scope: &XScope, block: &swc_ecma_ast::BlockStmt) {
     for stmt in &block.stmts {
       self.function_level_hoists_stmt(scope, stmt);
@@ -368,19 +445,11 @@ impl ScopeAnalysis {
         }
         Decl::TsInterface(_) => {}
         Decl::TsTypeAlias(_) => {}
-        Decl::TsEnum(ts_enum) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: Implement TsEnum declarations".to_string(),
-            span: ts_enum.span,
-          });
+        Decl::TsEnum(_) => {
+          // Diagnostic emitted after hoist processing
         }
-        Decl::TsModule(ts_module) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: "TsModule declaration is not supported".to_string(),
-            span: ts_module.span,
-          });
+        Decl::TsModule(_) => {
+          // Diagnostic emitted after hoist processing
         }
       },
       _ => {}
