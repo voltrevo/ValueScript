@@ -15,7 +15,7 @@ pub struct Capture {
   captor_id: OwnerId,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum NameType {
   Var,
   Let,
@@ -49,8 +49,57 @@ impl ScopeAnalysis {
     let mut sa = ScopeAnalysis::default();
     let scope = init_std_scope();
 
+    for builtin in vec![Builtin::Debug, Builtin::Math] {
+      sa.names.insert(
+        NameId::Builtin(builtin),
+        Name {
+          id: NameId::Builtin(builtin),
+          owner_id: OwnerId::Module,
+          sym: swc_atoms::JsWord::from(format!("{}", builtin)),
+          type_: NameType::Builtin,
+          mutations: vec![],
+          captures: vec![],
+        },
+      );
+    }
+
     for module_item in &module.body {
       sa.module_item(&scope, module_item);
+    }
+
+    for (name_id, name) in &sa.names {
+      if name.captures.len() > 0 {
+        if name.type_ == NameType::Let {
+          match name_id {
+            NameId::Span(span) => {
+              sa.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::Lint,
+                message: format!(
+                  "`{}` should be declared using `const` because it is implicitly \
+                  const due to capture",
+                  name.sym
+                ),
+                span: *span,
+              });
+            }
+            NameId::Builtin(_) => {
+              sa.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "Builtin should not have type_ let".to_string(),
+                span: swc_common::DUMMY_SP,
+              });
+            }
+          }
+        }
+
+        for mutation in &name.mutations {
+          sa.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: format!("Cannot mutate captured variable `{}`", name.sym),
+            span: *mutation,
+          });
+        }
+      }
     }
 
     return sa;

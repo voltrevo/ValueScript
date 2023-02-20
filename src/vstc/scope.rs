@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use super::function_compiler::QueuedFunction;
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Builtin {
   Math,
   Debug,
