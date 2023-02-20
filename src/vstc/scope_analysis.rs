@@ -229,11 +229,9 @@ impl ScopeAnalysis {
 
     match decl {
       Decl::Class(class_decl) => {
-        self.insert_name(scope, NameType::Class, &class_decl.ident);
         self.class_(scope, &Some(class_decl.ident.clone()), &class_decl.class);
       }
       Decl::Fn(fn_decl) => {
-        self.insert_name(scope, NameType::Function, &fn_decl.ident);
         self.function(scope, &Some(fn_decl.ident.clone()), &fn_decl.function);
       }
       Decl::Var(var_decl) => {
@@ -268,8 +266,8 @@ impl ScopeAnalysis {
   ) {
     let child_scope = scope.nest(Some(OwnerId::Span(function.span.clone())));
 
-    for n in name {
-      self.insert_name(&child_scope, NameType::Function, n);
+    if let Some(name) = name {
+      self.insert_name(&child_scope, NameType::Function, name);
     }
 
     for param in &function.params {
@@ -277,7 +275,191 @@ impl ScopeAnalysis {
     }
 
     for body in &function.body {
+      self.function_level_hoists(&child_scope, &body);
       self.block_stmt(&child_scope, &body);
+    }
+  }
+
+  fn function_level_hoists(&mut self, scope: &XScope, block: &swc_ecma_ast::BlockStmt) {
+    for stmt in &block.stmts {
+      self.function_level_hoists_stmt(scope, stmt);
+    }
+  }
+
+  fn function_level_hoists_stmt(&mut self, scope: &XScope, stmt: &swc_ecma_ast::Stmt) {
+    use swc_ecma_ast::Decl;
+    use swc_ecma_ast::Stmt;
+
+    match stmt {
+      Stmt::Decl(decl) => match decl {
+        Decl::Var(var_decl) => {
+          if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
+            for decl in &var_decl.decls {
+              for ident in self.get_pat_idents(&decl.name) {
+                self.insert_name(scope, NameType::Var, &ident);
+              }
+            }
+          }
+        }
+        _ => {}
+      },
+      Stmt::Block(block_stmt) => {
+        for stmt in &block_stmt.stmts {
+          self.function_level_hoists_stmt(scope, stmt);
+        }
+      }
+      Stmt::For(for_) => {
+        if let Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) = &for_.init {
+          if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
+            for decl in &var_decl.decls {
+              for ident in self.get_pat_idents(&decl.name) {
+                self.insert_name(scope, NameType::Var, &ident);
+              }
+            }
+          }
+        }
+      }
+      Stmt::ForIn(for_in) => {
+        if let swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) = &for_in.left {
+          if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
+            for decl in &var_decl.decls {
+              for ident in self.get_pat_idents(&decl.name) {
+                self.insert_name(scope, NameType::Var, &ident);
+              }
+            }
+          }
+        }
+      }
+      Stmt::ForOf(for_of) => {
+        if let swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) = &for_of.left {
+          if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
+            for decl in &var_decl.decls {
+              for ident in self.get_pat_idents(&decl.name) {
+                self.insert_name(scope, NameType::Var, &ident);
+              }
+            }
+          }
+        }
+      }
+      _ => {}
+    }
+  }
+
+  fn block_level_hoists(&mut self, scope: &XScope, block: &swc_ecma_ast::BlockStmt) {
+    for stmt in &block.stmts {
+      self.block_level_hoists_stmt(scope, stmt);
+    }
+  }
+
+  fn block_level_hoists_stmt(&mut self, scope: &XScope, stmt: &swc_ecma_ast::Stmt) {
+    use swc_ecma_ast::Decl;
+    use swc_ecma_ast::Stmt;
+
+    match stmt {
+      Stmt::Decl(decl) => match decl {
+        Decl::Class(class) => {
+          self.insert_name(scope, NameType::Class, &class.ident);
+        }
+        Decl::Fn(fn_) => {
+          self.insert_name(scope, NameType::Function, &fn_.ident);
+        }
+        Decl::Var(var_decl) => {
+          self.block_level_hoists_var_decl(scope, var_decl);
+        }
+        Decl::TsInterface(_) => {}
+        Decl::TsTypeAlias(_) => {}
+        Decl::TsEnum(ts_enum) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: Implement TsEnum declarations".to_string(),
+            span: ts_enum.span,
+          });
+        }
+        Decl::TsModule(ts_module) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: "TsModule declaration is not supported".to_string(),
+            span: ts_module.span,
+          });
+        }
+      },
+      _ => {}
+    }
+  }
+
+  fn block_level_hoists_var_decl(&mut self, scope: &XScope, var_decl: &swc_ecma_ast::VarDecl) {
+    let name_type = match var_decl.kind {
+      swc_ecma_ast::VarDeclKind::Var => return,
+      swc_ecma_ast::VarDeclKind::Let => NameType::Let,
+      swc_ecma_ast::VarDeclKind::Const => NameType::Const,
+    };
+
+    for decl in &var_decl.decls {
+      for ident in self.get_pat_idents(&decl.name) {
+        self.insert_name(scope, name_type, &ident);
+      }
+    }
+  }
+
+  fn get_pat_idents(&mut self, pat: &swc_ecma_ast::Pat) -> Vec<swc_ecma_ast::Ident> {
+    let mut idents = Vec::new();
+    self.get_pat_idents_impl(&mut idents, pat);
+    idents
+  }
+
+  fn get_pat_idents_impl(
+    &mut self,
+    idents: &mut Vec<swc_ecma_ast::Ident>,
+    pat: &swc_ecma_ast::Pat,
+  ) {
+    use swc_ecma_ast::Pat;
+
+    match pat {
+      Pat::Ident(ident) => {
+        idents.push(ident.id.clone());
+      }
+      Pat::Array(array_pat) => {
+        for elem in &array_pat.elems {
+          if let Some(elem) = elem {
+            self.get_pat_idents_impl(idents, elem);
+          }
+        }
+      }
+      Pat::Rest(rest_pat) => {
+        self.get_pat_idents_impl(idents, &rest_pat.arg);
+      }
+      Pat::Object(object_pat) => {
+        for prop in &object_pat.props {
+          match prop {
+            swc_ecma_ast::ObjectPatProp::KeyValue(key_value) => {
+              self.get_pat_idents_impl(idents, &key_value.value);
+            }
+            swc_ecma_ast::ObjectPatProp::Assign(assign) => {
+              idents.push(assign.key.clone());
+            }
+            swc_ecma_ast::ObjectPatProp::Rest(rest) => {
+              self.get_pat_idents_impl(idents, &rest.arg);
+            }
+          }
+        }
+      }
+      Pat::Assign(assign_pat) => {
+        self.get_pat_idents_impl(idents, &assign_pat.left);
+      }
+      Pat::Expr(expr) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Implement Expr".to_string(),
+          span: get_expr_span(expr),
+        });
+      }
+      Pat::Invalid(invalid) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Invalid pattern".to_string(),
+          span: invalid.span,
+        });
+      }
     }
   }
 
@@ -302,9 +484,7 @@ impl ScopeAnalysis {
     use swc_ecma_ast::Pat;
 
     match pat {
-      Pat::Ident(ident) => {
-        self.insert_name(scope, type_, &ident.id);
-      }
+      Pat::Ident(_) => {}
       Pat::Array(array) => {
         for elem in &array.elems {
           if let Some(elem) = elem {
@@ -320,8 +500,6 @@ impl ScopeAnalysis {
               self.var_declarator_pat(scope, type_, &key_value.value);
             }
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
-              self.insert_name(scope, type_, &assign.key);
-
               if let Some(value) = &assign.value {
                 self.expr(scope, value);
               }
@@ -342,7 +520,7 @@ impl ScopeAnalysis {
       Pat::Invalid(invalid) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
-          message: "Invalid pattern (TODO: is this possible?)".to_string(),
+          message: "Invalid pattern".to_string(),
           span: invalid.span,
         });
       }
@@ -1144,6 +1322,10 @@ impl ScopeAnalysis {
         let child_scope = scope.nest(None);
 
         for init in &for_.init {
+          if let swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl) = init {
+            self.block_level_hoists_var_decl(&child_scope, var_decl);
+          }
+
           match init {
             swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl) => {
               self.var_decl(&child_scope, var_decl);
@@ -1169,6 +1351,7 @@ impl ScopeAnalysis {
 
         match &for_in.left {
           swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
+            self.block_level_hoists_var_decl(&child_scope, var_decl);
             self.var_decl(&child_scope, var_decl);
           }
           swc_ecma_ast::VarDeclOrPat::Pat(pat) => {
@@ -1183,8 +1366,8 @@ impl ScopeAnalysis {
         let child_scope = scope.nest(None);
 
         match &for_of.left {
-          // TODO: associate scope with body
           swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
+            self.block_level_hoists_var_decl(&child_scope, var_decl);
             self.var_decl(&child_scope, var_decl);
           }
           swc_ecma_ast::VarDeclOrPat::Pat(pat) => {
@@ -1206,6 +1389,7 @@ impl ScopeAnalysis {
 
   fn block_stmt(&mut self, scope: &XScope, block_stmt: &swc_ecma_ast::BlockStmt) {
     let child_scope = scope.nest(None);
+    self.block_level_hoists(&child_scope, block_stmt);
 
     for stmt in &block_stmt.stmts {
       self.stmt(&child_scope, stmt);
