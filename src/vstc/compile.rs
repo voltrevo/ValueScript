@@ -155,7 +155,13 @@ impl Compiler {
 
     match program {
       Module(module) => self.compile_module(module),
-      Script(_) => std::panic!("Not supported: script"),
+      Script(script) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Scripts are not supported".to_string(),
+          span: script.span,
+        });
+      }
     }
   }
 
@@ -175,12 +181,26 @@ impl Compiler {
     for module_item in &module.body {
       match module_item {
         ModuleItem::ModuleDecl(module_decl) => match module_decl {
-          ModuleDecl::Import(_) => std::panic!("Not implemented: Import module declaration"),
-          ModuleDecl::ExportDecl(_) => {
-            std::panic!("Not implemented: ExportDecl module declaration")
+          ModuleDecl::Import(import) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: Import module declaration".to_string(),
+              span: import.span,
+            });
           }
-          ModuleDecl::ExportNamed(_) => {
-            std::panic!("Not implemented: ExportNamed module declaration")
+          ModuleDecl::ExportDecl(export_decl) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: ExportDecl module declaration".to_string(),
+              span: export_decl.span,
+            });
+          }
+          ModuleDecl::ExportNamed(export_named) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: ExportNamed module declaration".to_string(),
+              span: export_named.span,
+            });
           }
           ModuleDecl::ExportDefaultDecl(edd) => {
             match &edd.decl {
@@ -206,41 +226,178 @@ impl Compiler {
                   }
                 };
               }
-              _ => std::panic!("Not implemented: Non-function default export"),
+              swc_ecma_ast::DefaultDecl::Class(class) => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: "TODO: Class default export".to_string(),
+                  span: class.class.span,
+                });
+              }
+              swc_ecma_ast::DefaultDecl::TsInterfaceDecl(ts_interface_decl) => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: "TODO: TsInterfaceDecl default export".to_string(),
+                  span: ts_interface_decl.span,
+                });
+              }
             };
           }
-          ModuleDecl::ExportDefaultExpr(_) => {
-            std::panic!("Not implemented: ExportDefaultExpr module declaration")
+          ModuleDecl::ExportDefaultExpr(export_default_expr) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: ExportDefaultExpr module declaration".to_string(),
+              span: export_default_expr.span,
+            });
           }
-          ModuleDecl::ExportAll(_) => std::panic!("Not implemented: ExportAll module declaration"),
-          ModuleDecl::TsImportEquals(_) => {
-            std::panic!("Not implemented: TsImportEquals module declaration")
+          ModuleDecl::ExportAll(export_all) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: ExportAll module declaration".to_string(),
+              span: export_all.span,
+            });
           }
-          ModuleDecl::TsExportAssignment(_) => {
-            std::panic!("Not implemented: TsExportAssignment module declaration")
+          ModuleDecl::TsImportEquals(ts_import_equals) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: TsImportEquals module declaration".to_string(),
+              span: ts_import_equals.span,
+            });
           }
-          ModuleDecl::TsNamespaceExport(_) => {
-            std::panic!("Not implemented: TsNamespaceExport module declaration")
+          ModuleDecl::TsExportAssignment(ts_export_assignment) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: TsExportAssignment module declaration".to_string(),
+              span: ts_export_assignment.span,
+            });
+          }
+          ModuleDecl::TsNamespaceExport(ts_namespace_export) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: TsNamespaceExport module declaration".to_string(),
+              span: ts_namespace_export.span,
+            });
           }
         },
         ModuleItem::Stmt(stmt) => match stmt {
-          Stmt::Block(_) => std::panic!("Not implemented: module level Block statement"),
-          Stmt::Empty(_) => std::panic!("Not implemented: module level Empty statement"),
-          Stmt::Debugger(_) => std::panic!("Not implemented: module level Debugger statement"),
-          Stmt::With(_) => std::panic!("Not implemented: module level With statement"),
-          Stmt::Return(_) => std::panic!("Not implemented: module level Return statement"),
-          Stmt::Labeled(_) => std::panic!("Not implemented: module level Labeled statement"),
-          Stmt::Break(_) => std::panic!("Not implemented: module level Break statement"),
-          Stmt::Continue(_) => std::panic!("Not implemented: module level Continue statement"),
-          Stmt::If(_) => std::panic!("Not implemented: module level If statement"),
-          Stmt::Switch(_) => std::panic!("Not implemented: module level Switch statement"),
-          Stmt::Throw(_) => std::panic!("Not implemented: module level Throw statement"),
-          Stmt::Try(_) => std::panic!("Not implemented: module level Try statement"),
-          Stmt::While(_) => std::panic!("Not implemented: module level While statement"),
-          Stmt::DoWhile(_) => std::panic!("Not implemented: module level DoWhile statement"),
-          Stmt::For(_) => std::panic!("Not implemented: module level For statement"),
-          Stmt::ForIn(_) => std::panic!("Not implemented: module level ForIn statement"),
-          Stmt::ForOf(_) => std::panic!("Not implemented: module level ForOf statement"),
+          Stmt::Block(block) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Block statement".to_string(),
+              span: block.span,
+            });
+          }
+          Stmt::Empty(empty) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Empty statement".to_string(),
+              span: empty.span,
+            });
+          }
+          Stmt::Debugger(debugger) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Debugger statement".to_string(),
+              span: debugger.span,
+            });
+          }
+          Stmt::With(with) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level With statement".to_string(),
+              span: with.span,
+            });
+          }
+          Stmt::Return(return_) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Return statement".to_string(),
+              span: return_.span,
+            });
+          }
+          Stmt::Labeled(labeled) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Labeled statement".to_string(),
+              span: labeled.span,
+            });
+          }
+          Stmt::Break(break_) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Break statement".to_string(),
+              span: break_.span,
+            });
+          }
+          Stmt::Continue(continue_) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Continue statement".to_string(),
+              span: continue_.span,
+            });
+          }
+          Stmt::If(if_) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level If statement".to_string(),
+              span: if_.span,
+            });
+          }
+          Stmt::Switch(switch) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Switch statement".to_string(),
+              span: switch.span,
+            });
+          }
+          Stmt::Throw(throw) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Throw statement".to_string(),
+              span: throw.span,
+            });
+          }
+          Stmt::Try(try_) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Try statement".to_string(),
+              span: try_.span,
+            });
+          }
+          Stmt::While(while_) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level While statement".to_string(),
+              span: while_.span,
+            });
+          }
+          Stmt::DoWhile(do_while) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level DoWhile statement".to_string(),
+              span: do_while.span,
+            });
+          }
+          Stmt::For(for_) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level For statement".to_string(),
+              span: for_.span,
+            });
+          }
+          Stmt::ForIn(for_in) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level ForIn statement".to_string(),
+              span: for_in.span,
+            });
+          }
+          Stmt::ForOf(for_of) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level ForOf statement".to_string(),
+              span: for_of.span,
+            });
+          }
           Stmt::Decl(decl) => {
             match decl {
               Decl::Class(class) => {
@@ -267,18 +424,38 @@ impl Compiler {
               }
               Decl::Var(var_decl) => {
                 if !var_decl.declare {
-                  std::panic!("Not implemented: non-declare module level var declaration");
+                  self.diagnostics.push(Diagnostic {
+                    level: DiagnosticLevel::InternalError,
+                    message: "TODO: non-declare module level var declaration".to_string(),
+                    span: var_decl.span,
+                  });
                 }
               }
               Decl::TsInterface(_) => {}
               Decl::TsTypeAlias(_) => {}
-              Decl::TsEnum(_) => std::panic!("Not implemented: module level TsEnum declaration"),
-              Decl::TsModule(_) => {
-                std::panic!("Not implemented: module level TsModule declaration")
+              Decl::TsEnum(ts_enum) => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: "TODO: module level TsEnum declaration".to_string(),
+                  span: ts_enum.span,
+                });
+              }
+              Decl::TsModule(ts_module) => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: "TODO: module level TsModule declaration".to_string(),
+                  span: ts_module.span,
+                });
               }
             };
           }
-          Stmt::Expr(_) => std::panic!("Not implemented: module level Expr statement"),
+          Stmt::Expr(expr) => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: module level Expr statement".to_string(),
+              span: expr.span,
+            });
+          }
         },
       };
     }
@@ -322,8 +499,20 @@ impl Compiler {
     use swc_ecma_ast::ModuleDecl::*;
 
     match module_decl {
-      ExportDefaultDecl(_) => std::panic!("Default export should be handled elsewhere"),
-      _ => std::panic!("Not implemented: non-default module declaration"),
+      ExportDefaultDecl(export_default_decl) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "Default export should be handled elsewhere".to_string(),
+          span: export_default_decl.span,
+        });
+      }
+      _ => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: non-default module declaration".to_string(),
+          span: get_module_decl_span(module_decl),
+        });
+      }
     }
   }
 
@@ -331,25 +520,134 @@ impl Compiler {
     use swc_ecma_ast::Stmt::*;
 
     match stmt {
-      Block(_) => std::panic!("Not implemented: module level Block statement"),
-      Empty(_) => std::panic!("Not implemented: module level Empty statement"),
-      Debugger(_) => std::panic!("Not implemented: module level Debugger statement"),
-      With(_) => std::panic!("Not implemented: module level With statement"),
-      Return(_) => std::panic!("Not implemented: module level Return statement"),
-      Labeled(_) => std::panic!("Not implemented: module level Labeled statement"),
-      Break(_) => std::panic!("Not implemented: module level Break statement"),
-      Continue(_) => std::panic!("Not implemented: module level Continue statement"),
-      If(_) => std::panic!("Not implemented: module level If statement"),
-      Switch(_) => std::panic!("Not implemented: module level Switch statement"),
-      Throw(_) => std::panic!("Not implemented: module level Throw statement"),
-      Try(_) => std::panic!("Not implemented: module level Try statement"),
-      While(_) => std::panic!("Not implemented: module level While statement"),
-      DoWhile(_) => std::panic!("Not implemented: module level DoWhile statement"),
-      For(_) => std::panic!("Not implemented: module level For statement"),
-      ForIn(_) => std::panic!("Not implemented: module level ForIn statement"),
-      ForOf(_) => std::panic!("Not implemented: module level ForOf statement"),
       Decl(decl) => self.compile_module_level_decl(decl, scope),
-      Expr(_) => std::panic!("Not implemented: module level Expr statement"),
+
+      Block(block) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Block statement".to_string(),
+          span: block.span,
+        });
+      }
+      Empty(empty) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Empty statement".to_string(),
+          span: empty.span,
+        });
+      }
+      Debugger(debugger) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Debugger statement".to_string(),
+          span: debugger.span,
+        });
+      }
+      With(with) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level With statement".to_string(),
+          span: with.span,
+        });
+      }
+      Return(return_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Return statement".to_string(),
+          span: return_.span,
+        });
+      }
+      Labeled(labeled) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Labeled statement".to_string(),
+          span: labeled.span,
+        });
+      }
+      Break(break_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Break statement".to_string(),
+          span: break_.span,
+        });
+      }
+      Continue(continue_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Continue statement".to_string(),
+          span: continue_.span,
+        });
+      }
+      If(if_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level If statement".to_string(),
+          span: if_.span,
+        });
+      }
+      Switch(switch) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Switch statement".to_string(),
+          span: switch.span,
+        });
+      }
+      Throw(throw) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Throw statement".to_string(),
+          span: throw.span,
+        });
+      }
+      Try(try_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Try statement".to_string(),
+          span: try_.span,
+        });
+      }
+      While(while_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level While statement".to_string(),
+          span: while_.span,
+        });
+      }
+      DoWhile(do_while) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level DoWhile statement".to_string(),
+          span: do_while.span,
+        });
+      }
+      For(for_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level For statement".to_string(),
+          span: for_.span,
+        });
+      }
+      ForIn(for_in) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level ForIn statement".to_string(),
+          span: for_in.span,
+        });
+      }
+      ForOf(for_of) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level ForOf statement".to_string(),
+          span: for_of.span,
+        });
+      }
+      Expr(expr) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level Expr statement".to_string(),
+          span: expr.span,
+        });
+      }
     };
   }
 
@@ -384,13 +682,29 @@ impl Compiler {
       }
       Var(var_decl) => {
         if !var_decl.declare {
-          std::panic!("Not implemented: non-declare module level var declaration");
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: non-declare module level var declaration".to_string(),
+            span: var_decl.span,
+          });
         }
       }
       TsInterface(_) => {}
       TsTypeAlias(_) => {}
-      TsEnum(_) => std::panic!("Not implemented: TsEnum declaration"),
-      TsModule(_) => std::panic!("Not implemented: TsModule declaration"),
+      TsEnum(ts_enum) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: TsEnum declaration".to_string(),
+          span: ts_enum.span,
+        });
+      }
+      TsModule(ts_module) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: TsModule declaration".to_string(),
+          span: ts_module.span,
+        });
+      }
     };
   }
 
@@ -429,7 +743,7 @@ impl Compiler {
       _ => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "Not implemented: Non-function default export".to_string(),
+          message: "TODO: Non-function default export".to_string(),
           span: edd.span,
         });
       }
@@ -465,7 +779,15 @@ impl Compiler {
 
     let defn_name = match parent_scope.get(&class_name) {
       Some(MappedName::Definition(d)) => d,
-      _ => std::panic!("Definition name should have been in scope"),
+      _ => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: format!("Definition for {} should have been in scope", class_name),
+          span: class_decl.ident.span,
+        });
+
+        return;
+      }
     };
 
     let mut constructor_defn_name: Option<String> = None;
@@ -508,7 +830,15 @@ impl Compiler {
         Method(method) => {
           let name = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => ident.sym.to_string(),
-            _ => std::panic!("Not implemented: Non-identifier method name"),
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "TODO: Non-identifier method name".to_string(),
+                span: method.span,
+              });
+
+              continue;
+            }
           };
 
           let method_defn_name = definition_allocator
@@ -529,25 +859,61 @@ impl Compiler {
             method_defn_name,
           ));
         }
-        PrivateMethod(_) => std::panic!("Not implemented: PrivateMethod"),
+        PrivateMethod(private_method) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: PrivateMethod".to_string(),
+            span: private_method.span,
+          });
+        }
         ClassProp(prop) => {
           if prop.value.is_some() {
-            std::panic!("Not implemented: class property initializers");
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: class property initializers".to_string(),
+              span: prop.span,
+            });
           }
         }
         PrivateProp(prop) => {
           if prop.value.is_some() {
-            std::panic!("Not implemented: class property initializers");
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: class property initializers".to_string(),
+              span: prop.span,
+            });
           }
         }
         TsIndexSignature(_) => {}
         Empty(_) => {}
-        StaticBlock(_) => std::panic!("Not implemented: StaticBlock"),
+        StaticBlock(static_block) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: StaticBlock".to_string(),
+            span: static_block.span,
+          });
+        }
       }
     }
 
     defn.push("})".to_string());
 
     self.definitions.push(defn);
+  }
+}
+
+fn get_module_decl_span(module_decl: &swc_ecma_ast::ModuleDecl) -> swc_common::Span {
+  use swc_ecma_ast::ModuleDecl::*;
+
+  match module_decl {
+    Import(import) => import.span,
+    ExportAll(export_all) => export_all.span,
+    ExportDecl(export_decl) => export_decl.span,
+    ExportDefaultDecl(export_default_decl) => export_default_decl.span,
+    ExportDefaultExpr(export_default_expr) => export_default_expr.span,
+    ExportNamed(export_named) => export_named.span,
+    TsImportEquals(ts_import_equals) => ts_import_equals.span,
+    TsExportAssignment(ts_export_assignment) => ts_export_assignment.span,
+    TsNamespaceExport(ts_namespace_export) => ts_namespace_export.span,
   }
 }
