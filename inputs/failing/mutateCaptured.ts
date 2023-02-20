@@ -1,4 +1,4 @@
-export default function() {
+export default function main() {
   let x = 0;
 
   function foo() {

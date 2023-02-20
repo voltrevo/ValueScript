@@ -1,4 +1,4 @@
-export default function() {
+export default function main() {
   let sum = 0;
 
   const x = 1;

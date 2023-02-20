@@ -14,7 +14,7 @@ use swc_common::{
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
-use super::diagnostic::{handle_diagnostics_cli, Diagnostic};
+use super::diagnostic::{handle_diagnostics_cli, Diagnostic, DiagnosticLevel};
 use super::expression_compiler::string_literal;
 use super::function_compiler::{FunctionCompiler, Functionish};
 use super::name_allocator::NameAllocator;
@@ -361,10 +361,21 @@ impl Compiler {
       Fn(fn_) => {
         let fn_name = fn_.ident.sym.to_string();
 
+        let defn = match scope.get_defn(&fn_name) {
+          Some(defn) => defn,
+          None => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: format!("Definition for {} should have been in scope", fn_name),
+              span: fn_.ident.span,
+            });
+
+            return;
+          }
+        };
+
         self.compile_fn(
-          scope
-            .get_defn(&fn_name)
-            .expect("Definition should have been in scope"),
+          defn,
           Some(fn_.ident.sym.to_string()),
           Functionish::Fn(fn_.function.clone()),
           self.definition_allocator.clone(),
@@ -393,16 +404,35 @@ impl Compiler {
     use swc_ecma_ast::DefaultDecl::*;
 
     match &edd.decl {
-      Fn(fn_) => self.compile_fn(
-        scope
-          .get_defn(&fn_name)
-          .expect("Definition should have been in scope"),
-        Some(fn_name),
-        Functionish::Fn(fn_.function.clone()),
-        definition_allocator,
-        scope,
-      ),
-      _ => std::panic!("Not implemented: Non-function default export"),
+      Fn(fn_) => {
+        let defn = match scope.get_defn(&fn_name) {
+          Some(defn) => defn,
+          None => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: format!("Definition for {} should have been in scope", fn_name),
+              span: edd.span,
+            });
+
+            return;
+          }
+        };
+
+        self.compile_fn(
+          defn,
+          Some(fn_name),
+          Functionish::Fn(fn_.function.clone()),
+          definition_allocator,
+          scope,
+        );
+      }
+      _ => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "Not implemented: Non-function default export".to_string(),
+          span: edd.span,
+        });
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-export default function() {
+export default function main() {
   function foo() {
     const x = 3;
     return x + bar();

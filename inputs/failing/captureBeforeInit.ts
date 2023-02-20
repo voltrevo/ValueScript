@@ -1,4 +1,4 @@
-export default function() {
+export default function main() {
   let res = foo(); // Should fail compilation: Binds uninitialized variable
 
   let x = 3;

@@ -1,4 +1,4 @@
-export default function() {
+export default function main() {
   let c = Counter();
 
   return [c.get(), c.get(), c.get()];
@@ -7,7 +7,7 @@ export default function() {
 function Counter() {
   return {
     next: 1,
-    get: function() {
+    get: function () {
       return this.next++;
     },
   };
