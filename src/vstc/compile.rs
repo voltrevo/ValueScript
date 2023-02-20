@@ -65,6 +65,7 @@ pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
 
   Handler::with_emitter(true, false, Box::new(VsEmitter {}));
 
+  // TODO: Convert to diagnostics
   let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(source_map.clone()));
 
   let swc_compiler = swc::Compiler::new(source_map.clone());
@@ -461,19 +462,28 @@ impl Compiler {
     }
 
     // First compile default
-    for module_item in &module.body {
-      match module_item {
-        ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(edd)) => self
-          .compile_export_default_decl(
-            edd,
-            // FIXME: clone() shouldn't be necessary here (we want to move)
-            default_export_name
-              .clone()
-              .expect("Default export name should have been set"),
-            self.definition_allocator.clone(),
-            &scope,
-          ),
-        _ => {}
+    match default_export_name {
+      Some(default_export_name) => {
+        for module_item in &module.body {
+          match module_item {
+            ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(edd)) => self
+              .compile_export_default_decl(
+                edd,
+                // FIXME: clone() shouldn't be necessary here (we want to move)
+                default_export_name.clone(),
+                self.definition_allocator.clone(),
+                &scope,
+              ),
+            _ => {}
+          }
+        }
+      }
+      None => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: Modules which don't have a default export name".to_string(),
+          span: module.span,
+        });
       }
     }
 
