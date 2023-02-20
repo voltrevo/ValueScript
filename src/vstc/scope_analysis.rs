@@ -49,52 +49,8 @@ impl ScopeAnalysis {
     let mut sa = ScopeAnalysis::default();
     let scope = init_std_scope();
 
-    use swc_ecma_ast::ModuleDecl;
-    use swc_ecma_ast::ModuleItem;
-
     for module_item in &module.body {
-      match module_item {
-        ModuleItem::ModuleDecl(module_decl) => match module_decl {
-          ModuleDecl::Import(import_decl) => {
-            sa.import_decl(&scope, import_decl);
-          }
-          ModuleDecl::ExportDecl(ed) => {
-            sa.decl(&scope, &ed.decl);
-          }
-          ModuleDecl::ExportNamed(_) => {}
-          ModuleDecl::ExportDefaultDecl(edd) => {
-            sa.default_decl(&scope, &edd.decl);
-          }
-          ModuleDecl::ExportDefaultExpr(ede) => {
-            sa.expr(&scope, &ede.expr);
-          }
-          ModuleDecl::ExportAll(_) => {}
-          ModuleDecl::TsImportEquals(ts_import_equals) => {
-            sa.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: "TsImportEquals is not supported".to_string(),
-              span: ts_import_equals.span,
-            });
-          }
-          ModuleDecl::TsExportAssignment(ts_export_assignment) => {
-            sa.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: "TsExportAssignment is not supported".to_string(),
-              span: ts_export_assignment.span,
-            });
-          }
-          ModuleDecl::TsNamespaceExport(ts_namespace_export) => {
-            sa.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: "TsNamespaceExport is not supported".to_string(),
-              span: ts_namespace_export.span,
-            });
-          }
-        },
-        ModuleItem::Stmt(stmt) => {
-          sa.stmt(&scope, &stmt);
-        }
-      };
+      sa.module_item(&scope, module_item);
     }
 
     return sa;
@@ -143,6 +99,54 @@ impl ScopeAnalysis {
       ref_,
       captor_id: captor_id.clone(),
     });
+  }
+
+  fn module_item(&mut self, scope: &XScope, module_item: &swc_ecma_ast::ModuleItem) {
+    use swc_ecma_ast::ModuleDecl;
+    use swc_ecma_ast::ModuleItem;
+
+    match module_item {
+      ModuleItem::ModuleDecl(module_decl) => match module_decl {
+        ModuleDecl::Import(import_decl) => {
+          self.import_decl(&scope, import_decl);
+        }
+        ModuleDecl::ExportDecl(ed) => {
+          self.decl(&scope, &ed.decl);
+        }
+        ModuleDecl::ExportNamed(_) => {}
+        ModuleDecl::ExportDefaultDecl(edd) => {
+          self.default_decl(&scope, &edd.decl);
+        }
+        ModuleDecl::ExportDefaultExpr(ede) => {
+          self.expr(&scope, &ede.expr);
+        }
+        ModuleDecl::ExportAll(_) => {}
+        ModuleDecl::TsImportEquals(ts_import_equals) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: "TsImportEquals is not supported".to_string(),
+            span: ts_import_equals.span,
+          });
+        }
+        ModuleDecl::TsExportAssignment(ts_export_assignment) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: "TsExportAssignment is not supported".to_string(),
+            span: ts_export_assignment.span,
+          });
+        }
+        ModuleDecl::TsNamespaceExport(ts_namespace_export) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: "TsNamespaceExport is not supported".to_string(),
+            span: ts_namespace_export.span,
+          });
+        }
+      },
+      ModuleItem::Stmt(stmt) => {
+        self.stmt(&scope, &stmt);
+      }
+    };
   }
 
   fn import_decl(&mut self, scope: &XScope, import_decl: &swc_ecma_ast::ImportDecl) {
