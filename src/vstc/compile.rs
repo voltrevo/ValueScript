@@ -31,7 +31,7 @@ pub fn command(args: &Vec<String>) {
   let program = parse(&args[2]);
   let compiler_output = compile(&program);
 
-  handle_diagnostics_cli(&compiler_output.diagnostics);
+  handle_diagnostics_cli(&args[2], &compiler_output.diagnostics);
 
   let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
 

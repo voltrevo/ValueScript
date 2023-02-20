@@ -92,7 +92,7 @@ fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
     RunFormat::TypeScript => {
       let ast = parse(file_path);
       let compiler_output = compile(&ast);
-      handle_diagnostics_cli(&compiler_output.diagnostics);
+      handle_diagnostics_cli(file_path, &compiler_output.diagnostics);
 
       let mut assembly = String::new();
 

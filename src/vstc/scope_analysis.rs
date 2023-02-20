@@ -121,23 +121,23 @@ impl ScopeAnalysis {
   }
 
   fn insert_capture(&mut self, captor_id: &OwnerId, name_id: &NameId, ref_: swc_common::Span) {
-    self
-      .captures
-      .entry(captor_id.clone())
-      .or_insert_with(HashSet::new)
-      .insert(ref_);
-
     let name = match self.names.get_mut(name_id) {
       Some(name) => name,
       None => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: format!("Internal: expected name_id in names: {:?}", name_id),
+          message: format!("Expected name_id in names: {:?}", name_id),
           span: ref_,
         });
         return;
       }
     };
+
+    self
+      .captures
+      .entry(captor_id.clone())
+      .or_insert_with(HashSet::new)
+      .insert(ref_);
 
     name.captures.push(Capture {
       ref_,
@@ -601,7 +601,7 @@ impl ScopeAnalysis {
 
     match expr {
       Expr::Ident(ident) => {
-        self.mutate_ident(ident);
+        self.mutate_ident(scope, ident);
       }
       Expr::Member(member) => {
         self.mutate_expr(scope, &member.obj);
@@ -834,7 +834,7 @@ impl ScopeAnalysis {
 
     match pat {
       Pat::Ident(ident) => {
-        self.mutate_ident(&ident.id);
+        self.mutate_ident(scope, &ident.id);
       }
       Pat::Array(array_pat) => {
         for elem in &array_pat.elems {
@@ -855,7 +855,7 @@ impl ScopeAnalysis {
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
               // TODO: How is `({ y: x = 3 } = { y: 4 })` handled?
 
-              self.mutate_ident(&assign.key);
+              self.mutate_ident(scope, &assign.key);
 
               if let Some(value) = &assign.value {
                 // Note: Generally mutate_* only processes the mutation aspect
@@ -893,13 +893,25 @@ impl ScopeAnalysis {
     }
   }
 
-  fn mutate_ident(&mut self, ident: &swc_ecma_ast::Ident) {
-    let name = match self.names.get_mut(&NameId::Span(ident.span)) {
-      Some(name) => name,
+  fn mutate_ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
+    let name_id = match scope.get(&ident.sym) {
+      Some(name_id) => name_id,
       None => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
-          message: "Unresolved reference".to_string(),
+          message: "Unresolved reference (mutate_ident)".to_string(),
+          span: ident.span,
+        });
+        return;
+      }
+    };
+
+    let name = match self.names.get_mut(&name_id) {
+      Some(name) => name,
+      None => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "Expected name_id in names".to_string(),
           span: ident.span,
         });
         return;
@@ -915,7 +927,7 @@ impl ScopeAnalysis {
       None => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
-          message: "Unresolved reference".to_string(),
+          message: "Unresolved reference (ident)".to_string(),
           span: ident.span,
         });
         return;
@@ -927,7 +939,7 @@ impl ScopeAnalysis {
       None => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "Internal: expected name_id in names".to_string(),
+          message: "Expected name_id in names".to_string(),
           span: ident.span,
         });
         return;
@@ -1015,11 +1027,9 @@ impl ScopeAnalysis {
         });
       }
       Stmt::Return(return_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid: module level return statement".to_string(),
-          span: return_.span,
-        });
+        if let Some(arg) = &return_.arg {
+          self.expr(&scope, arg);
+        }
       }
       Stmt::Labeled(labeled_stmt) => {
         self.stmt(&scope, &labeled_stmt.body);
