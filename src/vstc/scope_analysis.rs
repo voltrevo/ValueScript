@@ -518,7 +518,7 @@ impl ScopeAnalysis {
       Pat::Expr(expr) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO: Implement Expr".to_string(),
+          message: "Pattern expression not expected in this context".to_string(),
           span: get_expr_span(expr),
         });
       }
@@ -595,8 +595,8 @@ impl ScopeAnalysis {
       }
       Pat::Expr(expr) => {
         self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "TODO: Implement pattern expressions (what are these?)".to_string(),
+          level: DiagnosticLevel::InternalError,
+          message: "Pattern expression not expected in declarator".to_string(),
           span: get_expr_span(expr),
         });
       }
@@ -1184,11 +1184,7 @@ impl ScopeAnalysis {
         });
       }
       Pat::Expr(expr) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: pattern expressions (what are these?)".to_string(),
-          span: get_expr_span(expr),
-        });
+        self.mutate_expr(&scope, expr);
       }
     }
   }

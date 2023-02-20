@@ -90,7 +90,7 @@ class GenMod30 {
   }
 
   next() {
-    const rem = this.i % 8
+    const rem = this.i % 8;
     const rounds = (this.i - rem) / 8;
     this.i++;
 
