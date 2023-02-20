@@ -49,7 +49,7 @@ impl ScopeAnalysis {
     let mut sa = ScopeAnalysis::default();
     let scope = init_std_scope();
 
-    for builtin in vec![Builtin::Debug, Builtin::Math] {
+    for builtin in vec![Builtin::Debug, Builtin::Math, Builtin::undefined] {
       sa.names.insert(
         NameId::Builtin(builtin),
         Name {
@@ -1598,6 +1598,10 @@ fn init_std_scope() -> XScope {
       (
         swc_atoms::JsWord::from("Debug"),
         NameId::Builtin(Builtin::Debug),
+      ),
+      (
+        swc_atoms::js_word!("undefined"),
+        NameId::Builtin(Builtin::undefined),
       ),
     ]),
     parent: None,

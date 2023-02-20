@@ -8,6 +8,9 @@ use super::function_compiler::QueuedFunction;
 pub enum Builtin {
   Math,
   Debug,
+
+  #[allow(non_camel_case_types)]
+  undefined,
 }
 
 impl std::fmt::Display for Builtin {
