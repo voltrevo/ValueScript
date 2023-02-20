@@ -193,12 +193,18 @@ impl FunctionCompiler {
 
     match functionish {
       Functionish::Fn(fn_) => {
-        let block = fn_
-          .body
-          .as_ref()
-          .expect("Not implemented: function without body");
-
-        handle_block_body(block);
+        match &fn_.body {
+          Some(block) => {
+            handle_block_body(block);
+          }
+          None => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: function without body".to_string(),
+              span: fn_.span(),
+            });
+          }
+        };
       }
       Functionish::Arrow(arrow) => match &arrow.body {
         swc_ecma_ast::BlockStmtOrExpr::BlockStmt(block) => {
@@ -214,12 +220,18 @@ impl FunctionCompiler {
         }
       },
       Functionish::Constructor(constructor) => {
-        let block = constructor
-          .body
-          .as_ref()
-          .expect("Not implemented: constructor without body");
-
-        handle_block_body(block);
+        match &constructor.body {
+          Some(block) => {
+            handle_block_body(block);
+          }
+          None => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: constructor without body".to_string(),
+              span: constructor.span(),
+            });
+          }
+        };
       }
     }
 
@@ -464,11 +476,22 @@ impl FunctionCompiler {
 
       let mut cap_queue = Queue::<String>::new();
 
-      for dc in direct_captures_map
-        .get(&fn_.ident.sym.to_string())
-        .expect("direct captures not found")
-      {
-        cap_queue.add(dc.clone()).expect("Failed to add to queue");
+      let direct_captures = direct_captures_map.get(&fn_.ident.sym.to_string());
+
+      match direct_captures {
+        Some(direct_captures) => {
+          for dc in direct_captures {
+            cap_queue.add(dc.clone()).expect("Failed to add to queue");
+          }
+        }
+        None => {
+          // code to add diagnostic below:
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "Direct captures not found".to_string(),
+            span: fn_.ident.span,
+          });
+        }
       }
 
       loop {
@@ -616,14 +639,22 @@ impl FunctionCompiler {
           return;
         }
 
-        let loop_labels = self
-          .loop_labels
-          .last()
-          .expect("break statement outside loop");
+        let loop_labels = self.loop_labels.last();
 
-        self
-          .definition
-          .push(format!("  jmp :{}", loop_labels.break_));
+        match loop_labels {
+          Some(loop_labels) => {
+            self
+              .definition
+              .push(format!("  jmp :{}", loop_labels.break_));
+          }
+          None => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::Error,
+              message: "break statement outside loop".to_string(),
+              span: break_.span,
+            });
+          }
+        }
       }
       Continue(continue_) => {
         if continue_.label.is_some() {
@@ -636,14 +667,20 @@ impl FunctionCompiler {
           return;
         }
 
-        let loop_labels = self
-          .loop_labels
-          .last()
-          .expect("continue statement outside loop");
-
-        self
-          .definition
-          .push(format!("  jmp :{}", loop_labels.continue_));
+        match self.loop_labels.last() {
+          Some(loop_labels) => {
+            self
+              .definition
+              .push(format!("  jmp :{}", loop_labels.continue_));
+          }
+          None => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::Error,
+              message: "continue statement outside loop".to_string(),
+              span: continue_.span,
+            });
+          }
+        }
       }
       If(if_) => {
         let mut expression_compiler = ExpressionCompiler {
