@@ -952,7 +952,7 @@ impl ScopeAnalysis {
       None => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
-          message: "Unresolved reference (mutate_ident)".to_string(),
+          message: "Unresolved reference".to_string(),
           span: ident.span,
         });
         return;
@@ -980,7 +980,7 @@ impl ScopeAnalysis {
       None => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
-          message: "Unresolved reference (ident)".to_string(),
+          message: "Unresolved reference".to_string(),
           span: ident.span,
         });
         return;
