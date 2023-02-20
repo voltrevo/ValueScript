@@ -1,82 +1,79 @@
 mod assemble;
-mod run;
-mod virtual_machine;
-mod compile;
-mod scope;
-mod name_allocator;
-mod expression_compiler;
-mod scope_analysis;
-mod function_compiler;
 mod capture_finder;
+mod compile;
+mod diagnostic;
+mod expression_compiler;
+mod function_compiler;
+mod name_allocator;
+mod run;
+mod scope;
+mod scope_analysis;
+mod virtual_machine;
 
 use std::env;
 use std::process::exit;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+  let args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        std::panic!("Not implemented: ValueScript repl");
-    }
+  if args.len() < 2 {
+    std::panic!("Not implemented: ValueScript repl");
+  }
 
-    if args.len() == 2 && (
-        args[1] == "-h" ||
-        args[1] == "--help" ||
-        args[1] == "help"
-     ) {
-        show_help();
-        return;
-    }
-
-    if args.len() >= 2 && args[1] == "assemble" {
-        assemble::command(&args);
-        return;
-    }
-
-    if args.len() >= 2 && args[1] == "run" {
-        run::command(&args);
-        return;
-    }
-
-    if args.len() >= 2 && args[1] == "compile" {
-        compile::command(&args);
-        return;
-    }
-
-    println!("ERROR: Unrecognized command\n");
+  if args.len() == 2 && (args[1] == "-h" || args[1] == "--help" || args[1] == "help") {
     show_help();
-    exit(1);
+    return;
+  }
+
+  if args.len() >= 2 && args[1] == "assemble" {
+    assemble::command(&args);
+    return;
+  }
+
+  if args.len() >= 2 && args[1] == "run" {
+    run::command(&args);
+    return;
+  }
+
+  if args.len() >= 2 && args[1] == "compile" {
+    compile::command(&args);
+    return;
+  }
+
+  println!("ERROR: Unrecognized command\n");
+  show_help();
+  exit(1);
 }
 
 fn show_help() {
-    println!("ValueScript toolchain 0.1.0");
-    println!("");
-    println!("USAGE:");
-    println!("    vstc [OPTIONS] [SUBCOMMAND]");
-    println!("");
-    println!("OPTIONS:");
-    println!("    -h, --help");
-    println!("            Print help information");
-    println!("");
-    println!("    -V, --version");
-    println!("            Print version information");
-    println!("");
-    println!("SUBCOMMANDS:");
-    println!("    compile");
-    println!("            Compile an entry point");
-    println!("");
-    println!("    assemble");
-    println!("            Convert assembly to bytecode");
-    println!("");
-    println!("    disassemble");
-    println!("            Convert bytecode to assembly");
-    println!("");
-    println!("    run");
-    println!("            Run a program");
-    println!("");
-    println!("    repl");
-    println!("            Read Eval Print Loop");
-    println!("");
-    println!("    host");
-    println!("            Start database server");
+  println!("ValueScript toolchain 0.1.0");
+  println!("");
+  println!("USAGE:");
+  println!("    vstc [OPTIONS] [SUBCOMMAND]");
+  println!("");
+  println!("OPTIONS:");
+  println!("    -h, --help");
+  println!("            Print help information");
+  println!("");
+  println!("    -V, --version");
+  println!("            Print version information");
+  println!("");
+  println!("SUBCOMMANDS:");
+  println!("    compile");
+  println!("            Compile an entry point");
+  println!("");
+  println!("    assemble");
+  println!("            Convert assembly to bytecode");
+  println!("");
+  println!("    disassemble");
+  println!("            Convert bytecode to assembly");
+  println!("");
+  println!("    run");
+  println!("            Run a program");
+  println!("");
+  println!("    repl");
+  println!("            Read Eval Print Loop");
+  println!("");
+  println!("    host");
+  println!("            Start database server");
 }

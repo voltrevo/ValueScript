@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
+use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::scope::Builtin;
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
@@ -34,18 +35,6 @@ pub struct Name {
   type_: NameType,
   mutations: Vec<swc_common::Span>,
   captures: Vec<Capture>,
-}
-
-enum DiagnosticLevel {
-  Lint,
-  Error,
-  InternalError,
-}
-
-pub struct Diagnostic {
-  level: DiagnosticLevel,
-  message: String,
-  span: swc_common::Span,
 }
 
 #[derive(Default)]

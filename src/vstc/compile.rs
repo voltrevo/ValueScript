@@ -14,6 +14,7 @@ use swc_common::{
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
+use super::diagnostic::{handle_diagnostics_cli, Diagnostic};
 use super::expression_compiler::string_literal;
 use super::function_compiler::{FunctionCompiler, Functionish};
 use super::name_allocator::NameAllocator;
@@ -28,11 +29,13 @@ pub fn command(args: &Vec<String>) {
   }
 
   let program = parse(&args[2]);
-  let assembly = compile(&program);
+  let compiler_output = compile(&program);
+
+  handle_diagnostics_cli(&compiler_output.diagnostics);
 
   let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
 
-  for line in assembly {
+  for line in compiler_output.assembly {
     file
       .write_all(line.as_bytes())
       .expect("Failed to write line");
@@ -82,26 +85,34 @@ pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
   return result.expect("Parse failed");
 }
 
-pub fn compile(program: &swc_ecma_ast::Program) -> Vec<String> {
+pub struct CompilerOutput {
+  pub diagnostics: Vec<Diagnostic>,
+  pub assembly: Vec<String>,
+}
+
+pub fn compile(program: &swc_ecma_ast::Program) -> CompilerOutput {
   let mut compiler = Compiler::default();
   compiler.compile_program(&program);
 
-  let mut lines = Vec::<String>::new();
+  let mut assembly = Vec::<String>::new();
   let mut first = true;
 
   for def in compiler.definitions {
     if first {
       first = false;
     } else {
-      lines.push("".to_string());
+      assembly.push("".to_string());
     }
 
     for line in def {
-      lines.push(line);
+      assembly.push(line);
     }
   }
 
-  return lines;
+  return CompilerOutput {
+    diagnostics: compiler.diagnostics,
+    assembly,
+  };
 }
 
 pub fn full_compile_raw(source: &str) -> String {
@@ -124,13 +135,16 @@ pub fn full_compile_raw(source: &str) -> String {
 
   let program = result.expect("Parse failed");
 
-  let lines = compile(&program);
+  let compiler_output = compile(&program);
 
-  return lines.join("\n");
+  // TODO: Handle diagnostics
+
+  return compiler_output.assembly.join("\n");
 }
 
 #[derive(Default)]
 struct Compiler {
+  diagnostics: Vec<Diagnostic>,
   definition_allocator: Rc<RefCell<NameAllocator>>,
   definitions: Vec<Vec<String>>,
 }
@@ -146,7 +160,8 @@ impl Compiler {
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
-    let scope_analysis = ScopeAnalysis::run(module);
+    let mut scope_analysis = ScopeAnalysis::run(module);
+    self.diagnostics.append(&mut scope_analysis.diagnostics);
     let scope = init_std_scope();
 
     use swc_ecma_ast::Decl;

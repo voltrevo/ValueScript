@@ -1,14 +1,15 @@
-use std::rc::Rc;
-use std::process::exit;
-use std::path::Path;
 use std::ffi::OsStr;
+use std::path::Path;
+use std::process::exit;
+use std::rc::Rc;
 
 use super::assemble::assemble;
+use super::compile::compile;
 use super::compile::full_compile_raw;
 use super::compile::parse;
-use super::compile::compile;
-use super::virtual_machine::VirtualMachine;
+use super::diagnostic::handle_diagnostics_cli;
 use super::virtual_machine::ValTrait;
+use super::virtual_machine::VirtualMachine;
 
 pub fn command(args: &Vec<String>) {
   if args.len() < 3 {
@@ -29,7 +30,7 @@ pub fn command(args: &Vec<String>) {
       let res = format_from_option(&args[argpos]);
       argpos += 1;
       res
-    },
+    }
     _ => format_from_path(&args[argpos]),
   };
 
@@ -66,7 +67,7 @@ fn format_from_option(option: &String) -> RunFormat {
     "--assembly" => RunFormat::Assembly,
     "--bytecode" => RunFormat::Bytecode,
     _ => std::panic!("Unrecognized option {}", option),
-  }
+  };
 }
 
 fn format_from_path(file_path: &String) -> RunFormat {
@@ -74,7 +75,7 @@ fn format_from_path(file_path: &String) -> RunFormat {
     .extension()
     .and_then(OsStr::to_str)
     .unwrap_or("");
-  
+
   return match ext {
     "ts" => RunFormat::TypeScript,
     "mts" => RunFormat::TypeScript,
@@ -90,29 +91,29 @@ fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
   return match format {
     RunFormat::TypeScript => {
       let ast = parse(file_path);
-      let assembly_lines = compile(&ast);
+      let compiler_output = compile(&ast);
+      handle_diagnostics_cli(&compiler_output.diagnostics);
 
       let mut assembly = String::new();
 
-      for line in assembly_lines {
+      for line in compiler_output.assembly {
         assembly.push_str(&line);
         assembly.push('\n');
       }
 
       return assemble(&assembly);
-    },
+    }
 
     RunFormat::Assembly => {
       let file_content = std::fs::read_to_string(&file_path)
         .expect(&std::format!("Failed to read file {}", file_path));
 
       assemble(&file_content)
-    },
+    }
 
-    RunFormat::Bytecode => Rc::new(
-      std::fs::read(&file_path)
-        .expect(&std::format!("Failed to read file {}", file_path))
-    ),
+    RunFormat::Bytecode => {
+      Rc::new(std::fs::read(&file_path).expect(&std::format!("Failed to read file {}", file_path)))
+    }
   };
 }
 
