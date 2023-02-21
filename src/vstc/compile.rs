@@ -85,6 +85,7 @@ pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
   return result.expect("Parse failed");
 }
 
+#[derive(serde::Serialize)]
 pub struct CompilerOutput {
   pub diagnostics: Vec<Diagnostic>,
   pub assembly: Vec<String>,
@@ -133,13 +134,19 @@ pub fn full_compile_raw(source: &str) -> String {
     None,
   );
 
-  let program = result.expect("Parse failed");
+  let compiler_output = match result {
+    Ok(program) => compile(&program),
+    Err(err) => CompilerOutput {
+      diagnostics: vec![Diagnostic {
+        level: DiagnosticLevel::Error,
+        message: err.to_string(),
+        span: swc_common::DUMMY_SP,
+      }],
+      assembly: Vec::<String>::new(),
+    },
+  };
 
-  let compiler_output = compile(&program);
-
-  // TODO: Handle diagnostics
-
-  return compiler_output.assembly.join("\n");
+  return serde_json::to_string(&compiler_output).expect("Failed json serialization");
 }
 
 #[derive(Default)]

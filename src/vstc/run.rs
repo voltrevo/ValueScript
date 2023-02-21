@@ -2,12 +2,23 @@ use std::ffi::OsStr;
 use std::path::Path;
 use std::process::exit;
 use std::rc::Rc;
+use std::sync::Arc;
+
+use swc_common::errors::DiagnosticBuilder;
+use swc_common::errors::Emitter;
+use swc_common::errors::Handler;
+use swc_common::FileName;
+use swc_common::SourceMap;
+use swc_ecma_ast::EsVersion;
+use swc_ecma_parser::Syntax;
+use swc_ecma_parser::TsConfig;
 
 use super::assemble::assemble;
 use super::compile::compile;
-use super::compile::full_compile_raw;
 use super::compile::parse;
 use super::diagnostic::handle_diagnostics_cli;
+use super::diagnostic::Diagnostic;
+use super::diagnostic::DiagnosticLevel;
 use super::virtual_machine::ValTrait;
 use super::virtual_machine::VirtualMachine;
 
@@ -45,14 +56,73 @@ pub fn command(args: &Vec<String>) {
   println!("{}", result);
 }
 
+#[derive(serde::Serialize)]
+pub struct RunResult {
+  pub diagnostics: Vec<Diagnostic>,
+  pub output: Result<String, String>,
+}
+
 pub fn full_run_raw(source: &str) -> String {
-  let vsm = full_compile_raw(source);
-  let bytecode = assemble(vsm.as_str());
+  let source_map = Arc::<SourceMap>::default();
+
+  let handler = Handler::with_emitter(true, false, Box::new(VsEmitter {}));
+
+  let swc_compiler = swc::Compiler::new(source_map.clone());
+
+  let file = source_map.new_source_file(FileName::Anon, source.into());
+
+  let result = swc_compiler.parse_js(
+    file,
+    &handler,
+    EsVersion::Es2022,
+    Syntax::Typescript(TsConfig::default()),
+    swc::config::IsModule::Bool(true),
+    None,
+  );
+
+  let compiler_output = match result {
+    Ok(program) => compile(&program),
+    Err(err) => {
+      return serde_json::to_string(&RunResult {
+        diagnostics: vec![Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: err.to_string(),
+          span: swc_common::DUMMY_SP,
+        }],
+        output: Err("Parse failed".into()),
+      })
+      .expect("Failed to serialize RunResult");
+    }
+  };
+
+  let mut have_compiler_errors = false;
+
+  for diagnostic in &compiler_output.diagnostics {
+    match diagnostic.level {
+      DiagnosticLevel::Error => have_compiler_errors = true,
+      DiagnosticLevel::InternalError => have_compiler_errors = true,
+      _ => (),
+    }
+  }
+
+  if have_compiler_errors {
+    return serde_json::to_string(&RunResult {
+      diagnostics: compiler_output.diagnostics,
+      output: Err("Compile failed".into()),
+    })
+    .expect("Failed to serialize RunResult");
+  }
+
+  let bytecode = assemble(compiler_output.assembly.join("\n").as_str());
 
   let mut vm = VirtualMachine::new();
   let result = vm.run(&bytecode, &[]);
 
-  return result.codify();
+  return serde_json::to_string(&RunResult {
+    diagnostics: compiler_output.diagnostics,
+    output: Ok(result.codify()),
+  })
+  .expect("Failed to serialize RunResult");
 }
 
 enum RunFormat {
@@ -137,4 +207,12 @@ fn show_help() {
   println!("");
   println!("NOTE:");
   println!("    <file> will be interpreted based on file extension if not otherwise specified");
+}
+
+struct VsEmitter {}
+
+impl Emitter for VsEmitter {
+  fn emit(&mut self, db: &DiagnosticBuilder<'_>) {
+    // TODO
+  }
 }

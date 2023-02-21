@@ -2152,6 +2152,8 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "queues",
+ "serde",
+ "serde_json",
  "swc",
  "swc_atoms",
  "swc_common",
