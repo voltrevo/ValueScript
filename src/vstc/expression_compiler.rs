@@ -1040,13 +1040,6 @@ impl<'a> ExpressionCompiler<'a> {
       CompiledExpression(CompiledExpression),
     }
 
-    // let obj = match TargetAccessor::compile(self, &callee_expr.obj) {
-    //   None => {
-    //     TargetAccessorOrCompiledExpression::CompiledExpression(self.compile(&callee_expr.obj, None))
-    //   }
-    //   Some(ta) => TargetAccessorOrCompiledExpression::TargetAccessor(ta),
-    // };
-
     let obj = match TargetAccessor::is_eligible_expr(self, &callee_expr.obj) {
       true => TargetAccessorOrCompiledExpression::TargetAccessor(TargetAccessor::compile(
         self,
@@ -1608,7 +1601,11 @@ impl TargetAccessor {
       _ => {
         ec.fnc.todo(
           expr.span(),
-          "TargetAccessor::is_eligible_expr for this expression type",
+          format!(
+            "TargetAccessor::is_eligible_expr for {}",
+            get_expr_type_str(expr)
+          )
+          .as_str(),
         );
 
         true
@@ -1628,10 +1625,8 @@ impl TargetAccessor {
             message: format!("Unresolved identifier: {}", ident.sym.to_string()),
           });
 
-          // None
           TargetAccessor::make_bad(ec)
         }
-        // Some(MappedName::Definition(_)) => None,
         Some(MappedName::Definition(def_name)) => {
           ec.fnc.diagnostics.push(Diagnostic {
             level: DiagnosticLevel::Error,
@@ -1641,7 +1636,6 @@ impl TargetAccessor {
 
           TargetAccessor::make_bad(ec)
         }
-        // Some(MappedName::QueuedFunction(_)) => None,
         Some(MappedName::QueuedFunction(qfn)) => {
           ec.fnc.diagnostics.push(Diagnostic {
             level: DiagnosticLevel::Error,
@@ -1685,15 +1679,14 @@ impl TargetAccessor {
       }
       SuperProp(super_prop) => {
         ec.fnc.todo(super_prop.span, "SuperProp expressions");
-        // None
         TargetAccessor::make_todo(ec)
-      } // _ => None,
+      }
       _ => {
         ec.fnc.todo(
           expr.span(),
-          "TargetAccessor::compile() for this expression type",
+          format!("TargetAccessor::compile for {}", get_expr_type_str(expr)).as_str(),
         );
-        // None
+
         TargetAccessor::make_todo(ec)
       }
     };
@@ -1747,4 +1740,48 @@ impl TargetAccessor {
       }
     }
   }
+}
+
+fn get_expr_type_str(expr: &swc_ecma_ast::Expr) -> &'static str {
+  use swc_ecma_ast::Expr::*;
+
+  return match expr {
+    This(_) => "This",
+    Ident(_) => "Ident",
+    Array(_) => "Array",
+    Object(_) => "Object",
+    Fn(_) => "Fn",
+    Unary(_) => "Unary",
+    Update(_) => "Update",
+    Bin(_) => "Bin",
+    Assign(_) => "Assign",
+    Seq(_) => "Seq",
+    Cond(_) => "Cond",
+    Call(_) => "Call",
+    Member(_) => "Member",
+    New(_) => "New",
+    Paren(_) => "Paren",
+    Arrow(_) => "Arrow",
+    Yield(_) => "Yield",
+    Await(_) => "Await",
+    Lit(_) => "Lit",
+    Tpl(_) => "Tpl",
+    TaggedTpl(_) => "TaggedTpl",
+    Class(_) => "Class",
+    MetaProp(_) => "MetaProp",
+    Invalid(_) => "Invalid",
+    TsTypeAssertion(_) => "TsTypeAssertion",
+    TsConstAssertion(_) => "TsConstAssertion",
+    TsNonNull(_) => "TsNonNull",
+    TsAs(_) => "TsAs",
+    OptChain(_) => "OptChain",
+    PrivateName(_) => "PrivateName",
+    SuperProp(_) => "SuperProp",
+    JSXMember(_) => "JSXMember",
+    JSXNamespacedName(_) => "JSXNamespacedName",
+    JSXEmpty(_) => "JSXEmpty",
+    JSXElement(_) => "JSXElement",
+    JSXFragment(_) => "JSXFragment",
+    TsInstantiation(_) => "TsInstantiation",
+  };
 }
