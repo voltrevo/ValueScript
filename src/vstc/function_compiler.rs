@@ -58,7 +58,7 @@ impl FunctionCompiler {
     };
   }
 
-  fn todo(&mut self, span: swc_common::Span, message: &str) {
+  pub fn todo(&mut self, span: swc_common::Span, message: &str) {
     self.diagnostics.push(Diagnostic {
       level: DiagnosticLevel::InternalError,
       message: format!("TODO: {}", message),

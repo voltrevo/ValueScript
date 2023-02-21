@@ -5,7 +5,7 @@ declare const Debug: {
 export default function main() {
   let triNum = 0;
 
-  for (let i = 1; ; i++) {
+  for (let i = 1;; i++) {
     triNum += i;
     const factorCount = countFactors(triNum);
 
