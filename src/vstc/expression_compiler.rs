@@ -1598,18 +1598,7 @@ impl TargetAccessor {
       },
       This(_) => true,
       Member(member) => TargetAccessor::is_eligible_expr(ec, &member.obj),
-      _ => {
-        ec.fnc.todo(
-          expr.span(),
-          format!(
-            "TargetAccessor::is_eligible_expr for {}",
-            get_expr_type_str(expr)
-          )
-          .as_str(),
-        );
-
-        true
-      }
+      _ => false, // TODO: Others may be eligible but not implemented?
     };
   }
 
