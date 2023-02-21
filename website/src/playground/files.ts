@@ -221,6 +221,52 @@ const files: Record<string, string | nil> = {
       return res;
     }
   `),
+
+  "examples/idGenerationError.ts": blockTrim(`
+    export default function main() {
+      let nextId = 1;
+          
+      function generateId() {
+        const result = nextId;
+        nextId++;
+      
+        return result;
+      }
+  
+      return [
+        generateId(),
+        generateId(),
+        generateId(),
+      ];
+    }
+  `),
+
+  "examples/idGeneration.ts": blockTrim(`
+    export default function main() {
+      let idGen = new IdGenerator();
+    
+      return [
+        idGen.generate(),
+        idGen.generate(),
+        idGen.generate(),
+      ];
+    }
+    
+    class IdGenerator {
+      nextId: number;
+    
+      constructor() {
+        this.nextId = 1;
+      }
+    
+      generate() {
+        const result = this.nextId;
+        this.nextId++;
+    
+        return result;
+      }
+    }
+  `),
 };
 
 export default files;

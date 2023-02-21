@@ -36,20 +36,49 @@ const workerUrl = URL.createObjectURL(
   new Blob([workerScript], { type: "application/javascript" }),
 );
 
+export type Diagnostic = {
+  level: "Lint" | "Error" | "InternalError" | "CompilerDebug";
+  message: string;
+  span: {
+    start: number;
+    end: number;
+    ctxt: number;
+  };
+};
+
+export type CompilerOutput = {
+  diagnostics: Diagnostic[];
+  assembly: string[];
+};
+
+export type RunResult = {
+  diagnostics: Diagnostic[];
+  output:
+    | { Ok: string }
+    | { Err: string };
+};
+
 export type Job<T> = {
   wait: () => Promise<T>;
   cancel: () => void;
 };
 
+export function mapJob<U, V>(job: Job<U>, f: (x: U) => V): Job<V> {
+  return {
+    wait: () => job.wait().then(f),
+    cancel: job.cancel,
+  };
+}
+
 export default class VslibPool {
   #pool = new valuescript.WorkerPool(workerUrl);
 
   run(source: string) {
-    return this.#Job("run", [source]) as Job<string>;
+    return this.#Job("run", [source]) as Job<RunResult>;
   }
 
   compile(source: string) {
-    return this.#Job("compile", [source]) as Job<string>;
+    return this.#Job("compile", [source]) as Job<CompilerOutput>;
   }
 
   #Job(method: string, args: unknown[]) {
@@ -70,7 +99,7 @@ export default class VslibPool {
 
         worker.onmessage = (evt) => {
           if ("ok" in evt.data) {
-            resolve(evt.data.ok);
+            resolve(JSON.parse(evt.data.ok));
           } else if ("err" in evt.data) {
             if (evt.data.err instanceof Error) {
               reject(evt.data.err);

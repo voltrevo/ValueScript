@@ -96,41 +96,41 @@ a, a:visited {
   white-space: normal;
 }
 
-#display #notes {
+#display #diagnostics {
   padding: 0;
   display: flex;
   flex-direction: column;
 }
 
-#display .note {
+#display .diagnostic {
   padding: 0.5em 1.5em;
 }
 
-#notes > .note:not(:first-child) {
+#diagnostics > .diagnostic:not(:first-child) {
   border-top: 1px solid black;
 }
 
-.note.info {
+.diagnostic.info {
   background-color: hsla(240, 100%, 50%, 0.1);
 }
 
-.note.warn {
+.diagnostic.warn, .diagnostic.lint {
   background-color: hsla(30, 100%, 50%, 0.1);
 }
 
-.note.error {
+.diagnostic.error {
   background-color: hsla(0, 100%, 50%, 0.1);
 }
 
-#display .note .note {
+#display .diagnostic .diagnostic {
   border: 1px solid black;
 }
 
-#display .note .note:first-child {
+#display .diagnostic .diagnostic:first-child {
   margin-top: 0.5em;
 }
 
-#display .note .note:not(:first-child) {
+#display .diagnostic .diagnostic:not(:first-child) {
   border-top: 0;
 }
 
