@@ -267,6 +267,138 @@ const files: Record<string, string | nil> = {
       }
     }
   `),
+
+  "examples/sideEffectsArticle/enablePirateError.ts": blockTrim(`
+    export default function main() {
+      let pirateEnabled = false;
+
+      function greet() {
+        if (!pirateEnabled) {
+          return "Hi";
+        }
+  
+        return "Ahoy";
+      }
+  
+      function enablePirate() {
+        pirateEnabled = true;
+        return "Done";
+      }
+  
+      return [
+        greet(),
+        enablePirate(),
+        greet(),
+      ];
+    }
+  `),
+
+  "examples/sideEffectsArticle/lyingAboutA.ts": blockTrim(`
+    export default function main() {
+      let a = 5;
+      a += 2;
+      
+      return a;
+    }
+  `),
+
+  "examples/sideEffectsArticle/add1To50WithMutation.ts": blockTrim(`
+    export default function main() {
+      let sum = 0;
+
+      for (let i = 1; i <= 50; i++) {
+        sum += i;
+      }
+
+      return sum;
+    }
+  `),
+
+  "examples/sideEffectsArticle/add1To50WithoutMutation.ts": blockTrim(`
+    export default function main() {
+      return makeRange(1, 51)
+        .reduce((a, b) => a + b);
+    }
+    
+    function makeRange(start: number, end: number): number[] {
+      if (start === end) {
+        return [];
+      }
+    
+      return [start].concat(
+        makeRange(start + 1, end),
+      );
+    }
+  `),
+
+  "examples/sideEffectsArticle/enablePirateWorkaround.ts": blockTrim(`
+    export default function main() {
+      let pirateEnabled = false;
+
+      function greet(pirateEnabled: boolean) {
+        if (!pirateEnabled) {
+          return "Hi";
+        }
+  
+        return "Ahoy";
+      }
+  
+      function enablePirate(
+        pirateEnabled: boolean,
+      ): [boolean, string] {
+        pirateEnabled = true;
+        return [pirateEnabled, "Done"];
+      }
+
+      const greetResponse1 = greet(pirateEnabled);
+
+      const enablePirateResult = enablePirate(pirateEnabled);
+      pirateEnabled = enablePirateResult[0];
+      const enablePirateResponse = enablePirateResult[1];
+      // (Destructuring isn't implemented yet)
+  
+      const greetResponse2 = greet(pirateEnabled);
+  
+      return [
+        greetResponse1,
+        enablePirateResponse,
+        greetResponse2,
+      ];
+    }
+  `),
+
+  "examples/sideEffectsArticle/actorEnablePirate.ts": blockTrim(`
+    export default function main() {
+      let actor = new Actor();
+  
+      return [
+        actor.greet(),
+        actor.enablePirate(),
+        actor.greet(),
+      ];
+    }
+
+    class Actor {
+      pirateEnabled: boolean; // (Member initializers aren't implemented yet)
+
+      constructor() {
+        this.pirateEnabled = false;
+      }
+
+      greet() {
+        if (!this.pirateEnabled) {
+          return "Hi";
+        }
+  
+        return "Ahoy";
+      }
+
+      enablePirate() {
+        this.pirateEnabled = true;
+        return "Done";
+      }
+    }
+  `),
 };
 
 export default files;
