@@ -624,7 +624,6 @@ impl<'a> ExpressionCompiler<'a> {
 
     for i in 0..object_exp.props.len() {
       use swc_ecma_ast::Prop;
-      use swc_ecma_ast::PropName;
       use swc_ecma_ast::PropOrSpread;
 
       match &object_exp.props[i] {
@@ -647,38 +646,10 @@ impl<'a> ExpressionCompiler<'a> {
           Prop::KeyValue(kv) => {
             let mut prop_element = "".to_string();
 
-            let key_assembly = match &kv.key {
-              PropName::Ident(ident) => std::format!("\"{}\"", ident.sym.to_string()),
-              PropName::Str(str_) =>
-              // TODO: Escaping
-              {
-                std::format!("\"{}\"", str_.value.to_string())
-              }
-              PropName::Num(num) =>
-              // TODO: JS number stringification (different from rust)
-              {
-                std::format!("\"{}\"", num.value.to_string())
-              }
-              PropName::Computed(comp) => {
-                // TODO: Always using a register is maybe not ideal
-                // At the least, the assembly supports definitions and should
-                // maybe support any value here
-                let reg = self
-                  .fnc
-                  .reg_allocator
-                  .allocate_numbered(&"computed_key".to_string());
-                let compiled = self.compile(&comp.expr, Some(reg.clone()));
-                assert_eq!(compiled.nested_registers.len(), 0);
-                sub_nested_registers.push(reg.clone());
+            let mut compiled_key = self.prop_name(&kv.key);
+            sub_nested_registers.append(&mut compiled_key.nested_registers);
 
-                std::format!("%{}", reg)
-              }
-              PropName::BigInt(bigint) => {
-                std::format!("\"{}\"", bigint.value.to_string())
-              }
-            };
-
-            prop_element += &key_assembly;
+            prop_element += &compiled_key.value_assembly;
             prop_element += ": ";
 
             let mut compiled_value = self.compile(&kv.value, None);
@@ -717,6 +688,48 @@ impl<'a> ExpressionCompiler<'a> {
           nested_registers: Vec::new(),
         }
       }
+    };
+  }
+
+  pub fn prop_name(&mut self, prop_name: &swc_ecma_ast::PropName) -> CompiledExpression {
+    use swc_ecma_ast::PropName;
+
+    let mut nested_registers = Vec::<String>::new();
+
+    let assembly = match &prop_name {
+      PropName::Ident(ident) => std::format!("\"{}\"", ident.sym.to_string()),
+      PropName::Str(str_) =>
+      // TODO: Escaping
+      {
+        std::format!("\"{}\"", str_.value.to_string())
+      }
+      PropName::Num(num) =>
+      // TODO: JS number stringification (different from rust)
+      {
+        std::format!("\"{}\"", num.value.to_string())
+      }
+      PropName::Computed(comp) => {
+        // TODO: Always using a register is maybe not ideal
+        // At the least, the assembly supports definitions and should
+        // maybe support any value here
+        let reg = self
+          .fnc
+          .reg_allocator
+          .allocate_numbered(&"computed_key".to_string());
+        let compiled = self.compile(&comp.expr, Some(reg.clone()));
+        assert_eq!(compiled.nested_registers.len(), 0);
+        nested_registers.push(reg.clone());
+
+        std::format!("%{}", reg)
+      }
+      PropName::BigInt(bigint) => {
+        std::format!("\"{}\"", bigint.value.to_string())
+      }
+    };
+
+    return CompiledExpression {
+      value_assembly: assembly,
+      nested_registers,
     };
   }
 
@@ -1283,7 +1296,7 @@ impl<'a> ExpressionCompiler<'a> {
             match &qfn.functionish {
               Functionish::Fn(fn_) => fn_.span,
               Functionish::Arrow(arrow) => arrow.span,
-              Functionish::Constructor(constructor) => constructor.span,
+              Functionish::Constructor(_, constructor) => constructor.span,
             },
             &qfn.definition_name,
             &qfn.capture_params,
@@ -1466,7 +1479,7 @@ impl<'a> ExpressionCompiler<'a> {
         match &qfn.functionish {
           Functionish::Fn(fn_) => fn_.span,
           Functionish::Arrow(arrow) => arrow.span,
-          Functionish::Constructor(constructor) => constructor.span,
+          Functionish::Constructor(_, constructor) => constructor.span,
         },
         &qfn.definition_name,
         &qfn.capture_params,

@@ -14,7 +14,7 @@ use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
 use super::diagnostic::{handle_diagnostics_cli, Diagnostic, DiagnosticLevel};
-use super::expression_compiler::string_literal;
+use super::expression_compiler::{string_literal, CompiledExpression, ExpressionCompiler};
 use super::function_compiler::{FunctionCompiler, Functionish};
 use super::name_allocator::NameAllocator;
 use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
@@ -811,9 +811,73 @@ impl Compiler {
 
     let mut constructor_defn_name: Option<String> = None;
 
+    let mut member_initializers_fnc = FunctionCompiler::new(definition_allocator.clone());
+
+    for class_member in &class_decl.class.body {
+      match class_member {
+        swc_ecma_ast::ClassMember::ClassProp(class_prop) => {
+          if class_prop.is_static {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "TODO: static props".to_string(),
+              span: class_prop.span,
+            });
+
+            continue;
+          }
+
+          let mut ec = ExpressionCompiler {
+            scope: parent_scope,
+            fnc: &mut member_initializers_fnc,
+          };
+
+          let compiled_key = ec.prop_name(&class_prop.key);
+
+          let compiled_value = match &class_prop.value {
+            None => CompiledExpression {
+              value_assembly: "undefined".to_string(),
+              nested_registers: vec![],
+            },
+            Some(expr) => ec.compile(expr, None),
+          };
+
+          ec.fnc.definition.push(format!(
+            "  submov {} {} %this",
+            compiled_key.value_assembly, compiled_value.value_assembly,
+          ));
+
+          for reg in compiled_key.nested_registers {
+            ec.fnc.reg_allocator.release(&reg);
+          }
+
+          for reg in compiled_value.nested_registers {
+            ec.fnc.reg_allocator.release(&reg);
+          }
+        }
+        swc_ecma_ast::ClassMember::PrivateProp(private_prop) => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: private props".to_string(),
+            span: private_prop.span,
+          });
+        }
+        _ => {}
+      }
+    }
+
+    let mut member_initializers_assembly = Vec::<String>::new();
+    member_initializers_assembly.append(&mut member_initializers_fnc.definition);
+
+    member_initializers_fnc.process_queue(parent_scope);
+    defn.append(&mut member_initializers_fnc.definition);
+
+    let mut has_constructor = false;
+
     for class_member in &class_decl.class.body {
       match class_member {
         swc_ecma_ast::ClassMember::Constructor(constructor) => {
+          has_constructor = true;
+
           let ctor_defn_name = definition_allocator
             .borrow_mut()
             .allocate(&format!("{}_constructor", class_name));
@@ -821,7 +885,7 @@ impl Compiler {
           self.compile_fn(
             ctor_defn_name.clone(),
             None,
-            Functionish::Constructor(constructor.clone()),
+            Functionish::Constructor(member_initializers_assembly.clone(), constructor.clone()),
             definition_allocator.clone(),
             parent_scope,
           );
@@ -830,6 +894,23 @@ impl Compiler {
         }
         _ => {}
       }
+    }
+
+    if member_initializers_assembly.len() > 0 && !has_constructor {
+      let ctor_defn_name = definition_allocator
+        .borrow_mut()
+        .allocate(&format!("{}_constructor", class_name));
+
+      defn.push(format!("@{} = function() {{", &ctor_defn_name,));
+
+      for line in member_initializers_assembly {
+        defn.push(line.clone());
+      }
+
+      defn.push("}".to_string());
+      defn.push("".to_string());
+
+      constructor_defn_name = Some(ctor_defn_name);
     }
 
     defn.push(format!(
@@ -885,15 +966,11 @@ impl Compiler {
             span: private_method.span,
           });
         }
-        ClassProp(prop) => {
-          if prop.value.is_some() {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: class property initializers".to_string(),
-              span: prop.span,
-            });
-          }
-        }
+
+        // Handled first because they need to be compiled before the
+        // constructor, regardless of syntax order
+        ClassProp(_) => {}
+
         PrivateProp(prop) => {
           if prop.value.is_some() {
             self.diagnostics.push(Diagnostic {

@@ -15,7 +15,7 @@ use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
 pub enum Functionish {
   Fn(swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
-  Constructor(swc_ecma_ast::Constructor),
+  Constructor(Vec<String>, swc_ecma_ast::Constructor),
 }
 
 #[derive(Clone, Debug)]
@@ -42,7 +42,7 @@ pub struct FunctionCompiler {
 }
 
 impl FunctionCompiler {
-  fn new(definition_allocator: Rc<RefCell<NameAllocator>>) -> FunctionCompiler {
+  pub fn new(definition_allocator: Rc<RefCell<NameAllocator>>) -> FunctionCompiler {
     let mut reg_allocator = NameAllocator::default();
     reg_allocator.allocate(&"return".to_string());
     reg_allocator.allocate(&"this".to_string());
@@ -85,9 +85,15 @@ impl FunctionCompiler {
       })
       .expect("Failed to queue function");
 
+    self_.process_queue(parent_scope);
+
+    return (self_.definition, self_.diagnostics);
+  }
+
+  pub fn process_queue(&mut self, parent_scope: &Scope) {
     loop {
-      match self_.queue.remove() {
-        Ok(qfn) => self_.compile_functionish(
+      match self.queue.remove() {
+        Ok(qfn) => self.compile_functionish(
           qfn.definition_name,
           qfn.fn_name,
           qfn.capture_params,
@@ -99,8 +105,6 @@ impl FunctionCompiler {
         }
       }
     }
-
-    return (self_.definition, self_.diagnostics);
   }
 
   fn compile_functionish(
@@ -155,7 +159,7 @@ impl FunctionCompiler {
           handle_param_pat(p, &mut self.diagnostics);
         }
       }
-      Functionish::Constructor(constructor) => {
+      Functionish::Constructor(_, constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => self.todo(
@@ -186,6 +190,15 @@ impl FunctionCompiler {
     heading += ") {";
 
     self.definition.push(heading);
+
+    match functionish {
+      Functionish::Constructor(members_assembly, _) => {
+        for line in members_assembly {
+          self.definition.push(line.clone());
+        }
+      }
+      _ => {}
+    }
 
     let mut handle_block_body = |block: &swc_ecma_ast::BlockStmt| {
       self.populate_fn_scope(block, &scope);
@@ -221,7 +234,7 @@ impl FunctionCompiler {
           expression_compiler.compile(expr, Some("return".to_string()));
         }
       },
-      Functionish::Constructor(constructor) => {
+      Functionish::Constructor(_, constructor) => {
         match &constructor.body {
           Some(block) => {
             handle_block_body(block);
