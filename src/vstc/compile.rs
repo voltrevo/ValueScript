@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::Path;
 use std::process::exit;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -25,8 +24,17 @@ pub fn command(args: &Vec<String>) {
     exit(1);
   }
 
-  let program = parse(&args[2]);
-  let compiler_output = compile(&program);
+  let source = std::fs::read_to_string(&args[2]).expect("Failed to read file");
+  let (program_optional, parse_diagnostics) = parse(&source);
+
+  handle_diagnostics_cli(&args[2], &parse_diagnostics);
+
+  let program = match program_optional {
+    Some(program) => program,
+    None => exit(1),
+  };
+
+  let compiler_output = compile_program(&program);
 
   handle_diagnostics_cli(&args[2], &compiler_output.diagnostics);
 
@@ -62,24 +70,22 @@ impl Emitter for DiagnosticCollector {
   }
 }
 
-pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
+pub fn parse(source: &str) -> (Option<swc_ecma_ast::Program>, Vec<Diagnostic>) {
   let source_map = Arc::<SourceMap>::default();
 
-  let diagnostics = Arc::new(Mutex::new(Vec::<Diagnostic>::new()));
+  let diagnostics_arc = Arc::new(Mutex::new(Vec::<Diagnostic>::new()));
 
   let handler = Handler::with_emitter(
     true,
     false,
     Box::new(DiagnosticCollector {
-      diagnostics: diagnostics.clone(),
+      diagnostics: diagnostics_arc.clone(),
     }),
   );
 
   let swc_compiler = swc::Compiler::new(source_map.clone());
 
-  let file = source_map
-    .load_file(Path::new(&file_path))
-    .expect("failed to load file");
+  let file = source_map.new_source_file(FileName::Anon, source.into());
 
   let result = swc_compiler.parse_js(
     file,
@@ -90,18 +96,19 @@ pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
     None,
   );
 
-  handle_diagnostics_cli(file_path, &*diagnostics.lock().unwrap());
+  let mut diagnostics = Vec::<Diagnostic>::new();
+  std::mem::swap(&mut diagnostics, &mut *diagnostics_arc.lock().unwrap());
 
-  return result.expect("Parse failed");
+  return (result.ok(), diagnostics);
 }
 
-#[derive(serde::Serialize)]
+#[derive(Default, serde::Serialize)]
 pub struct CompilerOutput {
   pub diagnostics: Vec<Diagnostic>,
   pub assembly: Vec<String>,
 }
 
-pub fn compile(program: &swc_ecma_ast::Program) -> CompilerOutput {
+pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
   let mut compiler = Compiler::default();
   compiler.compile_program(&program);
 
@@ -126,47 +133,18 @@ pub fn compile(program: &swc_ecma_ast::Program) -> CompilerOutput {
   };
 }
 
-pub fn full_compile_raw(source: &str) -> String {
-  let source_map = Arc::<SourceMap>::default();
+pub fn compile(source: &str) -> CompilerOutput {
+  let (program_optional, mut diagnostics) = parse(source);
 
-  let diagnostics = Arc::new(Mutex::new(Vec::<Diagnostic>::new()));
-
-  let handler = Handler::with_emitter(
-    true,
-    false,
-    Box::new(DiagnosticCollector {
-      diagnostics: diagnostics.clone(),
-    }),
-  );
-
-  let swc_compiler = swc::Compiler::new(source_map.clone());
-
-  let file = source_map.new_source_file(FileName::Anon, source.into());
-
-  let result = swc_compiler.parse_js(
-    file,
-    &handler,
-    EsVersion::Es2022,
-    Syntax::Typescript(TsConfig::default()),
-    swc::config::IsModule::Bool(true),
-    None,
-  );
-
-  let compiler_output = match result {
-    Ok(program) => compile(&program),
-    Err(_) => {
-      let mut res = CompilerOutput {
-        diagnostics: vec![],
-        assembly: Vec::<String>::new(),
-      };
-
-      std::mem::swap(&mut res.diagnostics, &mut *diagnostics.lock().unwrap());
-
-      res
-    }
+  let mut compiler_output = match program_optional {
+    Some(program) => compile_program(&program),
+    None => CompilerOutput::default(),
   };
 
-  return serde_json::to_string(&compiler_output).expect("Failed json serialization");
+  diagnostics.append(&mut compiler_output.diagnostics);
+  compiler_output.diagnostics = diagnostics;
+
+  return compiler_output;
 }
 
 #[derive(Default)]

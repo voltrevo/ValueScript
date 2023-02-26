@@ -15,7 +15,7 @@ use swc_ecma_parser::TsConfig;
 
 use super::assemble::assemble;
 use super::compile::compile;
-use super::compile::parse;
+use super::compile::compile_program;
 use super::diagnostic::handle_diagnostics_cli;
 use super::diagnostic::Diagnostic;
 use super::diagnostic::DiagnosticLevel;
@@ -62,38 +62,8 @@ pub struct RunResult {
   pub output: Result<String, String>,
 }
 
-pub fn full_run_raw(source: &str) -> String {
-  let source_map = Arc::<SourceMap>::default();
-
-  let handler = Handler::with_emitter(true, false, Box::new(VsEmitter {}));
-
-  let swc_compiler = swc::Compiler::new(source_map.clone());
-
-  let file = source_map.new_source_file(FileName::Anon, source.into());
-
-  let result = swc_compiler.parse_js(
-    file,
-    &handler,
-    EsVersion::Es2022,
-    Syntax::Typescript(TsConfig::default()),
-    swc::config::IsModule::Bool(true),
-    None,
-  );
-
-  let compiler_output = match result {
-    Ok(program) => compile(&program),
-    Err(err) => {
-      return serde_json::to_string(&RunResult {
-        diagnostics: vec![Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: err.to_string(),
-          span: swc_common::DUMMY_SP,
-        }],
-        output: Err("Parse failed".into()),
-      })
-      .expect("Failed to serialize RunResult");
-    }
-  };
+pub fn run(source: &str) -> RunResult {
+  let compiler_output = compile(source);
 
   let mut have_compiler_errors = false;
 
@@ -106,11 +76,10 @@ pub fn full_run_raw(source: &str) -> String {
   }
 
   if have_compiler_errors {
-    return serde_json::to_string(&RunResult {
+    return RunResult {
       diagnostics: compiler_output.diagnostics,
       output: Err("Compile failed".into()),
-    })
-    .expect("Failed to serialize RunResult");
+    };
   }
 
   let bytecode = assemble(compiler_output.assembly.join("\n").as_str());
@@ -118,11 +87,10 @@ pub fn full_run_raw(source: &str) -> String {
   let mut vm = VirtualMachine::new();
   let result = vm.run(&bytecode, &[]);
 
-  return serde_json::to_string(&RunResult {
+  return RunResult {
     diagnostics: compiler_output.diagnostics,
     output: Ok(result.codify()),
-  })
-  .expect("Failed to serialize RunResult");
+  };
 }
 
 enum RunFormat {
@@ -160,18 +128,11 @@ fn format_from_path(file_path: &String) -> RunFormat {
 fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
   return match format {
     RunFormat::TypeScript => {
-      let ast = parse(file_path);
-      let compiler_output = compile(&ast);
+      let source = std::fs::read_to_string(file_path).expect("Failed to read file");
+      let compiler_output = compile(&source);
       handle_diagnostics_cli(file_path, &compiler_output.diagnostics);
 
-      let mut assembly = String::new();
-
-      for line in compiler_output.assembly {
-        assembly.push_str(&line);
-        assembly.push('\n');
-      }
-
-      return assemble(&assembly);
+      return assemble(&compiler_output.assembly.join("\n"));
     }
 
     RunFormat::Assembly => {

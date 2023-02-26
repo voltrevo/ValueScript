@@ -10,10 +10,12 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
 pub fn compile(source: &str) -> String {
-    return vstc::compile::full_compile_raw(source);
+  let output = vstc::compile::compile(source);
+  return serde_json::to_string(&output).expect("Failed json serialization");
 }
 
 #[wasm_bindgen]
 pub fn run(source: &str) -> String {
-    return vstc::run::full_run_raw(source);
+  let run_result = vstc::run::run(source);
+  return serde_json::to_string(&run_result).expect("Failed json serialization");
 }
