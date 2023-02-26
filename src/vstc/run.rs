@@ -2,20 +2,9 @@ use std::ffi::OsStr;
 use std::path::Path;
 use std::process::exit;
 use std::rc::Rc;
-use std::sync::Arc;
-
-use swc_common::errors::DiagnosticBuilder;
-use swc_common::errors::Emitter;
-use swc_common::errors::Handler;
-use swc_common::FileName;
-use swc_common::SourceMap;
-use swc_ecma_ast::EsVersion;
-use swc_ecma_parser::Syntax;
-use swc_ecma_parser::TsConfig;
 
 use super::assemble::assemble;
 use super::compile::compile;
-use super::compile::compile_program;
 use super::diagnostic::handle_diagnostics_cli;
 use super::diagnostic::Diagnostic;
 use super::diagnostic::DiagnosticLevel;
@@ -168,12 +157,4 @@ fn show_help() {
   println!("");
   println!("NOTE:");
   println!("    <file> will be interpreted based on file extension if not otherwise specified");
-}
-
-struct VsEmitter {}
-
-impl Emitter for VsEmitter {
-  fn emit(&mut self, db: &DiagnosticBuilder<'_>) {
-    // TODO
-  }
 }
