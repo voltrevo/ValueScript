@@ -26,6 +26,33 @@ pub struct Diagnostic {
   pub span: swc_common::Span,
 }
 
+impl Diagnostic {
+  pub fn from_swc(swc_diagnostic: &swc_common::errors::Diagnostic) -> Option<Diagnostic> {
+    use swc_common::errors::Level;
+
+    let level = match swc_diagnostic.level {
+      Level::Bug => DiagnosticLevel::InternalError,
+      Level::Fatal => DiagnosticLevel::Error,
+      Level::PhaseFatal => DiagnosticLevel::Error,
+      Level::Error => DiagnosticLevel::Error,
+      Level::Warning => DiagnosticLevel::Lint,
+      Level::Note => return None,
+      Level::Help => return None,
+      Level::Cancelled => return None,
+      Level::FailureNote => return None,
+    };
+
+    return Some(Diagnostic {
+      level,
+      message: swc_diagnostic.message(),
+      span: swc_diagnostic
+        .span
+        .primary_span()
+        .unwrap_or(swc_common::DUMMY_SP),
+    });
+  }
+}
+
 pub fn handle_diagnostics_cli(file_path: &String, diagnostics: &Vec<Diagnostic>) {
   let mut has_error = false;
 

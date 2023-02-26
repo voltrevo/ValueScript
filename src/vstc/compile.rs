@@ -1,15 +1,13 @@
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::prelude::*;
+use std::path::Path;
 use std::process::exit;
 use std::rc::Rc;
-use std::{path::Path, sync::Arc};
+use std::sync::{Arc, Mutex};
 
 use swc_common::errors::{DiagnosticBuilder, Emitter};
-use swc_common::{
-  errors::{ColorConfig, Handler},
-  FileName, SourceMap, Spanned,
-};
+use swc_common::{errors::Handler, FileName, SourceMap, Spanned};
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
@@ -51,21 +49,31 @@ fn show_help() {
   println!("    vstc compile <entry point>");
 }
 
-struct VsEmitter {}
+struct DiagnosticCollector {
+  diagnostics: Arc<Mutex<Vec<Diagnostic>>>,
+}
 
-impl Emitter for VsEmitter {
+impl Emitter for DiagnosticCollector {
   fn emit(&mut self, db: &DiagnosticBuilder<'_>) {
-    // TODO
+    match Diagnostic::from_swc(&**db) {
+      Some(diagnostic) => self.diagnostics.lock().unwrap().push(diagnostic),
+      None => {}
+    }
   }
 }
 
 pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
   let source_map = Arc::<SourceMap>::default();
 
-  Handler::with_emitter(true, false, Box::new(VsEmitter {}));
+  let diagnostics = Arc::new(Mutex::new(Vec::<Diagnostic>::new()));
 
-  // TODO: Convert to diagnostics
-  let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(source_map.clone()));
+  let handler = Handler::with_emitter(
+    true,
+    false,
+    Box::new(DiagnosticCollector {
+      diagnostics: diagnostics.clone(),
+    }),
+  );
 
   let swc_compiler = swc::Compiler::new(source_map.clone());
 
@@ -81,6 +89,8 @@ pub fn parse(file_path: &String) -> swc_ecma_ast::Program {
     swc::config::IsModule::Bool(true),
     None,
   );
+
+  handle_diagnostics_cli(file_path, &*diagnostics.lock().unwrap());
 
   return result.expect("Parse failed");
 }
@@ -119,7 +129,15 @@ pub fn compile(program: &swc_ecma_ast::Program) -> CompilerOutput {
 pub fn full_compile_raw(source: &str) -> String {
   let source_map = Arc::<SourceMap>::default();
 
-  let handler = Handler::with_emitter(true, false, Box::new(VsEmitter {}));
+  let diagnostics = Arc::new(Mutex::new(Vec::<Diagnostic>::new()));
+
+  let handler = Handler::with_emitter(
+    true,
+    false,
+    Box::new(DiagnosticCollector {
+      diagnostics: diagnostics.clone(),
+    }),
+  );
 
   let swc_compiler = swc::Compiler::new(source_map.clone());
 
@@ -136,14 +154,16 @@ pub fn full_compile_raw(source: &str) -> String {
 
   let compiler_output = match result {
     Ok(program) => compile(&program),
-    Err(err) => CompilerOutput {
-      diagnostics: vec![Diagnostic {
-        level: DiagnosticLevel::Error,
-        message: err.to_string(),
-        span: swc_common::DUMMY_SP,
-      }],
-      assembly: Vec::<String>::new(),
-    },
+    Err(_) => {
+      let mut res = CompilerOutput {
+        diagnostics: vec![],
+        assembly: Vec::<String>::new(),
+      };
+
+      std::mem::swap(&mut res.diagnostics, &mut *diagnostics.lock().unwrap());
+
+      res
+    }
   };
 
   return serde_json::to_string(&compiler_output).expect("Failed json serialization");
