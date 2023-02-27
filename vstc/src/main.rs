@@ -1,17 +1,14 @@
-mod assemble;
-mod capture_finder;
-mod compile;
-mod diagnostic;
-mod expression_compiler;
-mod function_compiler;
-mod name_allocator;
-mod run;
-mod scope;
-mod scope_analysis;
-mod virtual_machine;
+mod assemble_command;
+mod compile_command;
+mod handle_diagnostics_cli;
+mod run_command;
 
 use std::env;
 use std::process::exit;
+
+use assemble_command::assemble_command;
+use compile_command::compile_command;
+use run_command::run_command;
 
 fn main() {
   let args: Vec<String> = env::args().collect();
@@ -26,17 +23,17 @@ fn main() {
   }
 
   if args.len() >= 2 && args[1] == "assemble" {
-    assemble::command(&args);
+    assemble_command(&args);
     return;
   }
 
   if args.len() >= 2 && args[1] == "run" {
-    run::command(&args);
+    run_command(&args);
     return;
   }
 
   if args.len() >= 2 && args[1] == "compile" {
-    compile::command(&args);
+    compile_command(&args);
     return;
   }
 

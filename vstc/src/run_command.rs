@@ -1,17 +1,12 @@
-use std::ffi::OsStr;
-use std::path::Path;
-use std::process::exit;
 use std::rc::Rc;
+use std::{ffi::OsStr, path::Path, process::exit};
 
-use super::assemble::assemble;
-use super::compile::compile;
-use super::diagnostic::handle_diagnostics_cli;
-use super::diagnostic::Diagnostic;
-use super::diagnostic::DiagnosticLevel;
-use super::virtual_machine::ValTrait;
-use super::virtual_machine::VirtualMachine;
+use valuescript_compiler::{assemble, compile};
+use valuescript_vm::VirtualMachine;
 
-pub fn command(args: &Vec<String>) {
+use super::handle_diagnostics_cli::handle_diagnostics_cli;
+
+pub fn run_command(args: &Vec<String>) {
   if args.len() < 3 {
     println!("ERROR: Unrecognized command\n");
     show_help();
@@ -43,43 +38,6 @@ pub fn command(args: &Vec<String>) {
   let result = vm.run(&bytecode, &args[argpos..]);
 
   println!("{}", result);
-}
-
-#[derive(serde::Serialize)]
-pub struct RunResult {
-  pub diagnostics: Vec<Diagnostic>,
-  pub output: Result<String, String>,
-}
-
-pub fn run(source: &str) -> RunResult {
-  let compiler_output = compile(source);
-
-  let mut have_compiler_errors = false;
-
-  for diagnostic in &compiler_output.diagnostics {
-    match diagnostic.level {
-      DiagnosticLevel::Error => have_compiler_errors = true,
-      DiagnosticLevel::InternalError => have_compiler_errors = true,
-      _ => (),
-    }
-  }
-
-  if have_compiler_errors {
-    return RunResult {
-      diagnostics: compiler_output.diagnostics,
-      output: Err("Compile failed".into()),
-    };
-  }
-
-  let bytecode = assemble(compiler_output.assembly.join("\n").as_str());
-
-  let mut vm = VirtualMachine::new();
-  let result = vm.run(&bytecode, &[]);
-
-  return RunResult {
-    diagnostics: compiler_output.diagnostics,
-    output: Ok(result.codify()),
-  };
 }
 
 enum RunFormat {

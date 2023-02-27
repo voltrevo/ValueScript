@@ -1,47 +1,6 @@
-use std::rc::Rc;  
-use std::process::exit;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::str::FromStr;
-
-pub fn command(args: &Vec<String>) {
-  if args.len() != 3 {
-    println!("ERROR: Unrecognized command\n");
-    show_help();
-    exit(1);
-  }
-
-  if args[2] == "-h" || args[2] == "--help" {
-    show_help();
-    return;
-  }
-
-  let read_result = std::fs::read_to_string(&args[2]);
-
-  if read_result.is_err() {
-    println!("Failed to read file {}", args[2]);
-    return;
-  }
-
-  let content = read_result.expect("");
-  let output_filename = "out.vsb";
-  let bytecode = assemble(&content);
-
-  let write_result = std::fs::write(output_filename, &*bytecode);
-
-  if write_result.is_err() {
-    println!("Failed to write file {}", output_filename);
-    std::process::exit(1);
-  }
-}
-
-fn show_help() {
-  println!("vstc assemble");
-  println!("");
-  println!("Convert ValueScript assembly to bytecode");
-  println!("");
-  println!("USAGE:");
-  println!("    vstc assemble <file>");
-}
 
 #[derive(Default)]
 struct LocationMap {
@@ -55,8 +14,9 @@ trait LocationMapper {
 }
 
 impl LocationMapper for LocationMap {
-  fn add_unresolved(&mut self, name: &String, output: &mut Vec<u8>){
-    self.references
+  fn add_unresolved(&mut self, name: &String, output: &mut Vec<u8>) {
+    self
+      .references
       .entry(name.clone())
       .or_default()
       .push(output.len());
@@ -70,11 +30,7 @@ impl LocationMapper for LocationMap {
       let location_optional = self.found_locations.get(name);
 
       if location_optional.is_none() {
-        std::panic!(
-          "Unresolved reference to {} at {}",
-          name,
-          ref_locations[0],
-        );
+        std::panic!("Unresolved reference to {} at {}", name, ref_locations[0],);
       }
 
       let location = location_optional.unwrap();
@@ -146,9 +102,11 @@ impl<'a> Assembler<'a> {
   fn parse_optional_whitespace(&mut self) {
     loop {
       match self.pos.peek() {
-        Some(' ') => {},
-        Some('\n') => {},
-        _ => { return; }
+        Some(' ') => {}
+        Some('\n') => {}
+        _ => {
+          return;
+        }
       }
 
       self.pos.next();
@@ -158,7 +116,10 @@ impl<'a> Assembler<'a> {
   fn assemble_definition(&mut self) {
     self.parse_exact("@");
     let def_name = self.parse_identifier();
-    self.definitions_map.found_locations.insert(def_name, self.output.len());
+    self
+      .definitions_map
+      .found_locations
+      .insert(def_name, self.output.len());
     self.parse_optional_whitespace();
     self.parse_exact("=");
     self.parse_optional_whitespace();
@@ -257,7 +218,9 @@ impl<'a> Assembler<'a> {
     let mut res = "".to_string();
 
     let leading_char = match pos.next() {
-      None => { return None; },
+      None => {
+        return None;
+      }
       Some(c) => c,
     };
 
@@ -269,7 +232,9 @@ impl<'a> Assembler<'a> {
 
     loop {
       match pos.next() {
-        None => { break; }
+        None => {
+          break;
+        }
         Some(c) => {
           if !is_identifier_char(c) {
             break;
@@ -382,7 +347,9 @@ impl<'a> Assembler<'a> {
       if next == ")" {
         self.fn_data.register_count_pos = self.output.len();
         self.output.push(0xff);
-        self.output.push((self.fn_data.register_map.len() - 3) as u8); // TODO: Handle >255
+        self
+          .output
+          .push((self.fn_data.register_map.len() - 3) as u8); // TODO: Handle >255
         break;
       }
 
@@ -393,7 +360,10 @@ impl<'a> Assembler<'a> {
       let param_name = self.parse_identifier();
 
       if self.fn_data.register_map.contains_key(param_name.as_str()) {
-        std::panic!("Unexpected duplicate parameter name at {}", self.get_pos_index());
+        std::panic!(
+          "Unexpected duplicate parameter name at {}",
+          self.get_pos_index()
+        );
       }
 
       self.get_register_index(param_name.as_str());
@@ -404,7 +374,9 @@ impl<'a> Assembler<'a> {
       if next == ")" {
         self.fn_data.register_count_pos = self.output.len();
         self.output.push(0xff);
-        self.output.push((self.fn_data.register_map.len() - 3) as u8); // TODO: Handle >255
+        self
+          .output
+          .push((self.fn_data.register_map.len() - 3) as u8); // TODO: Handle >255
         break;
       }
     }
@@ -415,7 +387,10 @@ impl<'a> Assembler<'a> {
     loop {
       self.parse_optional_whitespace();
 
-      let c = *self.pos.peek().expect("Expected instruction, label, or end of function");
+      let c = *self
+        .pos
+        .peek()
+        .expect("Expected instruction, label, or end of function");
 
       if c == '}' {
         self.output.push(Instruction::End as u8);
@@ -459,7 +434,7 @@ impl<'a> Assembler<'a> {
     let instr = self.parse_instruction_word();
 
     self.output.push(instr.clone() as u8);
-    
+
     for arg in get_instruction_layout(instr) {
       match arg {
         InstructionArg::Value => self.assemble_value(),
@@ -477,49 +452,44 @@ impl<'a> Assembler<'a> {
       Some('%') => {
         self.output.push(ValueType::Register as u8);
         self.assemble_register();
-      },
+      }
       Some('@') => {
         self.parse_exact("@");
         self.output.push(ValueType::Pointer as u8);
         let definition_name = self.parse_identifier();
-        self.definitions_map.add_unresolved(&definition_name, &mut self.output);
-      },
+        self
+          .definitions_map
+          .add_unresolved(&definition_name, &mut self.output);
+      }
       Some('$') => {
         self.parse_exact("$");
         self.output.push(ValueType::Builtin as u8);
         self.assemble_builtin();
-      },
+      }
       Some('[') => {
         self.assemble_array();
-      },
-      Some('-' | '.' | '0' ..= '9') => {
+      }
+      Some('-' | '.' | '0'..='9') => {
         self.assemble_number();
-      },
+      }
       Some('"') => {
         self.assemble_string();
-      },
+      }
       Some('{') => {
         self.assemble_object();
-      },
+      }
       Some(ref_c) => {
         let c = *ref_c;
 
-        let parsed = self.parse_one_of(&[
-          "void",
-          "undefined",
-          "null",
-          "false",
-          "true",
-          "",
-        ]);
-  
+        let parsed = self.parse_one_of(&["void", "undefined", "null", "false", "true", ""]);
+
         match parsed.as_str() {
           "void" => self.output.push(ValueType::Void as u8),
           "undefined" => self.output.push(ValueType::Undefined as u8),
           "null" => self.output.push(ValueType::Null as u8),
           "false" => self.output.push(ValueType::False as u8),
           "true" => self.output.push(ValueType::True as u8),
-  
+
           // TODO: Finish implementing the different values
           _ => std::panic!(
             "Unimplemented value type or unexpected character {} at {}",
@@ -527,7 +497,7 @@ impl<'a> Assembler<'a> {
             self.get_pos_index(),
           ),
         }
-      },
+      }
     }
   }
 
@@ -546,8 +516,8 @@ impl<'a> Assembler<'a> {
           self.pos.next();
           self.output.push(ValueType::End as u8);
           break;
-        },
-        _ => {},
+        }
+        _ => {}
       }
 
       self.assemble_value();
@@ -610,17 +580,21 @@ impl<'a> Assembler<'a> {
 
     advance_chars(&mut self.pos, label_name.len() + 1);
 
-    self.fn_data.labels_map.found_locations.insert(
-      label_name,
-      self.output.len(),
-    );
+    self
+      .fn_data
+      .labels_map
+      .found_locations
+      .insert(label_name, self.output.len());
   }
 
   fn assemble_label_read(&mut self) {
     self.parse_optional_whitespace();
     self.parse_exact(":");
     let label_name = self.parse_identifier();
-    self.fn_data.labels_map.add_unresolved(&label_name, &mut self.output);
+    self
+      .fn_data
+      .labels_map
+      .add_unresolved(&label_name, &mut self.output);
   }
 
   fn assemble_number(&mut self) {
@@ -628,10 +602,12 @@ impl<'a> Assembler<'a> {
 
     loop {
       match self.pos.peek() {
-        Some('-' | '.' | 'e' | '0' ..= '9') => {
+        Some('-' | '.' | 'e' | '0'..='9') => {
           num_string.push(self.pos.next().unwrap());
         }
-        _ => { break; }
+        _ => {
+          break;
+        }
       }
     }
 
@@ -686,7 +662,9 @@ impl<'a> Assembler<'a> {
         self.parse_exact("@");
         self.output.push(ValueType::Pointer as u8);
         let definition_name = self.parse_identifier();
-        self.definitions_map.add_unresolved(&definition_name, &mut self.output);
+        self
+          .definitions_map
+          .add_unresolved(&definition_name, &mut self.output);
       } else if c == '}' {
         self.output.push(ValueType::End as u8);
         self.pos.next();
@@ -721,7 +699,10 @@ impl<'a> Assembler<'a> {
     if get_result.is_none() {
       // TODO: Support >255 registers
       result = (self.fn_data.register_map.len() - 1) as u8;
-      self.fn_data.register_map.insert(register_name.to_string(), result);
+      self
+        .fn_data
+        .register_map
+        .insert(register_name.to_string(), result);
     } else {
       result = *get_result.unwrap();
     }
@@ -766,8 +747,7 @@ pub fn assemble(content: &str) -> Rc<Vec<u8>> {
   return Rc::new(assembler.output);
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum Instruction {
   End = 0x00,
   Mov = 0x01,
@@ -874,20 +854,11 @@ fn get_instruction_layout(instruction: Instruction) -> Vec<InstructionArg> {
 }
 
 fn is_leading_identifier_char(c: char) -> bool {
-  return
-    c == '_' ||
-    ('a' <= c && c <= 'z') ||
-    ('A' <= c && c <= 'Z')
-  ;
+  return c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
 }
 
 fn is_identifier_char(c: char) -> bool {
-  return
-    c == '_' ||
-    ('0' <= c && c <= '9') ||
-    ('a' <= c && c <= 'z') ||
-    ('A' <= c && c <= 'Z')
-  ;
+  return c == '_' || ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
 }
 
 enum ValueType {

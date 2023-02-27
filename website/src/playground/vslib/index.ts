@@ -2,6 +2,9 @@ export async function initVslib() {
   // deno-lint-ignore no-explicit-any
   const wasm: Record<string, any> = (await WebAssembly.instantiateStreaming(
     fetch(`${location.origin}/value_script_bg.wasm`),
+    {
+      "./valuescript_wasm_bg.js": { __wbindgen_throw },
+    },
   )).instance.exports;
 
   let WASM_VECTOR_LEN = 0;
@@ -126,6 +129,10 @@ export async function initVslib() {
       wasm.__wbindgen_add_to_stack_pointer(16);
       wasm.__wbindgen_free(r0, r1);
     }
+  }
+
+  function __wbindgen_throw(arg0: number, arg1: number) {
+    throw new Error(getStringFromWasm0(arg0, arg1));
   }
 
   return {

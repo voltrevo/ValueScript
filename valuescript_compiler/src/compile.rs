@@ -1,7 +1,4 @@
 use std::cell::RefCell;
-use std::fs::File;
-use std::io::prelude::*;
-use std::process::exit;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -10,52 +7,12 @@ use swc_common::{errors::Handler, FileName, SourceMap, Spanned};
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
-use super::diagnostic::{handle_diagnostics_cli, Diagnostic, DiagnosticLevel};
+use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::expression_compiler::{string_literal, CompiledExpression, ExpressionCompiler};
 use super::function_compiler::{FunctionCompiler, Functionish};
 use super::name_allocator::NameAllocator;
 use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
 use super::scope_analysis::ScopeAnalysis;
-
-pub fn command(args: &Vec<String>) {
-  if args.len() != 3 {
-    println!("ERROR: Unrecognized command\n");
-    show_help();
-    exit(1);
-  }
-
-  let source = std::fs::read_to_string(&args[2]).expect("Failed to read file");
-  let (program_optional, parse_diagnostics) = parse(&source);
-
-  handle_diagnostics_cli(&args[2], &parse_diagnostics);
-
-  let program = match program_optional {
-    Some(program) => program,
-    None => exit(1),
-  };
-
-  let compiler_output = compile_program(&program);
-
-  handle_diagnostics_cli(&args[2], &compiler_output.diagnostics);
-
-  let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
-
-  for line in compiler_output.assembly {
-    file
-      .write_all(line.as_bytes())
-      .expect("Failed to write line");
-    file.write_all(b"\n").expect("Failed to write line");
-  }
-}
-
-fn show_help() {
-  println!("vstc compile");
-  println!("");
-  println!("Compile ValueScript");
-  println!("");
-  println!("USAGE:");
-  println!("    vstc compile <entry point>");
-}
 
 struct DiagnosticCollector {
   diagnostics: Arc<Mutex<Vec<Diagnostic>>>,

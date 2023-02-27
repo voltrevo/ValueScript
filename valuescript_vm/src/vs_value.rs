@@ -1,12 +1,12 @@
 use std::rc::Rc;
 use std::str::FromStr;
 
-use super::vs_function::VsFunction;
-use super::vs_object::VsObject;
-use super::vs_array::VsArray;
-use super::vs_class::VsClass;
 use super::operations::{op_sub, op_submov};
 use super::stack_frame::StackFrame;
+use super::vs_array::VsArray;
+use super::vs_class::VsClass;
+use super::vs_function::VsFunction;
+use super::vs_object::VsObject;
 
 #[derive(Clone)]
 pub enum Val {
@@ -111,14 +111,16 @@ impl ValTrait for Val {
             res += ",";
 
             match val.typeof_() {
-              VsType::Undefined => {},
-              _ => { res += &val.val_to_string(); },
+              VsType::Undefined => {}
+              _ => {
+                res += &val.val_to_string();
+              }
             };
           }
 
           res
         }
-      },
+      }
       Object(_) => "[object Object]".to_string(),
       Function(_) => "[function]".to_string(),
       Class(_) => "[class]".to_string(),
@@ -188,7 +190,7 @@ impl ValTrait for Val {
       Class(_) => false,
       Static(val) => val.is_primitive(), // TODO: false?
       Custom(val) => val.is_primitive(),
-    }
+    };
   }
 
   fn to_primitive(&self) -> Val {
@@ -333,7 +335,7 @@ impl ValTrait for Val {
 
           res
         }
-      },
+      }
       Val::Object(object) => {
         if object.string_map.len() == 0 {
           return "{}".into();
@@ -357,7 +359,7 @@ impl ValTrait for Val {
         res += "}";
 
         res
-      },
+      }
       Val::Function(_) => "() => { [unavailable] }".to_string(),
       Val::Class(_) => "class { [unavailable] }".to_string(),
       Val::Static(val) => val.codify(),
@@ -395,15 +397,17 @@ impl std::fmt::Display for Val {
         }
 
         write!(f, " ]")
-      },
+      }
       Val::Object(object) => {
         if object.string_map.len() == 0 {
           return f.write_str("{}");
         }
 
         match f.write_str("{ ") {
-          Ok(_) => {},
-          Err(e) => { return Err(e); },
+          Ok(_) => {}
+          Err(e) => {
+            return Err(e);
+          }
         };
 
         let mut first = true;
@@ -419,7 +423,7 @@ impl std::fmt::Display for Val {
         }
 
         f.write_str(" }")
-      },
+      }
       Val::Function(_) => write!(f, "\x1b[36m[Function]\x1b[39m"),
       Val::Class(_) => write!(f, "\x1b[36m[Class]\x1b[39m"),
 
@@ -432,7 +436,7 @@ impl std::fmt::Display for Val {
 
 fn number_to_index(x: f64) -> Option<usize> {
   if x < 0_f64 || x != x.floor() {
-    return None
+    return None;
   }
 
   return Some(x as usize);
@@ -451,8 +455,12 @@ fn stringify_string(str: &String) -> String {
     };
 
     match escape_seq {
-      Some(seq) => { res += seq; },
-      None => { res.push(c); }
+      Some(seq) => {
+        res += seq;
+      }
+      None => {
+        res.push(c);
+      }
     };
   }
 

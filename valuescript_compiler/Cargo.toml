@@ -1,0 +1,16 @@
+[package]
+name = "valuescript_compiler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = "1.0"
+serde_json = "1.0"
+swc_atoms = "0.2"
+swc_common = { version = "0.17.22", features=["tty-emitter"] }
+swc_ecma_parser = "0.102.2"
+swc = "0.168.3"
+swc_ecma_ast = "0.76.0"
+queues = "1.0.2"

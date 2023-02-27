@@ -1447,6 +1447,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "swc_demo"
+version = "0.1.0"
+dependencies = [
+ "swc",
+ "swc_common",
+ "swc_ecma_ast",
+ "swc_ecma_parser",
+]
+
+[[package]]
 name = "swc_ecma_ast"
 version = "0.76.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2147,10 +2157,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "value_script"
+name = "valuescript_compiler"
 version = "0.1.0"
 dependencies = [
- "console_error_panic_hook",
  "queues",
  "serde",
  "serde_json",
@@ -2159,6 +2168,21 @@ dependencies = [
  "swc_common",
  "swc_ecma_ast",
  "swc_ecma_parser",
+]
+
+[[package]]
+name = "valuescript_vm"
+version = "0.1.0"
+
+[[package]]
+name = "valuescript_wasm"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "serde",
+ "serde_json",
+ "valuescript_compiler",
+ "valuescript_vm",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wee_alloc",
@@ -2175,6 +2199,14 @@ name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
+
+[[package]]
+name = "vstc"
+version = "0.1.0"
+dependencies = [
+ "valuescript_compiler",
+ "valuescript_vm",
+]
 
 [[package]]
 name = "wasi"

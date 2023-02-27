@@ -11,9 +11,14 @@ pub enum NameId {
   Builtin(Builtin),
 }
 
+// TODO: Make use of these in the next phase of the compiler, remove the
+// allow(dead_code) attributes
 #[derive(Clone)]
 pub struct Capture {
+  #[allow(dead_code)]
   ref_: swc_common::Span,
+
+  #[allow(dead_code)]
   captor_id: OwnerId,
 }
 

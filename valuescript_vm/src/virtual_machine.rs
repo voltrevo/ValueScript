@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
-use super::vs_value::{Val, ValTrait, LoadFunctionResult};
 use super::bytecode_decoder::BytecodeDecoder;
-use super::stack_frame::{StackFrame, FrameStepResult};
 use super::first_stack_frame::FirstStackFrame;
+use super::stack_frame::{FrameStepResult, StackFrame};
+use super::vs_value::{LoadFunctionResult, Val, ValTrait};
 
 pub struct VirtualMachine {
   pub frame: StackFrame,
@@ -50,14 +50,14 @@ impl VirtualMachine {
 
   pub fn step(&mut self) {
     match self.frame.step() {
-      FrameStepResult::Continue => {},
+      FrameStepResult::Continue => {}
       FrameStepResult::Pop(call_result) => {
         self.pop();
         self.frame.apply_call_result(call_result);
-      },
+      }
       FrameStepResult::Push(new_frame) => {
         self.push(new_frame);
-      },
+      }
     };
   }
 
