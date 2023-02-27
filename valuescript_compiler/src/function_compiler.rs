@@ -111,7 +111,7 @@ impl FunctionCompiler {
     &mut self,
     definition_name: String,
     fn_name: Option<String>,
-    mut capture_params: Vec<String>,
+    capture_params: Vec<String>,
     functionish: &Functionish,
     parent_scope: &Scope,
   ) {
@@ -130,75 +130,41 @@ impl FunctionCompiler {
     heading += &definition_name;
     heading += " = function(";
 
-    let mut params = Vec::<String>::new();
-    params.append(&mut capture_params);
+    let mut param_count = 0;
 
-    let mut handle_param_pat =
-      |pat: &swc_ecma_ast::Pat, diagnostics: &mut Vec<Diagnostic>| match pat {
-        swc_ecma_ast::Pat::Ident(binding_ident) => {
-          let param_name = binding_ident.id.sym.to_string();
-          params.push(param_name);
-        }
-        _ => {
-          diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: parameter destructuring".to_string(),
-            span: pat.span(),
-          });
-        }
-      };
+    for cap_param in &capture_params {
+      if param_count != 0 {
+        heading += ", ";
+      }
 
-    match functionish {
-      Functionish::Fn(fn_) => {
-        for p in &fn_.params {
-          handle_param_pat(&p.pat, &mut self.diagnostics);
-        }
-      }
-      Functionish::Arrow(arrow) => {
-        for p in &arrow.params {
-          handle_param_pat(p, &mut self.diagnostics);
-        }
-      }
-      Functionish::Constructor(_, constructor) => {
-        for potspp in &constructor.params {
-          match potspp {
-            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => self.todo(
-              ts_param_prop.span(),
-              "TypeScript parameter properties (what are these?)",
-            ),
-            swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              handle_param_pat(&p.pat, &mut self.diagnostics);
-            }
-          }
-        }
-      }
-    };
-
-    for i in 0..params.len() {
-      let reg = self.reg_allocator.allocate(&params[i]);
+      let reg = self.reg_allocator.allocate(cap_param);
 
       heading += "%";
       heading += &reg;
 
-      scope.set(params[i].clone(), MappedName::Register(reg));
+      scope.set(cap_param.clone(), MappedName::Register(reg));
 
-      if i != params.len() - 1 {
+      param_count += 1;
+    }
+
+    let param_registers = self.allocate_param_registers(functionish);
+
+    for reg in &param_registers {
+      if param_count != 0 {
         heading += ", ";
       }
+
+      heading += "%";
+      heading += reg;
+
+      param_count += 1;
     }
 
     heading += ") {";
 
     self.definition.push(heading);
 
-    match functionish {
-      Functionish::Constructor(members_assembly, _) => {
-        for line in members_assembly {
-          self.definition.push(line.clone());
-        }
-      }
-      _ => {}
-    }
+    self.add_param_code(functionish, &param_registers, &scope);
 
     let mut handle_block_body = |block: &swc_ecma_ast::BlockStmt| {
       self.populate_fn_scope(block, &scope);
@@ -245,6 +211,146 @@ impl FunctionCompiler {
     }
 
     self.definition.push("}".to_string());
+  }
+
+  fn allocate_param_registers(&mut self, functionish: &Functionish) -> Vec<String> {
+    let mut param_registers = Vec::<String>::new();
+
+    match functionish {
+      Functionish::Fn(fn_) => {
+        for p in &fn_.params {
+          param_registers.push(self.allocate_param_reg(&p.pat));
+        }
+      }
+      Functionish::Arrow(arrow) => {
+        for p in &arrow.params {
+          param_registers.push(self.allocate_param_reg(p));
+        }
+      }
+      Functionish::Constructor(_, constructor) => {
+        for potspp in &constructor.params {
+          match potspp {
+            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
+              self.todo(
+                ts_param_prop.span(),
+                "TypeScript parameter properties (what are these?)",
+              );
+
+              param_registers.push(
+                self
+                  .reg_allocator
+                  .allocate_numbered(&"_todo_ts_param_prop".to_string()),
+              );
+            }
+            swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
+              param_registers.push(self.allocate_param_reg(&p.pat))
+            }
+          }
+        }
+      }
+    };
+
+    return param_registers;
+  }
+
+  fn allocate_param_reg(&mut self, param_pat: &swc_ecma_ast::Pat) -> String {
+    use swc_ecma_ast::Pat;
+
+    match param_pat {
+      Pat::Ident(ident) => self.reg_allocator.allocate(&ident.id.sym.to_string()),
+      Pat::Assign(assign) => self.allocate_param_reg(&assign.left),
+      _ => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: parameter destructuring".to_string(),
+          span: param_pat.span(),
+        });
+
+        self
+          .reg_allocator
+          .allocate_numbered(&"_todo_param_pattern".to_string())
+      }
+    }
+  }
+
+  fn add_param_code(
+    &mut self,
+    functionish: &Functionish,
+    param_registers: &Vec<String>,
+    scope: &Scope,
+  ) {
+    match functionish {
+      Functionish::Fn(fn_) => {
+        for (i, p) in fn_.params.iter().enumerate() {
+          self.param_pat(&p.pat, &param_registers[i], scope);
+        }
+      }
+      Functionish::Arrow(arrow) => {
+        for (i, p) in arrow.params.iter().enumerate() {
+          self.param_pat(p, &param_registers[i], scope);
+        }
+      }
+      Functionish::Constructor(_, constructor) => {
+        for (i, potspp) in constructor.params.iter().enumerate() {
+          match potspp {
+            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
+              // Diagnostic emitted elsewhere
+            }
+            swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
+              self.param_pat(&p.pat, &param_registers[i], scope);
+            }
+          }
+        }
+      }
+    };
+  }
+
+  fn param_pat(&mut self, param_pat: &swc_ecma_ast::Pat, register: &String, scope: &Scope) {
+    use swc_ecma_ast::Pat;
+
+    match param_pat {
+      Pat::Ident(ident) => {
+        scope.set(
+          ident.id.sym.to_string(),
+          MappedName::Register(register.clone()),
+        );
+      }
+      Pat::Assign(assign) => {
+        self.param_pat(&assign.left, register, scope);
+
+        let provided_reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+
+        let initialized_label = self
+          .label_allocator
+          .allocate(&format!("{}_initialized", register));
+
+        self
+          .definition
+          .push(format!("  op!== %{} undefined %{}", register, provided_reg));
+
+        self
+          .definition
+          .push(format!("  jmpif %{} :{}", provided_reg, initialized_label));
+
+        self.reg_allocator.release(&provided_reg);
+
+        let mut expression_compiler = ExpressionCompiler {
+          fnc: self,
+          scope: scope,
+        };
+
+        let compiled = expression_compiler.compile(&assign.right, Some(register.clone()));
+
+        for reg in compiled.nested_registers {
+          self.reg_allocator.release(&reg);
+        }
+
+        self.definition.push(format!("{}:", initialized_label));
+      }
+      _ => {
+        // Diagnostic emitted elsewhere
+      }
+    }
   }
 
   fn populate_fn_scope(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
