@@ -1,5 +1,9 @@
 # ValueScript
 
+## [Playground](https://valuescript.org/playground)
+
+Try ValueScript instantly using your web browser.
+
 ## About
 
 ValueScript is a dialect of TypeScript with value semantics.
@@ -46,13 +50,35 @@ This is how ValueScript achieves the output below for the same input program:
 }
 ```
 
-To try this yourself, run the following:
+You can
+[see this in the playground](https://valuescript.org/playground/#tutorial/valueSemantics.ts),
+or run it locally:
 
 ```sh
+git clone git@github.com:voltrevo/ValueScript
+cd ValueScript
 cargo build -p vstc
 export PATH="$PATH:$(pwd)/target/debug"
 vstc run inputs/passing/readme-demo.ts
 ```
+
+## No Side Effects
+
+ValueScript has no side effects, with two exceptions:
+
+1. You can (in future) choose to introduce side effects via foreign functions
+2. Bugs (please
+   [report them](https://github.com/voltrevo/ValueScript/issues/new))
+
+ValueScript does this by behaving differently to TypeScript in three key ways:
+
+1. Value semantics (see [About](#about))
+2. Captured variables can't be mutated (mutation is otherwise encouraged)
+3. When `this` changes inside `obj.method()`, the updated `this` value is used
+   to mutate `obj` when the method returns
+
+(2) and (3) are described in more detail in
+[this article](https://voltrevo.medium.com/valuescripts-unique-strategy-for-preventing-side-effects-ac8133735a11).
 
 ## Intended Usage
 
@@ -215,9 +241,8 @@ let b = a;
 b.value = 37;
 
 type T = typeof a.value;
-//               ^^^^^^^
-//               TypeScript: 37
-//               ValueScript: 'str'
+//              ~~~~~~~ TypeScript: 37
+//              ~~~~~~~ ValueScript: "str"
 
 // The type checker assigns `string` to `T`.
 ```
