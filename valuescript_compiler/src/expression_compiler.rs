@@ -1469,7 +1469,7 @@ impl<'a> ExpressionCompiler<'a> {
     let mapped = self
       .scope
       .get(&ident_string)
-      .expect("Identifier not found in scope");
+      .expect(&format!("Identifier not found in scope {:?}", ident.span()));
 
     return match mapped {
       MappedName::Register(reg) => self.inline("%".to_string() + &reg, target_register),

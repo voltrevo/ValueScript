@@ -262,6 +262,9 @@ impl FunctionCompiler {
       Pat::Array(_) => self
         .reg_allocator
         .allocate_numbered(&"_array_pat".to_string()),
+      Pat::Object(_) => self
+        .reg_allocator
+        .allocate_numbered(&"_object_pat".to_string()),
       _ => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
@@ -297,7 +300,7 @@ impl FunctionCompiler {
         for (i, potspp) in constructor.params.iter().enumerate() {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
-              // Diagnostic emitted elsewhere
+              // TODO (Diagnostic emitted elsewhere)
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
               self.param_pat(&p.pat, &param_registers[i], scope);
@@ -319,35 +322,7 @@ impl FunctionCompiler {
         );
       }
       Pat::Assign(assign) => {
-        let provided_reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
-
-        let initialized_label = self
-          .label_allocator
-          .allocate(&format!("{}_initialized", register));
-
-        self
-          .definition
-          .push(format!("  op!== %{} undefined %{}", register, provided_reg));
-
-        self
-          .definition
-          .push(format!("  jmpif %{} :{}", provided_reg, initialized_label));
-
-        self.reg_allocator.release(&provided_reg);
-
-        let mut expression_compiler = ExpressionCompiler {
-          fnc: self,
-          scope: scope,
-        };
-
-        let compiled = expression_compiler.compile(&assign.right, Some(register.clone()));
-
-        for reg in compiled.nested_registers {
-          self.reg_allocator.release(&reg);
-        }
-
-        self.definition.push(format!("{}:", initialized_label));
-
+        self.default_expr(register, &assign.right, scope);
         self.param_pat(&assign.left, register, scope);
       }
       Pat::Array(array) => {
@@ -368,10 +343,96 @@ impl FunctionCompiler {
 
         self.reg_allocator.release(register);
       }
+      Pat::Object(object) => {
+        for prop in &object.props {
+          use swc_ecma_ast::ObjectPatProp;
+
+          match prop {
+            ObjectPatProp::KeyValue(kv) => {
+              let mut ec = ExpressionCompiler {
+                fnc: self,
+                scope: scope,
+              };
+
+              let param_reg = ec.fnc.allocate_param_reg(&kv.value);
+              let compiled_key = ec.prop_name(&kv.key);
+
+              ec.fnc.definition.push(format!(
+                "  sub %{} {} %{}",
+                register, compiled_key.value_assembly, param_reg
+              ));
+
+              for reg in compiled_key.nested_registers {
+                ec.fnc.reg_allocator.release(&reg);
+              }
+
+              ec.fnc.param_pat(&kv.value, &param_reg, scope);
+            }
+            ObjectPatProp::Assign(assign) => {
+              let key = assign.key.sym.to_string();
+              let reg = self.reg_allocator.allocate(&key);
+
+              self
+                .definition
+                .push(format!("  sub %{} \"{}\" %{}", register, key, reg));
+
+              if let Some(value) = &assign.value {
+                self.default_expr(&reg, value, scope);
+              }
+
+              scope.set(key, MappedName::Register(reg));
+            }
+            ObjectPatProp::Rest(rest) => {
+              self.todo(rest.span, "Rest pattern in object destructuring");
+            }
+          }
+        }
+
+        self.reg_allocator.release(register);
+      }
       _ => {
-        // Diagnostic emitted elsewhere
+        // TODO (Diagnostic emitted elsewhere)
       }
     }
+  }
+
+  fn default_expr(&mut self, register: &String, expr: &swc_ecma_ast::Expr, scope: &Scope) {
+    let provided_reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
+
+    let initialized_label = self
+      .label_allocator
+      .allocate(&format!("{}_initialized", register));
+
+    self
+      .definition
+      .push(format!("  op!== %{} undefined %{}", register, provided_reg));
+
+    self
+      .definition
+      .push(format!("  jmpif %{} :{}", provided_reg, initialized_label));
+
+    self.reg_allocator.release(&provided_reg);
+
+    let mut expression_compiler = ExpressionCompiler {
+      fnc: self,
+      scope: scope,
+    };
+
+    let compiled = expression_compiler.compile(expr, Some(register.clone()));
+
+    if compiled.value_assembly != format!("%{}", register) {
+      self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: "Default expression not compiled into target register (not sure whether this is possible in this case)".to_string(),
+        span: expr.span(),
+      });
+    }
+
+    for reg in compiled.nested_registers {
+      self.reg_allocator.release(&reg);
+    }
+
+    self.definition.push(format!("{}:", initialized_label));
   }
 
   fn populate_fn_scope(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
