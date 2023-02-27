@@ -227,18 +227,30 @@ type T = typeof a.value;
 <details>
 <summary>Concurrency</summary>
 
+tl;dr:
+
+- (This is not implemented yet)
+- ValueScript is multi-threaded
+- Calling an `async` function creates a new thread
+- Because ValueScript functions are pure (async or not), the concurrent
+  evaluation is guaranteed to be the same as sequential evaluation (ie no race
+  conditions)
+- You can write `value = promise.wait()` in a sync function, because this
+  doesn't block other threads from running
+
 By using value semantics, ValueScript ensures that a function, called with the
-same arguments, always returns the same value. This includes instance methods by
+same arguments, always returns the same value (except for any side effects you
+choose to introduce with foreign functions). This includes instance methods by
 considering the instance data to be one of the arguments.
 
-This means that if you wrap some calculation in a function that takes no
-arguments, it is destined to return the same value, regardless of what happens
-elsewhere in the program:
+This means that once a function has its arguments, its result is fully
+determined. It would be safe to evaluate the function concurrently because its
+output cannot be affected by other code:
 
 ```ts
-const f = () => {
+const f = (z: number): number => {
   const x = widget.calculate(37);
-  const y = expensiveCalculation(3, 5);
+  const y = expensiveCalculation(z, z);
 
   return x + y;
 };
@@ -246,29 +258,100 @@ const f = () => {
 
 Above, `widget` is captured by `f`. ValueScript requires that captured variables
 are `const`, which means that `widget` cannot change, and therefore
-`widget.calculate(37)` cannot change. This means that the value of `f()` is
-independent of any other work that happen in our program.
+`widget.calculate(37)` cannot change. This means that the value of `f(z)` is
+independent of any other work that happens in our program.
 
-Therefore, we could safely evaluate `f()` concurrently. In future, some
+Therefore, we could safely evaluate `f(z)` concurrently. In future, some
 calculations might automatically be upgraded to concurrent execution, but
-knowing when it is worthwhile to create a separate thread of execution is a
-complex and inexact science.
+knowing when it is worthwhile to create a separate thread is a complex and
+inexact science.
 
-Instead, in the foreseeable future, ValueScript will have a primitive called
-`vs.thread`:
+Instead, in the foreseeable future, ValueScript will allow concurrent evaluation
+of `async` functions. Even if `f` isn't already `async`, you could evaluate it
+concurrently like this:
 
 ```ts
-const f = vs.thread(() => {
+const fPromise = (async () => f(z))();
+```
+
+Alternatively, something like `vs.thread` could make this more clear:
+
+```ts
+const fPromise = vs.thread(() => f(z));
+```
+
+Of course, functions like `f` could be made `async` to begin with, to signal the
+intent that they are expensive calculations that justify a thread:
+
+```ts
+const f = async (z: number): Promise<number> => {
   const x = widget.calculate(37);
-  const y = expensiveCalculation(3, 5);
+  const y = expensiveCalculation(z, z);
 
   return x + y;
 });
 ```
 
-On the surface, `vs.thread` simply returns the function that is provided to it,
-unaltered. However, this signals the runtime to evaluate the function on another
-thread.
+Now `f` just returns a promise:
+
+```ts
+const fPromise = f(z);
+```
+
+Later, when you need the value inside `fPromise`, you can use `await` as normal:
+
+```ts
+const fValue = await fPromise;
+```
+
+However, this requires you to be inside an `async` function.
+
+In JavaScript, it would be a big no-no to allow a method that synchronously
+extracts the value of a promise by blocking evaluation until it became
+available. This is because JavaScript is single-threaded, and there's usually
+other work the runtime could be doing.
+
+In ValueScript, the other work happens in other threads, so there's no reason to
+prohibit it. ValueScript allows this via `promise.wait()`:
+
+```ts
+const fValue = f(z).wait();
+```
+
+Suppose instead that `f`, `widget.calculate`, and `expensiveCalculation` are all
+sync functions. Suppose that `f` is part of an important API - it has users and
+you can't require them to make changes. Allowing `.wait` means those users can
+still benefit this multithreaded version of `f`:
+
+```ts
+const f = (z: number): number => {
+  const [x, y] = Promise.all([
+    vs.thread(() => widget.calculate(37)),
+    vs.thread(() => expensiveCalculation(z, z)),
+  ]).wait();
+
+  return x + y;
+};
+```
+
+You could also simplify code like `f` with a utility like `parallel`:
+
+```ts
+// Simple version that unnecessarily widens T when the jobs return different
+// types
+function parallel<T>(...jobs: (() => T)[]): T[] {
+  return Promise.all(jobs.map(vs.thread)).wait();
+}
+
+const f = (z: number): number => {
+  const [x, y] = parallel(
+    () => widget.calculate(37),
+    () => expensiveCalculation(z, z),
+  );
+
+  return x + y;
+};
+```
 
 </details>
 
