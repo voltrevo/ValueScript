@@ -49,7 +49,7 @@ This is how ValueScript achieves the output below for the same input program:
 To try this yourself, run the following:
 
 ```sh
-cargo build --bin vstc
+cargo build -p vstc
 export PATH="$PATH:$(pwd)/target/debug"
 vstc run inputs/passing/readme-demo.ts
 ```
