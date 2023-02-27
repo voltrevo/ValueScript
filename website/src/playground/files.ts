@@ -100,11 +100,7 @@ const files: Record<string, string | nil> = {
     }
 
     class Counter {
-      next: number;
-
-      constructor() {
-        this.next = 1;
-      }
+      next = 1;
 
       get() {
         return this.next++;
@@ -379,11 +375,7 @@ const files: Record<string, string | nil> = {
     }
 
     class Actor {
-      pirateEnabled: boolean; // (Member initializers aren't implemented yet)
-
-      constructor() {
-        this.pirateEnabled = false;
-      }
+      pirateEnabled = false;
 
       greet() {
         if (!this.pirateEnabled) {
