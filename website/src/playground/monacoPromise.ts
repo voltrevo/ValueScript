@@ -4,7 +4,7 @@ import * as MonacoImport from "https://esm.sh/v99/monaco-editor@0.34.1/esm/vs/ed
 // export * from "https://esm.sh/v99/monaco-editor@0.34.1/esm/vs/editor/editor.api.d.ts";
 
 const script = document.createElement("script");
-script.src = "/monaco.bundle.js";
+script.src = "/monaco/monaco.bundle.js";
 document.head.append(script);
 
 const monacoPromise = new Promise<typeof MonacoImport>((resolve, reject) => {
