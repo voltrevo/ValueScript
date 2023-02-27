@@ -259,6 +259,9 @@ impl FunctionCompiler {
     match param_pat {
       Pat::Ident(ident) => self.reg_allocator.allocate(&ident.id.sym.to_string()),
       Pat::Assign(assign) => self.allocate_param_reg(&assign.left),
+      Pat::Array(_) => self
+        .reg_allocator
+        .allocate_numbered(&"_array_pat".to_string()),
       _ => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
@@ -316,8 +319,6 @@ impl FunctionCompiler {
         );
       }
       Pat::Assign(assign) => {
-        self.param_pat(&assign.left, register, scope);
-
         let provided_reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
 
         let initialized_label = self
@@ -346,6 +347,26 @@ impl FunctionCompiler {
         }
 
         self.definition.push(format!("{}:", initialized_label));
+
+        self.param_pat(&assign.left, register, scope);
+      }
+      Pat::Array(array) => {
+        for (i, elem_opt) in array.elems.iter().enumerate() {
+          let elem = match elem_opt {
+            Some(elem) => elem,
+            None => continue,
+          };
+
+          let elem_reg = self.allocate_param_reg(elem);
+
+          self
+            .definition
+            .push(format!("  sub %{} {} %{}", register, i, elem_reg));
+
+          self.param_pat(elem, &elem_reg, scope);
+        }
+
+        self.reg_allocator.release(register);
       }
       _ => {
         // Diagnostic emitted elsewhere
