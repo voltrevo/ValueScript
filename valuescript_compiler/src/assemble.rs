@@ -30,7 +30,7 @@ impl LocationMapper for LocationMap {
       let location_optional = self.found_locations.get(name);
 
       if location_optional.is_none() {
-        std::panic!("Unresolved reference to {} at {}", name, ref_locations[0],);
+        std::panic!("Unresolved reference to {} at {}", name, ref_locations[0]);
       }
 
       let location = location_optional.unwrap();

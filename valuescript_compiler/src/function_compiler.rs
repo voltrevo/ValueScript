@@ -7,6 +7,7 @@ use swc_common::Spanned;
 
 use super::capture_finder::CaptureFinder;
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
+use super::expression_compiler::CompiledExpression;
 use super::expression_compiler::ExpressionCompiler;
 use super::name_allocator::NameAllocator;
 use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
@@ -357,14 +358,14 @@ impl FunctionCompiler {
               let param_reg = ec.fnc.allocate_param_reg(&kv.value);
               let compiled_key = ec.prop_name(&kv.key);
 
-              ec.fnc.definition.push(format!(
+              let sub_instr = format!(
                 "  sub %{} {} %{}",
-                register, compiled_key.value_assembly, param_reg
-              ));
+                register,
+                ec.fnc.use_(compiled_key),
+                param_reg
+              );
 
-              for reg in compiled_key.nested_registers {
-                ec.fnc.reg_allocator.release(&reg);
-              }
+              ec.fnc.definition.push(sub_instr);
 
               ec.fnc.param_pat(&kv.value, &param_reg, scope);
             }
@@ -420,16 +421,12 @@ impl FunctionCompiler {
 
     let compiled = expression_compiler.compile(expr, Some(register.clone()));
 
-    if compiled.value_assembly != format!("%{}", register) {
+    if self.use_(compiled) != format!("%{}", register) {
       self.diagnostics.push(Diagnostic {
         level: DiagnosticLevel::InternalError,
         message: "Default expression not compiled into target register (not sure whether this is possible in this case)".to_string(),
         span: expr.span(),
       });
-    }
-
-    for reg in compiled.nested_registers {
-      self.reg_allocator.release(&reg);
     }
 
     self.definition.push(format!("{}:", initialized_label));
@@ -786,18 +783,17 @@ impl FunctionCompiler {
 
         let condition = expression_compiler.compile(&*if_.test, None);
 
-        for reg in condition.nested_registers {
-          self.reg_allocator.release(&reg);
-        }
+        // Usually we wouldn't capture the value_assembly before release, but
+        // it's safe to do so here, and allows cond_reg to re-use a register
+        // from the condition
+        let condition_asm = self.use_(condition);
 
         let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
 
         // TODO: Add negated jmpif instruction to avoid this
-        self.definition.push(std::format!(
-          "  op! {} %{}",
-          condition.value_assembly,
-          cond_reg,
-        ));
+        self
+          .definition
+          .push(std::format!("  op! {} %{}", condition_asm, cond_reg));
 
         let else_label = self.label_allocator.allocate_numbered(&"else".to_string());
 
@@ -852,18 +848,17 @@ impl FunctionCompiler {
 
         let condition = expression_compiler.compile(&*while_.test, None);
 
-        for reg in condition.nested_registers {
-          self.reg_allocator.release(&reg);
-        }
+        // Usually we wouldn't capture the value_assembly before release, but
+        // it's safe to do so here, and allows cond_reg to re-use a register
+        // from the condition
+        let condition_asm = self.use_(condition);
 
         let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
 
         // TODO: Add negated jmpif instruction to avoid this
-        self.definition.push(std::format!(
-          "  op! {} %{}",
-          condition.value_assembly,
-          cond_reg,
-        ));
+        self
+          .definition
+          .push(std::format!("  op! {} %{}", condition_asm, cond_reg));
 
         let mut jmpif_instr = "  jmpif %".to_string();
         jmpif_instr += &cond_reg;
@@ -909,14 +904,10 @@ impl FunctionCompiler {
 
         let condition = expression_compiler.compile(&*do_while.test, None);
 
-        for reg in condition.nested_registers {
-          self.reg_allocator.release(&reg);
-        }
-
         self.definition.push(format!("{}:", continue_label));
 
         let mut jmpif_instr = "  jmpif ".to_string();
-        jmpif_instr += &condition.value_assembly;
+        jmpif_instr += &self.use_(condition);
         jmpif_instr += " :";
         jmpif_instr += &start_label;
         self.definition.push(jmpif_instr);
@@ -975,18 +966,17 @@ impl FunctionCompiler {
 
             let condition = ec.compile(cond, None);
 
-            for reg in condition.nested_registers {
-              self.reg_allocator.release(&reg);
-            }
+            // Usually we wouldn't capture the value_assembly before release, but
+            // it's safe to do so here, and allows cond_reg to re-use a register
+            // from the condition
+            let condition_asm = self.use_(condition);
 
             let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
 
             // TODO: Add negated jmpif instruction to avoid this
-            self.definition.push(std::format!(
-              "  op! {} %{}",
-              condition.value_assembly,
-              cond_reg,
-            ));
+            self
+              .definition
+              .push(std::format!("  op! {} %{}", condition_asm, cond_reg));
 
             let mut jmpif_instr = "  jmpif %".to_string();
             jmpif_instr += &cond_reg;
@@ -1087,8 +1077,30 @@ impl FunctionCompiler {
       None,
     );
 
-    for reg in compiled.nested_registers {
-      self.reg_allocator.release(&reg);
+    self.use_(compiled);
+  }
+
+  pub fn use_(&mut self, mut compiled_expr: CompiledExpression) -> String {
+    let asm = compiled_expr.value_assembly;
+
+    for reg in &compiled_expr.nested_registers {
+      self.reg_allocator.release(reg);
     }
+
+    compiled_expr.release_checker.has_unreleased_registers = false;
+
+    return asm;
+  }
+
+  pub fn use_ref(&mut self, compiled_expr: &mut CompiledExpression) -> String {
+    let asm = compiled_expr.value_assembly.clone();
+
+    for reg in &compiled_expr.nested_registers {
+      self.reg_allocator.release(reg);
+    }
+
+    compiled_expr.release_checker.has_unreleased_registers = false;
+
+    return asm;
   }
 }

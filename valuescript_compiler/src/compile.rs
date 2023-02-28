@@ -789,25 +789,23 @@ impl Compiler {
           let compiled_key = ec.prop_name(&class_prop.key);
 
           let compiled_value = match &class_prop.value {
-            None => CompiledExpression {
+            None =>
+            /* CompiledExpression {
               value_assembly: "undefined".to_string(),
               nested_registers: vec![],
-            },
+            } */
+            {
+              CompiledExpression::new("undefined".to_string(), vec![])
+            }
             Some(expr) => ec.compile(expr, None),
           };
 
-          ec.fnc.definition.push(format!(
-            "  submov {} {} %this",
-            compiled_key.value_assembly, compiled_value.value_assembly,
-          ));
+          let key_asm = ec.fnc.use_(compiled_key);
+          let value_asm = ec.fnc.use_(compiled_value);
 
-          for reg in compiled_key.nested_registers {
-            ec.fnc.reg_allocator.release(&reg);
-          }
-
-          for reg in compiled_value.nested_registers {
-            ec.fnc.reg_allocator.release(&reg);
-          }
+          ec.fnc
+            .definition
+            .push(format!("  submov {} {} %this", key_asm, value_asm));
         }
         swc_ecma_ast::ClassMember::PrivateProp(private_prop) => {
           self.diagnostics.push(Diagnostic {
@@ -856,7 +854,7 @@ impl Compiler {
         .borrow_mut()
         .allocate(&format!("{}_constructor", class_name));
 
-      defn.push(format!("@{} = function() {{", &ctor_defn_name,));
+      defn.push(format!("@{} = function() {{", &ctor_defn_name));
 
       for line in member_initializers_assembly {
         defn.push(line.clone());
