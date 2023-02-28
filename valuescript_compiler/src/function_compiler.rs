@@ -629,7 +629,7 @@ impl FunctionCompiler {
 
         full_captures.push(cap.clone());
 
-        for nested_caps in direct_captures_map.get(&cap) {
+        if let Some(nested_caps) = direct_captures_map.get(&cap) {
           for nested_cap in nested_caps {
             cap_queue
               .add(nested_cap.clone())
