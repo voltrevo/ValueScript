@@ -834,8 +834,14 @@ impl ScopeAnalysis {
       Expr::Paren(paren) => {
         self.expr(scope, &paren.expr);
       }
-      Expr::Tpl(_) => {}
-      Expr::TaggedTpl(_) => {}
+      Expr::Tpl(tpl) => {
+        for elem in &tpl.exprs {
+          self.expr(scope, elem);
+        }
+      }
+      Expr::TaggedTpl(_) => {
+        // TODO (diagnostic emitted elsewhere)
+      }
       Expr::Arrow(arrow) => {
         self.arrow(scope, arrow);
       }
