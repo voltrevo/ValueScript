@@ -1,3 +1,5 @@
+// test_output! [71,839,1471,6857]
+
 export default function main() {
   return factorize(600851475143);
 }

@@ -1,3 +1,5 @@
+// test_output! 906609
+
 export default function main() {
   let largest = 0;
 

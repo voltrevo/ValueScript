@@ -2,6 +2,7 @@ mod assemble_command;
 mod compile_command;
 mod handle_diagnostics_cli;
 mod run_command;
+mod test_inputs;
 
 use std::env;
 use std::process::exit;

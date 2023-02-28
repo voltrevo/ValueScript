@@ -1,3 +1,5 @@
+// test_output! 4613732
+
 export default function main() {
   let sum = 0;
 
@@ -5,8 +7,8 @@ export default function main() {
   let fb = 1;
 
   while (true) {
-    let f = fa + fb;
-    
+    const f = fa + fb;
+
     if (f > 4000000) {
       return sum;
     }
