@@ -1,3 +1,5 @@
+// test_output! 1074
+
 export default function main() {
   const tower = [
     [75],

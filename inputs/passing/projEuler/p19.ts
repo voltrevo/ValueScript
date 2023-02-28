@@ -1,3 +1,5 @@
+// test_output! 171
+
 declare const Debug: {
   log: (...args: unknown[]) => undefined;
 };

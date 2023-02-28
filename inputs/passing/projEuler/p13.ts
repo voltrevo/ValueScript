@@ -1,3 +1,5 @@
+// test_output! "Probably 5537376230 (trailing digits: 39036)"
+
 export default function main() {
   const numStrs = [
     '37107287533902102798797998220837590246510135740250',

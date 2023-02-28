@@ -1,3 +1,5 @@
+// test_output! 137846528820
+
 export default function main() {
   let rc = new RouteCalculator();
   return rc.calculate(20, 20);

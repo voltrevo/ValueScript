@@ -24,12 +24,16 @@ mod tests {
 
     let mut failed_paths = HashSet::<PathBuf>::new();
 
-    let files = get_files_recursively(input_dir_path).expect("Failed to get files");
+    let mut files = get_files_recursively(input_dir_path).expect("Failed to get files");
+    files.sort();
+
     for file_path in files {
       let file_contents = fs::read_to_string(&file_path).expect("Failed to read file contents");
 
       if let Some(first_line) = file_contents.lines().next() {
         if first_line.starts_with("// test_output! ") {
+          println!("\nTesting {} ...", file_path.to_str().unwrap());
+
           let output_str = first_line
             .splitn(2, "// test_output! ")
             .nth(1)
@@ -62,10 +66,8 @@ mod tests {
 
           if result_str != output_str {
             println!(
-              "Failed {} (expected \"{}\", got \"{}\")",
-              file_path.to_str().unwrap(),
-              output_str,
-              result_str,
+              "  Expected: \"{}\"\n  Actual:   \"{}\"\n",
+              output_str, result_str,
             );
 
             failed_paths.insert(file_path.clone());

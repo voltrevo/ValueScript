@@ -1,3 +1,5 @@
+// test_output! 232792560
+
 declare const Debug: {
   log: (...args: unknown[]) => undefined;
 };
@@ -19,7 +21,7 @@ function lcm(leftFactors: number[], rightFactors: number[]): number[] {
     while (leftFactors[0] < rightFactors[0]) {
       factors.push(leftFactors.shift()!);
     }
-  
+
     while (rightFactors[0] < leftFactors[0]) {
       factors.push(rightFactors.shift()!);
     }

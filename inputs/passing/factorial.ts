@@ -1,8 +1,8 @@
-export default function main(n) {
+export default function main(n: string) {
   return factorial(+n);
 }
 
-function factorial(n) {
+function factorial(n: number): number {
   if (n === 0) {
     return 1;
   }
