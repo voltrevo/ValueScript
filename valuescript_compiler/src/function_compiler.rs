@@ -287,12 +287,12 @@ impl FunctionCompiler {
     match functionish {
       Functionish::Fn(fn_) => {
         for (i, p) in fn_.params.iter().enumerate() {
-          self.param_pat(&p.pat, &param_registers[i], scope);
+          self.decl_or_param_pat(&p.pat, &param_registers[i], scope);
         }
       }
       Functionish::Arrow(arrow) => {
         for (i, p) in arrow.params.iter().enumerate() {
-          self.param_pat(p, &param_registers[i], scope);
+          self.decl_or_param_pat(p, &param_registers[i], scope);
         }
       }
       Functionish::Constructor(_, constructor) => {
@@ -302,7 +302,7 @@ impl FunctionCompiler {
               // TODO (Diagnostic emitted elsewhere)
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              self.param_pat(&p.pat, &param_registers[i], scope);
+              self.decl_or_param_pat(&p.pat, &param_registers[i], scope);
             }
           }
         }
@@ -310,10 +310,10 @@ impl FunctionCompiler {
     };
   }
 
-  fn param_pat(&mut self, param_pat: &swc_ecma_ast::Pat, register: &String, scope: &Scope) {
+  fn decl_or_param_pat(&mut self, pat: &swc_ecma_ast::Pat, register: &String, scope: &Scope) {
     use swc_ecma_ast::Pat;
 
-    match param_pat {
+    match pat {
       Pat::Ident(ident) => {
         scope.set(
           ident.id.sym.to_string(),
@@ -321,8 +321,8 @@ impl FunctionCompiler {
         );
       }
       Pat::Assign(assign) => {
-        self.default_expr(register, &assign.right, scope);
-        self.param_pat(&assign.left, register, scope);
+        self.default_expr(&assign.right, register, scope);
+        self.decl_or_param_pat(&assign.left, register, scope);
       }
       Pat::Array(array) => {
         for (i, elem_opt) in array.elems.iter().enumerate() {
@@ -337,7 +337,7 @@ impl FunctionCompiler {
             .definition
             .push(format!("  sub %{} {} %{}", register, i, elem_reg));
 
-          self.param_pat(elem, &elem_reg, scope);
+          self.decl_or_param_pat(elem, &elem_reg, scope);
         }
 
         self.reg_allocator.release(register);
@@ -365,7 +365,7 @@ impl FunctionCompiler {
 
               ec.fnc.definition.push(sub_instr);
 
-              ec.fnc.param_pat(&kv.value, &param_reg, scope);
+              ec.fnc.decl_or_param_pat(&kv.value, &param_reg, scope);
             }
             ObjectPatProp::Assign(assign) => {
               let key = assign.key.sym.to_string();
@@ -376,7 +376,7 @@ impl FunctionCompiler {
                 .push(format!("  sub %{} \"{}\" %{}", register, key, reg));
 
               if let Some(value) = &assign.value {
-                self.default_expr(&reg, value, scope);
+                self.default_expr(value, &reg, scope);
               }
 
               scope.set(key, MappedName::Register(reg));
@@ -399,13 +399,13 @@ impl FunctionCompiler {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "Unexpected Pat::Expr in param/decl context".to_string(),
-          span: param_pat.span(),
+          span: pat.span(),
         });
       }
     }
   }
 
-  fn default_expr(&mut self, register: &String, expr: &swc_ecma_ast::Expr, scope: &Scope) {
+  fn default_expr(&mut self, expr: &swc_ecma_ast::Expr, register: &String, scope: &Scope) {
     let provided_reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
 
     let initialized_label = self
@@ -1041,10 +1041,7 @@ impl FunctionCompiler {
     for decl in &var_decl.decls {
       match &decl.init {
         Some(expr) => {
-          let mut expr_compiler = ExpressionCompiler {
-            fnc: self,
-            scope: scope,
-          };
+          let mut expr_compiler = ExpressionCompiler { fnc: self, scope };
 
           let name = match &decl.name {
             swc_ecma_ast::Pat::Ident(ident) => ident.id.sym.to_string(),
