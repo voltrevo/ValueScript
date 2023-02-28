@@ -16,14 +16,10 @@ fn main() {
   let fm = cm.new_source_file(
     FileName::Custom("test.js".into()),
     "
-        function foo(x: number) {
-            if (x < 3) {
-                return 'lt3';
-            }
-
-            return 'nlt3';
-        }
-        "
+      if (x < 3) {
+        1 + 1;
+      }
+    "
     .into(),
   );
   let result = c.parse_js(
