@@ -266,17 +266,15 @@ impl FunctionCompiler {
       Pat::Object(_) => self
         .reg_allocator
         .allocate_numbered(&"_object_pat".to_string()),
-      _ => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: parameter destructuring".to_string(),
-          span: param_pat.span(),
-        });
-
-        self
-          .reg_allocator
-          .allocate_numbered(&"_todo_param_pattern".to_string())
-      }
+      Pat::Invalid(_) => self
+        .reg_allocator
+        .allocate_numbered(&"_invalid_pat".to_string()),
+      Pat::Rest(_) => self
+        .reg_allocator
+        .allocate_numbered(&"_rest_pat".to_string()),
+      Pat::Expr(_) => self
+        .reg_allocator
+        .allocate_numbered(&"_expr_pat".to_string()),
     }
   }
 
@@ -391,8 +389,18 @@ impl FunctionCompiler {
 
         self.reg_allocator.release(register);
       }
-      _ => {
+      Pat::Invalid(_) => {
+        // Diagnostic emitted elsewhere
+      }
+      Pat::Rest(_) => {
         // TODO (Diagnostic emitted elsewhere)
+      }
+      Pat::Expr(_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "Unexpected Pat::Expr in param/decl context".to_string(),
+          span: param_pat.span(),
+        });
       }
     }
   }
