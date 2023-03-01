@@ -431,9 +431,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     match at {
       AssignTarget::Register(treg) => {
-        self.compile(&assign_expr.right, Some(treg.clone()));
-
-        return CompiledExpression::new(format!("%{}", treg), vec![]);
+        return self.compile(&assign_expr.right, Some(treg.clone()));
       }
       AssignTarget::Member(mut obj_accessor, prop) => {
         let subscript = match prop {
