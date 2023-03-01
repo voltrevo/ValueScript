@@ -378,7 +378,7 @@ impl<'a> ExpressionCompiler<'a> {
     &mut self,
     assign_expr: &swc_ecma_ast::AssignExpr,
     is_top_level: bool,
-    _target_register: Option<String>,
+    target_register: Option<String>,
   ) -> CompiledExpression {
     enum AssignTarget {
       Register(String),
@@ -446,16 +446,24 @@ impl<'a> ExpressionCompiler<'a> {
 
     match at {
       AssignTarget::Register(treg) => {
-        if is_top_level {
-          return self.compile(&assign_expr.right, Some(treg.clone()));
+        let rhs = match is_top_level {
+          true => self.compile(&assign_expr.right, Some(treg.clone())),
+          false => self.compile(&assign_expr.right, None),
+        };
+
+        if let Some(target_reg) = target_register {
+          self
+            .fnc
+            .definition
+            .push(format!("  mov {} %{}", rhs.value_assembly, target_reg));
         }
 
-        let rhs = self.compile(&assign_expr.right, None);
-
-        self
-          .fnc
-          .definition
-          .push(format!("  mov {} %{}", rhs.value_assembly, treg));
+        if !is_top_level {
+          self
+            .fnc
+            .definition
+            .push(format!("  mov {} %{}", rhs.value_assembly, treg));
+        }
 
         return rhs;
       }

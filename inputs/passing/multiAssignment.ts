@@ -1,5 +1,4 @@
-// test_output! [undefined,1]
-// TODO: This is wrong.
+// test_output! [1,1]
 
 export default function main() {
   let a;

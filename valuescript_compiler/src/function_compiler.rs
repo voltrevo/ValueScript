@@ -1182,15 +1182,8 @@ impl FunctionCompiler {
   }
 
   fn expression(&mut self, expr: &swc_ecma_ast::Expr, scope: &Scope) {
-    let mut expression_compiler = ExpressionCompiler {
-      fnc: self,
-      scope: scope,
-    };
-
-    let compiled = expression_compiler.compile_top_level(
-      expr, // FIXME: Specify the ignore register instead
-      None,
-    );
+    let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
+    let compiled = expression_compiler.compile_top_level(expr, None);
 
     self.use_(compiled);
   }
