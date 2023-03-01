@@ -1003,18 +1003,20 @@ impl ScopeAnalysis {
       }
       Expr::Array(array) => {
         self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "This case is not expected to occur. Expected parser to \
-            emit a pattern when mutating an array."
+          level: DiagnosticLevel::Error,
+          message: "Mutating a (non-pattern) array expression is not valid. \
+            This is an unusual case that can occur with things like [a,b]+=c."
             .to_string(),
           span: array.span,
         });
       }
       Expr::Object(object) => {
         self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "This case is not expected to occur. Expected parser to \
-            emit a pattern when mutating an object."
+          level: DiagnosticLevel::Error,
+          message: "Mutating a (non-pattern) object expression is not valid. \
+            This is an unusual case - it's not clear whether SWC ever emit it. \
+            Please consider creating an issue: \
+            https://github.com/ValueScript/issues/new."
             .to_string(),
           span: object.span,
         });
