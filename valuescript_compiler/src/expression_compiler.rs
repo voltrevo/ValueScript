@@ -61,6 +61,19 @@ pub struct ExpressionCompiler<'a> {
 }
 
 impl<'a> ExpressionCompiler<'a> {
+  pub fn compile_top_level(
+    &mut self,
+    expr: &swc_ecma_ast::Expr,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    use swc_ecma_ast::Expr::*;
+
+    match expr {
+      Assign(assign_exp) => self.assign_expression(assign_exp, true, target_register),
+      _ => self.compile(expr, target_register),
+    }
+  }
+
   pub fn compile(
     &mut self,
     expr: &swc_ecma_ast::Expr,
@@ -91,7 +104,7 @@ impl<'a> ExpressionCompiler<'a> {
         return self.binary_expression(bin_exp, target_register);
       }
       Assign(assign_exp) => {
-        return self.assign_expression(assign_exp, target_register);
+        return self.assign_expression(assign_exp, false, target_register);
       }
       Member(member_exp) => {
         return self.member_expression(member_exp, target_register);
@@ -352,10 +365,11 @@ impl<'a> ExpressionCompiler<'a> {
   pub fn assign_expression(
     &mut self,
     assign_expr: &swc_ecma_ast::AssignExpr,
+    is_top_level: bool,
     target_register: Option<String>,
   ) -> CompiledExpression {
     match get_assign_op_str(assign_expr.op) {
-      None => self.assign_expr_eq(assign_expr, target_register),
+      None => self.assign_expr_eq(assign_expr, is_top_level, target_register),
       Some(op_str) => self.assign_expr_compound(assign_expr, op_str, target_register),
     }
   }
@@ -363,6 +377,7 @@ impl<'a> ExpressionCompiler<'a> {
   pub fn assign_expr_eq(
     &mut self,
     assign_expr: &swc_ecma_ast::AssignExpr,
+    is_top_level: bool,
     _target_register: Option<String>,
   ) -> CompiledExpression {
     enum AssignTarget {
@@ -431,7 +446,18 @@ impl<'a> ExpressionCompiler<'a> {
 
     match at {
       AssignTarget::Register(treg) => {
-        return self.compile(&assign_expr.right, Some(treg.clone()));
+        if is_top_level {
+          return self.compile(&assign_expr.right, Some(treg.clone()));
+        }
+
+        let rhs = self.compile(&assign_expr.right, None);
+
+        self
+          .fnc
+          .definition
+          .push(format!("  mov {} %{}", rhs.value_assembly, treg));
+
+        return rhs;
       }
       AssignTarget::Member(mut obj_accessor, prop) => {
         let subscript = match prop {

@@ -1187,7 +1187,7 @@ impl FunctionCompiler {
       scope: scope,
     };
 
-    let compiled = expression_compiler.compile(
+    let compiled = expression_compiler.compile_top_level(
       expr, // FIXME: Specify the ignore register instead
       None,
     );
