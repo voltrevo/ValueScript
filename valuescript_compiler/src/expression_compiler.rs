@@ -544,12 +544,10 @@ impl<'a> ExpressionCompiler<'a> {
       .reg_allocator
       .allocate_numbered(&"_tmp".to_string());
 
-    let pre_rhs = self.compile(&assign_expr.right, Some(tmp_reg.clone()));
-
-    // TODO: Consider making two variations of compile, one that takes a target
-    // register and one that doesn't. This may simplify things eg by not
-    // returning any nested registers when there's a target.
-    assert_eq!(pre_rhs.nested_registers.len(), 0);
+    let mut nested_registers = Vec::<String>::new();
+    let mut pre_rhs = self.compile(&assign_expr.right, Some(tmp_reg.clone()));
+    nested_registers.append(&mut pre_rhs.nested_registers);
+    pre_rhs.release_checker.has_unreleased_registers = false;
 
     self.fnc.definition.push(format!(
       "  {} %{} %{} %{}",
@@ -560,8 +558,6 @@ impl<'a> ExpressionCompiler<'a> {
     ));
 
     self.fnc.reg_allocator.release(&tmp_reg);
-
-    let mut nested_registers = Vec::<String>::new();
 
     let result_reg = match &target {
       TargetAccessor::Register(treg) => {
