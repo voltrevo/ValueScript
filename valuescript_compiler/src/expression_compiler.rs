@@ -480,10 +480,13 @@ impl<'a> ExpressionCompiler<'a> {
     op_str: &str,
     target_register: Option<String>,
   ) -> CompiledExpression {
+    use swc_ecma_ast::Pat;
+    use swc_ecma_ast::PatOrExpr;
+
     let mut target = match &assign_expr.left {
-      swc_ecma_ast::PatOrExpr::Expr(expr) => TargetAccessor::compile(self, &expr),
-      swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
-        swc_ecma_ast::Pat::Ident(ident) => {
+      PatOrExpr::Expr(expr) => TargetAccessor::compile(self, &expr),
+      PatOrExpr::Pat(pat) => match &**pat {
+        Pat::Ident(ident) => {
           TargetAccessor::Register(self.get_register_for_ident_mutation(&ident.id))
         }
         _ => {
@@ -1639,12 +1642,13 @@ impl TargetAccessor {
         TargetAccessor::make_todo(ec)
       }
       _ => {
-        ec.fnc.todo(
-          expr.span(),
-          format!("TargetAccessor::compile for {}", get_expr_type_str(expr)).as_str(),
-        );
+        ec.fnc.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          span: expr.span(),
+          message: format!("Invalid target {}", get_expr_type_str(expr)),
+        });
 
-        TargetAccessor::make_todo(ec)
+        TargetAccessor::make_bad(ec)
       }
     };
   }
