@@ -148,7 +148,9 @@ impl FunctionCompiler {
       param_count += 1;
     }
 
-    let param_registers = self.allocate_param_registers(functionish);
+    self.populate_fn_scope_params(functionish, &scope);
+
+    let param_registers = self.allocate_param_registers(functionish, &scope);
 
     for reg in &param_registers {
       if param_count != 0 {
@@ -214,28 +216,68 @@ impl FunctionCompiler {
     self.definition.push("}".to_string());
   }
 
-  fn allocate_param_registers(&mut self, functionish: &Functionish) -> Vec<String> {
-    let mut param_registers = Vec::<String>::new();
-
+  fn populate_fn_scope_params(&mut self, functionish: &Functionish, scope: &Scope) {
     match functionish {
       Functionish::Fn(fn_) => {
         for p in &fn_.params {
-          param_registers.push(self.allocate_param_reg(&p.pat));
+          self.populate_scope_pat(&p.pat, scope);
         }
       }
       Functionish::Arrow(arrow) => {
         for p in &arrow.params {
-          param_registers.push(self.allocate_param_reg(p));
+          self.populate_scope_pat(p, scope);
         }
       }
       Functionish::Constructor(_, constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
-              self.todo(
-                ts_param_prop.span(),
-                "TypeScript parameter properties (what are these?)",
-              );
+              use swc_ecma_ast::TsParamPropParam::*;
+
+              match &ts_param_prop.param {
+                Ident(ident) => {
+                  self.populate_scope_ident(&ident.id, scope);
+                }
+                Assign(assign) => {
+                  self.populate_scope_pat(&assign.left, scope);
+                }
+              }
+            }
+            swc_ecma_ast::ParamOrTsParamProp::Param(param) => {
+              self.populate_scope_pat(&param.pat, scope);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  fn populate_scope_ident(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) {
+    scope.set(
+      ident.sym.to_string(),
+      MappedName::Register(self.reg_allocator.allocate(&ident.sym.to_string())),
+    );
+  }
+
+  fn allocate_param_registers(&mut self, functionish: &Functionish, scope: &Scope) -> Vec<String> {
+    let mut param_registers = Vec::<String>::new();
+
+    match functionish {
+      Functionish::Fn(fn_) => {
+        for p in &fn_.params {
+          param_registers.push(self.allocate_param_reg(&p.pat, scope));
+        }
+      }
+      Functionish::Arrow(arrow) => {
+        for p in &arrow.params {
+          param_registers.push(self.allocate_param_reg(p, scope));
+        }
+      }
+      Functionish::Constructor(_, constructor) => {
+        for potspp in &constructor.params {
+          match potspp {
+            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
+              self.todo(ts_param_prop.span(), "TypeScript parameter properties");
 
               param_registers.push(
                 self
@@ -244,7 +286,7 @@ impl FunctionCompiler {
               );
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              param_registers.push(self.allocate_param_reg(&p.pat))
+              param_registers.push(self.allocate_param_reg(&p.pat, scope))
             }
           }
         }
@@ -254,12 +296,12 @@ impl FunctionCompiler {
     return param_registers;
   }
 
-  fn allocate_param_reg(&mut self, param_pat: &swc_ecma_ast::Pat) -> String {
+  fn allocate_param_reg(&mut self, param_pat: &swc_ecma_ast::Pat, scope: &Scope) -> String {
     use swc_ecma_ast::Pat;
 
     match param_pat {
-      Pat::Ident(ident) => self.reg_allocator.allocate(&ident.id.sym.to_string()),
-      Pat::Assign(assign) => self.allocate_param_reg(&assign.left),
+      Pat::Ident(ident) => self.get_param_register(&ident.id, scope),
+      Pat::Assign(assign) => self.allocate_param_reg(&assign.left, scope),
       Pat::Array(_) => self
         .reg_allocator
         .allocate_numbered(&"_array_pat".to_string()),
@@ -275,6 +317,26 @@ impl FunctionCompiler {
       Pat::Expr(_) => self
         .reg_allocator
         .allocate_numbered(&"_expr_pat".to_string()),
+    }
+  }
+
+  fn get_param_register(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) -> String {
+    match scope.get(&ident.sym.to_string()) {
+      Some(MappedName::Register(reg)) => reg,
+      _ => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: format!(
+            "Register should have been allocated for parameter {}",
+            ident.sym.to_string()
+          ),
+          span: ident.span(),
+        });
+
+        self
+          .reg_allocator
+          .allocate_numbered(&"_error_nonregister_param".to_string())
+      }
     }
   }
 
@@ -315,10 +377,27 @@ impl FunctionCompiler {
 
     match pat {
       Pat::Ident(ident) => {
-        scope.set(
-          ident.id.sym.to_string(),
-          MappedName::Register(register.clone()),
-        );
+        let ident_reg = self.allocate_param_reg(pat, scope);
+
+        if register != &ident_reg {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: format!(
+              "Register mismatch for parameter {} (expected {}, got {})",
+              ident.id.sym.to_string(),
+              ident_reg,
+              register
+            ),
+            span: pat.span(),
+          });
+
+          // Note: We still have this sensible interpretation, so emitting it
+          // may help troubleshooting the error above. Hopefully it never
+          // occurs.
+          self
+            .definition
+            .push(format!("  mov %{} %{}", register, ident_reg));
+        }
       }
       Pat::Assign(assign) => {
         self.default_expr(&assign.right, register, scope);
@@ -331,7 +410,7 @@ impl FunctionCompiler {
             None => continue,
           };
 
-          let elem_reg = self.allocate_param_reg(elem);
+          let elem_reg = self.allocate_param_reg(elem, scope);
 
           self
             .definition
@@ -353,7 +432,7 @@ impl FunctionCompiler {
                 scope: scope,
               };
 
-              let param_reg = ec.fnc.allocate_param_reg(&kv.value);
+              let param_reg = ec.fnc.allocate_param_reg(&kv.value, scope);
               let compiled_key = ec.prop_name(&kv.key);
 
               let sub_instr = format!(
@@ -369,7 +448,7 @@ impl FunctionCompiler {
             }
             ObjectPatProp::Assign(assign) => {
               let key = assign.key.sym.to_string();
-              let reg = self.reg_allocator.allocate(&key);
+              let reg = self.get_param_register(&assign.key, scope);
 
               self
                 .definition
@@ -378,8 +457,6 @@ impl FunctionCompiler {
               if let Some(value) = &assign.value {
                 self.default_expr(value, &reg, scope);
               }
-
-              scope.set(key, MappedName::Register(reg));
             }
             ObjectPatProp::Rest(rest) => {
               self.todo(rest.span, "Rest pattern in object destructuring");
@@ -517,16 +594,65 @@ impl FunctionCompiler {
     }
 
     for decl in &var_decl.decls {
-      match &decl.name {
-        swc_ecma_ast::Pat::Ident(ident) => {
-          let name = ident.id.sym.to_string();
+      self.populate_scope_pat(&decl.name, scope);
+    }
+  }
 
-          scope.set(
-            name.clone(),
-            MappedName::Register(self.reg_allocator.allocate(&name)),
-          );
+  fn populate_scope_pat(&mut self, pat: &swc_ecma_ast::Pat, scope: &Scope) {
+    use swc_ecma_ast::Pat::*;
+
+    match pat {
+      Ident(ident) => {
+        let name = ident.id.sym.to_string();
+
+        scope.set(
+          name.clone(),
+          MappedName::Register(self.reg_allocator.allocate(&name)),
+        );
+      }
+      Array(array) => {
+        for element in &array.elems {
+          if let Some(element) = element {
+            self.populate_scope_pat(element, scope);
+          }
         }
-        _ => self.todo(var_decl.span(), "destructuring"),
+      }
+      Object(object) => {
+        for prop in &object.props {
+          use swc_ecma_ast::ObjectPatProp::*;
+
+          match prop {
+            KeyValue(key_value) => {
+              self.populate_scope_pat(&key_value.value, scope);
+            }
+            Assign(assign) => {
+              self.populate_scope_ident(&assign.key, scope);
+            }
+            Rest(rest) => {
+              self.populate_scope_pat(&rest.arg, scope);
+            }
+          }
+        }
+      }
+      Rest(rest) => {
+        self.populate_scope_pat(&rest.arg, scope);
+      }
+      Assign(assign) => {
+        self.populate_scope_pat(&assign.left, scope);
+      }
+      Invalid(invalid) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Invalid pattern".to_string(),
+          span: invalid.span(),
+        });
+      }
+      Expr(expr) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "Unexpected Pat::Expr in param/decl context".to_string(),
+          span: expr.span(),
+        });
       }
     }
   }
@@ -669,17 +795,7 @@ impl FunctionCompiler {
     }
 
     for decl in &var_decl.decls {
-      match &decl.name {
-        swc_ecma_ast::Pat::Ident(ident) => {
-          let name = ident.id.sym.to_string();
-
-          scope.set(
-            name.clone(),
-            MappedName::Register(self.reg_allocator.allocate(&name)),
-          );
-        }
-        _ => self.todo(decl.span(), "destructuring"),
-      }
+      self.populate_scope_pat(&decl.name, scope);
     }
   }
 
