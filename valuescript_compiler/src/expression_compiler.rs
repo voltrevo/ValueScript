@@ -1574,46 +1574,7 @@ impl TargetAccessor {
     use swc_ecma_ast::Expr::*;
 
     return match expr {
-      Ident(ident) => match ec.scope.get(&ident.sym.to_string()) {
-        None => {
-          ec.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            span: ident.span,
-            message: format!("Unresolved identifier: {}", ident.sym.to_string()),
-          });
-
-          TargetAccessor::make_bad(ec)
-        }
-        Some(MappedName::Definition(def_name)) => {
-          ec.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            span: ident.span,
-            message: format!("Cannot assign to definition: {}", def_name),
-          });
-
-          TargetAccessor::make_bad(ec)
-        }
-        Some(MappedName::QueuedFunction(qfn)) => {
-          ec.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            span: ident.span,
-            message: format!("Cannot assign to function: {}", qfn.definition_name),
-          });
-
-          TargetAccessor::make_bad(ec)
-        }
-        Some(MappedName::Register(reg)) => TargetAccessor::Register(reg),
-        // Some(MappedName::Builtin(_)) => None,
-        Some(MappedName::Builtin(builtin)) => {
-          ec.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            span: ident.span,
-            message: format!("Cannot assign to builtin: {}", builtin),
-          });
-
-          TargetAccessor::make_bad(ec)
-        }
-      },
+      Ident(ident) => TargetAccessor::Register(ec.get_register_for_ident_mutation(ident)),
       This(_) => TargetAccessor::Register("this".to_string()),
       Member(member) => {
         let obj = TargetAccessor::compile(ec, &member.obj);
