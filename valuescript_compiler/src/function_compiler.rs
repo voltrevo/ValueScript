@@ -265,12 +265,12 @@ impl FunctionCompiler {
     match functionish {
       Functionish::Fn(fn_) => {
         for p in &fn_.params {
-          param_registers.push(self.allocate_param_reg(&p.pat, scope));
+          param_registers.push(self.get_pattern_register(&p.pat, scope));
         }
       }
       Functionish::Arrow(arrow) => {
         for p in &arrow.params {
-          param_registers.push(self.allocate_param_reg(p, scope));
+          param_registers.push(self.get_pattern_register(p, scope));
         }
       }
       Functionish::Constructor(_, constructor) => {
@@ -286,7 +286,7 @@ impl FunctionCompiler {
               );
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              param_registers.push(self.allocate_param_reg(&p.pat, scope))
+              param_registers.push(self.get_pattern_register(&p.pat, scope))
             }
           }
         }
@@ -296,12 +296,12 @@ impl FunctionCompiler {
     return param_registers;
   }
 
-  fn allocate_param_reg(&mut self, param_pat: &swc_ecma_ast::Pat, scope: &Scope) -> String {
+  fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat, scope: &Scope) -> String {
     use swc_ecma_ast::Pat;
 
     match param_pat {
-      Pat::Ident(ident) => self.get_param_register(&ident.id, scope),
-      Pat::Assign(assign) => self.allocate_param_reg(&assign.left, scope),
+      Pat::Ident(ident) => self.get_variable_register(&ident.id, scope),
+      Pat::Assign(assign) => self.get_pattern_register(&assign.left, scope),
       Pat::Array(_) => self
         .reg_allocator
         .allocate_numbered(&"_array_pat".to_string()),
@@ -320,14 +320,14 @@ impl FunctionCompiler {
     }
   }
 
-  fn get_param_register(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) -> String {
+  fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) -> String {
     match scope.get(&ident.sym.to_string()) {
       Some(MappedName::Register(reg)) => reg,
       _ => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: format!(
-            "Register should have been allocated for parameter {}",
+            "Register should have been allocated for variable {}",
             ident.sym.to_string()
           ),
           span: ident.span(),
@@ -335,7 +335,7 @@ impl FunctionCompiler {
 
         self
           .reg_allocator
-          .allocate_numbered(&"_error_nonregister_param".to_string())
+          .allocate_numbered(&"_error_variable_without_register".to_string())
       }
     }
   }
@@ -377,7 +377,7 @@ impl FunctionCompiler {
 
     match pat {
       Pat::Ident(ident) => {
-        let ident_reg = self.allocate_param_reg(pat, scope);
+        let ident_reg = self.get_pattern_register(pat, scope);
 
         if register != &ident_reg {
           self.diagnostics.push(Diagnostic {
@@ -410,7 +410,7 @@ impl FunctionCompiler {
             None => continue,
           };
 
-          let elem_reg = self.allocate_param_reg(elem, scope);
+          let elem_reg = self.get_pattern_register(elem, scope);
 
           self
             .definition
@@ -427,12 +427,9 @@ impl FunctionCompiler {
 
           match prop {
             ObjectPatProp::KeyValue(kv) => {
-              let mut ec = ExpressionCompiler {
-                fnc: self,
-                scope: scope,
-              };
+              let mut ec = ExpressionCompiler { fnc: self, scope };
 
-              let param_reg = ec.fnc.allocate_param_reg(&kv.value, scope);
+              let param_reg = ec.fnc.get_pattern_register(&kv.value, scope);
               let compiled_key = ec.prop_name(&kv.key);
 
               let sub_instr = format!(
@@ -448,7 +445,7 @@ impl FunctionCompiler {
             }
             ObjectPatProp::Assign(assign) => {
               let key = assign.key.sym.to_string();
-              let reg = self.get_param_register(&assign.key, scope);
+              let reg = self.get_variable_register(&assign.key, scope);
 
               self
                 .definition
@@ -1157,32 +1154,29 @@ impl FunctionCompiler {
     for decl in &var_decl.decls {
       match &decl.init {
         Some(expr) => {
-          let mut expr_compiler = ExpressionCompiler { fnc: self, scope };
+          let target_register = self.get_pattern_register(&decl.name, scope);
 
-          let name = match &decl.name {
-            swc_ecma_ast::Pat::Ident(ident) => ident.id.sym.to_string(),
-            _ => {
-              self.todo(decl.span(), "destructuring");
+          let mut ec = ExpressionCompiler { fnc: self, scope };
+          ec.compile(expr, Some(target_register.clone()));
+          drop(ec);
 
-              return;
-            }
-          };
-
-          let target_register = match scope.get(&name) {
-            Some(MappedName::Register(reg_name)) => reg_name,
-            _ => {
-              self.todo(
-                decl.span(),
-                "var decl should always get mapped to a register during scan",
-              );
-
-              return;
-            }
-          };
-
-          expr_compiler.compile(expr, Some(target_register));
+          self.decl_or_param_pat(&decl.name, &target_register, scope);
         }
-        None => {}
+        None => match &decl.name {
+          swc_ecma_ast::Pat::Ident(_) => {
+            // Nothing to do - identifier without initializer should be
+            // undefined
+          }
+          _ => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "Expected destructuring declaration without initializer \
+                to be caught in the parser. Pattern has not been compiled."
+                .to_string(),
+              span: decl.span(),
+            });
+          }
+        },
       }
     }
   }
