@@ -370,7 +370,7 @@ impl<'a> ExpressionCompiler<'a> {
   ) -> CompiledExpression {
     match get_assign_op_str(assign_expr.op) {
       None => self.assign_expr_eq(assign_expr, is_top_level, target_register),
-      Some(op_str) => self.assign_expr_compound(assign_expr, op_str, target_register),
+      Some(op_str) => self.assign_expr_compound(assign_expr, is_top_level, op_str, target_register),
     }
   }
 
@@ -501,6 +501,7 @@ impl<'a> ExpressionCompiler<'a> {
   pub fn assign_expr_compound(
     &mut self,
     assign_expr: &swc_ecma_ast::AssignExpr,
+    is_top_level: bool,
     op_str: &str,
     target_register: Option<String>,
   ) -> CompiledExpression {
@@ -563,7 +564,19 @@ impl<'a> ExpressionCompiler<'a> {
           }
         }
 
-        treg.clone()
+        if is_top_level {
+          treg.clone()
+        } else {
+          let result_reg = self.fnc.reg_allocator.allocate(&"_tmp".to_string());
+
+          self
+            .fnc
+            .definition
+            .push(format!("  mov %{} %{}", treg, result_reg));
+
+          nested_registers.push(result_reg.clone());
+          result_reg
+        }
       }
       TargetAccessor::Nested(nta) => {
         let res_reg = match target_register {
