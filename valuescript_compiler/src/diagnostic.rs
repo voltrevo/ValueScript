@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum DiagnosticLevel {
   Lint,
   Error,
