@@ -380,50 +380,6 @@ impl<'a> ExpressionCompiler<'a> {
     is_top_level: bool,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    enum AssignTarget {
-      Register(String),
-      Member(TargetAccessor, swc_ecma_ast::MemberProp),
-    }
-
-    impl AssignTarget {
-      fn from_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> AssignTarget {
-        return match expr {
-          swc_ecma_ast::Expr::Ident(ident) => {
-            AssignTarget::Register(ec.get_register_for_ident_mutation(&ident))
-          }
-          swc_ecma_ast::Expr::This(_) => AssignTarget::Register("this".to_string()),
-          swc_ecma_ast::Expr::Member(member) => AssignTarget::Member(
-            TargetAccessor::compile(ec, &member.obj),
-            member.prop.clone(),
-          ),
-          swc_ecma_ast::Expr::SuperProp(super_prop) => {
-            ec.fnc.todo(super_prop.span(), "SuperProp");
-
-            let bad_reg = ec
-              .fnc
-              .reg_allocator
-              .allocate_numbered(&"_todo_super_prop".to_string());
-
-            AssignTarget::Register(bad_reg)
-          }
-          _ => {
-            ec.fnc.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: "Invalid lvalue expression".to_string(),
-              span: expr.span(),
-            });
-
-            let bad_reg = ec
-              .fnc
-              .reg_allocator
-              .allocate_numbered(&"_bad_lvalue".to_string());
-
-            AssignTarget::Register(bad_reg)
-          }
-        };
-      }
-    }
-
     let at = match &assign_expr.left {
       swc_ecma_ast::PatOrExpr::Expr(expr) => AssignTarget::from_expr(self, expr),
       swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
@@ -1784,4 +1740,48 @@ fn get_expr_type_str(expr: &swc_ecma_ast::Expr) -> &'static str {
     JSXFragment(_) => "JSXFragment",
     TsInstantiation(_) => "TsInstantiation",
   };
+}
+
+enum AssignTarget {
+  Register(String),
+  Member(TargetAccessor, swc_ecma_ast::MemberProp),
+}
+
+impl AssignTarget {
+  fn from_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> AssignTarget {
+    return match expr {
+      swc_ecma_ast::Expr::Ident(ident) => {
+        AssignTarget::Register(ec.get_register_for_ident_mutation(&ident))
+      }
+      swc_ecma_ast::Expr::This(_) => AssignTarget::Register("this".to_string()),
+      swc_ecma_ast::Expr::Member(member) => AssignTarget::Member(
+        TargetAccessor::compile(ec, &member.obj),
+        member.prop.clone(),
+      ),
+      swc_ecma_ast::Expr::SuperProp(super_prop) => {
+        ec.fnc.todo(super_prop.span(), "SuperProp");
+
+        let bad_reg = ec
+          .fnc
+          .reg_allocator
+          .allocate_numbered(&"_todo_super_prop".to_string());
+
+        AssignTarget::Register(bad_reg)
+      }
+      _ => {
+        ec.fnc.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Invalid lvalue expression".to_string(),
+          span: expr.span(),
+        });
+
+        let bad_reg = ec
+          .fnc
+          .reg_allocator
+          .allocate_numbered(&"_bad_lvalue".to_string());
+
+        AssignTarget::Register(bad_reg)
+      }
+    };
+  }
 }
