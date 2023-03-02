@@ -446,10 +446,8 @@ const files: Record<string, string | nil> = {
 
       const greetResponse1 = greet(pirateEnabled);
 
-      const enablePirateResult = enablePirate(pirateEnabled);
-      pirateEnabled = enablePirateResult[0];
-      const enablePirateResponse = enablePirateResult[1];
-      // (Destructuring isn't implemented yet)
+      let enablePirateResponse: string;
+      [pirateEnabled, enablePirateResponse] = enablePirate(pirateEnabled);
   
       const greetResponse2 = greet(pirateEnabled);
   
