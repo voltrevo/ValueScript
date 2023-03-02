@@ -320,7 +320,7 @@ impl FunctionCompiler {
     }
   }
 
-  fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) -> String {
+  pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) -> String {
     match scope.get(&ident.sym.to_string()) {
       Some(MappedName::Register(reg)) => reg,
       _ => {
@@ -349,12 +349,14 @@ impl FunctionCompiler {
     match functionish {
       Functionish::Fn(fn_) => {
         for (i, p) in fn_.params.iter().enumerate() {
-          self.pat(&p.pat, &param_registers[i], false, scope);
+          let mut ec = ExpressionCompiler { fnc: self, scope };
+          ec.pat(&p.pat, &param_registers[i], false, scope);
         }
       }
       Functionish::Arrow(arrow) => {
         for (i, p) in arrow.params.iter().enumerate() {
-          self.pat(p, &param_registers[i], false, scope);
+          let mut ec = ExpressionCompiler { fnc: self, scope };
+          ec.pat(p, &param_registers[i], false, scope);
         }
       }
       Functionish::Constructor(_, constructor) => {
@@ -364,164 +366,13 @@ impl FunctionCompiler {
               // TODO (Diagnostic emitted elsewhere)
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              self.pat(&p.pat, &param_registers[i], false, scope);
-            }
-          }
-        }
-      }
-    };
-  }
-
-  pub fn pat(
-    &mut self,
-    pat: &swc_ecma_ast::Pat,
-    register: &String,
-    skip_release: bool,
-    scope: &Scope,
-  ) {
-    use swc_ecma_ast::Pat;
-
-    match pat {
-      Pat::Ident(ident) => {
-        let ident_reg = self.get_pattern_register(pat, scope);
-
-        if register != &ident_reg {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!(
-              "Register mismatch for parameter {} (expected {}, got {})",
-              ident.id.sym.to_string(),
-              ident_reg,
-              register
-            ),
-            span: pat.span(),
-          });
-
-          // Note: We still have this sensible interpretation, so emitting it
-          // may help troubleshooting the error above. Hopefully it never
-          // occurs.
-          self
-            .definition
-            .push(format!("  mov %{} %{}", register, ident_reg));
-        }
-      }
-      Pat::Assign(assign) => {
-        self.default_expr(&assign.right, register, scope);
-        self.pat(&assign.left, register, false, scope);
-      }
-      Pat::Array(array) => {
-        for (i, elem_opt) in array.elems.iter().enumerate() {
-          let elem = match elem_opt {
-            Some(elem) => elem,
-            None => continue,
-          };
-
-          let elem_reg = self.get_pattern_register(elem, scope);
-
-          self
-            .definition
-            .push(format!("  sub %{} {} %{}", register, i, elem_reg));
-
-          self.pat(elem, &elem_reg, false, scope);
-        }
-
-        if !skip_release {
-          self.reg_allocator.release(register);
-        }
-      }
-      Pat::Object(object) => {
-        for prop in &object.props {
-          use swc_ecma_ast::ObjectPatProp;
-
-          match prop {
-            ObjectPatProp::KeyValue(kv) => {
               let mut ec = ExpressionCompiler { fnc: self, scope };
-
-              let param_reg = ec.fnc.get_pattern_register(&kv.value, scope);
-              let compiled_key = ec.prop_name(&kv.key);
-
-              let sub_instr = format!(
-                "  sub %{} {} %{}",
-                register,
-                ec.fnc.use_(compiled_key),
-                param_reg
-              );
-
-              ec.fnc.definition.push(sub_instr);
-
-              ec.fnc.pat(&kv.value, &param_reg, false, scope);
-            }
-            ObjectPatProp::Assign(assign) => {
-              let key = assign.key.sym.to_string();
-              let reg = self.get_variable_register(&assign.key, scope);
-
-              self
-                .definition
-                .push(format!("  sub %{} \"{}\" %{}", register, key, reg));
-
-              if let Some(value) = &assign.value {
-                self.default_expr(value, &reg, scope);
-              }
-            }
-            ObjectPatProp::Rest(rest) => {
-              self.todo(rest.span, "Rest pattern in object destructuring");
+              ec.pat(&p.pat, &param_registers[i], false, scope);
             }
           }
         }
-
-        if !skip_release {
-          self.reg_allocator.release(register);
-        }
       }
-      Pat::Invalid(_) => {
-        // Diagnostic emitted elsewhere
-      }
-      Pat::Rest(_) => {
-        // TODO (Diagnostic emitted elsewhere)
-      }
-      Pat::Expr(_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Unexpected Pat::Expr in param/decl context".to_string(),
-          span: pat.span(),
-        });
-      }
-    }
-  }
-
-  fn default_expr(&mut self, expr: &swc_ecma_ast::Expr, register: &String, scope: &Scope) {
-    let provided_reg = self.reg_allocator.allocate_numbered(&"_tmp".to_string());
-
-    let initialized_label = self
-      .label_allocator
-      .allocate(&format!("{}_initialized", register));
-
-    self
-      .definition
-      .push(format!("  op!== %{} undefined %{}", register, provided_reg));
-
-    self
-      .definition
-      .push(format!("  jmpif %{} :{}", provided_reg, initialized_label));
-
-    self.reg_allocator.release(&provided_reg);
-
-    let mut expression_compiler = ExpressionCompiler {
-      fnc: self,
-      scope: scope,
     };
-
-    let compiled = expression_compiler.compile(expr, Some(register.clone()));
-
-    if self.use_(compiled) != format!("%{}", register) {
-      self.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: "Default expression not compiled into target register (not sure whether this is possible in this case)".to_string(),
-        span: expr.span(),
-      });
-    }
-
-    self.definition.push(format!("{}:", initialized_label));
   }
 
   fn populate_fn_scope(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
@@ -845,10 +696,7 @@ impl FunctionCompiler {
           self.definition.push("  end".to_string());
         }
         Some(expr) => {
-          let mut expression_compiler = ExpressionCompiler {
-            fnc: self,
-            scope: scope,
-          };
+          let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
 
           expression_compiler.compile(expr, Some("return".to_string()));
 
@@ -1168,9 +1016,7 @@ impl FunctionCompiler {
 
           let mut ec = ExpressionCompiler { fnc: self, scope };
           ec.compile(expr, Some(target_register.clone()));
-          drop(ec);
-
-          self.pat(&decl.name, &target_register, false, scope);
+          ec.pat(&decl.name, &target_register, false, scope);
         }
         None => match &decl.name {
           swc_ecma_ast::Pat::Ident(_) => {

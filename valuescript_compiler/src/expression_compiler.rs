@@ -429,7 +429,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let rhs = self.compile(assign_expr_right, Some(rhs_reg.clone()));
 
-    self.fnc.pat(pat, &rhs_reg, true, &self.scope);
+    self.pat(pat, &rhs_reg, true, &self.scope);
 
     if let Some(target_reg) = target_register {
       self
@@ -1443,6 +1443,162 @@ impl<'a> ExpressionCompiler<'a> {
       .allocate_numbered(&todo_name.to_string());
 
     return format!("%{}", todo_reg);
+  }
+
+  pub fn pat(
+    &mut self,
+    pat: &swc_ecma_ast::Pat,
+    register: &String,
+    skip_release: bool,
+    scope: &Scope,
+  ) {
+    use swc_ecma_ast::Pat;
+
+    match pat {
+      Pat::Ident(ident) => {
+        let ident_reg = self.fnc.get_pattern_register(pat, scope);
+
+        if register != &ident_reg {
+          self.fnc.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: format!(
+              "Register mismatch for parameter {} (expected {}, got {})",
+              ident.id.sym.to_string(),
+              ident_reg,
+              register
+            ),
+            span: pat.span(),
+          });
+
+          // Note: We still have this sensible interpretation, so emitting it
+          // may help troubleshooting the error above. Hopefully it never
+          // occurs.
+          self
+            .fnc
+            .definition
+            .push(format!("  mov %{} %{}", register, ident_reg));
+        }
+      }
+      Pat::Assign(assign) => {
+        self.default_expr(&assign.right, register);
+        self.pat(&assign.left, register, false, scope);
+      }
+      Pat::Array(array) => {
+        for (i, elem_opt) in array.elems.iter().enumerate() {
+          let elem = match elem_opt {
+            Some(elem) => elem,
+            None => continue,
+          };
+
+          let elem_reg = self.fnc.get_pattern_register(elem, scope);
+
+          self
+            .fnc
+            .definition
+            .push(format!("  sub %{} {} %{}", register, i, elem_reg));
+
+          self.pat(elem, &elem_reg, false, scope);
+        }
+
+        if !skip_release {
+          self.fnc.reg_allocator.release(register);
+        }
+      }
+      Pat::Object(object) => {
+        for prop in &object.props {
+          use swc_ecma_ast::ObjectPatProp;
+
+          match prop {
+            ObjectPatProp::KeyValue(kv) => {
+              let param_reg = self.fnc.get_pattern_register(&kv.value, scope);
+              let compiled_key = self.prop_name(&kv.key);
+
+              let sub_instr = format!(
+                "  sub %{} {} %{}",
+                register,
+                self.fnc.use_(compiled_key),
+                param_reg
+              );
+
+              self.fnc.definition.push(sub_instr);
+
+              self.pat(&kv.value, &param_reg, false, scope);
+            }
+            ObjectPatProp::Assign(assign) => {
+              let key = assign.key.sym.to_string();
+              let reg = self.fnc.get_variable_register(&assign.key, scope);
+
+              self
+                .fnc
+                .definition
+                .push(format!("  sub %{} \"{}\" %{}", register, key, reg));
+
+              if let Some(value) = &assign.value {
+                self.default_expr(value, &reg);
+              }
+            }
+            ObjectPatProp::Rest(rest) => {
+              self
+                .fnc
+                .todo(rest.span, "Rest pattern in object destructuring");
+            }
+          }
+        }
+
+        if !skip_release {
+          self.fnc.reg_allocator.release(register);
+        }
+      }
+      Pat::Invalid(_) => {
+        // Diagnostic emitted elsewhere
+      }
+      Pat::Rest(_) => {
+        // TODO (Diagnostic emitted elsewhere)
+      }
+      Pat::Expr(_) => {
+        self.fnc.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "Unexpected Pat::Expr in param/decl context".to_string(),
+          span: pat.span(),
+        });
+      }
+    }
+  }
+
+  fn default_expr(&mut self, expr: &swc_ecma_ast::Expr, register: &String) {
+    let provided_reg = self
+      .fnc
+      .reg_allocator
+      .allocate_numbered(&"_tmp".to_string());
+
+    let initialized_label = self
+      .fnc
+      .label_allocator
+      .allocate(&format!("{}_initialized", register));
+
+    self
+      .fnc
+      .definition
+      .push(format!("  op!== %{} undefined %{}", register, provided_reg));
+
+    self
+      .fnc
+      .definition
+      .push(format!("  jmpif %{} :{}", provided_reg, initialized_label));
+
+    self.fnc.reg_allocator.release(&provided_reg);
+
+    let compiled = self.compile(expr, Some(register.clone()));
+
+    if self.fnc.use_(compiled) != format!("%{}", register) {
+      self.fnc.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: "Default expression not compiled into target register (not sure whether this is possible in this case)".to_string(),
+        span: expr.span(),
+      });
+    }
+
+    self.fnc.definition.push(format!("{}:", initialized_label));
   }
 }
 
