@@ -380,9 +380,14 @@ impl<'a> ExpressionCompiler<'a> {
     is_top_level: bool,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    self.fnc.definition.push("".to_string());
-
-    let mut at = AssignTarget::from_pat_or_expr(self, &assign_expr.left);
+    let mut at = match &assign_expr.left {
+      swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
+        swc_ecma_ast::Pat::Ident(ident) => TargetAccessor::compile_ident(self, &ident.id),
+        swc_ecma_ast::Pat::Expr(expr) => TargetAccessor::compile(self, expr, true),
+        _ => return self.assign_pat_eq(pat, &assign_expr.right, is_top_level, target_register),
+      },
+      swc_ecma_ast::PatOrExpr::Expr(expr) => TargetAccessor::compile(self, expr, true),
+    };
 
     let rhs = match is_top_level {
       true => self.compile(&assign_expr.right, at.direct_register()),
@@ -390,8 +395,6 @@ impl<'a> ExpressionCompiler<'a> {
     };
 
     if let Some(target_reg) = target_register {
-      self.fnc.definition.push("  mov %here %here".to_string());
-
       self
         .fnc
         .definition
@@ -411,6 +414,20 @@ impl<'a> ExpressionCompiler<'a> {
     }
 
     rhs
+  }
+
+  pub fn assign_pat_eq(
+    &mut self,
+    pat: &swc_ecma_ast::Pat,
+    assign_expr_right: &swc_ecma_ast::Expr,
+    is_top_level: bool,
+    target_register: Option<String>,
+  ) -> CompiledExpression {
+    self
+      .fnc
+      .todo(pat.span(), &format!("Assign expression with pattern"));
+
+    return CompiledExpression::empty();
   }
 
   pub fn assign_expr_compound(
@@ -1528,7 +1545,7 @@ impl TargetAccessor {
     use swc_ecma_ast::Expr::*;
 
     return match expr {
-      Ident(ident) => TargetAccessor::Register(ec.get_register_for_ident_mutation(ident)),
+      Ident(ident) => TargetAccessor::compile_ident(ec, ident),
       This(_) => TargetAccessor::Register("this".to_string()),
       Member(member) => {
         let obj = TargetAccessor::compile(ec, &member.obj, false);
@@ -1565,6 +1582,10 @@ impl TargetAccessor {
         TargetAccessor::make_bad(ec)
       }
     };
+  }
+
+  fn compile_ident(ec: &mut ExpressionCompiler, ident: &swc_ecma_ast::Ident) -> TargetAccessor {
+    return TargetAccessor::Register(ec.get_register_for_ident_mutation(ident));
   }
 
   fn make_bad(ec: &mut ExpressionCompiler) -> TargetAccessor {
@@ -1712,89 +1733,4 @@ fn get_expr_type_str(expr: &swc_ecma_ast::Expr) -> &'static str {
     JSXFragment(_) => "JSXFragment",
     TsInstantiation(_) => "TsInstantiation",
   };
-}
-
-enum AssignTarget {
-  Register(String),
-  Member(TargetAccessor, swc_ecma_ast::MemberProp),
-}
-
-impl AssignTarget {
-  fn from_pat_or_expr(
-    ec: &mut ExpressionCompiler,
-    pat_or_expr: &swc_ecma_ast::PatOrExpr,
-  ) -> TargetAccessor {
-    use swc_ecma_ast::PatOrExpr;
-
-    match pat_or_expr {
-      PatOrExpr::Pat(pat) => AssignTarget::from_pat(ec, pat),
-      PatOrExpr::Expr(expr) => AssignTarget::from_expr(ec, expr),
-    }
-  }
-
-  fn from_pat(ec: &mut ExpressionCompiler, pat: &swc_ecma_ast::Pat) -> TargetAccessor {
-    use swc_ecma_ast::Pat;
-
-    match pat {
-      Pat::Ident(ident) => TargetAccessor::Register(ec.get_register_for_ident_mutation(&ident.id)),
-      Pat::Expr(expr) => AssignTarget::from_expr(ec, &expr),
-      Pat::Array(array) => {
-        ec.fnc.todo(array.span, "Array destructuring assignment");
-
-        TargetAccessor::Register(
-          ec.fnc
-            .reg_allocator
-            .allocate_numbered(&"_todo_array_destruct".to_string()),
-        )
-      }
-      Pat::Object(object) => {
-        ec.fnc.todo(object.span, "Object destructuring assignment");
-
-        TargetAccessor::Register(
-          ec.fnc
-            .reg_allocator
-            .allocate_numbered(&"_todo_object_destruct".to_string()),
-        )
-      }
-      Pat::Rest(rest) => {
-        ec.fnc
-          .todo(rest.span, "Rest destructuring assignment (not implemented)");
-
-        TargetAccessor::Register(
-          ec.fnc
-            .reg_allocator
-            .allocate_numbered(&"_todo_rest_destruct".to_string()),
-        )
-      }
-      Pat::Assign(assign) => {
-        ec.fnc.todo(
-          assign.span,
-          "Default destructuring assignment (not implemented)",
-        );
-
-        TargetAccessor::Register(
-          ec.fnc
-            .reg_allocator
-            .allocate_numbered(&"_todo_default_destruct".to_string()),
-        )
-      }
-      Pat::Invalid(invalid) => {
-        ec.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid pattern".to_string(),
-          span: invalid.span,
-        });
-
-        TargetAccessor::Register(
-          ec.fnc
-            .reg_allocator
-            .allocate_numbered(&"_invalid_pat".to_string()),
-        )
-      }
-    }
-  }
-
-  fn from_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> TargetAccessor {
-    TargetAccessor::compile(ec, expr, true)
-  }
 }
