@@ -429,7 +429,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let rhs = self.compile(assign_expr_right, Some(rhs_reg.clone()));
 
-    self.fnc.decl_or_param_pat(pat, &rhs_reg, true, &self.scope);
+    self.fnc.pat(pat, &rhs_reg, true, &self.scope);
 
     if let Some(target_reg) = target_register {
       self
