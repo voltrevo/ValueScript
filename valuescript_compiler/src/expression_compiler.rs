@@ -1480,8 +1480,14 @@ impl<'a> ExpressionCompiler<'a> {
         }
       }
       Pat::Assign(assign) => {
-        self.default_expr(&assign.right, register);
-        self.pat(&assign.left, register, false, scope);
+        if let Pat::Expr(expr) = &*assign.left {
+          let mut at = TargetAccessor::compile(self, expr, true);
+          self.default_expr(&assign.right, register);
+          at.assign_and_packup(self, &format!("%{}", register));
+        } else {
+          self.default_expr(&assign.right, register);
+          self.pat(&assign.left, register, false, scope);
+        }
       }
       Pat::Array(array) => {
         for (i, elem_opt) in array.elems.iter().enumerate() {
