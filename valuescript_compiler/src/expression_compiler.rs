@@ -380,68 +380,37 @@ impl<'a> ExpressionCompiler<'a> {
     is_top_level: bool,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    let at = AssignTarget::from_pat_or_expr(self, &assign_expr.left);
+    self.fnc.definition.push("".to_string());
 
-    match at {
-      AssignTarget::Register(treg) => {
-        let rhs = match is_top_level {
-          true => self.compile(&assign_expr.right, Some(treg.clone())),
-          false => self.compile(&assign_expr.right, None),
-        };
+    let mut at = AssignTarget::from_pat_or_expr(self, &assign_expr.left);
 
-        if let Some(target_reg) = target_register {
-          self
-            .fnc
-            .definition
-            .push(format!("  mov {} %{}", rhs.value_assembly, target_reg));
-        }
-
-        if !is_top_level {
-          self
-            .fnc
-            .definition
-            .push(format!("  mov {} %{}", rhs.value_assembly, treg));
-        }
-
-        return rhs;
-      }
-      AssignTarget::Member(mut obj_accessor, prop) => {
-        let subscript = match prop {
-          swc_ecma_ast::MemberProp::Ident(ident) => {
-            CompiledExpression::new(format!("\"{}\"", ident.sym.to_string()), vec![])
-          }
-          swc_ecma_ast::MemberProp::Computed(computed) => self.compile(&computed.expr, None),
-          swc_ecma_ast::MemberProp::PrivateName(_) => {
-            self.fnc.todo(prop.span(), "private name");
-            CompiledExpression::empty()
-          }
-        };
-
-        let rhs = self.compile(&assign_expr.right, None);
-
-        let submov_instr = format!(
-          "  submov {} {} %{}",
-          self.fnc.use_(subscript),
-          rhs.value_assembly,
-          obj_accessor.register(),
-        );
-
-        self.fnc.definition.push(submov_instr);
-
-        obj_accessor.packup(self);
-
-        let res_reg = self
-          .fnc
-          .reg_allocator
-          .allocate_numbered(&"_tmp".to_string());
-
-        let mov_instr = format!("  mov {} %{}", self.fnc.use_(rhs), res_reg);
-
-        self.fnc.definition.push(mov_instr);
-
-        return CompiledExpression::new(format!("%{}", res_reg), vec![res_reg]);
-      }
+    let rhs = match is_top_level {
+      true => self.compile(&assign_expr.right, at.direct_register()),
+      false => self.compile(&assign_expr.right, None),
     };
+
+    if let Some(target_reg) = target_register {
+      self.fnc.definition.push("  mov %here %here".to_string());
+
+      self
+        .fnc
+        .definition
+        .push(format!("  mov {} %{}", rhs.value_assembly, target_reg));
+    }
+
+    let at_is_register = match &at {
+      TargetAccessor::Register(_) => true,
+      _ => false,
+    };
+
+    if is_top_level && at_is_register {
+      // at is already assigned by compiling directly into at.direct_register()
+      // and also doesn't need to be packed up, since it's just a register
+    } else {
+      at.assign_and_packup(self, &rhs.value_assembly);
+    }
+
+    rhs
   }
 
   pub fn assign_expr_compound(
@@ -455,7 +424,7 @@ impl<'a> ExpressionCompiler<'a> {
     use swc_ecma_ast::PatOrExpr;
 
     let mut target = match &assign_expr.left {
-      PatOrExpr::Expr(expr) => TargetAccessor::compile(self, &expr),
+      PatOrExpr::Expr(expr) => TargetAccessor::compile(self, &expr, true),
       PatOrExpr::Pat(pat) => match &**pat {
         Pat::Ident(ident) => {
           TargetAccessor::Register(self.get_register_for_ident_mutation(&ident.id))
@@ -487,12 +456,11 @@ impl<'a> ExpressionCompiler<'a> {
     nested_registers.append(&mut pre_rhs.nested_registers);
     pre_rhs.release_checker.has_unreleased_registers = false;
 
+    let target_read = target.read(self);
+
     self.fnc.definition.push(format!(
       "  {} %{} %{} %{}",
-      op_str,
-      target.register(),
-      tmp_reg,
-      target.register(),
+      op_str, target_read, tmp_reg, target_read,
     ));
 
     self.fnc.reg_allocator.release(&tmp_reg);
@@ -543,7 +511,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    target.packup(self);
+    target.assign_and_packup(self, &format!("%{}", target_read));
 
     CompiledExpression::new(format!("%{}", result_reg), nested_registers)
   }
@@ -774,7 +742,8 @@ impl<'a> ExpressionCompiler<'a> {
     update_exp: &swc_ecma_ast::UpdateExpr,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    let mut target = TargetAccessor::compile(self, &update_exp.arg);
+    let mut target = TargetAccessor::compile(self, &update_exp.arg, true);
+    let target_read = target.read(self);
 
     let op_str = match update_exp.op {
       swc_ecma_ast::UpdateOp::PlusPlus => "op++",
@@ -786,7 +755,7 @@ impl<'a> ExpressionCompiler<'a> {
         self
           .fnc
           .definition
-          .push(format!("  {} %{}", op_str, &target.register()));
+          .push(format!("  {} %{}", op_str, &target_read));
 
         let mut nested_registers = Vec::<String>::new();
 
@@ -847,18 +816,18 @@ impl<'a> ExpressionCompiler<'a> {
         self
           .fnc
           .definition
-          .push(format!("  mov %{} %{}", &target.register(), &old_value_reg));
+          .push(format!("  mov %{} %{}", target_read, &old_value_reg));
 
         self
           .fnc
           .definition
-          .push(format!("  {} %{}", op_str, &target.register()));
+          .push(format!("  {} %{}", op_str, target_read));
 
         CompiledExpression::new(format!("%{}", &old_value_reg), nested_registers)
       }
     };
 
-    target.packup(self);
+    target.assign_and_packup(self, &format!("%{}", target_read));
 
     return res;
   }
@@ -1015,10 +984,16 @@ impl<'a> ExpressionCompiler<'a> {
       true => TargetAccessorOrCompiledExpression::TargetAccessor(TargetAccessor::compile(
         self,
         &callee_expr.obj,
+        true,
       )),
       false => {
         TargetAccessorOrCompiledExpression::CompiledExpression(self.compile(&callee_expr.obj, None))
       }
+    };
+
+    let obj_value_assembly = match &obj {
+      TargetAccessorOrCompiledExpression::TargetAccessor(ta) => format!("%{}", ta.read(self)),
+      TargetAccessorOrCompiledExpression::CompiledExpression(ce) => ce.value_assembly.clone(),
     };
 
     let mut prop = self.member_prop(&callee_expr.prop, None);
@@ -1026,14 +1001,7 @@ impl<'a> ExpressionCompiler<'a> {
     prop.release_checker.has_unreleased_registers = false;
     sub_nested_registers.append(&mut prop.nested_registers);
 
-    let mut instr = format!(
-      "  subcall {} {} [",
-      match &obj {
-        TargetAccessorOrCompiledExpression::TargetAccessor(ta) => format!("%{}", ta.register()),
-        TargetAccessorOrCompiledExpression::CompiledExpression(ce) => ce.value_assembly.clone(),
-      },
-      prop.value_assembly,
-    );
+    let mut instr = format!("  subcall {} {} [", obj_value_assembly, prop.value_assembly,);
 
     for i in 0..args.len() {
       let arg = &args[i];
@@ -1074,7 +1042,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     match obj {
       TargetAccessorOrCompiledExpression::TargetAccessor(mut ta) => {
-        ta.packup(self);
+        ta.assign_and_packup(self, &obj_value_assembly);
       }
       TargetAccessorOrCompiledExpression::CompiledExpression(ce) => {
         self.fnc.use_(ce);
@@ -1552,29 +1520,35 @@ impl TargetAccessor {
     };
   }
 
-  fn compile(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> TargetAccessor {
+  fn compile(
+    ec: &mut ExpressionCompiler,
+    expr: &swc_ecma_ast::Expr,
+    is_outermost: bool,
+  ) -> TargetAccessor {
     use swc_ecma_ast::Expr::*;
 
     return match expr {
       Ident(ident) => TargetAccessor::Register(ec.get_register_for_ident_mutation(ident)),
       This(_) => TargetAccessor::Register("this".to_string()),
       Member(member) => {
-        let obj = TargetAccessor::compile(ec, &member.obj);
+        let obj = TargetAccessor::compile(ec, &member.obj, false);
         let subscript = ec.member_prop(&member.prop, None);
 
         let register = ec.fnc.reg_allocator.allocate_numbered(&"_tmp".to_string());
 
-        ec.fnc.definition.push(format!(
-          "  sub %{} {} %{}",
-          obj.register(),
-          subscript.value_assembly,
-          register,
-        ));
+        if !is_outermost {
+          ec.fnc.definition.push(format!(
+            "  sub %{} {} %{}",
+            obj.register(),
+            subscript.value_assembly,
+            register,
+          ));
+        }
 
         TargetAccessor::Nested(NestedTargetAccess {
           obj: Box::new(obj),
-          subscript: subscript,
-          register: register,
+          subscript,
+          register,
         })
       }
       SuperProp(super_prop) => {
@@ -1609,12 +1583,67 @@ impl TargetAccessor {
     );
   }
 
+  fn assign_and_packup(&mut self, ec: &mut ExpressionCompiler, value_assembly: &String) {
+    use TargetAccessor::*;
+
+    match self {
+      Register(reg) => {
+        if value_assembly != &format!("%{}", reg) {
+          ec.fnc
+            .definition
+            .push(format!("  mov {} %{}", value_assembly, reg));
+        }
+      }
+      Nested(nta) => {
+        let submov_instr = format!(
+          "  submov {} {} %{}",
+          ec.fnc.use_ref(&mut nta.subscript),
+          value_assembly,
+          nta.obj.register(),
+        );
+
+        ec.fnc.definition.push(submov_instr);
+
+        ec.fnc.reg_allocator.release(&nta.register);
+
+        nta.obj.packup(ec);
+      }
+    }
+  }
+
+  fn read(&self, ec: &mut ExpressionCompiler) -> String {
+    use TargetAccessor::*;
+
+    return match self {
+      Register(reg) => reg.clone(),
+      Nested(nta) => {
+        ec.fnc.definition.push(format!(
+          "  sub %{} {} %{}",
+          nta.obj.register(),
+          nta.subscript.value_assembly,
+          nta.register,
+        ));
+
+        nta.register.clone()
+      }
+    };
+  }
+
   fn register(&self) -> String {
     use TargetAccessor::*;
 
     return match self {
       Register(reg) => reg.clone(),
       Nested(nta) => nta.register.clone(),
+    };
+  }
+
+  fn direct_register(&self) -> Option<String> {
+    use TargetAccessor::*;
+
+    return match self {
+      Register(reg) => Some(reg.clone()),
+      Nested(_) => None,
     };
   }
 
@@ -1694,7 +1723,7 @@ impl AssignTarget {
   fn from_pat_or_expr(
     ec: &mut ExpressionCompiler,
     pat_or_expr: &swc_ecma_ast::PatOrExpr,
-  ) -> AssignTarget {
+  ) -> TargetAccessor {
     use swc_ecma_ast::PatOrExpr;
 
     match pat_or_expr {
@@ -1703,16 +1732,16 @@ impl AssignTarget {
     }
   }
 
-  fn from_pat(ec: &mut ExpressionCompiler, pat: &swc_ecma_ast::Pat) -> AssignTarget {
+  fn from_pat(ec: &mut ExpressionCompiler, pat: &swc_ecma_ast::Pat) -> TargetAccessor {
     use swc_ecma_ast::Pat;
 
     match pat {
-      Pat::Ident(ident) => AssignTarget::Register(ec.get_register_for_ident_mutation(&ident.id)),
+      Pat::Ident(ident) => TargetAccessor::Register(ec.get_register_for_ident_mutation(&ident.id)),
       Pat::Expr(expr) => AssignTarget::from_expr(ec, &expr),
       Pat::Array(array) => {
         ec.fnc.todo(array.span, "Array destructuring assignment");
 
-        AssignTarget::Register(
+        TargetAccessor::Register(
           ec.fnc
             .reg_allocator
             .allocate_numbered(&"_todo_array_destruct".to_string()),
@@ -1721,7 +1750,7 @@ impl AssignTarget {
       Pat::Object(object) => {
         ec.fnc.todo(object.span, "Object destructuring assignment");
 
-        AssignTarget::Register(
+        TargetAccessor::Register(
           ec.fnc
             .reg_allocator
             .allocate_numbered(&"_todo_object_destruct".to_string()),
@@ -1731,7 +1760,7 @@ impl AssignTarget {
         ec.fnc
           .todo(rest.span, "Rest destructuring assignment (not implemented)");
 
-        AssignTarget::Register(
+        TargetAccessor::Register(
           ec.fnc
             .reg_allocator
             .allocate_numbered(&"_todo_rest_destruct".to_string()),
@@ -1743,7 +1772,7 @@ impl AssignTarget {
           "Default destructuring assignment (not implemented)",
         );
 
-        AssignTarget::Register(
+        TargetAccessor::Register(
           ec.fnc
             .reg_allocator
             .allocate_numbered(&"_todo_default_destruct".to_string()),
@@ -1756,7 +1785,7 @@ impl AssignTarget {
           span: invalid.span,
         });
 
-        AssignTarget::Register(
+        TargetAccessor::Register(
           ec.fnc
             .reg_allocator
             .allocate_numbered(&"_invalid_pat".to_string()),
@@ -1765,40 +1794,7 @@ impl AssignTarget {
     }
   }
 
-  fn from_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> AssignTarget {
-    return match expr {
-      swc_ecma_ast::Expr::Ident(ident) => {
-        AssignTarget::Register(ec.get_register_for_ident_mutation(&ident))
-      }
-      swc_ecma_ast::Expr::This(_) => AssignTarget::Register("this".to_string()),
-      swc_ecma_ast::Expr::Member(member) => AssignTarget::Member(
-        TargetAccessor::compile(ec, &member.obj),
-        member.prop.clone(),
-      ),
-      swc_ecma_ast::Expr::SuperProp(super_prop) => {
-        ec.fnc.todo(super_prop.span(), "SuperProp");
-
-        let bad_reg = ec
-          .fnc
-          .reg_allocator
-          .allocate_numbered(&"_todo_super_prop".to_string());
-
-        AssignTarget::Register(bad_reg)
-      }
-      _ => {
-        ec.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid lvalue expression".to_string(),
-          span: expr.span(),
-        });
-
-        let bad_reg = ec
-          .fnc
-          .reg_allocator
-          .allocate_numbered(&"_bad_lvalue".to_string());
-
-        AssignTarget::Register(bad_reg)
-      }
-    };
+  fn from_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> TargetAccessor {
+    TargetAccessor::compile(ec, expr, true)
   }
 }
