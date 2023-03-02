@@ -349,12 +349,12 @@ impl FunctionCompiler {
     match functionish {
       Functionish::Fn(fn_) => {
         for (i, p) in fn_.params.iter().enumerate() {
-          self.decl_or_param_pat(&p.pat, &param_registers[i], scope);
+          self.decl_or_param_pat(&p.pat, &param_registers[i], false, scope);
         }
       }
       Functionish::Arrow(arrow) => {
         for (i, p) in arrow.params.iter().enumerate() {
-          self.decl_or_param_pat(p, &param_registers[i], scope);
+          self.decl_or_param_pat(p, &param_registers[i], false, scope);
         }
       }
       Functionish::Constructor(_, constructor) => {
@@ -364,7 +364,7 @@ impl FunctionCompiler {
               // TODO (Diagnostic emitted elsewhere)
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              self.decl_or_param_pat(&p.pat, &param_registers[i], scope);
+              self.decl_or_param_pat(&p.pat, &param_registers[i], false, scope);
             }
           }
         }
@@ -372,7 +372,13 @@ impl FunctionCompiler {
     };
   }
 
-  fn decl_or_param_pat(&mut self, pat: &swc_ecma_ast::Pat, register: &String, scope: &Scope) {
+  pub fn decl_or_param_pat(
+    &mut self,
+    pat: &swc_ecma_ast::Pat,
+    register: &String,
+    skip_release: bool,
+    scope: &Scope,
+  ) {
     use swc_ecma_ast::Pat;
 
     match pat {
@@ -401,7 +407,7 @@ impl FunctionCompiler {
       }
       Pat::Assign(assign) => {
         self.default_expr(&assign.right, register, scope);
-        self.decl_or_param_pat(&assign.left, register, scope);
+        self.decl_or_param_pat(&assign.left, register, false, scope);
       }
       Pat::Array(array) => {
         for (i, elem_opt) in array.elems.iter().enumerate() {
@@ -416,10 +422,12 @@ impl FunctionCompiler {
             .definition
             .push(format!("  sub %{} {} %{}", register, i, elem_reg));
 
-          self.decl_or_param_pat(elem, &elem_reg, scope);
+          self.decl_or_param_pat(elem, &elem_reg, false, scope);
         }
 
-        self.reg_allocator.release(register);
+        if !skip_release {
+          self.reg_allocator.release(register);
+        }
       }
       Pat::Object(object) => {
         for prop in &object.props {
@@ -441,7 +449,8 @@ impl FunctionCompiler {
 
               ec.fnc.definition.push(sub_instr);
 
-              ec.fnc.decl_or_param_pat(&kv.value, &param_reg, scope);
+              ec.fnc
+                .decl_or_param_pat(&kv.value, &param_reg, false, scope);
             }
             ObjectPatProp::Assign(assign) => {
               let key = assign.key.sym.to_string();
@@ -461,7 +470,9 @@ impl FunctionCompiler {
           }
         }
 
-        self.reg_allocator.release(register);
+        if !skip_release {
+          self.reg_allocator.release(register);
+        }
       }
       Pat::Invalid(_) => {
         // Diagnostic emitted elsewhere
@@ -1160,7 +1171,7 @@ impl FunctionCompiler {
           ec.compile(expr, Some(target_register.clone()));
           drop(ec);
 
-          self.decl_or_param_pat(&decl.name, &target_register, scope);
+          self.decl_or_param_pat(&decl.name, &target_register, false, scope);
         }
         None => match &decl.name {
           swc_ecma_ast::Pat::Ident(_) => {

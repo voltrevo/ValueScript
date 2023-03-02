@@ -384,7 +384,7 @@ impl<'a> ExpressionCompiler<'a> {
       swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
         swc_ecma_ast::Pat::Ident(ident) => TargetAccessor::compile_ident(self, &ident.id),
         swc_ecma_ast::Pat::Expr(expr) => TargetAccessor::compile(self, expr, true),
-        _ => return self.assign_pat_eq(pat, &assign_expr.right, is_top_level, target_register),
+        _ => return self.assign_pat_eq(pat, &assign_expr.right, target_register),
       },
       swc_ecma_ast::PatOrExpr::Expr(expr) => TargetAccessor::compile(self, expr, true),
     };
@@ -420,14 +420,25 @@ impl<'a> ExpressionCompiler<'a> {
     &mut self,
     pat: &swc_ecma_ast::Pat,
     assign_expr_right: &swc_ecma_ast::Expr,
-    is_top_level: bool,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    self
+    let rhs_reg = self
       .fnc
-      .todo(pat.span(), &format!("Assign expression with pattern"));
+      .reg_allocator
+      .allocate_numbered(&"_tmp".to_string());
 
-    return CompiledExpression::empty();
+    let rhs = self.compile(assign_expr_right, Some(rhs_reg.clone()));
+
+    self.fnc.decl_or_param_pat(pat, &rhs_reg, true, &self.scope);
+
+    if let Some(target_reg) = target_register {
+      self
+        .fnc
+        .definition
+        .push(format!("  mov {} %{}", rhs.value_assembly, target_reg));
+    }
+
+    rhs
   }
 
   pub fn assign_expr_compound(
