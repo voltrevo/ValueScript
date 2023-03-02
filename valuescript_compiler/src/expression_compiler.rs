@@ -1555,12 +1555,9 @@ impl<'a> ExpressionCompiler<'a> {
       Pat::Rest(_) => {
         // TODO (Diagnostic emitted elsewhere)
       }
-      Pat::Expr(_) => {
-        self.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Unexpected Pat::Expr in param/decl context".to_string(),
-          span: pat.span(),
-        });
+      Pat::Expr(expr) => {
+        let mut at = TargetAccessor::compile(self, expr, true);
+        at.assign_and_packup(self, &format!("%{}", register));
       }
     }
   }

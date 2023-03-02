@@ -1,3 +1,5 @@
+// test_output! "right"
+
 export default function main() {
   let x;
   let key = 'left';
