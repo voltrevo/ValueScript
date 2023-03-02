@@ -296,7 +296,7 @@ impl FunctionCompiler {
     return param_registers;
   }
 
-  fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat, scope: &Scope) -> String {
+  pub fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat, scope: &Scope) -> String {
     use swc_ecma_ast::Pat;
 
     match param_pat {

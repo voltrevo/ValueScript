@@ -380,25 +380,7 @@ impl<'a> ExpressionCompiler<'a> {
     is_top_level: bool,
     target_register: Option<String>,
   ) -> CompiledExpression {
-    let at = match &assign_expr.left {
-      swc_ecma_ast::PatOrExpr::Expr(expr) => AssignTarget::from_expr(self, expr),
-      swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
-        swc_ecma_ast::Pat::Ident(ident) => {
-          AssignTarget::Register(self.get_register_for_ident_mutation(&ident.id))
-        }
-        swc_ecma_ast::Pat::Expr(expr) => AssignTarget::from_expr(self, expr),
-        _ => {
-          self.fnc.todo(pat.span(), "destructuring (a)");
-
-          let bad_reg = self
-            .fnc
-            .reg_allocator
-            .allocate_numbered(&"_todo_destructuring".to_string());
-
-          AssignTarget::Register(bad_reg)
-        }
-      },
-    };
+    let at = AssignTarget::from_pat_or_expr(self, &assign_expr.left);
 
     match at {
       AssignTarget::Register(treg) => {
@@ -1709,6 +1691,80 @@ enum AssignTarget {
 }
 
 impl AssignTarget {
+  fn from_pat_or_expr(
+    ec: &mut ExpressionCompiler,
+    pat_or_expr: &swc_ecma_ast::PatOrExpr,
+  ) -> AssignTarget {
+    use swc_ecma_ast::PatOrExpr;
+
+    match pat_or_expr {
+      PatOrExpr::Pat(pat) => AssignTarget::from_pat(ec, pat),
+      PatOrExpr::Expr(expr) => AssignTarget::from_expr(ec, expr),
+    }
+  }
+
+  fn from_pat(ec: &mut ExpressionCompiler, pat: &swc_ecma_ast::Pat) -> AssignTarget {
+    use swc_ecma_ast::Pat;
+
+    match pat {
+      Pat::Ident(ident) => AssignTarget::Register(ec.get_register_for_ident_mutation(&ident.id)),
+      Pat::Expr(expr) => AssignTarget::from_expr(ec, &expr),
+      Pat::Array(array) => {
+        ec.fnc.todo(array.span, "Array destructuring assignment");
+
+        AssignTarget::Register(
+          ec.fnc
+            .reg_allocator
+            .allocate_numbered(&"_todo_array_destruct".to_string()),
+        )
+      }
+      Pat::Object(object) => {
+        ec.fnc.todo(object.span, "Object destructuring assignment");
+
+        AssignTarget::Register(
+          ec.fnc
+            .reg_allocator
+            .allocate_numbered(&"_todo_object_destruct".to_string()),
+        )
+      }
+      Pat::Rest(rest) => {
+        ec.fnc
+          .todo(rest.span, "Rest destructuring assignment (not implemented)");
+
+        AssignTarget::Register(
+          ec.fnc
+            .reg_allocator
+            .allocate_numbered(&"_todo_rest_destruct".to_string()),
+        )
+      }
+      Pat::Assign(assign) => {
+        ec.fnc.todo(
+          assign.span,
+          "Default destructuring assignment (not implemented)",
+        );
+
+        AssignTarget::Register(
+          ec.fnc
+            .reg_allocator
+            .allocate_numbered(&"_todo_default_destruct".to_string()),
+        )
+      }
+      Pat::Invalid(invalid) => {
+        ec.fnc.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "Invalid pattern".to_string(),
+          span: invalid.span,
+        });
+
+        AssignTarget::Register(
+          ec.fnc
+            .reg_allocator
+            .allocate_numbered(&"_invalid_pat".to_string()),
+        )
+      }
+    }
+  }
+
   fn from_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> AssignTarget {
     return match expr {
       swc_ecma_ast::Expr::Ident(ident) => {
