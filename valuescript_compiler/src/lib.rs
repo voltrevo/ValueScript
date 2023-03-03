@@ -1,4 +1,5 @@
 mod assemble;
+mod assembly_ast;
 mod capture_finder;
 mod compile;
 mod diagnostic;
