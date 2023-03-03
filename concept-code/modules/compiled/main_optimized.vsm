@@ -1,0 +1,18 @@
+export @main { "main": @main }
+@f1 = lazy {
+  import "./f1.vsm" %return
+}
+@f2 = lazy {
+  import_star "./f2.vsm" %return
+  sub %return "f2" %return
+}
+@util_dist = lazy {
+  import_star "./util.vsm" %return
+  sub %return "dist" %return
+}
+@main = function() {
+  call @f1 [1, 2, 3] %x
+  apply @f2 %x [] %ignore
+  call @util_dist [3, 4] %dist
+  mov [%x, %dist] %return
+}

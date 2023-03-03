@@ -1,0 +1,4 @@
+export void { "f2": @f2 }
+@f2 = function() {
+  op++ %this
+}

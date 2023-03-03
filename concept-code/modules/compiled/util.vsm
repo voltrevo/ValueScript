@@ -1,0 +1,7 @@
+export void { "dist": @dist }
+@dist = function(%x, %y) {
+  op* %x %x %_tmp0
+  op* %y %y %_tmp1
+  op+ %_tmp0 %_tmp1 %_tmp1
+  subcall $Math "sqrt" [%_tmp1] %return
+}

@@ -1,0 +1,20 @@
+export @main { "main": @main }
+@main = function() {
+  call @f1_default [1, 2, 3] %x
+  apply @f2_f2 %x [] %ignore
+  call @util_dist [3, 4] %dist
+  mov [%x, %dist] %return
+}
+@f1_default = function(%a, %b, %c) {
+  op* %b %c %_tmp0
+  op+ %a %_tmp0 %return
+}
+@f2_f2 = function() {
+  op++ %this
+}
+@util_dist = function(%x, %y) {
+  op* %x %x %_tmp0
+  op* %y %y %_tmp1
+  op+ %_tmp0 %_tmp1 %_tmp1
+  subcall $Math "sqrt" [%_tmp1] %return
+}
