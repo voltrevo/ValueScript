@@ -6,4 +6,12 @@ declare namespace vs {
   export function inc(x: number): void;
 }
 
-export default vs;
+declare module "ffi:console" {
+  type Console = {
+    log(...args: unknown[]): void;
+  };
+
+  const console: Console;
+
+  export default console;
+}

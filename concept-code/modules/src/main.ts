@@ -1,4 +1,4 @@
-import vs from "./vs.d.ts";
+/// <reference path="../../vs.d.ts" />
 
 import f1 from "./f1.ts";
 import { f2 } from "./f2.ts";
