@@ -1,7 +1,5 @@
-// pub fn foo() -> Assembly {}
-
-struct Assembly {
-  definitions: Vec<Definition>,
+pub struct Assembly {
+  pub definitions: Vec<Definition>,
 }
 
 impl std::fmt::Display for Assembly {
@@ -14,9 +12,9 @@ impl std::fmt::Display for Assembly {
   }
 }
 
-struct Definition {
-  ref_: DefinitionRef,
-  content: DefinitionContent,
+pub struct Definition {
+  pub ref_: DefinitionRef,
+  pub content: DefinitionContent,
 }
 
 impl std::fmt::Display for Definition {
@@ -25,8 +23,9 @@ impl std::fmt::Display for Definition {
   }
 }
 
-enum DefinitionContent {
+pub enum DefinitionContent {
   Function(Function),
+  Class(Class),
   Value(Value),
 }
 
@@ -36,6 +35,9 @@ impl std::fmt::Display for DefinitionContent {
       DefinitionContent::Function(function) => {
         write!(f, "{}", function)
       }
+      DefinitionContent::Class(class) => {
+        write!(f, "{}", class)
+      }
       DefinitionContent::Value(value) => {
         write!(f, "{}", value)
       }
@@ -43,8 +45,9 @@ impl std::fmt::Display for DefinitionContent {
   }
 }
 
-struct DefinitionRef {
-  name: String,
+#[derive(Hash, PartialEq, Eq, Clone)]
+pub struct DefinitionRef {
+  pub name: String,
 }
 
 impl std::fmt::Display for DefinitionRef {
@@ -53,9 +56,9 @@ impl std::fmt::Display for DefinitionRef {
   }
 }
 
-struct Function {
-  parameters: Vec<Register>,
-  body: Vec<InstructionOrLabel>,
+pub struct Function {
+  pub parameters: Vec<Register>,
+  pub body: Vec<InstructionOrLabel>,
 }
 
 impl std::fmt::Display for Function {
@@ -82,10 +85,38 @@ impl std::fmt::Display for Function {
   }
 }
 
-enum Register {
+pub struct Class {
+  pub constructor: Value,
+  pub methods: Value,
+}
+
+impl std::fmt::Display for Class {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    write!(f, "class({}, ", self.constructor)?;
+
+    match &self.methods {
+      Value::Object(object) => {
+        write!(f, "{{\n")?;
+        for (name, method) in &object.properties {
+          write!(f, "  {}: {}\n", name, method)?;
+        }
+        write!(f, "}})\n")?;
+      }
+      _ => {
+        write!(f, "{})\n", self.methods)?;
+      }
+    }
+
+    return Ok(());
+  }
+}
+
+#[derive(Hash, PartialEq, Eq, Clone)]
+pub enum Register {
   Return,
   This,
   Named(String),
+  Ignore,
 }
 
 impl std::fmt::Display for Register {
@@ -94,11 +125,12 @@ impl std::fmt::Display for Register {
       Register::Return => write!(f, "%return"),
       Register::This => write!(f, "%this"),
       Register::Named(name) => write!(f, "%{}", name),
+      Register::Ignore => write!(f, "%ignore"),
     }
   }
 }
 
-enum InstructionOrLabel {
+pub enum InstructionOrLabel {
   Instruction(Instruction),
   Label(Label),
 }
@@ -116,8 +148,16 @@ impl std::fmt::Display for InstructionOrLabel {
   }
 }
 
-struct Label {
-  name: String,
+pub struct Label {
+  pub name: String,
+}
+
+impl Label {
+  pub fn ref_(&self) -> LabelRef {
+    LabelRef {
+      name: self.name.clone(),
+    }
+  }
 }
 
 impl std::fmt::Display for Label {
@@ -126,8 +166,9 @@ impl std::fmt::Display for Label {
   }
 }
 
-struct LabelRef {
-  name: String,
+#[derive(Hash, PartialEq, Eq, Clone)]
+pub struct LabelRef {
+  pub name: String,
 }
 
 impl std::fmt::Display for LabelRef {
@@ -176,8 +217,8 @@ pub enum Instruction {
   Sub(Value, Value, Register),
   SubMov(Value, Value, Register),
   SubCall(Value, Value, Value, Register),
-  Jmp(Label),
-  JmpIf(Value, Label),
+  Jmp(LabelRef),
+  JmpIf(Value, LabelRef),
   UnaryPlus(Value, Register),
   UnaryMinus(Value, Register),
   New(Value, Value, Register),
@@ -297,9 +338,9 @@ impl std::fmt::Display for Instruction {
       Instruction::SubCall(obj, subscript, args, register) => {
         write!(f, "subcall {} {} {} {}", obj, subscript, args, register)
       }
-      Instruction::Jmp(label) => write!(f, "jmp {}", label),
-      Instruction::JmpIf(value, label) => {
-        write!(f, "jmpif {} {}", value, label)
+      Instruction::Jmp(label_ref) => write!(f, "jmp {}", label_ref),
+      Instruction::JmpIf(value, label_ref) => {
+        write!(f, "jmpif {} {}", value, label_ref)
       }
       Instruction::UnaryPlus(value, register) => {
         write!(f, "unary+ {} {}", value, register)
@@ -314,7 +355,61 @@ impl std::fmt::Display for Instruction {
   }
 }
 
-enum Value {
+impl Instruction {
+  pub fn byte(&self) -> u8 {
+    use Instruction::*;
+
+    // TODO: Define this in one place only
+    match self {
+      End => 0x00,
+      Mov(..) => 0x01,
+      OpInc(..) => 0x02,
+      OpDec(..) => 0x03,
+      OpPlus(..) => 0x04,
+      OpMinus(..) => 0x05,
+      OpMul(..) => 0x06,
+      OpDiv(..) => 0x07,
+      OpMod(..) => 0x08,
+      OpExp(..) => 0x09,
+      OpEq(..) => 0x0a,
+      OpNe(..) => 0x0b,
+      OpTripleEq(..) => 0x0c,
+      OpTripleNe(..) => 0x0d,
+      OpAnd(..) => 0x0e,
+      OpOr(..) => 0x0f,
+      OpNot(..) => 0x10,
+      OpLess(..) => 0x11,
+      OpLessEq(..) => 0x12,
+      OpGreater(..) => 0x13,
+      OpGreaterEq(..) => 0x14,
+      OpNullishCoalesce(..) => 0x15,
+      OpOptionalChain(..) => 0x16,
+      OpBitAnd(..) => 0x17,
+      OpBitOr(..) => 0x18,
+      OpBitNot(..) => 0x19,
+      OpBitXor(..) => 0x1a,
+      OpLeftShift(..) => 0x1b,
+      OpRightShift(..) => 0x1c,
+      OpRightShiftUnsigned(..) => 0x1d,
+      TypeOf(..) => 0x1e,
+      InstanceOf(..) => 0x1f,
+      In(..) => 0x20,
+      Call(..) => 0x21,
+      Apply(..) => 0x22,
+      Bind(..) => 0x23,
+      Sub(..) => 0x24,
+      SubMov(..) => 0x25,
+      SubCall(..) => 0x26,
+      Jmp(..) => 0x27,
+      JmpIf(..) => 0x28,
+      UnaryPlus(..) => 0x29,
+      UnaryMinus(..) => 0x2a,
+      New(..) => 0x2b,
+    }
+  }
+}
+
+pub enum Value {
   Undefined,
   Null,
   Boolean(bool),
@@ -324,7 +419,6 @@ enum Value {
   Object(Box<Object>),
   Register(Register),
   DefinitionRef(DefinitionRef),
-  LabelRef(LabelRef),
 }
 
 impl std::fmt::Display for Value {
@@ -343,13 +437,12 @@ impl std::fmt::Display for Value {
       Value::Object(value) => write!(f, "{}", value),
       Value::Register(value) => write!(f, "{}", value),
       Value::DefinitionRef(value) => write!(f, "{}", value),
-      Value::LabelRef(value) => write!(f, "{}", value),
     }
   }
 }
 
-struct Array {
-  values: Vec<Value>,
+pub struct Array {
+  pub values: Vec<Value>,
 }
 
 impl std::fmt::Display for Array {
@@ -365,8 +458,8 @@ impl std::fmt::Display for Array {
   }
 }
 
-struct Object {
-  properties: Vec<(String, Value)>,
+pub struct Object {
+  pub properties: Vec<(Value, Value)>,
 }
 
 impl std::fmt::Display for Object {
@@ -380,12 +473,7 @@ impl std::fmt::Display for Object {
       if i > 0 {
         write!(f, ", ")?;
       }
-      write!(
-        f,
-        "{}: {}",
-        serde_json::to_string(&key).expect("Failed json serialization"),
-        value
-      )?;
+      write!(f, "{}: {}", key, value)?;
     }
     write!(f, " }}")
   }
