@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use crate::assembly_ast::{
-  Array, Assembly, Class, Definition, DefinitionContent, DefinitionRef, Function, Instruction,
-  InstructionOrLabel, Label, LabelRef, Object, Register, Value,
+use crate::asm::{
+  Array, Class, Definition, DefinitionContent, DefinitionRef, Function, Instruction,
+  InstructionOrLabel, Label, LabelRef, Module, Object, Register, Value,
 };
 
-pub fn assemble(assembly: &Assembly) -> Vec<u8> {
+pub fn assemble(assembly: &Module) -> Vec<u8> {
   let mut assembler = Assembler {
     output: Vec::new(),
     fn_data: Default::default(),
@@ -15,7 +15,7 @@ pub fn assemble(assembly: &Assembly) -> Vec<u8> {
     },
   };
 
-  assembler.assembly(assembly);
+  assembler.module(assembly);
 
   return assembler.output;
 }
@@ -27,8 +27,8 @@ struct Assembler {
 }
 
 impl Assembler {
-  fn assembly(&mut self, assembly: &Assembly) {
-    for definition in &assembly.definitions {
+  fn module(&mut self, module: &Module) {
+    for definition in &module.definitions {
       self.definition(definition);
     }
 

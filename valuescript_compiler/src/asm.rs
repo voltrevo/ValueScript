@@ -1,8 +1,8 @@
-pub struct Assembly {
+pub struct Module {
   pub definitions: Vec<Definition>,
 }
 
-impl std::fmt::Display for Assembly {
+impl std::fmt::Display for Module {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     for definition in &self.definitions {
       write!(f, "{}\n", definition)?;
