@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::asm::{
-  Array, Class, Definition, DefinitionContent, DefinitionRef, Function, Instruction,
+  Array, Builtin, Class, Definition, DefinitionContent, DefinitionRef, Function, Instruction,
   InstructionOrLabel, Label, LabelRef, Module, Object, Register, Value,
 };
 
@@ -64,7 +64,15 @@ impl Assembler {
 
     self.output.push(function.parameters.len() as u8);
 
+    let mut param_set = HashSet::<Register>::new();
+
     for parameter in &function.parameters {
+      let inserted = param_set.insert(parameter.clone());
+
+      if !inserted {
+        panic!("Duplicate parameter: {}", parameter);
+      }
+
       self.register(parameter);
     }
 
@@ -179,7 +187,7 @@ impl Assembler {
       }
       Value::Number(number) => self.number(*number),
       Value::String(string) => self.string(string),
-      Value::Boolean(boolean) => match boolean {
+      Value::Bool(boolean) => match boolean {
         false => self.output.push(ValueType::False as u8),
         true => self.output.push(ValueType::True as u8),
       },
@@ -189,6 +197,7 @@ impl Assembler {
       Value::Array(array) => self.array(array),
       Value::Object(object) => self.object(object),
       Value::DefinitionRef(definition_ref) => self.definition_ref(definition_ref),
+      Value::Builtin(builtin) => self.builtin(builtin),
     }
   }
 
@@ -272,6 +281,18 @@ impl Assembler {
     self
       .definitions_map
       .add_unresolved(LocationRef::DefinitionRef(value.clone()), &mut self.output);
+  }
+
+  fn builtin(&mut self, builtin: &Builtin) {
+    self.output.push(ValueType::Builtin as u8);
+
+    let builtin_code = match builtin.name.as_str() {
+      "Math" => 0,
+      "Debug" => 1,
+      _ => panic!("Unknown builtin: {}", builtin.name),
+    };
+
+    self.varsize_uint(builtin_code);
   }
 
   fn array(&mut self, array: &Array) {

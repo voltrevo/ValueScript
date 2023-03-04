@@ -56,6 +56,7 @@ impl std::fmt::Display for DefinitionRef {
   }
 }
 
+#[derive(Default)]
 pub struct Function {
   pub parameters: Vec<Register>,
   pub body: Vec<InstructionOrLabel>,
@@ -413,13 +414,14 @@ pub enum Value {
   Void,
   Undefined,
   Null,
-  Boolean(bool),
+  Bool(bool),
   Number(f64),
   String(String),
   Array(Box<Array>),
   Object(Box<Object>),
   Register(Register),
   DefinitionRef(DefinitionRef),
+  Builtin(Builtin),
 }
 
 impl std::fmt::Display for Value {
@@ -428,7 +430,7 @@ impl std::fmt::Display for Value {
       Value::Void => write!(f, "void"),
       Value::Undefined => write!(f, "undefined"),
       Value::Null => write!(f, "null"),
-      Value::Boolean(value) => write!(f, "{}", value),
+      Value::Bool(value) => write!(f, "{}", value),
       Value::Number(value) => write!(f, "{}", value),
       Value::String(value) => write!(
         f,
@@ -439,10 +441,22 @@ impl std::fmt::Display for Value {
       Value::Object(value) => write!(f, "{}", value),
       Value::Register(value) => write!(f, "{}", value),
       Value::DefinitionRef(value) => write!(f, "{}", value),
+      Value::Builtin(value) => write!(f, "{}", value),
     }
   }
 }
 
+pub struct Builtin {
+  pub name: String,
+}
+
+impl std::fmt::Display for Builtin {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "${}", self.name)
+  }
+}
+
+#[derive(Default)]
 pub struct Array {
   pub values: Vec<Value>,
 }
@@ -460,6 +474,7 @@ impl std::fmt::Display for Array {
   }
 }
 
+#[derive(Default)]
 pub struct Object {
   pub properties: Vec<(Value, Value)>,
 }

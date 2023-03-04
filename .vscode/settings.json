@@ -1,5 +1,5 @@
 {
-  "editor.rulers": [80],
+  "editor.rulers": [100],
   "editor.codeActionsOnSave": {
     "source.fixAll": false
   },
@@ -12,7 +12,7 @@
   "rust-analyzer.inlayHints.bindingModeHints.enable": false,
   "rust-analyzer.inlayHints.chainingHints.enable": false,
   "rust-analyzer.inlayHints.closingBraceHints.enable": false,
-  "rust-analyzer.inlayHints.closureReturnTypeHints.enable":"never",
+  "rust-analyzer.inlayHints.closureReturnTypeHints.enable": "never",
   "rust-analyzer.inlayHints.lifetimeElisionHints.enable": "never",
   "rust-analyzer.inlayHints.parameterHints.enable": false,
   "rust-analyzer.inlayHints.reborrowHints.enable": "never",
