@@ -410,6 +410,7 @@ impl Instruction {
 }
 
 pub enum Value {
+  Void,
   Undefined,
   Null,
   Boolean(bool),
@@ -424,6 +425,7 @@ pub enum Value {
 impl std::fmt::Display for Value {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
+      Value::Void => write!(f, "void"),
       Value::Undefined => write!(f, "undefined"),
       Value::Null => write!(f, "null"),
       Value::Boolean(value) => write!(f, "{}", value),

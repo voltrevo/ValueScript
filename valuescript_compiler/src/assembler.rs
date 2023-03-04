@@ -183,6 +183,7 @@ impl Assembler {
         false => self.output.push(ValueType::False as u8),
         true => self.output.push(ValueType::True as u8),
       },
+      Value::Void => self.output.push(ValueType::Void as u8),
       Value::Null => self.output.push(ValueType::Null as u8),
       Value::Undefined => self.output.push(ValueType::Undefined as u8),
       Value::Array(array) => self.array(array),
