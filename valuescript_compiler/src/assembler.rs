@@ -73,7 +73,9 @@ impl Assembler {
         panic!("Duplicate parameter: {}", parameter);
       }
 
-      self.register(parameter);
+      // Only lookup so that parameters go into the first registers.
+      // Output isn't needed because it's implied by specifying the number of parameters.
+      self.lookup_register(parameter);
     }
 
     for instruction_or_label in &function.body {
