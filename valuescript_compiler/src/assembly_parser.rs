@@ -42,11 +42,12 @@ impl<'a> AssemblyParser<'a> {
     }
   }
 
-  fn get_line_col(&self) -> LineCol {
+  fn get_line_col(&self, offset: isize) -> LineCol {
     let mut line = 1;
     let mut col = 1;
 
-    let pos = self.get_pos_index();
+    let raw_pos = self.get_pos_index();
+    let pos = (raw_pos as isize + offset).max(0) as usize;
 
     for (i, c) in self.content.chars().enumerate() {
       if i == pos {
@@ -68,8 +69,8 @@ impl<'a> AssemblyParser<'a> {
     return self.content.split('\n').collect();
   }
 
-  fn render_pos(&self, message: &String) -> String {
-    let LineCol { line, col } = self.get_line_col();
+  fn render_pos(&self, offset: isize, message: &String) -> String {
+    let LineCol { line, col } = self.get_line_col(offset);
     let source_lines = self.get_lines();
 
     let mut output = String::new();
@@ -195,7 +196,7 @@ impl<'a> AssemblyParser<'a> {
 
     panic!(
       "{}",
-      self.render_pos(&"Failed to parse instruction".to_string())
+      self.render_pos(0, &"Failed to parse instruction".to_string())
     );
   }
 
@@ -257,7 +258,7 @@ impl<'a> AssemblyParser<'a> {
     let optional_identifier = self.test_identifier();
 
     if optional_identifier.is_none() {
-      panic!("{}", self.render_pos(&"Invalid identifier".to_string()));
+      panic!("{}", self.render_pos(0, &"Invalid identifier".to_string()));
     }
 
     let identifier = optional_identifier.unwrap();
@@ -269,7 +270,7 @@ impl<'a> AssemblyParser<'a> {
   fn parse_exact(&mut self, chars: &str) {
     for c in chars.chars() {
       if self.pos.next() != Some(c) {
-        panic!("{}", self.render_pos(&format!("Expected '{}'", c)));
+        panic!("{}", self.render_pos(-1, &format!("Expected '{}'", c)));
       }
     }
   }
@@ -284,7 +285,7 @@ impl<'a> AssemblyParser<'a> {
 
     panic!(
       "{}",
-      self.render_pos(&format!("Expected one of {:?}", options))
+      self.render_pos(0, &format!("Expected one of {:?}", options))
     );
   }
 
@@ -315,7 +316,7 @@ impl<'a> AssemblyParser<'a> {
         } else {
           panic!(
             "{}",
-            self.render_pos(&"Unimplemented escape sequence".to_string())
+            self.render_pos(-1, &"Unimplemented escape sequence".to_string())
           );
         }
 
@@ -332,7 +333,10 @@ impl<'a> AssemblyParser<'a> {
     if escaping {
       panic!(
         "{}",
-        self.render_pos(&"Unexpected end of input after escape character".to_string())
+        self.render_pos(
+          0,
+          &"Unexpected end of input after escape character".to_string()
+        )
       );
     }
 
@@ -614,7 +618,7 @@ impl<'a> AssemblyParser<'a> {
 
     match self.pos.peek() {
       None => {
-        panic!("{}", self.render_pos(&format!("Expected value")));
+        panic!("{}", self.render_pos(0, &format!("Expected value")));
       }
       Some('%') => Value::Register(self.assemble_register()),
       Some('@') => {
@@ -643,10 +647,10 @@ impl<'a> AssemblyParser<'a> {
           _ => {
             panic!(
               "{}",
-              self.render_pos(&format!(
-                "Unimplemented value type or unexpected character {}",
-                c
-              ))
+              self.render_pos(
+                -(parsed.len() as isize),
+                &format!("Unimplemented value type or unexpected character {}", c)
+              )
             );
           }
         }
@@ -668,7 +672,7 @@ impl<'a> AssemblyParser<'a> {
         None => {
           panic!(
             "{}",
-            self.render_pos(&format!("Expected value or array end"))
+            self.render_pos(0, &format!("Expected value or array end"))
           );
         }
         Some(']') => {
@@ -773,7 +777,13 @@ impl<'a> AssemblyParser<'a> {
     let value_result = f64::from_str(num_string.as_str());
 
     if value_result.is_err() {
-      panic!("{}", self.render_pos(&format!("Expected valid number")));
+      panic!(
+        "{}",
+        self.render_pos(
+          -(num_string.len() as isize),
+          &format!("Expected valid number")
+        )
+      );
     }
 
     value_result.unwrap()
@@ -796,11 +806,14 @@ impl<'a> AssemblyParser<'a> {
           let name = self.parse_identifier();
           Value::Pointer(Pointer { name })
         }
-        '}' => break object,
+        '}' => {
+          self.pos.next();
+          break object;
+        }
         _ => {
           panic!(
             "{}",
-            self.render_pos(&format!("Unexpected character {}", c))
+            self.render_pos(0, &format!("Unexpected character {}", c))
           );
         }
       };
@@ -826,7 +839,7 @@ impl<'a> AssemblyParser<'a> {
         _ => {
           panic!(
             "{}",
-            self.render_pos(&format!("Unexpected character {}", c))
+            self.render_pos(0, &format!("Unexpected character {}", c))
           );
         }
       }
