@@ -64,6 +64,32 @@ impl<'a> AssemblyParser<'a> {
     return LineCol { line, col };
   }
 
+  fn get_lines(&self) -> Vec<&str> {
+    return self.content.split('\n').collect();
+  }
+
+  fn render_pos(&self, message: &String) -> String {
+    let LineCol { line, col } = self.get_line_col();
+    let source_lines = self.get_lines();
+
+    let mut output = String::new();
+
+    output += &format!("(unknown):{}:{}: {}:\n", line, col, message);
+
+    if line >= 2 {
+      output += &format!("{: >6} | {}\n", line - 1, source_lines[line - 2]);
+    }
+
+    output += &format!("{: >6} | {}\n", line, source_lines[line - 1]);
+    output += &format!("{: >6} | {}\n", "", " ".repeat(col - 1) + "^");
+
+    if line < source_lines.len() {
+      output += &format!("{: >6} | {}\n", line + 1, source_lines[line]);
+    }
+
+    output
+  }
+
   fn test_chars(&self, chars: &str) -> bool {
     let mut pos = self.pos.clone();
 
@@ -167,7 +193,10 @@ impl<'a> AssemblyParser<'a> {
       }
     }
 
-    panic!("Failed to parse instruction at {}", self.get_line_col());
+    panic!(
+      "{}",
+      self.render_pos(&"Failed to parse instruction".to_string())
+    );
   }
 
   fn test_instruction_word(&self, word: &str) -> bool {
@@ -228,7 +257,7 @@ impl<'a> AssemblyParser<'a> {
     let optional_identifier = self.test_identifier();
 
     if optional_identifier.is_none() {
-      panic!("Invalid identifier at {}", self.get_line_col());
+      panic!("{}", self.render_pos(&"Invalid identifier".to_string()));
     }
 
     let identifier = optional_identifier.unwrap();
@@ -240,7 +269,7 @@ impl<'a> AssemblyParser<'a> {
   fn parse_exact(&mut self, chars: &str) {
     for c in chars.chars() {
       if self.pos.next() != Some(c) {
-        panic!("Expected '{}' at {}", c, self.get_line_col());
+        panic!("{}", self.render_pos(&format!("Expected '{}'", c)));
       }
     }
   }
@@ -253,8 +282,10 @@ impl<'a> AssemblyParser<'a> {
       }
     }
 
-    // FIXME: How best to display options here?
-    panic!("Expected one of (options) at {}", self.get_line_col());
+    panic!(
+      "{}",
+      self.render_pos(&format!("Expected one of {:?}", options))
+    );
   }
 
   fn parse_string_literal(&mut self) -> String {
@@ -282,7 +313,10 @@ impl<'a> AssemblyParser<'a> {
         } else if c == 't' {
           result.push('\t');
         } else {
-          panic!("Unimplemented escape sequence at {}", self.get_line_col());
+          panic!(
+            "{}",
+            self.render_pos(&"Unimplemented escape sequence".to_string())
+          );
         }
 
         escaping = false;
@@ -297,8 +331,8 @@ impl<'a> AssemblyParser<'a> {
 
     if escaping {
       panic!(
-        "Unexpected end of input after escape character at {}",
-        self.get_line_col(),
+        "{}",
+        self.render_pos(&"Unexpected end of input after escape character".to_string())
       );
     }
 
@@ -579,7 +613,9 @@ impl<'a> AssemblyParser<'a> {
     self.parse_optional_whitespace();
 
     match self.pos.peek() {
-      None => panic!("Expected value at {}", self.get_line_col()),
+      None => {
+        panic!("{}", self.render_pos(&format!("Expected value")));
+      }
       Some('%') => Value::Register(self.assemble_register()),
       Some('@') => {
         self.parse_exact("@");
@@ -604,11 +640,15 @@ impl<'a> AssemblyParser<'a> {
           "true" => Value::Bool(true),
 
           // TODO: Finish implementing the different values
-          _ => panic!(
-            "Unimplemented value type or unexpected character {} at {}",
-            c,
-            self.get_line_col(),
-          ),
+          _ => {
+            panic!(
+              "{}",
+              self.render_pos(&format!(
+                "Unimplemented value type or unexpected character {}",
+                c
+              ))
+            );
+          }
         }
       }
     }
@@ -625,7 +665,12 @@ impl<'a> AssemblyParser<'a> {
       self.parse_optional_whitespace();
 
       match self.pos.peek() {
-        None => panic!("Expected value or array end at {}", self.get_line_col()),
+        None => {
+          panic!(
+            "{}",
+            self.render_pos(&format!("Expected value or array end"))
+          );
+        }
         Some(']') => {
           self.pos.next();
           break array;
@@ -728,7 +773,7 @@ impl<'a> AssemblyParser<'a> {
     let value_result = f64::from_str(num_string.as_str());
 
     if value_result.is_err() {
-      panic!("Expected valid number at {}", self.get_line_col());
+      panic!("{}", self.render_pos(&format!("Expected valid number")));
     }
 
     value_result.unwrap()
@@ -752,7 +797,12 @@ impl<'a> AssemblyParser<'a> {
           Value::Pointer(Pointer { name })
         }
         '}' => break object,
-        _ => panic!("Unexpected character {} at {}", c, self.get_line_col()),
+        _ => {
+          panic!(
+            "{}",
+            self.render_pos(&format!("Unexpected character {}", c))
+          );
+        }
       };
 
       self.parse_optional_whitespace();
@@ -773,7 +823,12 @@ impl<'a> AssemblyParser<'a> {
           self.pos.next();
           break object;
         }
-        _ => panic!("Unexpected character {} at {}", c, self.get_line_col()),
+        _ => {
+          panic!(
+            "{}",
+            self.render_pos(&format!("Unexpected character {}", c))
+          );
+        }
       }
     }
   }
