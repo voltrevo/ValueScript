@@ -298,26 +298,28 @@ impl Assembler {
 
   fn array(&mut self, array: &Array) {
     self.output.push(ValueType::Array as u8);
-    self.varsize_uint(array.values.len());
 
     for value in &array.values {
       self.value(value);
     }
+
+    self.output.push(ValueType::End as u8);
   }
 
   fn object(&mut self, object: &Object) {
     self.output.push(ValueType::Object as u8);
-    self.varsize_uint(object.properties.len());
 
     for (key, value) in &object.properties {
       self.value(key);
       self.value(value);
     }
+
+    self.output.push(ValueType::End as u8);
   }
 }
 
 enum ValueType {
-  // End = 0x00,
+  End = 0x00,
   Void = 0x01,
   Undefined = 0x02,
   Null = 0x03,
