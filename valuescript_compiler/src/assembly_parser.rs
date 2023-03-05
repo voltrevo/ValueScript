@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::asm::{
-  Array, Builtin, Class, Definition, DefinitionContent, DefinitionRef, Function, Instruction,
-  InstructionOrLabel, Label, LabelRef, Module, Object, Register, Value,
+  Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
+  Label, LabelRef, Module, Object, Pointer, Register, Value,
 };
 
 struct AssemblyParser<'a> {
@@ -106,7 +106,7 @@ impl<'a> AssemblyParser<'a> {
     };
 
     Definition {
-      ref_: DefinitionRef { name: def_name },
+      pointer: Pointer { name: def_name },
       content,
     }
   }
@@ -584,7 +584,7 @@ impl<'a> AssemblyParser<'a> {
       Some('@') => {
         self.parse_exact("@");
         let name = self.parse_identifier();
-        Value::DefinitionRef(DefinitionRef { name })
+        Value::Pointer(Pointer { name })
       }
       Some('$') => Value::Builtin(self.assemble_builtin()),
       Some('[') => Value::Array(Box::new(self.assemble_array())),
@@ -749,7 +749,7 @@ impl<'a> AssemblyParser<'a> {
         '@' => {
           self.parse_exact("@");
           let name = self.parse_identifier();
-          Value::DefinitionRef(DefinitionRef { name })
+          Value::Pointer(Pointer { name })
         }
         '}' => break object,
         _ => panic!("Unexpected character {} at {}", c, self.get_line_col()),

@@ -13,13 +13,13 @@ impl std::fmt::Display for Module {
 }
 
 pub struct Definition {
-  pub ref_: DefinitionRef,
+  pub pointer: Pointer,
   pub content: DefinitionContent,
 }
 
 impl std::fmt::Display for Definition {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "{} = {}", self.ref_, self.content)
+    write!(f, "{} = {}", self.pointer, self.content)
   }
 }
 
@@ -46,11 +46,11 @@ impl std::fmt::Display for DefinitionContent {
 }
 
 #[derive(Hash, PartialEq, Eq, Clone)]
-pub struct DefinitionRef {
+pub struct Pointer {
   pub name: String,
 }
 
-impl std::fmt::Display for DefinitionRef {
+impl std::fmt::Display for Pointer {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     write!(f, "@{}", self.name)
   }
@@ -420,7 +420,7 @@ pub enum Value {
   Array(Box<Array>),
   Object(Box<Object>),
   Register(Register),
-  DefinitionRef(DefinitionRef),
+  Pointer(Pointer),
   Builtin(Builtin),
 }
 
@@ -440,7 +440,7 @@ impl std::fmt::Display for Value {
       Value::Array(value) => write!(f, "{}", value),
       Value::Object(value) => write!(f, "{}", value),
       Value::Register(value) => write!(f, "{}", value),
-      Value::DefinitionRef(value) => write!(f, "{}", value),
+      Value::Pointer(value) => write!(f, "{}", value),
       Value::Builtin(value) => write!(f, "{}", value),
     }
   }

@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::asm::{
-  Array, Builtin, Class, Definition, DefinitionContent, DefinitionRef, Function, Instruction,
-  InstructionOrLabel, Label, LabelRef, Module, Object, Register, Value,
+  Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
+  Label, LabelRef, Module, Object, Pointer, Register, Value,
 };
 
 pub fn assemble_module(module: &Module) -> Vec<u8> {
@@ -37,7 +37,7 @@ impl Assembler {
 
   fn definition(&mut self, definition: &Definition) {
     self.definitions_map.found_locations.insert(
-      LocationRef::DefinitionRef(definition.ref_.clone()),
+      LocationRef::Pointer(definition.pointer.clone()),
       self.output.len(),
     );
 
@@ -197,7 +197,7 @@ impl Assembler {
       Value::Undefined => self.output.push(ValueType::Undefined as u8),
       Value::Array(array) => self.array(array),
       Value::Object(object) => self.object(object),
-      Value::DefinitionRef(definition_ref) => self.definition_ref(definition_ref),
+      Value::Pointer(pointer) => self.pointer(pointer),
       Value::Builtin(builtin) => self.builtin(builtin),
     }
   }
@@ -277,11 +277,11 @@ impl Assembler {
     }
   }
 
-  fn definition_ref(&mut self, value: &DefinitionRef) {
-    self.output.push(ValueType::Function as u8);
+  fn pointer(&mut self, value: &Pointer) {
+    self.output.push(ValueType::Pointer as u8);
     self
       .definitions_map
-      .add_unresolved(LocationRef::DefinitionRef(value.clone()), &mut self.output);
+      .add_unresolved(LocationRef::Pointer(value.clone()), &mut self.output);
   }
 
   fn builtin(&mut self, builtin: &Builtin) {
@@ -339,14 +339,14 @@ enum ValueType {
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 enum LocationRef {
-  DefinitionRef(DefinitionRef),
+  Pointer(Pointer),
   LabelRef(LabelRef),
 }
 
 impl std::fmt::Display for LocationRef {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      LocationRef::DefinitionRef(def) => write!(f, "{}", def),
+      LocationRef::Pointer(def) => write!(f, "{}", def),
       LocationRef::LabelRef(label) => write!(f, "{}", label),
     }
   }
