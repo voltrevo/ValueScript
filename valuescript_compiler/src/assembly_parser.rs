@@ -626,7 +626,10 @@ impl<'a> AssemblyParser<'a> {
 
       match self.pos.peek() {
         None => panic!("Expected value or array end at {}", self.get_line_col()),
-        Some(']') => break array,
+        Some(']') => {
+          self.pos.next();
+          break array;
+        }
         _ => {}
       }
 
