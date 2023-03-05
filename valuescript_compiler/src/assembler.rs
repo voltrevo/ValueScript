@@ -317,7 +317,7 @@ impl Assembler {
 }
 
 enum ValueType {
-  End = 0x00,
+  // End = 0x00,
   Void = 0x01,
   Undefined = 0x02,
   Null = 0x03,

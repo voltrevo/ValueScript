@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Module {
   pub definitions: Vec<Definition>,
 }
@@ -12,6 +13,7 @@ impl std::fmt::Display for Module {
   }
 }
 
+#[derive(Debug)]
 pub struct Definition {
   pub pointer: Pointer,
   pub content: DefinitionContent,
@@ -23,6 +25,7 @@ impl std::fmt::Display for Definition {
   }
 }
 
+#[derive(Debug)]
 pub enum DefinitionContent {
   Function(Function),
   Class(Class),
@@ -45,7 +48,7 @@ impl std::fmt::Display for DefinitionContent {
   }
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub struct Pointer {
   pub name: String,
 }
@@ -56,7 +59,7 @@ impl std::fmt::Display for Pointer {
   }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Function {
   pub parameters: Vec<Register>,
   pub body: Vec<InstructionOrLabel>,
@@ -86,6 +89,7 @@ impl std::fmt::Display for Function {
   }
 }
 
+#[derive(Debug)]
 pub struct Class {
   pub constructor: Value,
   pub methods: Value,
@@ -112,7 +116,7 @@ impl std::fmt::Display for Class {
   }
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum Register {
   Return,
   This,
@@ -131,6 +135,7 @@ impl std::fmt::Display for Register {
   }
 }
 
+#[derive(Debug)]
 pub enum InstructionOrLabel {
   Instruction(Instruction),
   Label(Label),
@@ -149,6 +154,7 @@ impl std::fmt::Display for InstructionOrLabel {
   }
 }
 
+#[derive(Debug)]
 pub struct Label {
   pub name: String,
 }
@@ -167,7 +173,7 @@ impl std::fmt::Display for Label {
   }
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub struct LabelRef {
   pub name: String,
 }
@@ -178,6 +184,7 @@ impl std::fmt::Display for LabelRef {
   }
 }
 
+#[derive(Debug)]
 pub enum Instruction {
   End,
   Mov(Value, Register),
@@ -410,6 +417,7 @@ impl Instruction {
   }
 }
 
+#[derive(Debug)]
 pub enum Value {
   Void,
   Undefined,
@@ -446,6 +454,7 @@ impl std::fmt::Display for Value {
   }
 }
 
+#[derive(Debug)]
 pub struct Builtin {
   pub name: String,
 }
@@ -456,7 +465,7 @@ impl std::fmt::Display for Builtin {
   }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Array {
   pub values: Vec<Value>,
 }
@@ -474,7 +483,7 @@ impl std::fmt::Display for Array {
   }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Object {
   pub properties: Vec<(Value, Value)>,
 }
