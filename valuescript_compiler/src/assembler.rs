@@ -251,8 +251,6 @@ impl Assembler {
   }
 
   fn number(&mut self, value: f64) {
-    self.output.push(ValueType::Number as u8);
-
     if value == (value as i8) as f64 {
       self.output.push(ValueType::SignedByte as u8);
 
