@@ -1,15 +1,15 @@
-use std::rc::Rc;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
-use super::vs_value::Val;
-use super::vs_value::ValTrait;
-use super::vs_pointer::VsPointer;
-use super::vs_function::VsFunction;
+use super::builtins::get_builtin;
 use super::instruction::Instruction;
-use super::vs_object::VsObject;
 use super::vs_array::VsArray;
 use super::vs_class::VsClass;
-use super::builtins::get_builtin;
+use super::vs_function::VsFunction;
+use super::vs_object::VsObject;
+use super::vs_pointer::VsPointer;
+use super::vs_value::Val;
+use super::vs_value::ValTrait;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -39,28 +39,28 @@ pub enum BytecodeType {
 }
 
 impl BytecodeType {
-  fn from_byte(byte: u8) -> BytecodeType {
+  fn from_byte(byte: u8) -> Option<BytecodeType> {
     use BytecodeType::*;
 
     return match byte {
-      0x00 => End,
-      0x01 => Void,
-      0x02 => Undefined,
-      0x03 => Null,
-      0x04 => False,
-      0x05 => True,
-      0x06 => SignedByte,
-      0x07 => Number,
-      0x08 => String,
-      0x09 => Array,
-      0x0a => Object,
-      0x0b => Function,
-      0x0d => Pointer,
-      0x0e => Register,
-      0x10 => Builtin,
-      0x11 => Class,
+      0x00 => Some(End),
+      0x01 => Some(Void),
+      0x02 => Some(Undefined),
+      0x03 => Some(Null),
+      0x04 => Some(False),
+      0x05 => Some(True),
+      0x06 => Some(SignedByte),
+      0x07 => Some(Number),
+      0x08 => Some(String),
+      0x09 => Some(Array),
+      0x0a => Some(Object),
+      0x0b => Some(Function),
+      0x0d => Some(Pointer),
+      0x0e => Some(Register),
+      0x10 => Some(Builtin),
+      0x11 => Some(Class),
 
-      _ => std::panic!("Unrecognized BytecodeType"),
+      _ => None,
     };
   }
 }
@@ -77,11 +77,13 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_type(&mut self) -> BytecodeType {
-    return BytecodeType::from_byte(self.decode_byte());
+    return BytecodeType::from_byte(self.decode_byte())
+      .expect(format!("Unrecognized bytecode type at {}", self.pos - 1).as_str());
   }
 
   pub fn peek_type(&self) -> BytecodeType {
-    return BytecodeType::from_byte(self.peek_byte());
+    return BytecodeType::from_byte(self.peek_byte())
+      .expect(format!("Unrecognized bytecode type at {}", self.pos).as_str());
   }
 
   pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
@@ -92,15 +94,9 @@ impl BytecodeDecoder {
       BytecodeType::Null => Val::Null,
       BytecodeType::False => Val::Bool(false),
       BytecodeType::True => Val::Bool(true),
-      BytecodeType::SignedByte => Val::Number(
-        self.decode_signed_byte() as f64
-      ),
-      BytecodeType::Number => Val::Number(
-        self.decode_number()
-      ),
-      BytecodeType::String => Val::String(Rc::new(
-        self.decode_string()
-      )),
+      BytecodeType::SignedByte => Val::Number(self.decode_signed_byte() as f64),
+      BytecodeType::Number => Val::Number(self.decode_number()),
+      BytecodeType::String => Val::String(Rc::new(self.decode_string())),
       BytecodeType::Array => {
         let mut vals: Vec<Val> = Vec::new();
 
@@ -111,7 +107,7 @@ impl BytecodeDecoder {
         self.decode_type(); // End (TODO: assert)
 
         Val::Array(Rc::new(VsArray::from(vals)))
-      },
+      }
       BytecodeType::Object => {
         let mut obj: BTreeMap<String, Val> = BTreeMap::new();
 
@@ -124,8 +120,11 @@ impl BytecodeDecoder {
 
         self.decode_type(); // End (TODO: assert)
 
-        Val::Object(Rc::new(VsObject { string_map: obj, prototype: None }))
-      },
+        Val::Object(Rc::new(VsObject {
+          string_map: obj,
+          prototype: None,
+        }))
+      }
       BytecodeType::Function => self.decode_function_header(),
       BytecodeType::Pointer => self.decode_pointer(),
       BytecodeType::Register => registers[self.decode_register_index().unwrap()].clone(),
@@ -133,8 +132,8 @@ impl BytecodeDecoder {
       BytecodeType::Class => Val::Class(Rc::new(VsClass {
         constructor: self.decode_val(registers),
         instance_prototype: self.decode_val(registers),
-      }))
-    }
+      })),
+    };
   }
 
   pub fn decode_signed_byte(&mut self) -> i8 {
@@ -195,26 +194,25 @@ impl BytecodeDecoder {
   }
 
   pub fn clone_at(&self, pos: usize) -> BytecodeDecoder {
-    return BytecodeDecoder { data: self.data.clone(), pos: pos };
+    return BytecodeDecoder {
+      data: self.data.clone(),
+      pos: pos,
+    };
   }
 
   pub fn decode_pointer(&mut self) -> Val {
     let from_pos = self.pos;
     let pos = self.decode_pos();
-    
+
     if pos < from_pos {
-      if
-        self.clone_at(pos).decode_type() != BytecodeType::Function &&
-        self.clone_at(pos).decode_type() != BytecodeType::Class
+      if self.clone_at(pos).decode_type() != BytecodeType::Function
+        && self.clone_at(pos).decode_type() != BytecodeType::Class
       {
         std::panic!("Invalid: non-function pointer that points backwards");
       }
     }
 
-    return VsPointer::new(
-      &self.data,
-      pos,
-    );
+    return VsPointer::new(&self.data, pos);
   }
 
   pub fn decode_function_header(&mut self) -> Val {
