@@ -656,7 +656,13 @@ impl<'a> AssemblyParser<'a> {
     self.parse_optional_whitespace();
     self.parse_exact("%");
     let name = self.parse_identifier();
-    Register::Named(name)
+
+    match name.as_str() {
+      "return" => Register::Return,
+      "this" => Register::This,
+      "ignore" => Register::Ignore,
+      _ => Register::Named(name),
+    }
   }
 
   fn assemble_builtin(&mut self) -> Builtin {

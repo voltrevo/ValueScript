@@ -90,7 +90,8 @@ impl Assembler {
     self.output.push(Instruction::End.byte());
 
     // TODO: Handle >255 registers
-    self.output[self.fn_data.register_count_pos] = self.fn_data.register_map.len() as u8;
+    // +3: return, this, ignore
+    self.output[self.fn_data.register_count_pos] = (self.fn_data.register_map.len() + 3) as u8;
 
     self.fn_data.labels_map.resolve(&mut self.output);
   }
