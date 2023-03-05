@@ -5,7 +5,7 @@ use crate::asm::{
   InstructionOrLabel, Label, LabelRef, Module, Object, Register, Value,
 };
 
-pub fn assemble(assembly: &Module) -> Vec<u8> {
+pub fn assemble_module(module: &Module) -> Vec<u8> {
   let mut assembler = Assembler {
     output: Vec::new(),
     fn_data: Default::default(),
@@ -15,7 +15,7 @@ pub fn assemble(assembly: &Module) -> Vec<u8> {
     },
   };
 
-  assembler.module(assembly);
+  assembler.module(module);
 
   return assembler.output;
 }
