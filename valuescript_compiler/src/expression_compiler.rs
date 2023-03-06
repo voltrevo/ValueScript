@@ -257,23 +257,7 @@ impl<'a> ExpressionCompiler<'a> {
   ) -> CompiledExpression {
     let mut nested_registers = Vec::<Register>::new();
 
-    let unary_op_str = match get_unary_op_str(un_exp.op) {
-      Some(s) => s,
-      None => {
-        self
-          .fnc
-          .todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
-
-        return CompiledExpression::empty();
-      }
-    };
-
     let arg = self.compile(&un_exp.arg, None);
-
-    let mut instr = "  ".to_string();
-    instr += unary_op_str;
-    instr += " ";
-    instr += &self.fnc.use_(arg).to_string();
 
     let target: Register = match &target_register {
       None => {
@@ -284,9 +268,18 @@ impl<'a> ExpressionCompiler<'a> {
       Some(t) => t.clone(),
     };
 
-    instr += &format!(" {}", target);
+    let instr = match make_unary_op(un_exp.op, self.fnc.use_(arg), target.clone()) {
+      Some(i) => i,
+      None => {
+        self
+          .fnc
+          .todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
 
-    self.fnc.definition.push(instr);
+        return CompiledExpression::empty();
+      }
+    };
+
+    self.fnc.definition.push(instr.to_string());
 
     return CompiledExpression::new(Value::Register(target), nested_registers);
   }
@@ -299,19 +292,10 @@ impl<'a> ExpressionCompiler<'a> {
     let mut nested_registers = Vec::<Register>::new();
 
     let left = self.compile(&bin.left, None);
-
     let right = self.compile(&bin.right, None);
-
-    let mut instr = "  ".to_string();
 
     // FIXME: && and || need to avoid executing the right side where applicable
     // (mandatory if they mutate)
-    instr += get_binary_op_str(bin.op);
-
-    instr += " ";
-    instr += &self.fnc.use_(left).to_string();
-    instr += " ";
-    instr += &self.fnc.use_(right).to_string();
 
     let target: Register = match &target_register {
       None => {
@@ -322,9 +306,14 @@ impl<'a> ExpressionCompiler<'a> {
       Some(t) => t.clone(),
     };
 
-    instr += &format!(" {}", target);
+    let instr = make_binary_op(
+      bin.op,
+      self.fnc.use_(left),
+      self.fnc.use_(right),
+      target.clone(),
+    );
 
-    self.fnc.definition.push(instr);
+    self.fnc.definition.push(instr.to_string());
 
     return CompiledExpression::new(Value::Register(target), nested_registers);
   }
@@ -1642,6 +1631,57 @@ pub fn get_unary_op_str(op: swc_ecma_ast::UnaryOp) -> Option<&'static str> {
     Void => None,   // TODO
     Delete => None, // TODO
   };
+}
+
+pub fn make_unary_op(op: swc_ecma_ast::UnaryOp, arg: Value, dst: Register) -> Option<Instruction> {
+  use swc_ecma_ast::UnaryOp::*;
+
+  return match op {
+    Minus => Some(Instruction::UnaryMinus(arg, dst)),
+    Plus => Some(Instruction::UnaryPlus(arg, dst)),
+    Bang => Some(Instruction::OpNot(arg, dst)),
+    Tilde => Some(Instruction::OpBitNot(arg, dst)),
+    TypeOf => Some(Instruction::TypeOf(arg, dst)),
+    Void => None,   // TODO
+    Delete => None, // TODO
+  };
+}
+
+pub fn make_binary_op(
+  op: swc_ecma_ast::BinaryOp,
+  arg1: Value,
+  arg2: Value,
+  dst: Register,
+) -> Instruction {
+  use swc_ecma_ast::BinaryOp::*;
+
+  match op {
+    EqEq => Instruction::OpEq(arg1, arg2, dst),
+    NotEq => Instruction::OpNe(arg1, arg2, dst),
+    EqEqEq => Instruction::OpTripleEq(arg1, arg2, dst),
+    NotEqEq => Instruction::OpTripleNe(arg1, arg2, dst),
+    Lt => Instruction::OpLess(arg1, arg2, dst),
+    LtEq => Instruction::OpLessEq(arg1, arg2, dst),
+    Gt => Instruction::OpGreater(arg1, arg2, dst),
+    GtEq => Instruction::OpGreaterEq(arg1, arg2, dst),
+    LShift => Instruction::OpLeftShift(arg1, arg2, dst),
+    RShift => Instruction::OpRightShift(arg1, arg2, dst),
+    ZeroFillRShift => Instruction::OpRightShiftUnsigned(arg1, arg2, dst),
+    Add => Instruction::OpPlus(arg1, arg2, dst),
+    Sub => Instruction::OpMinus(arg1, arg2, dst),
+    Mul => Instruction::OpMul(arg1, arg2, dst),
+    Div => Instruction::OpDiv(arg1, arg2, dst),
+    Mod => Instruction::OpMod(arg1, arg2, dst),
+    BitOr => Instruction::OpBitOr(arg1, arg2, dst),
+    BitXor => Instruction::OpBitXor(arg1, arg2, dst),
+    BitAnd => Instruction::OpBitAnd(arg1, arg2, dst),
+    LogicalOr => Instruction::OpOr(arg1, arg2, dst),
+    LogicalAnd => Instruction::OpAnd(arg1, arg2, dst),
+    In => Instruction::In(arg1, arg2, dst),
+    InstanceOf => Instruction::InstanceOf(arg1, arg2, dst),
+    Exp => Instruction::OpExp(arg1, arg2, dst),
+    NullishCoalescing => Instruction::OpNullishCoalesce(arg1, arg2, dst),
+  }
 }
 
 pub fn get_assign_op_str(op: swc_ecma_ast::AssignOp) -> Option<&'static str> {
