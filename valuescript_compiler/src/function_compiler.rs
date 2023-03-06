@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use swc_common::Spanned;
 
-use crate::asm::{Pointer, Register, Value};
+use crate::asm::{Instruction, Label, Pointer, Register, Value};
 use crate::scope::scope_reg;
 
 use super::capture_finder::CaptureFinder;
@@ -31,8 +31,8 @@ pub struct QueuedFunction {
 }
 
 pub struct LoopLabels {
-  pub continue_: String,
-  pub break_: String,
+  pub continue_: Label,
+  pub break_: Label,
 }
 
 pub struct FunctionCompiler {
@@ -749,7 +749,7 @@ impl FunctionCompiler {
           Some(loop_labels) => {
             self
               .definition
-              .push(format!("  jmp :{}", loop_labels.break_));
+              .push(Instruction::Jmp(loop_labels.break_.ref_()).to_string());
           }
           None => {
             self.diagnostics.push(Diagnostic {
@@ -771,7 +771,7 @@ impl FunctionCompiler {
           Some(loop_labels) => {
             self
               .definition
-              .push(format!("  jmp :{}", loop_labels.continue_));
+              .push(Instruction::Jmp(loop_labels.continue_.ref_()).to_string());
           }
           None => {
             self.diagnostics.push(Diagnostic {
@@ -800,15 +800,15 @@ impl FunctionCompiler {
         // TODO: Add negated jmpif instruction to avoid this
         self
           .definition
-          .push(std::format!("  op! {} {}", condition_asm, cond_reg));
+          .push(Instruction::OpNot(condition_asm, cond_reg.clone()).to_string());
 
-        let else_label = self.label_allocator.allocate_numbered(&"else".to_string());
+        let else_label = Label {
+          name: self.label_allocator.allocate_numbered(&"else".to_string()),
+        };
 
-        let mut jmpif_instr = "  jmpif ".to_string();
-        jmpif_instr += &cond_reg.to_string();
-        jmpif_instr += " :";
-        jmpif_instr += &else_label;
-        self.definition.push(jmpif_instr);
+        self.definition.push(
+          Instruction::JmpIf(Value::Register(cond_reg.clone()), else_label.ref_()).to_string(),
+        );
 
         self.release_reg(&cond_reg);
 
@@ -816,18 +816,22 @@ impl FunctionCompiler {
 
         match &if_.alt {
           None => {
-            self.definition.push(std::format!("{}:", else_label));
+            self.definition.push(std::format!("{}", else_label));
           }
           Some(alt) => {
-            let after_else_label = self
-              .label_allocator
-              .allocate_numbered(&"after_else".to_string());
+            let after_else_label = Label {
+              name: self
+                .label_allocator
+                .allocate_numbered(&"after_else".to_string()),
+            };
+
             self
               .definition
-              .push(std::format!("  jmp :{}", after_else_label));
-            self.definition.push(std::format!("{}:", else_label));
+              .push(Instruction::Jmp(after_else_label.ref_()).to_string());
+
+            self.definition.push(std::format!("{}", else_label));
             self.statement(&*alt, false, scope);
-            self.definition.push(std::format!("{}:", after_else_label));
+            self.definition.push(std::format!("{}", after_else_label));
           }
         }
       }
@@ -835,18 +839,22 @@ impl FunctionCompiler {
       Throw(throw) => self.todo(throw.span, "Throw statement"),
       Try(try_) => self.todo(try_.span, "Try statement"),
       While(while_) => {
-        let start_label = self.label_allocator.allocate_numbered(&"while".to_string());
+        let start_label = Label {
+          name: self.label_allocator.allocate_numbered(&"while".to_string()),
+        };
 
-        let end_label = self
-          .label_allocator
-          .allocate_numbered(&"while_end".to_string());
+        let end_label = Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"while_end".to_string()),
+        };
 
         self.loop_labels.push(LoopLabels {
           continue_: start_label.clone(),
           break_: end_label.clone(),
         });
 
-        self.definition.push(std::format!("{}:", start_label));
+        self.definition.push(std::format!("{}", start_label));
 
         let mut expression_compiler = ExpressionCompiler {
           fnc: self,
@@ -865,42 +873,49 @@ impl FunctionCompiler {
         // TODO: Add negated jmpif instruction to avoid this
         self
           .definition
-          .push(std::format!("  op! {} {}", condition_asm, cond_reg));
+          .push(Instruction::OpNot(condition_asm, cond_reg.clone()).to_string());
 
-        let mut jmpif_instr = "  jmpif ".to_string();
-        jmpif_instr += &cond_reg.to_string();
-        jmpif_instr += " :";
-        jmpif_instr += &end_label;
-        self.definition.push(jmpif_instr);
+        self.definition.push(
+          Instruction::JmpIf(Value::Register(cond_reg.clone()), end_label.ref_()).to_string(),
+        );
 
         self.release_reg(&cond_reg);
 
         self.statement(&*while_.body, false, scope);
-        self.definition.push(std::format!("  jmp :{}", start_label));
 
-        self.definition.push(std::format!("{}:", end_label));
+        self
+          .definition
+          .push(Instruction::Jmp(start_label.ref_()).to_string());
+
+        self.definition.push(std::format!("{}", end_label));
 
         self.loop_labels.pop();
       }
       DoWhile(do_while) => {
-        let start_label = self
-          .label_allocator
-          .allocate_numbered(&"do_while".to_string());
+        let start_label = Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"do_while".to_string()),
+        };
 
-        let continue_label = self
-          .label_allocator
-          .allocate_numbered(&"do_while_continue".to_string());
+        let continue_label = Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"do_while_continue".to_string()),
+        };
 
-        let end_label = self
-          .label_allocator
-          .allocate_numbered(&"do_while_end".to_string());
+        let end_label = Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"do_while_end".to_string()),
+        };
 
         self.loop_labels.push(LoopLabels {
           continue_: continue_label.clone(),
           break_: end_label.clone(),
         });
 
-        self.definition.push(std::format!("{}:", start_label));
+        self.definition.push(std::format!("{}", start_label));
 
         self.statement(&*do_while.body, false, scope);
 
@@ -911,15 +926,12 @@ impl FunctionCompiler {
 
         let condition = expression_compiler.compile(&*do_while.test, None);
 
-        self.definition.push(format!("{}:", continue_label));
+        self.definition.push(format!("{}", continue_label));
 
-        let mut jmpif_instr = "  jmpif ".to_string();
-        jmpif_instr += &self.use_(condition).to_string();
-        jmpif_instr += " :";
-        jmpif_instr += &start_label;
-        self.definition.push(jmpif_instr);
+        let jmpif = Instruction::JmpIf(self.use_(condition), start_label.ref_());
+        self.definition.push(jmpif.to_string());
 
-        self.definition.push(format!("{}:", end_label));
+        self.definition.push(format!("{}", end_label));
 
         self.loop_labels.pop();
       }
@@ -945,19 +957,25 @@ impl FunctionCompiler {
           None => {}
         }
 
-        let for_test_label = self
-          .label_allocator
-          .allocate_numbered(&"for_test".to_string());
+        let for_test_label = Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"for_test".to_string()),
+        };
 
-        let for_continue_label = self
-          .label_allocator
-          .allocate_numbered(&"for_continue".to_string());
+        let for_continue_label = Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"for_continue".to_string()),
+        };
 
-        let for_end_label = self
-          .label_allocator
-          .allocate_numbered(&"for_end".to_string());
+        let for_end_label = Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"for_end".to_string()),
+        };
 
-        self.definition.push(format!("{}:", &for_test_label));
+        self.definition.push(format!("{}", &for_test_label));
 
         self.loop_labels.push(LoopLabels {
           continue_: for_continue_label.clone(),
@@ -985,11 +1003,10 @@ impl FunctionCompiler {
               .definition
               .push(std::format!("  op! {} {}", condition_asm, cond_reg));
 
-            let mut jmpif_instr = "  jmpif ".to_string();
-            jmpif_instr += &cond_reg.to_string();
-            jmpif_instr += " :";
-            jmpif_instr += &for_end_label;
-            self.definition.push(jmpif_instr);
+            self.definition.push(
+              Instruction::JmpIf(Value::Register(cond_reg.clone()), for_end_label.ref_())
+                .to_string(),
+            );
 
             self.release_reg(&cond_reg);
           }
@@ -998,16 +1015,18 @@ impl FunctionCompiler {
 
         self.statement(&for_.body, false, &for_scope);
 
-        self.definition.push(format!("{}:", for_continue_label));
+        self.definition.push(format!("{}", for_continue_label));
 
         match &for_.update {
           Some(update) => self.expression(update, &for_scope),
           None => {}
         }
 
-        self.definition.push(format!("  jmp :{}", for_test_label));
+        self
+          .definition
+          .push(Instruction::Jmp(for_test_label.ref_()).to_string());
 
-        self.definition.push(format!("{}:", for_end_label));
+        self.definition.push(format!("{}", for_end_label));
 
         self.loop_labels.pop();
       }

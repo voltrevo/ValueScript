@@ -165,7 +165,7 @@ impl std::fmt::Display for InstructionOrLabel {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Label {
   pub name: String,
 }
