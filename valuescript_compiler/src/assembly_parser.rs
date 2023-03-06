@@ -13,6 +13,15 @@ struct AssemblyParser<'a> {
 
 impl<'a> AssemblyParser<'a> {
   fn module(&mut self) -> Module {
+    self.parse_exact("export");
+    self.parse_whitespace();
+
+    let export_default = self.assemble_value();
+    self.parse_whitespace();
+
+    let export_star = self.assemble_object();
+    self.parse_whitespace();
+
     let mut definitions = Vec::<Definition>::new();
 
     loop {
@@ -25,7 +34,11 @@ impl<'a> AssemblyParser<'a> {
       definitions.push(self.assemble_definition());
     }
 
-    Module { definitions }
+    Module {
+      export_default,
+      export_star,
+      definitions,
+    }
   }
 
   fn get_pos_index(&self) -> usize {
@@ -101,6 +114,25 @@ impl<'a> AssemblyParser<'a> {
     }
 
     return true;
+  }
+
+  fn parse_whitespace(&mut self) {
+    let mut count = 0;
+
+    loop {
+      match self.pos.peek() {
+        Some(' ') => (),
+        Some('\n') => (),
+        _ => break,
+      }
+
+      count += 1;
+      self.pos.next();
+    }
+
+    if count == 0 {
+      panic!("{}", self.render_pos(0, &"Expected whitespace".to_string()));
+    }
   }
 
   fn parse_optional_whitespace(&mut self) {

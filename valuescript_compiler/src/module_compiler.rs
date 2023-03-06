@@ -419,6 +419,8 @@ impl ModuleCompiler {
     // First compile default
     match default_export_pointer {
       Some(default_export_pointer) => {
+        self.module.export_default = Value::Pointer(default_export_pointer.clone());
+
         for module_item in &module.body {
           match module_item {
             ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(edd)) => self

@@ -1,5 +1,7 @@
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Module {
+  pub export_default: Value,
+  pub export_star: Object,
   pub definitions: Vec<Definition>,
 }
 
@@ -13,18 +15,32 @@ impl Module {
   }
 }
 
+impl Default for Module {
+  fn default() -> Self {
+    Module {
+      export_default: Value::Void,
+      export_star: Object::default(),
+      definitions: Vec::default(),
+    }
+  }
+}
+
 impl std::fmt::Display for Module {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    let mut first = true;
+    if self.export_star.properties.len() == 0 {
+      write!(f, "export {} {}", self.export_default, self.export_star)?;
+    } else {
+      write!(f, "export {} * {{\n", self.export_default)?;
 
-    for definition in &self.definitions {
-      if first {
-        first = false;
-      } else {
-        write!(f, "\n\n")?;
+      for (name, value) in &self.export_star.properties {
+        write!(f, "  {}: {},\n", name, value)?;
       }
 
-      write!(f, "{}", definition)?;
+      write!(f, "}}")?;
+    }
+
+    for definition in &self.definitions {
+      write!(f, "\n\n{}", definition)?;
     }
 
     return Ok(());
