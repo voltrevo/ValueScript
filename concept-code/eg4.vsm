@@ -1,3 +1,4 @@
+export @main {}
 @main = function() {
   mov @Counter %Counter
   sub %Counter "prototype" %_tmp0

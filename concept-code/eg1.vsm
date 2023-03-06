@@ -1,3 +1,4 @@
+export @main {}
 @main = function() {
   call @f1 [1, 2, 3] %x
   apply @f2 %x [] %ignore

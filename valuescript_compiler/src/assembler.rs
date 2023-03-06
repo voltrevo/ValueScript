@@ -32,6 +32,9 @@ struct Assembler {
 
 impl Assembler {
   fn module(&mut self, module: &Module) {
+    self.value(&module.export_default);
+    self.object(&module.export_star);
+
     for definition in &module.definitions {
       self.definition(definition);
     }

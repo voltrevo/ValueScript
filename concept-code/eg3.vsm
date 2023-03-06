@@ -1,3 +1,4 @@
+export @main {}
 @main = function() {
   new @Counter [] %counter
   subcall %counter "inc" [] %ignore
