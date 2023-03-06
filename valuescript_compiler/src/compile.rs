@@ -432,7 +432,6 @@ impl Compiler {
                 edd,
                 // FIXME: clone() shouldn't be necessary here (we want to move)
                 default_export_name.clone(),
-                self.definition_allocator.clone(),
                 &scope,
               ),
             _ => {}
@@ -683,7 +682,6 @@ impl Compiler {
     &mut self,
     edd: &swc_ecma_ast::ExportDefaultDecl,
     fn_name: String,
-    definition_allocator: Rc<RefCell<NameAllocator>>,
     scope: &Scope,
   ) {
     use swc_ecma_ast::DefaultDecl::*;
@@ -707,7 +705,7 @@ impl Compiler {
           defn,
           Some(fn_name),
           Functionish::Fn(fn_.function.clone()),
-          definition_allocator,
+          self.definition_allocator.clone(),
           scope,
         );
       }
