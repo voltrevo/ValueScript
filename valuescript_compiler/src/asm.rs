@@ -124,6 +124,17 @@ pub enum Register {
   Ignore,
 }
 
+impl Register {
+  pub fn as_name(&self) -> String {
+    match self {
+      Register::Return => "return".to_string(),
+      Register::This => "this".to_string(),
+      Register::Named(name) => name.clone(),
+      Register::Ignore => "ignore".to_string(),
+    }
+  }
+}
+
 impl std::fmt::Display for Register {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     match self {

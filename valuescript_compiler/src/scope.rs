@@ -2,6 +2,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::asm;
+
 use super::function_compiler::QueuedFunction;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -21,10 +23,18 @@ impl std::fmt::Display for Builtin {
 
 #[derive(Clone, Debug)]
 pub enum MappedName {
-  Register(String),
+  Register(asm::Register),
   Definition(String),
   QueuedFunction(QueuedFunction),
   Builtin(Builtin),
+}
+
+pub fn scope_reg(name: String) -> MappedName {
+  if name == "return" || name == "this" || name == "ignore" {
+    std::panic!("Invalid register name (use Register enum)");
+  }
+
+  MappedName::Register(asm::Register::Named(name))
 }
 
 pub struct ScopeData {

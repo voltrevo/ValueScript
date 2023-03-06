@@ -5,6 +5,9 @@ use std::rc::Rc;
 
 use swc_common::Spanned;
 
+use crate::asm::Register;
+use crate::scope::scope_reg;
+
 use super::capture_finder::CaptureFinder;
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::expression_compiler::CompiledExpression;
@@ -65,6 +68,33 @@ impl FunctionCompiler {
       message: format!("TODO: {}", message),
       span: span,
     });
+  }
+
+  pub fn allocate_tmp(&mut self) -> Register {
+    return Register::Named(self.reg_allocator.allocate(&"_tmp".to_string()));
+  }
+
+  pub fn allocate_reg(&mut self, based_on: &String) -> Register {
+    return Register::Named(self.reg_allocator.allocate(based_on));
+  }
+
+  pub fn allocate_numbered_reg(&mut self, prefix: &str) -> Register {
+    return Register::Named(self.reg_allocator.allocate_numbered(&prefix.to_string()));
+  }
+
+  pub fn release_reg(&mut self, reg: &Register) {
+    match reg {
+      Register::Named(name) => {
+        self.reg_allocator.release(name);
+      }
+      _ => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: format!("Tried to release non-named register {:?}", reg),
+          span: swc_common::DUMMY_SP,
+        });
+      }
+    }
   }
 
   pub fn compile(
@@ -138,10 +168,9 @@ impl FunctionCompiler {
         heading += ", ";
       }
 
-      let reg = self.reg_allocator.allocate(cap_param);
+      let reg = self.allocate_reg(cap_param);
 
-      heading += "%";
-      heading += &reg;
+      heading += &format!("{}", reg);
 
       scope.set(cap_param.clone(), MappedName::Register(reg));
 
@@ -157,9 +186,7 @@ impl FunctionCompiler {
         heading += ", ";
       }
 
-      heading += "%";
-      heading += reg;
-
+      heading += &format!("{}", reg);
       param_count += 1;
     }
 
@@ -200,7 +227,7 @@ impl FunctionCompiler {
             scope: &scope,
           };
 
-          expression_compiler.compile(expr, Some("return".to_string()));
+          expression_compiler.compile(expr, Some(Register::Return));
         }
       },
       Functionish::Constructor(_, constructor) => {
@@ -255,12 +282,16 @@ impl FunctionCompiler {
   fn populate_scope_ident(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) {
     scope.set(
       ident.sym.to_string(),
-      MappedName::Register(self.reg_allocator.allocate(&ident.sym.to_string())),
+      MappedName::Register(self.allocate_reg(&ident.sym.to_string())),
     );
   }
 
-  fn allocate_param_registers(&mut self, functionish: &Functionish, scope: &Scope) -> Vec<String> {
-    let mut param_registers = Vec::<String>::new();
+  fn allocate_param_registers(
+    &mut self,
+    functionish: &Functionish,
+    scope: &Scope,
+  ) -> Vec<Register> {
+    let mut param_registers = Vec::<Register>::new();
 
     match functionish {
       Functionish::Fn(fn_) => {
@@ -278,12 +309,7 @@ impl FunctionCompiler {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
               self.todo(ts_param_prop.span(), "TypeScript parameter properties");
-
-              param_registers.push(
-                self
-                  .reg_allocator
-                  .allocate_numbered(&"_todo_ts_param_prop".to_string()),
-              );
+              param_registers.push(self.allocate_numbered_reg(&"_todo_ts_param_prop".to_string()));
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
               param_registers.push(self.get_pattern_register(&p.pat, scope))
@@ -296,31 +322,21 @@ impl FunctionCompiler {
     return param_registers;
   }
 
-  pub fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat, scope: &Scope) -> String {
+  pub fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat, scope: &Scope) -> Register {
     use swc_ecma_ast::Pat;
 
     match param_pat {
       Pat::Ident(ident) => self.get_variable_register(&ident.id, scope),
       Pat::Assign(assign) => self.get_pattern_register(&assign.left, scope),
-      Pat::Array(_) => self
-        .reg_allocator
-        .allocate_numbered(&"_array_pat".to_string()),
-      Pat::Object(_) => self
-        .reg_allocator
-        .allocate_numbered(&"_object_pat".to_string()),
-      Pat::Invalid(_) => self
-        .reg_allocator
-        .allocate_numbered(&"_invalid_pat".to_string()),
-      Pat::Rest(_) => self
-        .reg_allocator
-        .allocate_numbered(&"_rest_pat".to_string()),
-      Pat::Expr(_) => self
-        .reg_allocator
-        .allocate_numbered(&"_expr_pat".to_string()),
+      Pat::Array(_) => self.allocate_numbered_reg(&"_array_pat".to_string()),
+      Pat::Object(_) => self.allocate_numbered_reg(&"_object_pat".to_string()),
+      Pat::Invalid(_) => self.allocate_numbered_reg(&"_invalid_pat".to_string()),
+      Pat::Rest(_) => self.allocate_numbered_reg(&"_rest_pat".to_string()),
+      Pat::Expr(_) => self.allocate_numbered_reg(&"_expr_pat".to_string()),
     }
   }
 
-  pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) -> String {
+  pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) -> Register {
     match scope.get(&ident.sym.to_string()) {
       Some(MappedName::Register(reg)) => reg,
       _ => {
@@ -333,9 +349,7 @@ impl FunctionCompiler {
           span: ident.span(),
         });
 
-        self
-          .reg_allocator
-          .allocate_numbered(&"_error_variable_without_register".to_string())
+        self.allocate_numbered_reg(&"_error_variable_without_register".to_string())
       }
     }
   }
@@ -343,7 +357,7 @@ impl FunctionCompiler {
   fn add_param_code(
     &mut self,
     functionish: &Functionish,
-    param_registers: &Vec<String>,
+    param_registers: &Vec<Register>,
     scope: &Scope,
   ) {
     match functionish {
@@ -462,11 +476,7 @@ impl FunctionCompiler {
     match pat {
       Ident(ident) => {
         let name = ident.id.sym.to_string();
-
-        scope.set(
-          name.clone(),
-          MappedName::Register(self.reg_allocator.allocate(&name)),
-        );
+        scope.set(name.clone(), MappedName::Register(self.allocate_reg(&name)));
       }
       Array(array) => {
         for element in &array.elems {
@@ -569,10 +579,7 @@ impl FunctionCompiler {
     let synth_scope = scope.nest();
 
     for fn_ in &function_decls {
-      synth_scope.set(
-        fn_.ident.sym.to_string(),
-        MappedName::Register("".to_string()),
-      );
+      synth_scope.set(fn_.ident.sym.to_string(), scope_reg("".to_string()));
     }
 
     let mut direct_captures_map = HashMap::<String, Vec<String>>::new();
@@ -672,7 +679,7 @@ impl FunctionCompiler {
         for mapping in block_scope.borrow().name_map.values() {
           match mapping {
             MappedName::Register(reg) => {
-              self.reg_allocator.release(reg);
+              self.release_reg(reg);
             }
             MappedName::Definition(_) => {}
             MappedName::QueuedFunction(_) => {}
@@ -698,7 +705,7 @@ impl FunctionCompiler {
         Some(expr) => {
           let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
 
-          expression_compiler.compile(expr, Some("return".to_string()));
+          expression_compiler.compile(expr, Some(Register::Return));
 
           if !fn_last {
             self.definition.push("  end".to_string());
@@ -767,22 +774,22 @@ impl FunctionCompiler {
         // from the condition
         let condition_asm = self.use_(condition);
 
-        let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
+        let cond_reg = self.allocate_numbered_reg("_cond");
 
         // TODO: Add negated jmpif instruction to avoid this
         self
           .definition
-          .push(std::format!("  op! {} %{}", condition_asm, cond_reg));
+          .push(std::format!("  op! {} {}", condition_asm, cond_reg));
 
         let else_label = self.label_allocator.allocate_numbered(&"else".to_string());
 
-        let mut jmpif_instr = "  jmpif %".to_string();
-        jmpif_instr += &cond_reg;
+        let mut jmpif_instr = "  jmpif ".to_string();
+        jmpif_instr += &format!("{}", cond_reg);
         jmpif_instr += " :";
         jmpif_instr += &else_label;
         self.definition.push(jmpif_instr);
 
-        self.reg_allocator.release(&cond_reg);
+        self.release_reg(&cond_reg);
 
         self.statement(&*if_.cons, false, scope);
 
@@ -1048,7 +1055,7 @@ impl FunctionCompiler {
     let asm = compiled_expr.value_assembly;
 
     for reg in &compiled_expr.nested_registers {
-      self.reg_allocator.release(reg);
+      self.release_reg(reg);
     }
 
     compiled_expr.release_checker.has_unreleased_registers = false;
@@ -1060,7 +1067,7 @@ impl FunctionCompiler {
     let asm = compiled_expr.value_assembly.clone();
 
     for reg in &compiled_expr.nested_registers {
-      self.reg_allocator.release(reg);
+      self.release_reg(reg);
     }
 
     compiled_expr.release_checker.has_unreleased_registers = false;

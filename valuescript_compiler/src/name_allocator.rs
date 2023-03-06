@@ -14,8 +14,8 @@ impl NameAllocator {
         // the leftover value
         self.used_names.insert(name.clone());
         return name;
-      },
-      None => {},
+      }
+      None => {}
     };
 
     if !self.used_names.contains(based_on_name) {
@@ -33,8 +33,8 @@ impl NameAllocator {
         // the leftover value
         self.used_names.insert(name.clone());
         return name;
-      },
-      None => {},
+      }
+      None => {}
     };
 
     let mut i = 0_u64;
