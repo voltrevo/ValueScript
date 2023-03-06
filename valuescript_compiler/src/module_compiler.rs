@@ -149,8 +149,6 @@ impl ModuleCompiler {
     use swc_ecma_ast::ModuleItem;
     use swc_ecma_ast::Stmt;
 
-    let mut default_export_pointer = None;
-
     // Populate scope with top-level declarations
     for module_item in &module.body {
       match module_item {
@@ -179,18 +177,12 @@ impl ModuleCompiler {
           ModuleDecl::ExportDefaultDecl(edd) => {
             match &edd.decl {
               swc_ecma_ast::DefaultDecl::Fn(fn_) => {
-                match &fn_.ident {
-                  Some(id) => {
-                    let allocated_name = self.allocate_defn(&id.sym.to_string());
-
-                    default_export_pointer = Some(allocated_name.clone());
-
-                    scope.set(id.sym.to_string(), MappedName::Definition(allocated_name));
-                  }
-                  None => {
-                    default_export_pointer = Some(self.allocate_defn_numbered("_anon"));
-                  }
-                };
+                if let Some(id) = &fn_.ident {
+                  scope.set(
+                    id.sym.to_string(),
+                    MappedName::Definition(self.allocate_defn(&id.sym.to_string())),
+                  );
+                }
               }
               swc_ecma_ast::DefaultDecl::Class(class) => {
                 self.diagnostics.push(Diagnostic {
@@ -416,39 +408,8 @@ impl ModuleCompiler {
       };
     }
 
-    // First compile default
-    match default_export_pointer {
-      Some(default_export_pointer) => {
-        self.module.export_default = Value::Pointer(default_export_pointer.clone());
-
-        for module_item in &module.body {
-          match module_item {
-            ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(edd)) => self
-              .compile_export_default_decl(
-                edd,
-                // FIXME: clone() shouldn't be necessary here (we want to move)
-                default_export_pointer.name.clone(),
-                &scope,
-              ),
-            _ => {}
-          }
-        }
-      }
-      None => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Modules which don't have a default export name".to_string(),
-          span: module.span,
-        });
-      }
-    }
-
-    // Then compile others
     for module_item in &module.body {
-      match module_item {
-        ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(_)) => {}
-        _ => self.compile_module_item(module_item, &scope),
-      }
+      self.compile_module_item(module_item, &scope);
     }
   }
 
@@ -461,17 +422,11 @@ impl ModuleCompiler {
     }
   }
 
-  fn compile_module_decl(&mut self, module_decl: &swc_ecma_ast::ModuleDecl, _scope: &Scope) {
+  fn compile_module_decl(&mut self, module_decl: &swc_ecma_ast::ModuleDecl, scope: &Scope) {
     use swc_ecma_ast::ModuleDecl::*;
 
     match module_decl {
-      ExportDefaultDecl(export_default_decl) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Default export should be handled elsewhere".to_string(),
-          span: export_default_decl.span,
-        });
-      }
+      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
       _ => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
@@ -622,29 +577,7 @@ impl ModuleCompiler {
 
     match decl {
       Class(class) => self.compile_class_decl(class, scope),
-      Fn(fn_) => {
-        let fn_name = fn_.ident.sym.to_string();
-
-        let defn = match scope.get_defn(&fn_name) {
-          Some(defn) => defn,
-          None => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: format!("Definition for {} should have been in scope", fn_name),
-              span: fn_.ident.span,
-            });
-
-            return;
-          }
-        };
-
-        self.compile_fn(
-          defn,
-          Some(fn_.ident.sym.to_string()),
-          Functionish::Fn(fn_.function.clone()),
-          scope,
-        )
-      }
+      Fn(fn_) => self.compile_fn_decl(fn_, scope),
       Var(var_decl) => {
         if !var_decl.declare {
           self.diagnostics.push(Diagnostic {
@@ -673,42 +606,70 @@ impl ModuleCompiler {
     };
   }
 
-  fn compile_export_default_decl(
-    &mut self,
-    edd: &swc_ecma_ast::ExportDefaultDecl,
-    fn_name: String,
-    scope: &Scope,
-  ) {
-    use swc_ecma_ast::DefaultDecl::*;
+  fn compile_fn_decl(&mut self, fn_: &swc_ecma_ast::FnDecl, scope: &Scope) {
+    let fn_name = fn_.ident.sym.to_string();
 
-    match &edd.decl {
-      Fn(fn_) => {
-        let defn = match scope.get_defn(&fn_name) {
-          Some(defn) => defn,
-          None => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: format!("Definition for {} should have been in scope", fn_name),
-              span: edd.span,
-            });
-
-            return;
-          }
-        };
-
-        self.compile_fn(
-          defn,
-          Some(fn_name),
-          Functionish::Fn(fn_.function.clone()),
-          scope,
-        );
-      }
-      _ => {
+    let defn = match scope.get_defn(&fn_name) {
+      Some(defn) => defn,
+      None => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO: Non-function default export".to_string(),
+          message: format!("Definition for {} should have been in scope", fn_name),
+          span: fn_.ident.span,
+        });
+
+        return;
+      }
+    };
+
+    self.compile_fn(
+      defn,
+      Some(fn_.ident.sym.to_string()),
+      Functionish::Fn(fn_.function.clone()),
+      scope,
+    );
+  }
+
+  fn compile_export_default_decl(&mut self, edd: &swc_ecma_ast::ExportDefaultDecl, scope: &Scope) {
+    use swc_ecma_ast::DefaultDecl;
+
+    match &edd.decl {
+      DefaultDecl::Class(_) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: DefaultDecl::Class".to_string(),
           span: edd.span,
         });
+      }
+      DefaultDecl::Fn(fn_) => {
+        let (fn_name, defn) = match &fn_.ident {
+          Some(ident) => {
+            let fn_name = ident.sym.to_string();
+
+            let defn = match scope.get_defn(&fn_name) {
+              Some(defn) => defn,
+              None => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: format!("Definition for {} should have been in scope", fn_name),
+                  span: ident.span,
+                });
+
+                return;
+              }
+            };
+
+            (Some(fn_name), defn)
+          }
+          None => (None, self.allocate_defn_numbered("_anon")),
+        };
+
+        self.module.export_default = Value::Pointer(defn.clone());
+
+        self.compile_fn(defn, fn_name, Functionish::Fn(fn_.function.clone()), scope);
+      }
+      DefaultDecl::TsInterfaceDecl(_) => {
+        // Nothing to do
       }
     }
   }
