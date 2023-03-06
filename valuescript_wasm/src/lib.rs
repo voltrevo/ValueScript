@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-use valuescript_compiler::DiagnosticLevel;
+use valuescript_compiler::{CompilerOutput, Diagnostic, DiagnosticLevel};
 use valuescript_vm::ValTrait;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -35,7 +35,7 @@ fn run_to_result(source: &str) -> RunResult {
     };
   }
 
-  let bytecode = valuescript_compiler::assemble(compiler_output.assembly.join("\n").as_str());
+  let bytecode = valuescript_compiler::assemble(&compiler_output.module);
 
   let mut vm = valuescript_vm::VirtualMachine::new();
   let result = vm.run(&bytecode, &[]);
@@ -46,10 +46,27 @@ fn run_to_result(source: &str) -> RunResult {
   };
 }
 
+#[derive(serde::Serialize)]
+struct CompilerOutputWasm {
+  diagnostics: Vec<Diagnostic>,
+  assembly: Vec<String>,
+}
+
+impl CompilerOutputWasm {
+  fn from_compiler_output(output: CompilerOutput) -> CompilerOutputWasm {
+    CompilerOutputWasm {
+      diagnostics: output.diagnostics,
+      assembly: output.module.as_lines(),
+    }
+  }
+}
+
 #[wasm_bindgen]
 pub fn compile(source: &str) -> String {
   let output = valuescript_compiler::compile(source);
-  return serde_json::to_string(&output).expect("Failed json serialization");
+
+  return serde_json::to_string(&CompilerOutputWasm::from_compiler_output(output))
+    .expect("Failed json serialization");
 }
 
 #[wasm_bindgen]

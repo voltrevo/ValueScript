@@ -1,11 +1,14 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+  collections::{HashMap, HashSet},
+  rc::Rc,
+};
 
 use crate::asm::{
   Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
   Label, LabelRef, Module, Object, Pointer, Register, Value,
 };
 
-pub fn assemble_module(module: &Module) -> Vec<u8> {
+pub fn assemble(module: &Module) -> Rc<Vec<u8>> {
   let mut assembler = Assembler {
     output: Vec::new(),
     fn_data: Default::default(),
@@ -17,7 +20,8 @@ pub fn assemble_module(module: &Module) -> Vec<u8> {
 
   assembler.module(module);
 
-  return assembler.output;
+  // TODO: Don't use Rc
+  return Rc::new(assembler.output);
 }
 
 struct Assembler {

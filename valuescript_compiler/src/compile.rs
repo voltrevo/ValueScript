@@ -64,10 +64,10 @@ pub fn parse(source: &str) -> (Option<swc_ecma_ast::Program>, Vec<Diagnostic>) {
   return (result.ok(), diagnostics);
 }
 
-#[derive(Default, serde::Serialize)]
+#[derive(Default)]
 pub struct CompilerOutput {
   pub diagnostics: Vec<Diagnostic>,
-  pub assembly: Vec<String>,
+  pub module: Module,
 }
 
 pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
@@ -79,7 +79,7 @@ pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
 
   return CompilerOutput {
     diagnostics: compiler.diagnostics,
-    assembly: module.as_lines(),
+    module,
   };
 }
 

@@ -19,7 +19,7 @@ pub fn compile_command(args: &Vec<String>) {
 
   let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
 
-  for line in compiler_output.assembly {
+  for line in compiler_output.module.as_lines() {
     file
       .write_all(line.as_bytes())
       .expect("Failed to write line");

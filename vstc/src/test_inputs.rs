@@ -57,7 +57,8 @@ mod tests {
             }
           }
 
-          let bytecode = assemble(&compiler_output.assembly.join("\n"));
+          // TODO: Also test rendering and parsing assembly
+          let bytecode = assemble(&compiler_output.module);
 
           let mut vm = VirtualMachine::new();
           let result = vm.run(&bytecode, &[]);

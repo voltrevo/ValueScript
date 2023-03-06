@@ -1,6 +1,6 @@
 use std::process::exit;
 
-use valuescript_compiler::assemble;
+use valuescript_compiler::{assemble, parse_module};
 
 pub fn assemble_command(args: &Vec<String>) {
   if args.len() != 3 {
@@ -23,7 +23,9 @@ pub fn assemble_command(args: &Vec<String>) {
 
   let content = read_result.expect("");
   let output_filename = "out.vsb";
-  let bytecode = assemble(&content);
+
+  let module = parse_module(&content);
+  let bytecode = assemble(&module);
 
   let write_result = std::fs::write(output_filename, &*bytecode);
 

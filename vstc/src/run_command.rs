@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::{ffi::OsStr, path::Path, process::exit};
 
-use valuescript_compiler::{assemble, compile};
+use valuescript_compiler::{assemble, compile, parse_module};
 use valuescript_vm::VirtualMachine;
 
 use super::handle_diagnostics_cli::handle_diagnostics_cli;
@@ -79,14 +79,15 @@ fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
       let compiler_output = compile(&source);
       handle_diagnostics_cli(file_path, &compiler_output.diagnostics);
 
-      return assemble(&compiler_output.assembly.join("\n"));
+      return assemble(&compiler_output.module);
     }
 
     RunFormat::Assembly => {
       let file_content = std::fs::read_to_string(&file_path)
         .expect(&std::format!("Failed to read file {}", file_path));
 
-      assemble(&file_content)
+      let module = parse_module(&file_content);
+      assemble(&module)
     }
 
     RunFormat::Bytecode => {
