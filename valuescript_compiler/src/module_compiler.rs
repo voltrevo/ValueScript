@@ -71,15 +71,12 @@ pub struct CompilerOutput {
 }
 
 pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
-  let mut compiler = Compiler::default();
+  let mut compiler = ModuleCompiler::default();
   compiler.compile_program(&program);
-
-  let mut module = Module::default();
-  module.definitions.append(&mut compiler.definitions);
 
   return CompilerOutput {
     diagnostics: compiler.diagnostics,
-    module,
+    module: compiler.module,
   };
 }
 
@@ -98,13 +95,13 @@ pub fn compile(source: &str) -> CompilerOutput {
 }
 
 #[derive(Default)]
-struct Compiler {
+struct ModuleCompiler {
   diagnostics: Vec<Diagnostic>,
   definition_allocator: Rc<RefCell<NameAllocator>>,
-  definitions: Vec<Definition>,
+  module: Module,
 }
 
-impl Compiler {
+impl ModuleCompiler {
   fn allocate_defn(&mut self, name: &str) -> Pointer {
     let allocated_name = self
       .definition_allocator
@@ -729,7 +726,7 @@ impl Compiler {
       parent_scope,
     );
 
-    self.definitions.append(&mut defn);
+    self.module.definitions.append(&mut defn);
     self.diagnostics.append(&mut diagnostics);
   }
 
@@ -904,7 +901,7 @@ impl Compiler {
       }
     }
 
-    self.definitions.push(Definition {
+    self.module.definitions.push(Definition {
       pointer: defn_name,
       content: DefinitionContent::Class(Class {
         constructor,
@@ -912,6 +909,6 @@ impl Compiler {
       }),
     });
 
-    self.definitions.append(&mut dependent_definitions);
+    self.module.definitions.append(&mut dependent_definitions);
   }
 }
