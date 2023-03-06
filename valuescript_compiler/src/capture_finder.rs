@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use crate::scope::scope_reg;
+use crate::{asm::Pointer, scope::scope_reg};
 
-use super::scope::{MappedName, Scope, ScopeTrait};
+use super::scope::{MappedName, Scope};
 
 pub struct CaptureFinder {
   outside_scope: Scope,
@@ -222,7 +222,12 @@ impl CaptureFinder {
             Fn(fn_) => {
               let fn_name = fn_.ident.sym.to_string();
 
-              scope.set(fn_name.clone(), MappedName::Definition("".to_string()));
+              scope.set(
+                fn_name.clone(),
+                MappedName::Definition(Pointer {
+                  name: "".to_string(),
+                }),
+              );
             }
             Var(var_decl) => self.populate_block_scope_var_decl(scope, var_decl),
             TsInterface(_) => {}

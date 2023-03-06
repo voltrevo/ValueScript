@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::asm;
+use crate::asm::{Pointer, Register};
 
 use super::function_compiler::QueuedFunction;
 
@@ -23,8 +23,8 @@ impl std::fmt::Display for Builtin {
 
 #[derive(Clone, Debug)]
 pub enum MappedName {
-  Register(asm::Register),
-  Definition(String),
+  Register(Register),
+  Definition(Pointer),
   QueuedFunction(QueuedFunction),
   Builtin(Builtin),
 }
@@ -34,35 +34,31 @@ pub fn scope_reg(name: String) -> MappedName {
     std::panic!("Invalid register name (use Register enum)");
   }
 
-  MappedName::Register(asm::Register::Named(name))
+  MappedName::Register(Register::Named(name))
 }
 
 pub struct ScopeData {
   pub name_map: HashMap<String, MappedName>,
-  pub parent: Option<Rc<RefCell<ScopeData>>>,
+  pub parent: Option<Scope>,
 }
 
-pub type Scope = Rc<RefCell<ScopeData>>;
-
-pub trait ScopeTrait {
-  fn get(&self, name: &String) -> Option<MappedName>;
-  fn get_defn(&self, name: &String) -> Option<String>;
-  fn set(&self, name: String, mapped_name: MappedName);
-  fn nest(&self) -> Rc<RefCell<ScopeData>>;
+#[derive(Clone)]
+pub struct Scope {
+  pub rc: Rc<RefCell<ScopeData>>,
 }
 
-impl ScopeTrait for Scope {
-  fn get(&self, name: &String) -> Option<MappedName> {
-    match self.borrow().name_map.get(name) {
+impl Scope {
+  pub fn get(&self, name: &String) -> Option<MappedName> {
+    match self.rc.borrow().name_map.get(name) {
       Some(mapped_name) => Some(mapped_name.clone()),
-      None => match &self.borrow().parent {
+      None => match &self.rc.borrow().parent {
         Some(parent) => parent.get(name),
         None => None,
       },
     }
   }
 
-  fn get_defn(&self, name: &String) -> Option<String> {
+  pub fn get_defn(&self, name: &String) -> Option<Pointer> {
     let get_result = self.get(name);
 
     return match get_result {
@@ -71,36 +67,42 @@ impl ScopeTrait for Scope {
     };
   }
 
-  fn set(&self, name: String, mapped_name: MappedName) {
-    let old_mapping = self.borrow_mut().name_map.insert(name, mapped_name);
+  pub fn set(&self, name: String, mapped_name: MappedName) {
+    let old_mapping = self.rc.borrow_mut().name_map.insert(name, mapped_name);
 
     if old_mapping.is_some() {
       std::panic!("Scope overwrite occurred (not implemented: being permissive about this)");
     }
   }
 
-  fn nest(&self) -> Rc<RefCell<ScopeData>> {
-    return Rc::new(RefCell::new(ScopeData {
-      name_map: Default::default(),
-      parent: Some(self.clone()),
-    }));
+  pub fn nest(&self) -> Scope {
+    return Scope {
+      rc: Rc::new(RefCell::new(ScopeData {
+        name_map: Default::default(),
+        parent: Some(self.clone()),
+      })),
+    };
   }
 }
 
 pub fn _init_scope() -> Scope {
-  return Rc::new(RefCell::new(ScopeData {
-    name_map: Default::default(),
-    parent: None,
-  }));
+  return Scope {
+    rc: Rc::new(RefCell::new(ScopeData {
+      name_map: Default::default(),
+      parent: None,
+    })),
+  };
 }
 
 pub fn init_std_scope() -> Scope {
-  return Rc::new(RefCell::new(ScopeData {
-    name_map: HashMap::from([
-      ("Math".to_string(), MappedName::Builtin(Builtin::Math)),
-      ("Debug".to_string(), MappedName::Builtin(Builtin::Debug)),
-    ]),
-    parent: None,
-  }))
-  .nest();
+  Scope {
+    rc: Rc::new(RefCell::new(ScopeData {
+      name_map: HashMap::from([
+        ("Math".to_string(), MappedName::Builtin(Builtin::Math)),
+        ("Debug".to_string(), MappedName::Builtin(Builtin::Debug)),
+      ]),
+      parent: None,
+    })),
+  }
+  .nest()
 }

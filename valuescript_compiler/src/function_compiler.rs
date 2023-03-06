@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use swc_common::Spanned;
 
-use crate::asm::Register;
+use crate::asm::{Pointer, Register};
 use crate::scope::scope_reg;
 
 use super::capture_finder::CaptureFinder;
@@ -13,7 +13,7 @@ use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::expression_compiler::CompiledExpression;
 use super::expression_compiler::ExpressionCompiler;
 use super::name_allocator::NameAllocator;
-use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
+use super::scope::{init_std_scope, MappedName, Scope};
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
@@ -24,7 +24,7 @@ pub enum Functionish {
 
 #[derive(Clone, Debug)]
 pub struct QueuedFunction {
-  pub definition_name: String,
+  pub definition_pointer: Pointer,
   pub fn_name: Option<String>,
   pub capture_params: Vec<String>,
   pub functionish: Functionish,
@@ -71,6 +71,28 @@ impl FunctionCompiler {
     });
   }
 
+  pub fn allocate_defn(&mut self, name: &str) -> Pointer {
+    let allocated_name = self
+      .definition_allocator
+      .borrow_mut()
+      .allocate(&name.to_string());
+
+    Pointer {
+      name: allocated_name,
+    }
+  }
+
+  pub fn allocate_defn_numbered(&mut self, name: &str) -> Pointer {
+    let allocated_name = self
+      .definition_allocator
+      .borrow_mut()
+      .allocate_numbered(&name.to_string());
+
+    Pointer {
+      name: allocated_name,
+    }
+  }
+
   pub fn allocate_tmp(&mut self) -> Register {
     return Register::Named(self.reg_allocator.allocate(&"_tmp".to_string()));
   }
@@ -99,7 +121,7 @@ impl FunctionCompiler {
   }
 
   pub fn compile(
-    definition_name: String,
+    definition_pointer: Pointer,
     fn_name: Option<String>,
     functionish: Functionish,
     definition_allocator: Rc<RefCell<NameAllocator>>,
@@ -110,7 +132,7 @@ impl FunctionCompiler {
     self_
       .queue
       .add(QueuedFunction {
-        definition_name: definition_name.clone(),
+        definition_pointer: definition_pointer.clone(),
         fn_name,
         capture_params: Vec::new(),
         functionish,
@@ -126,7 +148,7 @@ impl FunctionCompiler {
     loop {
       match self.queue.remove() {
         Ok(qfn) => self.compile_functionish(
-          qfn.definition_name,
+          qfn.definition_pointer,
           qfn.fn_name,
           qfn.capture_params,
           &qfn.functionish,
@@ -141,7 +163,7 @@ impl FunctionCompiler {
 
   fn compile_functionish(
     &mut self,
-    definition_name: String,
+    definition_pointer: Pointer,
     fn_name: Option<String>,
     capture_params: Vec<String>,
     functionish: &Functionish,
@@ -154,13 +176,11 @@ impl FunctionCompiler {
 
     match fn_name {
       // TODO: Capture propagation when using this name recursively
-      Some(fn_name_) => scope.set(fn_name_, MappedName::Definition(definition_name.clone())),
+      Some(fn_name_) => scope.set(fn_name_, MappedName::Definition(definition_pointer.clone())),
       None => {}
     }
 
-    let mut heading = "@".to_string();
-    heading += &definition_name;
-    heading += " = function(";
+    let mut heading = format!("{} = function(", definition_pointer);
 
     let mut param_count = 0;
 
@@ -640,10 +660,10 @@ impl FunctionCompiler {
 
       let fn_name = fn_.ident.sym.to_string();
 
-      let definition_name = self.definition_allocator.borrow_mut().allocate(&fn_name);
+      let definition_pointer = self.allocate_defn(&fn_name);
 
       let qf = QueuedFunction {
-        definition_name: definition_name,
+        definition_pointer,
         fn_name: Some(fn_name.clone()),
         capture_params: full_captures,
         functionish: Functionish::Fn(fn_.function.clone()),
@@ -677,7 +697,7 @@ impl FunctionCompiler {
           self.statement(stmt, false, &block_scope);
         }
 
-        for mapping in block_scope.borrow().name_map.values() {
+        for mapping in block_scope.rc.borrow().name_map.values() {
           match mapping {
             MappedName::Register(reg) => {
               self.release_reg(reg);

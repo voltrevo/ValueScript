@@ -2,12 +2,12 @@ use queues::*;
 
 use swc_common::Spanned;
 
-use crate::asm::Register;
+use crate::asm::{Pointer, Register};
 
 use super::capture_finder::CaptureFinder;
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
-use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
+use super::scope::{init_std_scope, MappedName, Scope};
 
 pub struct CompiledExpression {
   /** It is usually better to access this via functionCompiler.use_ */
@@ -1058,13 +1058,9 @@ impl<'a> ExpressionCompiler<'a> {
       .clone()
       .and_then(|ident| Some(ident.sym.to_string()));
 
-    let definition_name = match &fn_name {
-      Some(name) => self.fnc.definition_allocator.borrow_mut().allocate(&name),
-      None => self
-        .fnc
-        .definition_allocator
-        .borrow_mut()
-        .allocate_numbered(&"_anon".to_string()),
+    let definition_pointer = match &fn_name {
+      Some(name) => self.fnc.allocate_defn(&name),
+      None => self.fnc.allocate_defn_numbered(&"_anon".to_string()),
     };
 
     let mut cf = CaptureFinder::new(self.scope.clone());
@@ -1074,7 +1070,7 @@ impl<'a> ExpressionCompiler<'a> {
       .fnc
       .queue
       .add(QueuedFunction {
-        definition_name: definition_name.clone(),
+        definition_pointer: definition_pointer.clone(),
         fn_name: fn_name.clone(),
         capture_params: cf.ordered_names.clone(),
         functionish: Functionish::Fn(fn_.function.clone()),
@@ -1082,13 +1078,13 @@ impl<'a> ExpressionCompiler<'a> {
       .expect("Failed to queue function");
 
     if cf.ordered_names.len() == 0 {
-      return self.inline(format!("@{}", definition_name), target_register);
+      return self.inline(format!("{}", definition_pointer), target_register);
     }
 
     return self.capturing_fn_ref(
       fn_name,
       fn_.ident.span(),
-      &definition_name,
+      &definition_pointer,
       &cf.ordered_names,
       target_register,
     );
@@ -1099,11 +1095,7 @@ impl<'a> ExpressionCompiler<'a> {
     arrow_expr: &swc_ecma_ast::ArrowExpr,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let definition_name = self
-      .fnc
-      .definition_allocator
-      .borrow_mut()
-      .allocate_numbered(&"_anon".to_string());
+    let definition_pointer = self.fnc.allocate_defn_numbered(&"_anon".to_string());
 
     let mut cf = CaptureFinder::new(self.scope.clone());
     cf.arrow_expr(&init_std_scope(), arrow_expr);
@@ -1112,7 +1104,7 @@ impl<'a> ExpressionCompiler<'a> {
       .fnc
       .queue
       .add(QueuedFunction {
-        definition_name: definition_name.clone(),
+        definition_pointer: definition_pointer.clone(),
         fn_name: None,
         capture_params: cf.ordered_names.clone(),
         functionish: Functionish::Arrow(arrow_expr.clone()),
@@ -1120,13 +1112,13 @@ impl<'a> ExpressionCompiler<'a> {
       .expect("Failed to queue function");
 
     if cf.ordered_names.len() == 0 {
-      return self.inline(format!("@{}", definition_name), target_register);
+      return self.inline(format!("{}", definition_pointer), target_register);
     }
 
     return self.capturing_fn_ref(
       None,
       arrow_expr.span(),
-      &definition_name,
+      &definition_pointer,
       &cf.ordered_names,
       target_register,
     );
@@ -1136,7 +1128,7 @@ impl<'a> ExpressionCompiler<'a> {
     &mut self,
     fn_name: Option<String>,
     span: swc_common::Span,
-    definition_name: &String,
+    definition_pointer: &Pointer,
     captures: &Vec<String>,
     target_register: Option<Register>,
   ) -> CompiledExpression {
@@ -1157,7 +1149,7 @@ impl<'a> ExpressionCompiler<'a> {
       Some(tr) => tr.clone(),
     };
 
-    let mut bind_instr = format!("  bind @{} [", definition_name);
+    let mut bind_instr = format!("  bind {} [", definition_pointer);
 
     for i in 0..captures.len() {
       let captured_name = &captures[i];
@@ -1208,7 +1200,7 @@ impl<'a> ExpressionCompiler<'a> {
               Functionish::Arrow(arrow) => arrow.span,
               Functionish::Constructor(_, constructor) => constructor.span,
             },
-            &qfn.definition_name,
+            &qfn.definition_pointer,
             &qfn.capture_params,
             None,
           );
@@ -1360,7 +1352,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     return match mapped {
       MappedName::Register(reg) => self.inline(format!("{}", reg), target_register),
-      MappedName::Definition(def) => self.inline("@".to_string() + &def, target_register),
+      MappedName::Definition(def) => self.inline(format!("{}", def), target_register),
       MappedName::QueuedFunction(qfn) => self.capturing_fn_ref(
         qfn.fn_name.clone(),
         match &qfn.functionish {
@@ -1368,7 +1360,7 @@ impl<'a> ExpressionCompiler<'a> {
           Functionish::Arrow(arrow) => arrow.span,
           Functionish::Constructor(_, constructor) => constructor.span,
         },
-        &qfn.definition_name,
+        &qfn.definition_pointer,
         &qfn.capture_params,
         target_register,
       ),

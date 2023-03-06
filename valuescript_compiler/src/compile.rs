@@ -7,11 +7,13 @@ use swc_common::{errors::Handler, FileName, SourceMap, Spanned};
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
+use crate::asm::Pointer;
+
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::expression_compiler::{string_literal, CompiledExpression, ExpressionCompiler};
 use super::function_compiler::{FunctionCompiler, Functionish};
 use super::name_allocator::NameAllocator;
-use super::scope::{init_std_scope, MappedName, Scope, ScopeTrait};
+use super::scope::{init_std_scope, MappedName, Scope};
 use super::scope_analysis::ScopeAnalysis;
 
 struct DiagnosticCollector {
@@ -112,6 +114,28 @@ struct Compiler {
 }
 
 impl Compiler {
+  fn allocate_defn(&mut self, name: &str) -> Pointer {
+    let allocated_name = self
+      .definition_allocator
+      .borrow_mut()
+      .allocate(&name.to_string());
+
+    Pointer {
+      name: allocated_name,
+    }
+  }
+
+  fn allocate_defn_numbered(&mut self, name: &str) -> Pointer {
+    let allocated_name = self
+      .definition_allocator
+      .borrow_mut()
+      .allocate_numbered(&name.to_string());
+
+    Pointer {
+      name: allocated_name,
+    }
+  }
+
   fn compile_program(&mut self, program: &swc_ecma_ast::Program) {
     use swc_ecma_ast::Program::*;
 
@@ -137,7 +161,7 @@ impl Compiler {
     use swc_ecma_ast::ModuleItem;
     use swc_ecma_ast::Stmt;
 
-    let mut default_export_name = None;
+    let mut default_export_pointer = None;
 
     // Populate scope with top-level declarations
     for module_item in &module.body {
@@ -169,22 +193,14 @@ impl Compiler {
               swc_ecma_ast::DefaultDecl::Fn(fn_) => {
                 match &fn_.ident {
                   Some(id) => {
-                    let allocated_name = self
-                      .definition_allocator
-                      .borrow_mut()
-                      .allocate(&id.sym.to_string());
+                    let allocated_name = self.allocate_defn(&id.sym.to_string());
 
-                    default_export_name = Some(allocated_name.clone());
+                    default_export_pointer = Some(allocated_name.clone());
 
                     scope.set(id.sym.to_string(), MappedName::Definition(allocated_name));
                   }
                   None => {
-                    default_export_name = Some(
-                      self
-                        .definition_allocator
-                        .borrow_mut()
-                        .allocate_numbered(&"_anon".to_string()),
-                    );
+                    default_export_pointer = Some(self.allocate_defn_numbered("_anon"));
                   }
                 };
               }
@@ -365,23 +381,13 @@ impl Compiler {
               Decl::Class(class) => {
                 scope.set(
                   class.ident.sym.to_string(),
-                  MappedName::Definition(
-                    self
-                      .definition_allocator
-                      .borrow_mut()
-                      .allocate(&class.ident.sym.to_string()),
-                  ),
+                  MappedName::Definition(self.allocate_defn(&class.ident.sym.to_string())),
                 );
               }
               Decl::Fn(fn_) => {
                 scope.set(
                   fn_.ident.sym.to_string(),
-                  MappedName::Definition(
-                    self
-                      .definition_allocator
-                      .borrow_mut()
-                      .allocate(&fn_.ident.sym.to_string()),
-                  ),
+                  MappedName::Definition(self.allocate_defn(&fn_.ident.sym.to_string())),
                 );
               }
               Decl::Var(var_decl) => {
@@ -423,15 +429,15 @@ impl Compiler {
     }
 
     // First compile default
-    match default_export_name {
-      Some(default_export_name) => {
+    match default_export_pointer {
+      Some(default_export_pointer) => {
         for module_item in &module.body {
           match module_item {
             ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(edd)) => self
               .compile_export_default_decl(
                 edd,
                 // FIXME: clone() shouldn't be necessary here (we want to move)
-                default_export_name.clone(),
+                default_export_pointer.name.clone(),
                 &scope,
               ),
             _ => {}
@@ -625,7 +631,7 @@ impl Compiler {
     use swc_ecma_ast::Decl::*;
 
     match decl {
-      Class(class) => self.compile_class_decl(class, self.definition_allocator.clone(), scope),
+      Class(class) => self.compile_class_decl(class, scope),
       Fn(fn_) => {
         let fn_name = fn_.ident.sym.to_string();
 
@@ -646,7 +652,6 @@ impl Compiler {
           defn,
           Some(fn_.ident.sym.to_string()),
           Functionish::Fn(fn_.function.clone()),
-          self.definition_allocator.clone(),
           scope,
         )
       }
@@ -705,7 +710,6 @@ impl Compiler {
           defn,
           Some(fn_name),
           Functionish::Fn(fn_.function.clone()),
-          self.definition_allocator.clone(),
           scope,
         );
       }
@@ -721,17 +725,16 @@ impl Compiler {
 
   fn compile_fn(
     &mut self,
-    defn_name: String,
+    defn_pointer: Pointer,
     fn_name: Option<String>,
     functionish: Functionish,
-    definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) {
     let (defn, mut diagnostics) = FunctionCompiler::compile(
-      defn_name,
+      defn_pointer,
       fn_name,
       functionish,
-      definition_allocator,
+      self.definition_allocator.clone(),
       parent_scope,
     );
 
@@ -739,12 +742,7 @@ impl Compiler {
     self.diagnostics.append(&mut diagnostics);
   }
 
-  fn compile_class_decl(
-    &mut self,
-    class_decl: &swc_ecma_ast::ClassDecl,
-    definition_allocator: Rc<RefCell<NameAllocator>>,
-    parent_scope: &Scope,
-  ) {
+  fn compile_class_decl(&mut self, class_decl: &swc_ecma_ast::ClassDecl, parent_scope: &Scope) {
     let mut defn = Vec::<String>::new();
 
     let class_name = class_decl.ident.sym.to_string();
@@ -762,9 +760,9 @@ impl Compiler {
       }
     };
 
-    let mut constructor_defn_name: Option<String> = None;
+    let mut constructor_defn_name: Option<Pointer> = None;
 
-    let mut member_initializers_fnc = FunctionCompiler::new(definition_allocator.clone());
+    let mut member_initializers_fnc = FunctionCompiler::new(self.definition_allocator.clone());
 
     for class_member in &class_decl.class.body {
       match class_member {
@@ -829,15 +827,12 @@ impl Compiler {
         swc_ecma_ast::ClassMember::Constructor(constructor) => {
           has_constructor = true;
 
-          let ctor_defn_name = definition_allocator
-            .borrow_mut()
-            .allocate(&format!("{}_constructor", class_name));
+          let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", class_name));
 
           self.compile_fn(
             ctor_defn_name.clone(),
             None,
             Functionish::Constructor(member_initializers_assembly.clone(), constructor.clone()),
-            definition_allocator.clone(),
             parent_scope,
           );
 
@@ -848,11 +843,9 @@ impl Compiler {
     }
 
     if member_initializers_assembly.len() > 0 && !has_constructor {
-      let ctor_defn_name = definition_allocator
-        .borrow_mut()
-        .allocate(&format!("{}_constructor", class_name));
+      let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", class_name));
 
-      defn.push(format!("@{} = function() {{", &ctor_defn_name));
+      defn.push(format!("{} = function() {{", ctor_defn_name));
 
       for line in member_initializers_assembly {
         defn.push(line.clone());
@@ -865,11 +858,11 @@ impl Compiler {
     }
 
     defn.push(format!(
-      "@{} = class({}, {{",
+      "{} = class({}, {{",
       defn_name,
       match constructor_defn_name {
         None => "void".to_string(),
-        Some(d) => format!("@{}", d),
+        Some(d) => format!("{}", d),
       },
     ));
 
@@ -892,20 +885,17 @@ impl Compiler {
             }
           };
 
-          let method_defn_name = definition_allocator
-            .borrow_mut()
-            .allocate(&format!("{}_{}", defn_name, name));
+          let method_defn_name = self.allocate_defn(&format!("{}_{}", defn_name.name, name));
 
           self.compile_fn(
             method_defn_name.clone(),
             None,
             Functionish::Fn(method.function.clone()),
-            definition_allocator.clone(),
             parent_scope,
           );
 
           defn.push(format!(
-            "  {}: @{},",
+            "  {}: {},",
             string_literal(&name),
             method_defn_name,
           ));
