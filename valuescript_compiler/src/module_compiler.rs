@@ -152,7 +152,6 @@ impl ModuleCompiler {
   }
 
   fn populate_scope(&mut self, module: &swc_ecma_ast::Module, scope: &Scope) {
-    use swc_ecma_ast::Decl;
     use swc_ecma_ast::ModuleDecl;
     use swc_ecma_ast::ModuleItem;
     use swc_ecma_ast::Stmt;
@@ -167,13 +166,7 @@ impl ModuleCompiler {
               span: import.span,
             });
           }
-          ModuleDecl::ExportDecl(export_decl) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: ExportDecl module declaration".to_string(),
-              span: export_decl.span,
-            });
-          }
+          ModuleDecl::ExportDecl(export_decl) => self.populate_scope_decl(&export_decl.decl, scope),
           ModuleDecl::ExportNamed(export_named) => {
             self.diagnostics.push(Diagnostic {
               level: DiagnosticLevel::InternalError,
@@ -357,47 +350,7 @@ impl ModuleCompiler {
               span: for_of.span,
             });
           }
-          Stmt::Decl(decl) => {
-            match decl {
-              Decl::Class(class) => {
-                scope.set(
-                  class.ident.sym.to_string(),
-                  MappedName::Definition(self.allocate_defn(&class.ident.sym.to_string())),
-                );
-              }
-              Decl::Fn(fn_) => {
-                scope.set(
-                  fn_.ident.sym.to_string(),
-                  MappedName::Definition(self.allocate_defn(&fn_.ident.sym.to_string())),
-                );
-              }
-              Decl::Var(var_decl) => {
-                if !var_decl.declare {
-                  self.diagnostics.push(Diagnostic {
-                    level: DiagnosticLevel::InternalError,
-                    message: "TODO: non-declare module level var declaration".to_string(),
-                    span: var_decl.span,
-                  });
-                }
-              }
-              Decl::TsInterface(_) => {}
-              Decl::TsTypeAlias(_) => {}
-              Decl::TsEnum(ts_enum) => {
-                self.diagnostics.push(Diagnostic {
-                  level: DiagnosticLevel::InternalError,
-                  message: "TODO: module level TsEnum declaration".to_string(),
-                  span: ts_enum.span,
-                });
-              }
-              Decl::TsModule(ts_module) => {
-                self.diagnostics.push(Diagnostic {
-                  level: DiagnosticLevel::InternalError,
-                  message: "TODO: module level TsModule declaration".to_string(),
-                  span: ts_module.span,
-                });
-              }
-            };
-          }
+          Stmt::Decl(decl) => self.populate_scope_decl(decl, scope),
           Stmt::Expr(expr) => {
             self.diagnostics.push(Diagnostic {
               level: DiagnosticLevel::InternalError,
@@ -408,6 +361,50 @@ impl ModuleCompiler {
         },
       };
     }
+  }
+
+  fn populate_scope_decl(&mut self, decl: &swc_ecma_ast::Decl, scope: &Scope) {
+    use swc_ecma_ast::Decl;
+
+    match decl {
+      Decl::Class(class) => {
+        scope.set(
+          class.ident.sym.to_string(),
+          MappedName::Definition(self.allocate_defn(&class.ident.sym.to_string())),
+        );
+      }
+      Decl::Fn(fn_) => {
+        scope.set(
+          fn_.ident.sym.to_string(),
+          MappedName::Definition(self.allocate_defn(&fn_.ident.sym.to_string())),
+        );
+      }
+      Decl::Var(var_decl) => {
+        if !var_decl.declare {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: non-declare module level var declaration".to_string(),
+            span: var_decl.span,
+          });
+        }
+      }
+      Decl::TsInterface(_) => {}
+      Decl::TsTypeAlias(_) => {}
+      Decl::TsEnum(ts_enum) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level TsEnum declaration".to_string(),
+          span: ts_enum.span,
+        });
+      }
+      Decl::TsModule(ts_module) => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: module level TsModule declaration".to_string(),
+          span: ts_module.span,
+        });
+      }
+    };
   }
 
   fn compile_module_item(&mut self, module_item: &swc_ecma_ast::ModuleItem, scope: &Scope) {
