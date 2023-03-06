@@ -416,7 +416,6 @@ impl<'a> ExpressionCompiler<'a> {
       self
         .fnc
         .definition
-        // .push(format!("  mov {} {}", rhs.value, target_reg));
         .push(Instruction::Mov(rhs.value.clone(), target_reg).to_string());
     }
 
@@ -511,13 +510,9 @@ impl<'a> ExpressionCompiler<'a> {
           Some(tr) => tr,
         };
 
-        self
-          .fnc
-          .definition
-          // .push(format!("  mov {} {}", nta.register, res_reg));
-          .push(
-            Instruction::Mov(Value::Register(nta.register.clone()), res_reg.clone()).to_string(),
-          );
+        self.fnc.definition.push(
+          Instruction::Mov(Value::Register(nta.register.clone()), res_reg.clone()).to_string(),
+        );
 
         res_reg
       }
@@ -564,7 +559,6 @@ impl<'a> ExpressionCompiler<'a> {
         self
           .fnc
           .definition
-          // .push(std::format!("  mov {} {}", array_asm, tr));
           .push(Instruction::Mov(Value::Array(Box::new(array_asm)), tr.clone()).to_string());
 
         for reg in sub_nested_registers {
@@ -632,7 +626,6 @@ impl<'a> ExpressionCompiler<'a> {
         self
           .fnc
           .definition
-          // .push(std::format!("  mov {} {}", object_asm, tr));
           .push(Instruction::Mov(Value::Object(Box::new(object_asm)), tr.clone()).to_string());
 
         for reg in sub_nested_registers {
@@ -731,17 +724,12 @@ impl<'a> ExpressionCompiler<'a> {
     let mut target = TargetAccessor::compile(self, &update_exp.arg, true);
     let target_read = target.read(self);
 
-    let op_str = match update_exp.op {
-      swc_ecma_ast::UpdateOp::PlusPlus => "op++",
-      swc_ecma_ast::UpdateOp::MinusMinus => "op--",
-    };
-
     let res = match update_exp.prefix {
       true => {
         self
           .fnc
           .definition
-          .push(format!("  {} {}", op_str, &target_read));
+          .push(make_update_op(update_exp.op, target_read.clone()).to_string());
 
         let mut nested_registers = Vec::<Register>::new();
 
@@ -749,7 +737,6 @@ impl<'a> ExpressionCompiler<'a> {
           TargetAccessor::Register(reg) => {
             for tr in &target_register {
               if tr != reg {
-                // self.fnc.definition.push(format!("  mov {} {}", reg, tr));
                 self
                   .fnc
                   .definition
@@ -761,13 +748,9 @@ impl<'a> ExpressionCompiler<'a> {
           }
           TargetAccessor::Nested(nta) => match target_register {
             Some(tr) => {
-              self
-                .fnc
-                .definition
-                // .push(format!("  mov {} {}", nta.register, tr));
-                .push(
-                  Instruction::Mov(Value::Register(nta.register.clone()), tr.clone()).to_string(),
-                );
+              self.fnc.definition.push(
+                Instruction::Mov(Value::Register(nta.register.clone()), tr.clone()).to_string(),
+              );
 
               tr
             }
@@ -775,13 +758,9 @@ impl<'a> ExpressionCompiler<'a> {
               let res = self.fnc.allocate_tmp();
               nested_registers.push(res.clone());
 
-              self
-                .fnc
-                .definition
-                // .push(format!("  mov {} {}", nta.register, res));
-                .push(
-                  Instruction::Mov(Value::Register(nta.register.clone()), res.clone()).to_string(),
-                );
+              self.fnc.definition.push(
+                Instruction::Mov(Value::Register(nta.register.clone()), res.clone()).to_string(),
+              );
 
               res
             }
@@ -803,19 +782,14 @@ impl<'a> ExpressionCompiler<'a> {
           }
         };
 
-        self
-          .fnc
-          .definition
-          // .push(format!("  mov {} {}", target_read, &old_value_reg));
-          .push(
-            Instruction::Mov(Value::Register(target_read.clone()), old_value_reg.clone())
-              .to_string(),
-          );
+        self.fnc.definition.push(
+          Instruction::Mov(Value::Register(target_read.clone()), old_value_reg.clone()).to_string(),
+        );
 
         self
           .fnc
           .definition
-          .push(format!("  {} {}", op_str, target_read));
+          .push(make_update_op(update_exp.op, target_read.clone()).to_string());
 
         CompiledExpression::new(Value::Register(old_value_reg), nested_registers)
       }
@@ -848,10 +822,6 @@ impl<'a> ExpressionCompiler<'a> {
     callee.release_checker.has_unreleased_registers = false;
     sub_nested_registers.append(&mut callee.nested_registers);
 
-    let mut instr = "  call ".to_string();
-    instr += &callee.value.to_string();
-    instr += " ";
-
     let mut args = Array::default();
 
     for i in 0..call_exp.args.len() {
@@ -868,8 +838,6 @@ impl<'a> ExpressionCompiler<'a> {
       args.values.push(compiled_arg.value);
     }
 
-    instr += &format!("{} ", args);
-
     let tmp_dest: Register;
 
     let dest = match &target_register {
@@ -882,9 +850,9 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    instr += &dest.to_string();
-
-    self.fnc.definition.push(instr);
+    self.fnc.definition.push(
+      Instruction::Call(callee.value, Value::Array(Box::new(args)), dest.clone()).to_string(),
+    );
 
     for reg in sub_nested_registers {
       self.fnc.release_reg(&reg);
@@ -908,9 +876,9 @@ impl<'a> ExpressionCompiler<'a> {
     callee.release_checker.has_unreleased_registers = false;
     sub_nested_registers.append(&mut callee.nested_registers);
 
-    let mut instr = "  new ".to_string();
-    instr += &callee.value.to_string();
-    instr += " ";
+    // let mut instr = "  new ".to_string();
+    // instr += &callee.value.to_string();
+    // instr += " ";
 
     let mut args = Array::default();
 
@@ -929,7 +897,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     }
 
-    instr += &format!("{} ", args);
+    // instr += &format!("{} ", args);
 
     let tmp_dest: Register;
 
@@ -943,9 +911,10 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    instr += &dest.to_string();
-
-    self.fnc.definition.push(instr);
+    self
+      .fnc
+      .definition
+      .push(Instruction::New(callee.value, Value::Array(Box::new(args)), dest.clone()).to_string());
 
     for reg in sub_nested_registers {
       self.fnc.release_reg(&reg);
@@ -1287,7 +1256,6 @@ impl<'a> ExpressionCompiler<'a> {
 
       let expr_i = self.compile(&tpl.exprs[i], None);
 
-      // let plus_instr = format!("  op+ {} {} {}", acc_reg, self.fnc.use_(expr_i), acc_reg);
       let plus_instr = Instruction::OpPlus(
         Value::Register(acc_reg.clone()),
         self.fnc.use_(expr_i),
@@ -1300,12 +1268,6 @@ impl<'a> ExpressionCompiler<'a> {
     let last_str = tpl.quasis[len].raw.to_string();
 
     if last_str != "" {
-      // self.fnc.definition.push(format!(
-      //   "  op+ {} {} {}",
-      //   acc_reg,
-      //   Value::String(last_str),
-      //   acc_reg,
-      // ));
       self.fnc.definition.push(
         Instruction::OpPlus(
           Value::Register(acc_reg.clone()),
@@ -1332,7 +1294,6 @@ impl<'a> ExpressionCompiler<'a> {
     return match target_register {
       None => CompiledExpression::new(value, vec![]),
       Some(t) => {
-        // self.fnc.definition.push(format!("  mov {} {}", value, t));
         self
           .fnc
           .definition
@@ -1426,7 +1387,6 @@ impl<'a> ExpressionCompiler<'a> {
           self
             .fnc
             .definition
-            // .push(format!("  mov {} {}", register, ident_reg));
             .push(Instruction::Mov(Value::Register(register.clone()), ident_reg).to_string());
         }
       }
@@ -1449,18 +1409,14 @@ impl<'a> ExpressionCompiler<'a> {
 
           let elem_reg = self.fnc.get_pattern_register(elem, scope);
 
-          self
-            .fnc
-            .definition
-            // .push(format!("  sub {} {} {}", register, i, elem_reg));
-            .push(
-              Instruction::Sub(
-                Value::Register(register.clone()),
-                Value::Number(i as f64),
-                elem_reg.clone(),
-              )
-              .to_string(),
-            );
+          self.fnc.definition.push(
+            Instruction::Sub(
+              Value::Register(register.clone()),
+              Value::Number(i as f64),
+              elem_reg.clone(),
+            )
+            .to_string(),
+          );
 
           self.pat(elem, &elem_reg, false, scope);
         }
@@ -1478,12 +1434,6 @@ impl<'a> ExpressionCompiler<'a> {
               let param_reg = self.fnc.get_pattern_register(&kv.value, scope);
               let compiled_key = self.prop_name(&kv.key);
 
-              // let sub_instr = format!(
-              //   "  sub {} {} {}",
-              //   register,
-              //   self.fnc.use_(compiled_key),
-              //   param_reg
-              // );
               let sub_instr = Instruction::Sub(
                 Value::Register(register.clone()),
                 self.fnc.use_(compiled_key),
@@ -1498,18 +1448,14 @@ impl<'a> ExpressionCompiler<'a> {
               let key = assign.key.sym.to_string();
               let reg = self.fnc.get_variable_register(&assign.key, scope);
 
-              self
-                .fnc
-                .definition
-                // .push(format!("  sub {} \"{}\" {}", register, key, reg));
-                .push(
-                  Instruction::Sub(
-                    Value::Register(register.clone()),
-                    Value::String(key),
-                    reg.clone(),
-                  )
-                  .to_string(),
-                );
+              self.fnc.definition.push(
+                Instruction::Sub(
+                  Value::Register(register.clone()),
+                  Value::String(key),
+                  reg.clone(),
+                )
+                .to_string(),
+              );
 
               if let Some(value) = &assign.value {
                 self.default_expr(value, &reg);
@@ -1548,32 +1494,24 @@ impl<'a> ExpressionCompiler<'a> {
       .label_allocator
       .allocate(&format!("{}_initialized", register.as_name()));
 
-    self
-      .fnc
-      .definition
-      // .push(format!("  op!== {} undefined {}", register, provided_reg));
-      .push(
-        Instruction::OpTripleNe(
-          Value::Register(register.clone()),
-          Value::Undefined,
-          provided_reg.clone(),
-        )
-        .to_string(),
-      );
+    self.fnc.definition.push(
+      Instruction::OpTripleNe(
+        Value::Register(register.clone()),
+        Value::Undefined,
+        provided_reg.clone(),
+      )
+      .to_string(),
+    );
 
-    self
-      .fnc
-      .definition
-      // .push(format!("  jmpif {} :{}", provided_reg, initialized_label));
-      .push(
-        Instruction::JmpIf(
-          Value::Register(provided_reg.clone()),
-          LabelRef {
-            name: initialized_label.clone(),
-          },
-        )
-        .to_string(),
-      );
+    self.fnc.definition.push(
+      Instruction::JmpIf(
+        Value::Register(provided_reg.clone()),
+        LabelRef {
+          name: initialized_label.clone(),
+        },
+      )
+      .to_string(),
+    );
 
     self.fnc.release_reg(&provided_reg);
 
@@ -1668,6 +1606,15 @@ pub fn get_binary_op_for_assign_op(
   };
 }
 
+pub fn make_update_op(op: swc_ecma_ast::UpdateOp, register: Register) -> Instruction {
+  use swc_ecma_ast::UpdateOp::*;
+
+  match op {
+    PlusPlus => Instruction::OpInc(register),
+    MinusMinus => Instruction::OpDec(register),
+  }
+}
+
 struct NestedTargetAccess {
   obj: Box<TargetAccessor>,
   subscript: CompiledExpression,
@@ -1714,12 +1661,6 @@ impl TargetAccessor {
         let register = ec.fnc.allocate_tmp();
 
         if !is_outermost {
-          // ec.fnc.definition.push(format!(
-          //   "  sub {} {} {}",
-          //   obj.register(),
-          //   subscript.value,
-          //   register,
-          // ));
           ec.fnc.definition.push(
             Instruction::Sub(
               Value::Register(obj.register()),
@@ -1771,19 +1712,12 @@ impl TargetAccessor {
       Register(reg) => {
         // TODO: Should value just derive from Eq?
         if value.to_string() != reg.to_string() {
-          // ec.fnc.definition.push(format!("  mov {} {}", value, reg));
           ec.fnc
             .definition
             .push(Instruction::Mov(value.clone(), reg.clone()).to_string());
         }
       }
       Nested(nta) => {
-        // let submov_instr = format!(
-        //   "  submov {} {} {}",
-        //   ec.fnc.use_ref(&mut nta.subscript),
-        //   value,
-        //   nta.obj.register(),
-        // );
         let submov_instr = Instruction::SubMov(
           ec.fnc.use_ref(&mut nta.subscript),
           value.clone(),
@@ -1805,12 +1739,6 @@ impl TargetAccessor {
     return match self {
       Register(reg) => reg.clone(),
       Nested(nta) => {
-        // ec.fnc.definition.push(format!(
-        //   "  sub {} {} {}",
-        //   nta.obj.register(),
-        //   nta.subscript.value,
-        //   nta.register,
-        // ));
         ec.fnc.definition.push(
           Instruction::Sub(
             Value::Register(nta.obj.register()),
@@ -1849,12 +1777,6 @@ impl TargetAccessor {
     match self {
       Register(_) => {}
       Nested(nta) => {
-        // let submov_instr = format!(
-        //   "  submov {} {} {}",
-        //   ec.fnc.use_ref(&mut nta.subscript),
-        //   &nta.register,
-        //   nta.obj.register(),
-        // );
         let submov_instr = Instruction::SubMov(
           ec.fnc.use_ref(&mut nta.subscript),
           Value::Register(nta.register.clone()),
