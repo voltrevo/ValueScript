@@ -146,7 +146,7 @@ impl std::fmt::Display for Register {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InstructionOrLabel {
   Instruction(Instruction),
   Label(Label),
@@ -195,7 +195,7 @@ impl std::fmt::Display for LabelRef {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Instruction {
   End,
   Mov(Value, Register),

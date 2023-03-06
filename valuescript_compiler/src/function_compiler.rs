@@ -22,7 +22,7 @@ use super::scope::{init_std_scope, MappedName, Scope};
 pub enum Functionish {
   Fn(swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
-  Constructor(swc_ecma_ast::Constructor),
+  Constructor(Vec<InstructionOrLabel>, swc_ecma_ast::Constructor),
 }
 
 #[derive(Clone, Debug)]
@@ -213,20 +213,11 @@ impl FunctionCompiler {
 
     self.add_param_code(functionish, &param_registers, &scope);
 
-    let mut handle_block_body = |block: &swc_ecma_ast::BlockStmt| {
-      self.populate_fn_scope(block, &scope);
-      self.populate_block_scope(block, &scope);
-
-      for i in 0..block.stmts.len() {
-        self.statement(&block.stmts[i], i == block.stmts.len() - 1, &scope);
-      }
-    };
-
     match functionish {
       Functionish::Fn(fn_) => {
         match &fn_.body {
           Some(block) => {
-            handle_block_body(block);
+            self.handle_block_body(block, &scope);
           }
           None => self.todo(
             fn_.span(),
@@ -236,7 +227,7 @@ impl FunctionCompiler {
       }
       Functionish::Arrow(arrow) => match &arrow.body {
         swc_ecma_ast::BlockStmtOrExpr::BlockStmt(block) => {
-          handle_block_body(block);
+          self.handle_block_body(block, &scope);
         }
         swc_ecma_ast::BlockStmtOrExpr::Expr(expr) => {
           let mut expression_compiler = ExpressionCompiler {
@@ -247,10 +238,13 @@ impl FunctionCompiler {
           expression_compiler.compile(expr, Some(Register::Return));
         }
       },
-      Functionish::Constructor(constructor) => {
+      Functionish::Constructor(member_initializers_assembly, constructor) => {
+        let mut mia_copy = member_initializers_assembly.clone();
+        self.current.body.append(&mut mia_copy);
+
         match &constructor.body {
           Some(block) => {
-            handle_block_body(block);
+            self.handle_block_body(block, &scope);
           }
           None => self.todo(constructor.span(), "constructor without body"),
         };
@@ -261,6 +255,15 @@ impl FunctionCompiler {
       pointer: definition_pointer,
       content: DefinitionContent::Function(std::mem::take(&mut self.current)),
     });
+  }
+
+  fn handle_block_body(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
+    self.populate_fn_scope(block, scope);
+    self.populate_block_scope(block, scope);
+
+    for i in 0..block.stmts.len() {
+      self.statement(&block.stmts[i], i == block.stmts.len() - 1, scope);
+    }
   }
 
   fn populate_fn_scope_params(&mut self, functionish: &Functionish, scope: &Scope) {
@@ -275,7 +278,7 @@ impl FunctionCompiler {
           self.populate_scope_pat(p, scope);
         }
       }
-      Functionish::Constructor(constructor) => {
+      Functionish::Constructor(_, constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
@@ -324,7 +327,7 @@ impl FunctionCompiler {
           param_registers.push(self.get_pattern_register(p, scope));
         }
       }
-      Functionish::Constructor(constructor) => {
+      Functionish::Constructor(_, constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
@@ -393,7 +396,7 @@ impl FunctionCompiler {
           ec.pat(p, &param_registers[i], false, scope);
         }
       }
-      Functionish::Constructor(constructor) => {
+      Functionish::Constructor(_, constructor) => {
         for (i, potspp) in constructor.params.iter().enumerate() {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {

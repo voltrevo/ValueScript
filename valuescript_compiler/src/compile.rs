@@ -812,7 +812,7 @@ impl Compiler {
 
     for class_member in &class_decl.class.body {
       match class_member {
-        swc_ecma_ast::ClassMember::Constructor(constructor) => {
+        swc_ecma_ast::ClassMember::Constructor(ctor) => {
           has_constructor = true;
 
           let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", class_name));
@@ -820,9 +820,11 @@ impl Compiler {
           self.compile_fn(
             ctor_defn_name.clone(),
             None,
-            Functionish::Constructor(constructor.clone()),
+            Functionish::Constructor(member_initializers_assembly.clone(), ctor.clone()),
             parent_scope,
           );
+
+          constructor = Value::Pointer(ctor_defn_name);
         }
         _ => {}
       }
