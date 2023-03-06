@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use swc_common::Spanned;
 
-use crate::asm::{Pointer, Register};
+use crate::asm::{Pointer, Register, Value};
 use crate::scope::scope_reg;
 
 use super::capture_finder::CaptureFinder;
@@ -914,7 +914,7 @@ impl FunctionCompiler {
         self.definition.push(format!("{}:", continue_label));
 
         let mut jmpif_instr = "  jmpif ".to_string();
-        jmpif_instr += &self.use_(condition);
+        jmpif_instr += &format!("{}", self.use_(condition));
         jmpif_instr += " :";
         jmpif_instr += &start_label;
         self.definition.push(jmpif_instr);
@@ -1072,8 +1072,8 @@ impl FunctionCompiler {
     self.use_(compiled);
   }
 
-  pub fn use_(&mut self, mut compiled_expr: CompiledExpression) -> String {
-    let asm = compiled_expr.value_assembly;
+  pub fn use_(&mut self, mut compiled_expr: CompiledExpression) -> Value {
+    let asm = compiled_expr.value;
 
     for reg in &compiled_expr.nested_registers {
       self.release_reg(reg);
@@ -1084,8 +1084,8 @@ impl FunctionCompiler {
     return asm;
   }
 
-  pub fn use_ref(&mut self, compiled_expr: &mut CompiledExpression) -> String {
-    let asm = compiled_expr.value_assembly.clone();
+  pub fn use_ref(&mut self, compiled_expr: &mut CompiledExpression) -> Value {
+    let asm = compiled_expr.value.clone();
 
     for reg in &compiled_expr.nested_registers {
       self.release_reg(reg);

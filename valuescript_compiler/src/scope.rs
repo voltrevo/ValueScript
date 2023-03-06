@@ -2,24 +2,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::asm::{Pointer, Register};
+use crate::asm::{Builtin, Pointer, Register};
 
 use super::function_compiler::QueuedFunction;
-
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum Builtin {
-  Math,
-  Debug,
-
-  #[allow(non_camel_case_types)]
-  undefined,
-}
-
-impl std::fmt::Display for Builtin {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "{:?}", self)
-  }
-}
 
 #[derive(Clone, Debug)]
 pub enum MappedName {
@@ -98,8 +83,18 @@ pub fn init_std_scope() -> Scope {
   Scope {
     rc: Rc::new(RefCell::new(ScopeData {
       name_map: HashMap::from([
-        ("Math".to_string(), MappedName::Builtin(Builtin::Math)),
-        ("Debug".to_string(), MappedName::Builtin(Builtin::Debug)),
+        (
+          "Math".to_string(),
+          MappedName::Builtin(Builtin {
+            name: "Math".to_string(),
+          }),
+        ),
+        (
+          "Debug".to_string(),
+          MappedName::Builtin(Builtin {
+            name: "Debug".to_string(),
+          }),
+        ),
       ]),
       parent: None,
     })),

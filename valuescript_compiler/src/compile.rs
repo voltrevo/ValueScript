@@ -7,10 +7,10 @@ use swc_common::{errors::Handler, FileName, SourceMap, Spanned};
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
-use crate::asm::Pointer;
+use crate::asm::{Pointer, Value};
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
-use super::expression_compiler::{string_literal, CompiledExpression, ExpressionCompiler};
+use super::expression_compiler::{CompiledExpression, ExpressionCompiler};
 use super::function_compiler::{FunctionCompiler, Functionish};
 use super::name_allocator::NameAllocator;
 use super::scope::{init_std_scope, MappedName, Scope};
@@ -785,14 +785,7 @@ impl Compiler {
           let compiled_key = ec.prop_name(&class_prop.key);
 
           let compiled_value = match &class_prop.value {
-            None =>
-            /* CompiledExpression {
-              value_assembly: "undefined".to_string(),
-              nested_registers: vec![],
-            } */
-            {
-              CompiledExpression::new("undefined".to_string(), vec![])
-            }
+            None => CompiledExpression::new(Value::Undefined, vec![]),
             Some(expr) => ec.compile(expr, None),
           };
 
@@ -894,11 +887,7 @@ impl Compiler {
             parent_scope,
           );
 
-          defn.push(format!(
-            "  {}: {},",
-            string_literal(&name),
-            method_defn_name,
-          ));
+          defn.push(format!("  {}: {},", Value::String(name), method_defn_name,));
         }
         PrivateMethod(private_method) => {
           self.diagnostics.push(Diagnostic {

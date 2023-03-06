@@ -2,7 +2,7 @@ use queues::*;
 
 use swc_common::Spanned;
 
-use crate::asm::{Pointer, Register};
+use crate::asm::{Array, Object, Pointer, Register, Value};
 
 use super::capture_finder::CaptureFinder;
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
@@ -11,7 +11,7 @@ use super::scope::{init_std_scope, MappedName, Scope};
 
 pub struct CompiledExpression {
   /** It is usually better to access this via functionCompiler.use_ */
-  pub value_assembly: String,
+  pub value: Value,
 
   pub nested_registers: Vec<Register>,
   pub release_checker: ReleaseChecker,
@@ -32,17 +32,17 @@ impl ReleaseChecker {
 impl CompiledExpression {
   pub fn empty() -> CompiledExpression {
     CompiledExpression {
-      value_assembly: "void".to_string(), // TODO: Allocate register instead
+      value: Value::Void, // TODO: Allocate register instead
       nested_registers: vec![],
       release_checker: ReleaseChecker::new(false),
     }
   }
 
-  pub fn new(value_assembly: String, nested_registers: Vec<Register>) -> CompiledExpression {
+  pub fn new(value: Value, nested_registers: Vec<Register>) -> CompiledExpression {
     let has_unreleased_registers = nested_registers.len() > 0;
 
     CompiledExpression {
-      value_assembly,
+      value,
       nested_registers,
       release_checker: ReleaseChecker::new(has_unreleased_registers),
     }
@@ -85,7 +85,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     match expr {
       This(_) => {
-        return self.inline(format!("{}", Register::This), target_register);
+        return self.inline(Value::Register(Register::This), target_register);
       }
       Array(array_exp) => {
         return self.array_expression(array_exp, target_register);
@@ -273,7 +273,7 @@ impl<'a> ExpressionCompiler<'a> {
     let mut instr = "  ".to_string();
     instr += unary_op_str;
     instr += " ";
-    instr += &self.fnc.use_(arg);
+    instr += &format!("{}", self.fnc.use_(arg));
 
     let target: Register = match &target_register {
       None => {
@@ -288,7 +288,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.definition.push(instr);
 
-    return CompiledExpression::new(format!("{}", target), nested_registers);
+    return CompiledExpression::new(Value::Register(target), nested_registers);
   }
 
   pub fn binary_expression(
@@ -309,9 +309,9 @@ impl<'a> ExpressionCompiler<'a> {
     instr += get_binary_op_str(bin.op);
 
     instr += " ";
-    instr += &self.fnc.use_(left);
+    instr += &format!("{}", self.fnc.use_(left));
     instr += " ";
-    instr += &self.fnc.use_(right);
+    instr += &format!("{}", self.fnc.use_(right));
 
     let target: Register = match &target_register {
       None => {
@@ -326,7 +326,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.definition.push(instr);
 
-    return CompiledExpression::new(format!("{}", target), nested_registers);
+    return CompiledExpression::new(Value::Register(target), nested_registers);
   }
 
   fn get_register_for_ident_mutation(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
@@ -391,7 +391,7 @@ impl<'a> ExpressionCompiler<'a> {
       self
         .fnc
         .definition
-        .push(format!("  mov {} {}", rhs.value_assembly, target_reg));
+        .push(format!("  mov {} {}", rhs.value, target_reg));
     }
 
     let at_is_register = match &at {
@@ -403,7 +403,7 @@ impl<'a> ExpressionCompiler<'a> {
       // at is already assigned by compiling directly into at.direct_register()
       // and also doesn't need to be packed up, since it's just a register
     } else {
-      at.assign_and_packup(self, &rhs.value_assembly);
+      at.assign_and_packup(self, &rhs.value);
     }
 
     rhs
@@ -425,7 +425,7 @@ impl<'a> ExpressionCompiler<'a> {
       self
         .fnc
         .definition
-        .push(format!("  mov {} {}", rhs.value_assembly, target_reg));
+        .push(format!("  mov {} {}", rhs.value, target_reg));
     }
 
     rhs
@@ -520,9 +520,9 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    target.assign_and_packup(self, &format!("{}", target_read));
+    target.assign_and_packup(self, &Value::Register(target_read));
 
-    CompiledExpression::new(format!("{}", result_reg), nested_registers)
+    CompiledExpression::new(Value::Register(result_reg), nested_registers)
   }
 
   pub fn array_expression(
@@ -530,13 +530,13 @@ impl<'a> ExpressionCompiler<'a> {
     array_exp: &swc_ecma_ast::ArrayLit,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let mut value_assembly = "[".to_string();
+    let mut array_asm = Array::default();
     let mut sub_nested_registers = Vec::<Register>::new();
 
     for i in 0..array_exp.elems.len() {
       match &array_exp.elems[i] {
         None => {
-          value_assembly += "void";
+          array_asm.values.push(Value::Void);
         }
         Some(elem) => {
           if elem.spread.is_some() {
@@ -544,36 +544,30 @@ impl<'a> ExpressionCompiler<'a> {
 
             let reg = self.fnc.allocate_numbered_reg("_todo_spread");
 
-            value_assembly += &format!("{}", reg);
+            array_asm.values.push(Value::Register(reg));
           } else {
             let mut compiled_elem = self.compile(&*elem.expr, None);
-            value_assembly += &compiled_elem.value_assembly;
+            array_asm.values.push(compiled_elem.value);
             sub_nested_registers.append(&mut compiled_elem.nested_registers);
             compiled_elem.release_checker.has_unreleased_registers = false;
           }
         }
       }
-
-      if i != array_exp.elems.len() - 1 {
-        value_assembly += ", ";
-      }
     }
 
-    value_assembly += "]";
-
     return match target_register {
-      None => CompiledExpression::new(value_assembly, sub_nested_registers),
+      None => CompiledExpression::new(Value::Array(Box::new(array_asm)), sub_nested_registers),
       Some(tr) => {
         self
           .fnc
           .definition
-          .push(std::format!("  mov {} {}", value_assembly, tr));
+          .push(std::format!("  mov {} {}", array_asm, tr));
 
         for reg in sub_nested_registers {
           self.fnc.release_reg(&reg);
         }
 
-        CompiledExpression::new(std::format!("{}", tr), vec![])
+        CompiledExpression::new(Value::Register(tr), vec![])
       }
     };
   }
@@ -583,8 +577,9 @@ impl<'a> ExpressionCompiler<'a> {
     object_exp: &swc_ecma_ast::ObjectLit,
     target_register: Option<Register>,
   ) -> CompiledExpression {
+    let mut object_asm = Object::default();
+
     let mut sub_nested_registers = Vec::<Register>::new();
-    let mut prop_elements = Vec::<String>::new();
 
     for i in 0..object_exp.props.len() {
       use swc_ecma_ast::Prop;
@@ -596,34 +591,28 @@ impl<'a> ExpressionCompiler<'a> {
         }
         PropOrSpread::Prop(prop) => match &**prop {
           Prop::Shorthand(ident) => {
-            let mut prop_element = "".to_string();
-
-            prop_element += &std::format!("\"{}\"", ident.sym.to_string());
-            prop_element += ": ";
+            let prop_key = Value::String(ident.sym.to_string());
 
             let mut compiled_value = self.identifier(ident, None);
             sub_nested_registers.append(&mut compiled_value.nested_registers);
             compiled_value.release_checker.has_unreleased_registers = false;
-            prop_element += &compiled_value.value_assembly;
+            let prop_value = compiled_value.value;
 
-            prop_elements.push(prop_element);
+            object_asm.properties.push((prop_key, prop_value));
           }
           Prop::KeyValue(kv) => {
-            let mut prop_element = "".to_string();
-
             let mut compiled_key = self.prop_name(&kv.key);
             compiled_key.release_checker.has_unreleased_registers = false;
             sub_nested_registers.append(&mut compiled_key.nested_registers);
 
-            prop_element += &compiled_key.value_assembly;
-            prop_element += ": ";
+            let prop_key = compiled_key.value;
 
             let mut compiled_value = self.compile(&kv.value, None);
             compiled_value.release_checker.has_unreleased_registers = false;
             sub_nested_registers.append(&mut compiled_value.nested_registers);
-            prop_element += &compiled_value.value_assembly;
+            let prop_value = compiled_value.value;
 
-            prop_elements.push(prop_element);
+            object_asm.properties.push((prop_key, prop_value));
           }
           Prop::Assign(assign) => self.fnc.todo(assign.span(), "Assign prop"),
           Prop::Getter(getter) => self.fnc.todo(getter.span(), "Getter prop"),
@@ -633,21 +622,19 @@ impl<'a> ExpressionCompiler<'a> {
       }
     }
 
-    let value_assembly = format!("{{ {} }}", prop_elements.join(", "));
-
     return match target_register {
-      None => CompiledExpression::new(value_assembly, sub_nested_registers),
+      None => CompiledExpression::new(Value::Object(Box::new(object_asm)), sub_nested_registers),
       Some(tr) => {
         self
           .fnc
           .definition
-          .push(std::format!("  mov {} {}", value_assembly, tr));
+          .push(std::format!("  mov {} {}", object_asm, tr));
 
         for reg in sub_nested_registers {
           self.fnc.release_reg(&reg);
         }
 
-        CompiledExpression::new(std::format!("{}", tr), vec![])
+        CompiledExpression::new(Value::Register(tr), vec![])
       }
     };
   }
@@ -657,17 +644,13 @@ impl<'a> ExpressionCompiler<'a> {
 
     let mut nested_registers = Vec::<Register>::new();
 
-    let assembly = match &prop_name {
-      PropName::Ident(ident) => std::format!("\"{}\"", ident.sym.to_string()),
-      PropName::Str(str_) =>
-      // TODO: Escaping
-      {
-        std::format!("\"{}\"", str_.value.to_string())
-      }
+    let value = match &prop_name {
+      PropName::Ident(ident) => Value::String(ident.sym.to_string()),
+      PropName::Str(str_) => Value::String(str_.value.to_string()),
       PropName::Num(num) =>
       // TODO: JS number stringification (different from rust)
       {
-        std::format!("\"{}\"", num.value.to_string())
+        Value::String(num.value.to_string()) // TODO: Can we just use Value::Number here?
       }
       PropName::Computed(comp) => {
         // TODO: Always using a register is maybe not ideal
@@ -678,14 +661,12 @@ impl<'a> ExpressionCompiler<'a> {
         assert_eq!(compiled.nested_registers.len(), 0);
         nested_registers.push(reg.clone());
 
-        std::format!("{}", reg)
+        Value::Register(reg)
       }
-      PropName::BigInt(bigint) => {
-        std::format!("\"{}\"", bigint.value.to_string())
-      }
+      PropName::BigInt(bigint) => Value::String(bigint.value.to_string()),
     };
 
-    CompiledExpression::new(assembly, nested_registers)
+    CompiledExpression::new(value, nested_registers)
   }
 
   pub fn member_prop(
@@ -695,7 +676,7 @@ impl<'a> ExpressionCompiler<'a> {
   ) -> CompiledExpression {
     return match member_prop {
       swc_ecma_ast::MemberProp::Ident(ident) => {
-        self.inline(string_literal(&ident.sym.to_string()), target_register)
+        self.inline(Value::String(ident.sym.to_string()), target_register)
       }
       swc_ecma_ast::MemberProp::Computed(computed) => self.compile(&computed.expr, target_register),
       swc_ecma_ast::MemberProp::PrivateName(private_name) => {
@@ -735,7 +716,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.definition.push(sub_instr);
 
-    CompiledExpression::new(format!("{}", dest), nested_registers)
+    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
   }
 
   pub fn update_expression(
@@ -793,7 +774,7 @@ impl<'a> ExpressionCompiler<'a> {
           },
         };
 
-        CompiledExpression::new(format!("{}", result_reg), nested_registers)
+        CompiledExpression::new(Value::Register(result_reg), nested_registers)
       }
       false => {
         let mut nested_registers = Vec::<Register>::new();
@@ -818,11 +799,11 @@ impl<'a> ExpressionCompiler<'a> {
           .definition
           .push(format!("  {} {}", op_str, target_read));
 
-        CompiledExpression::new(format!("{}", &old_value_reg), nested_registers)
+        CompiledExpression::new(Value::Register(old_value_reg), nested_registers)
       }
     };
 
-    target.assign_and_packup(self, &format!("{}", target_read));
+    target.assign_and_packup(self, &Value::Register(target_read));
 
     return res;
   }
@@ -850,8 +831,10 @@ impl<'a> ExpressionCompiler<'a> {
     sub_nested_registers.append(&mut callee.nested_registers);
 
     let mut instr = "  call ".to_string();
-    instr += &callee.value_assembly;
-    instr += " [";
+    instr += &format!("{}", callee.value);
+    instr += " ";
+
+    let mut args = Array::default();
 
     for i in 0..call_exp.args.len() {
       let arg = &call_exp.args[i];
@@ -864,14 +847,10 @@ impl<'a> ExpressionCompiler<'a> {
       compiled_arg.release_checker.has_unreleased_registers = false;
       sub_nested_registers.append(&mut compiled_arg.nested_registers);
 
-      instr += &compiled_arg.value_assembly;
-
-      if i != call_exp.args.len() - 1 {
-        instr += ", ";
-      }
+      args.values.push(compiled_arg.value);
     }
 
-    instr += "] ";
+    instr += &format!("{} ", args);
 
     let tmp_dest: Register;
 
@@ -893,7 +872,7 @@ impl<'a> ExpressionCompiler<'a> {
       self.fnc.release_reg(&reg);
     }
 
-    CompiledExpression::new(format!("{}", dest), nested_registers)
+    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
   }
 
   pub fn new_expression(
@@ -912,12 +891,14 @@ impl<'a> ExpressionCompiler<'a> {
     sub_nested_registers.append(&mut callee.nested_registers);
 
     let mut instr = "  new ".to_string();
-    instr += &callee.value_assembly;
-    instr += " [";
+    instr += &format!("{}", callee.value);
+    instr += " ";
 
-    for args in &new_exp.args {
-      for i in 0..args.len() {
-        let arg = &args[i];
+    let mut args = Array::default();
+
+    for new_args in &new_exp.args {
+      for i in 0..new_args.len() {
+        let arg = &new_args[i];
 
         if arg.spread.is_some() {
           self.fnc.todo(arg.spread.span(), "argument spreading");
@@ -926,15 +907,11 @@ impl<'a> ExpressionCompiler<'a> {
         let mut compiled_arg = self.compile(&*arg.expr, None);
         sub_nested_registers.append(&mut compiled_arg.nested_registers);
 
-        instr += &compiled_arg.value_assembly;
-
-        if i != args.len() - 1 {
-          instr += ", ";
-        }
+        args.values.push(compiled_arg.value);
       }
     }
 
-    instr += "] ";
+    instr += &format!("{} ", args);
 
     let tmp_dest: Register;
 
@@ -956,7 +933,7 @@ impl<'a> ExpressionCompiler<'a> {
       self.fnc.release_reg(&reg);
     }
 
-    CompiledExpression::new(format!("{}", dest), nested_registers)
+    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
   }
 
   pub fn method_call_expression(
@@ -984,9 +961,9 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let obj_value_assembly = match &obj {
-      TargetAccessorOrCompiledExpression::TargetAccessor(ta) => format!("{}", ta.read(self)),
-      TargetAccessorOrCompiledExpression::CompiledExpression(ce) => ce.value_assembly.clone(),
+    let obj_value = match &obj {
+      TargetAccessorOrCompiledExpression::TargetAccessor(ta) => Value::Register(ta.read(self)),
+      TargetAccessorOrCompiledExpression::CompiledExpression(ce) => ce.value.clone(),
     };
 
     let mut prop = self.member_prop(&callee_expr.prop, None);
@@ -994,7 +971,8 @@ impl<'a> ExpressionCompiler<'a> {
     prop.release_checker.has_unreleased_registers = false;
     sub_nested_registers.append(&mut prop.nested_registers);
 
-    let mut instr = format!("  subcall {} {} [", obj_value_assembly, prop.value_assembly,);
+    let mut instr = format!("  subcall {} {} ", obj_value, prop.value);
+    let mut asm_args = Array::default();
 
     for i in 0..args.len() {
       let arg = &args[i];
@@ -1007,14 +985,10 @@ impl<'a> ExpressionCompiler<'a> {
       compiled_arg.release_checker.has_unreleased_registers = false;
       sub_nested_registers.append(&mut compiled_arg.nested_registers);
 
-      instr += &compiled_arg.value_assembly;
-
-      if i != args.len() - 1 {
-        instr += ", ";
-      }
+      asm_args.values.push(compiled_arg.value);
     }
 
-    instr += "] ";
+    instr += &format!("{} ", asm_args);
 
     let tmp_dest: Register;
 
@@ -1034,7 +1008,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     match obj {
       TargetAccessorOrCompiledExpression::TargetAccessor(mut ta) => {
-        ta.assign_and_packup(self, &obj_value_assembly);
+        ta.assign_and_packup(self, &obj_value);
       }
       TargetAccessorOrCompiledExpression::CompiledExpression(ce) => {
         self.fnc.use_(ce);
@@ -1045,7 +1019,7 @@ impl<'a> ExpressionCompiler<'a> {
       self.fnc.release_reg(&reg);
     }
 
-    CompiledExpression::new(format!("{}", dest), nested_registers)
+    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
   }
 
   pub fn fn_expression(
@@ -1078,7 +1052,7 @@ impl<'a> ExpressionCompiler<'a> {
       .expect("Failed to queue function");
 
     if cf.ordered_names.len() == 0 {
-      return self.inline(format!("{}", definition_pointer), target_register);
+      return self.inline(Value::Pointer(definition_pointer), target_register);
     }
 
     return self.capturing_fn_ref(
@@ -1112,7 +1086,7 @@ impl<'a> ExpressionCompiler<'a> {
       .expect("Failed to queue function");
 
     if cf.ordered_names.len() == 0 {
-      return self.inline(format!("{}", definition_pointer), target_register);
+      return self.inline(Value::Pointer(definition_pointer), target_register);
     }
 
     return self.capturing_fn_ref(
@@ -1149,94 +1123,93 @@ impl<'a> ExpressionCompiler<'a> {
       Some(tr) => tr.clone(),
     };
 
-    let mut bind_instr = format!("  bind {} [", definition_pointer);
+    let mut bind_instr = format!("  bind {} ", definition_pointer);
+    let mut bind_values = Array::default();
 
     for i in 0..captures.len() {
       let captured_name = &captures[i];
 
-      if i > 0 {
-        bind_instr += ", ";
-      }
+      bind_values
+        .values
+        .push(match self.scope.get(captured_name) {
+          None => {
+            self.fnc.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: format!(
+                "Failed to resolve captured name {} (captured names should always resolve)",
+                captured_name
+              ),
+              span,
+            });
 
-      bind_instr += &match self.scope.get(captured_name) {
-        None => {
-          self.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!(
-              "Failed to resolve captured name {} (captured names should always resolve)",
-              captured_name
-            ),
-            span,
-          });
+            Value::Register(
+              self
+                .fnc
+                .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name)),
+            )
+          }
+          Some(MappedName::Definition(_)) => {
+            self.fnc.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: format!(
+                "Captured name {} resolved to a definition (this should never happen)",
+                captured_name
+              ),
+              span,
+            });
 
-          let reg = self
-            .fnc
-            .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name));
+            Value::Register(
+              self
+                .fnc
+                .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name)),
+            )
+          }
+          Some(MappedName::Register(cap_reg)) => Value::Register(cap_reg),
+          Some(MappedName::QueuedFunction(qfn)) => {
+            let mut compiled_ref = self.capturing_fn_ref(
+              qfn.fn_name.clone(),
+              match &qfn.functionish {
+                Functionish::Fn(fn_) => fn_.span,
+                Functionish::Arrow(arrow) => arrow.span,
+                Functionish::Constructor(_, constructor) => constructor.span,
+              },
+              &qfn.definition_pointer,
+              &qfn.capture_params,
+              None,
+            );
 
-          format!("{}", reg)
-        }
-        Some(MappedName::Definition(_)) => {
-          self.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!(
-              "Captured name {} resolved to a definition (this should never happen)",
-              captured_name
-            ),
-            span,
-          });
+            compiled_ref.release_checker.has_unreleased_registers = false;
+            sub_nested_registers.append(&mut compiled_ref.nested_registers);
 
-          let reg = self
-            .fnc
-            .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name));
+            compiled_ref.value
+          }
+          Some(MappedName::Builtin(_)) => {
+            self.fnc.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: format!(
+                "Captured name {} resolved to a builtin (this should never happen)",
+                captured_name
+              ),
+              span,
+            });
 
-          format!("{}", reg)
-        }
-        Some(MappedName::Register(cap_reg)) => format!("{}", cap_reg),
-        Some(MappedName::QueuedFunction(qfn)) => {
-          let mut compiled_ref = self.capturing_fn_ref(
-            qfn.fn_name.clone(),
-            match &qfn.functionish {
-              Functionish::Fn(fn_) => fn_.span,
-              Functionish::Arrow(arrow) => arrow.span,
-              Functionish::Constructor(_, constructor) => constructor.span,
-            },
-            &qfn.definition_pointer,
-            &qfn.capture_params,
-            None,
-          );
-
-          compiled_ref.release_checker.has_unreleased_registers = false;
-          sub_nested_registers.append(&mut compiled_ref.nested_registers);
-
-          compiled_ref.value_assembly
-        }
-        Some(MappedName::Builtin(_)) => {
-          self.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!(
-              "Captured name {} resolved to a builtin (this should never happen)",
-              captured_name
-            ),
-            span,
-          });
-
-          let reg = self
-            .fnc
-            .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name).to_string());
-
-          format!("{}", reg)
-        }
-      };
+            Value::Register(
+              self
+                .fnc
+                .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name).to_string()),
+            )
+          }
+        });
     }
 
-    bind_instr += &format!("] {}", reg);
+    bind_instr += &format!("{} {}", bind_values, reg);
     self.fnc.definition.push(bind_instr);
 
     for reg in sub_nested_registers {
       self.fnc.release_reg(&reg);
     }
 
-    return CompiledExpression::new(format!("{}", reg), nested_registers);
+    return CompiledExpression::new(Value::Register(reg), nested_registers);
   }
 
   pub fn template_literal(
@@ -1250,7 +1223,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     if len == 0 {
       return self.inline(
-        string_literal(&tpl.quasis[0].raw.to_string()),
+        Value::String(tpl.quasis[0].raw.to_string()),
         target_register,
       );
     }
@@ -1271,7 +1244,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let plus_instr = format!(
       "  op+ {} {} {}",
-      string_literal(&tpl.quasis[0].raw.to_string()),
+      Value::String(tpl.quasis[0].raw.to_string()),
       self.fnc.use_(first_expr),
       acc_reg,
     );
@@ -1282,7 +1255,7 @@ impl<'a> ExpressionCompiler<'a> {
       self.fnc.definition.push(format!(
         "  op+ {} {} {}",
         acc_reg,
-        string_literal(&tpl.quasis[i].raw.to_string()),
+        Value::String(tpl.quasis[i].raw.to_string()),
         acc_reg,
       ));
 
@@ -1299,12 +1272,12 @@ impl<'a> ExpressionCompiler<'a> {
       self.fnc.definition.push(format!(
         "  op+ {} {} {}",
         acc_reg,
-        string_literal(&last_str),
+        Value::String(last_str),
         acc_reg,
       ));
     }
 
-    return CompiledExpression::new(format!("{}", acc_reg), nested_registers);
+    return CompiledExpression::new(Value::Register(acc_reg), nested_registers);
   }
 
   pub fn literal(
@@ -1316,20 +1289,12 @@ impl<'a> ExpressionCompiler<'a> {
     return self.inline(compiled_literal, target_register);
   }
 
-  pub fn inline(
-    &mut self,
-    value_assembly: String,
-    target_register: Option<Register>,
-  ) -> CompiledExpression {
+  pub fn inline(&mut self, value: Value, target_register: Option<Register>) -> CompiledExpression {
     return match target_register {
-      None => CompiledExpression::new(value_assembly, vec![]),
+      None => CompiledExpression::new(value, vec![]),
       Some(t) => {
-        let mut instr = "  mov ".to_string();
-        instr += &value_assembly;
-        instr += &format!(" {}", t);
-        self.fnc.definition.push(instr);
-
-        CompiledExpression::new(std::format!("{}", t), vec![])
+        self.fnc.definition.push(format!("  mov {} {}", value, t));
+        CompiledExpression::new(Value::Register(t), vec![])
       }
     };
   }
@@ -1342,7 +1307,7 @@ impl<'a> ExpressionCompiler<'a> {
     let ident_string = ident.sym.to_string();
 
     if ident_string == "undefined" {
-      return self.inline("undefined".to_string(), target_register);
+      return self.inline(Value::Undefined, target_register);
     }
 
     let mapped = self
@@ -1351,8 +1316,8 @@ impl<'a> ExpressionCompiler<'a> {
       .expect(&format!("Identifier not found in scope {:?}", ident.span()));
 
     return match mapped {
-      MappedName::Register(reg) => self.inline(format!("{}", reg), target_register),
-      MappedName::Definition(def) => self.inline(format!("{}", def), target_register),
+      MappedName::Register(reg) => self.inline(Value::Register(reg), target_register),
+      MappedName::Definition(def) => self.inline(Value::Pointer(def), target_register),
       MappedName::QueuedFunction(qfn) => self.capturing_fn_ref(
         qfn.fn_name.clone(),
         match &qfn.functionish {
@@ -1364,18 +1329,18 @@ impl<'a> ExpressionCompiler<'a> {
         &qfn.capture_params,
         target_register,
       ),
-      MappedName::Builtin(builtin) => self.inline(format!("${}", builtin), target_register),
+      MappedName::Builtin(builtin) => self.inline(Value::Builtin(builtin), target_register),
     };
   }
 
-  pub fn compile_literal(&mut self, lit: &swc_ecma_ast::Lit) -> String {
+  pub fn compile_literal(&mut self, lit: &swc_ecma_ast::Lit) -> Value {
     use swc_ecma_ast::Lit::*;
 
     let (todo_name, message) = match lit {
-      Str(str_) => return string_literal(&str_.value.to_string()),
-      Bool(bool_) => return bool_.value.to_string(),
-      Null(_) => return "null".to_string(),
-      Num(num) => return num.value.to_string(),
+      Str(str_) => return Value::String(str_.value.to_string()),
+      Bool(bool_) => return Value::Bool(bool_.value),
+      Null(_) => return Value::Null,
+      Num(num) => return Value::Number(num.value),
       BigInt(_) => ("_todo_bigint_literal", "BigInt literals"),
       Regex(_) => ("_todo_regex_literal", "Regex literals"),
       JSXText(_) => ("_todo_jsxtext_literal", "JSXText literals"),
@@ -1383,9 +1348,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.todo(lit.span(), message);
 
-    let todo_reg = self.fnc.allocate_numbered_reg(todo_name);
-
-    return format!("{}", todo_reg);
+    return Value::Register(self.fnc.allocate_numbered_reg(todo_name));
   }
 
   pub fn pat(
@@ -1426,7 +1389,7 @@ impl<'a> ExpressionCompiler<'a> {
         if let Pat::Expr(expr) = &*assign.left {
           let mut at = TargetAccessor::compile(self, expr, true);
           self.default_expr(&assign.right, register);
-          at.assign_and_packup(self, &format!("{}", register));
+          at.assign_and_packup(self, &Value::Register(register.clone()));
         } else {
           self.default_expr(&assign.right, register);
           self.pat(&assign.left, register, false, scope);
@@ -1506,7 +1469,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
       Pat::Expr(expr) => {
         let mut at = TargetAccessor::compile(self, expr, true);
-        at.assign_and_packup(self, &format!("{}", register));
+        at.assign_and_packup(self, &Value::Register(register.clone()));
       }
     }
   }
@@ -1533,7 +1496,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let compiled = self.compile(expr, Some(register.clone()));
 
-    if self.fnc.use_(compiled) != format!("{}", register) {
+    if format!("{}", self.fnc.use_(compiled)) != format!("{}", register) {
       self.fnc.diagnostics.push(Diagnostic {
         level: DiagnosticLevel::InternalError,
         message: "Default expression not compiled into target register (not sure whether this is possible in this case)".to_string(),
@@ -1543,10 +1506,6 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.definition.push(format!("{}:", initialized_label));
   }
-}
-
-pub fn string_literal(str_: &String) -> String {
-  return format!("\"{}\"", str_); // TODO: Escaping
 }
 
 pub fn get_binary_op_str(op: swc_ecma_ast::BinaryOp) -> &'static str {
@@ -1667,7 +1626,7 @@ impl TargetAccessor {
           ec.fnc.definition.push(format!(
             "  sub {} {} {}",
             obj.register(),
-            subscript.value_assembly,
+            subscript.value,
             register,
           ));
         }
@@ -1706,22 +1665,21 @@ impl TargetAccessor {
     return TargetAccessor::Register(ec.fnc.allocate_numbered_reg(&"_todo_lvalue".to_string()));
   }
 
-  fn assign_and_packup(&mut self, ec: &mut ExpressionCompiler, value_assembly: &String) {
+  fn assign_and_packup(&mut self, ec: &mut ExpressionCompiler, value: &Value) {
     use TargetAccessor::*;
 
     match self {
       Register(reg) => {
-        if value_assembly != &format!("{}", reg) {
-          ec.fnc
-            .definition
-            .push(format!("  mov {} {}", value_assembly, reg));
+        // TODO: Should value just derive from Eq?
+        if format!("{}", value) != format!("{}", reg) {
+          ec.fnc.definition.push(format!("  mov {} {}", value, reg));
         }
       }
       Nested(nta) => {
         let submov_instr = format!(
           "  submov {} {} {}",
           ec.fnc.use_ref(&mut nta.subscript),
-          value_assembly,
+          value,
           nta.obj.register(),
         );
 
@@ -1743,7 +1701,7 @@ impl TargetAccessor {
         ec.fnc.definition.push(format!(
           "  sub {} {} {}",
           nta.obj.register(),
-          nta.subscript.value_assembly,
+          nta.subscript.value,
           nta.register,
         ));
 

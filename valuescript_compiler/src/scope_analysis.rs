@@ -2,8 +2,9 @@ use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
 use swc_common::Spanned;
 
+use crate::asm::Builtin;
+
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
-use super::scope::Builtin;
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum NameId {
@@ -56,13 +57,17 @@ impl ScopeAnalysis {
     let mut sa = ScopeAnalysis::default();
     let scope = init_std_scope();
 
-    for builtin in vec![Builtin::Debug, Builtin::Math, Builtin::undefined] {
+    for builtin_name in vec!["Debug", "Math"] {
+      let builtin = Builtin {
+        name: builtin_name.to_string(),
+      };
+
       sa.names.insert(
-        NameId::Builtin(builtin),
+        NameId::Builtin(builtin.clone()),
         Name {
           id: NameId::Builtin(builtin),
           owner_id: OwnerId::Module,
-          sym: swc_atoms::JsWord::from(format!("{}", builtin)),
+          sym: swc_atoms::JsWord::from(builtin_name),
           type_: NameType::Builtin,
           mutations: vec![],
           captures: vec![],
@@ -1233,6 +1238,13 @@ impl ScopeAnalysis {
   }
 
   fn ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
+    if ident.sym.to_string() == "undefined" {
+      // The way that `undefined` is considered to be an identifier is an artifact of history. It's
+      // not an identifier (unless used in an identifier context like an object key), instead it's a
+      // keyword like `null`.
+      return;
+    }
+
     let name_id = match scope.get(&ident.sym) {
       Some(name_id) => name_id,
       None => {
@@ -1605,14 +1617,17 @@ fn init_std_scope() -> XScope {
   return Rc::new(RefCell::new(XScopeData {
     owner_id: OwnerId::Module,
     name_map: HashMap::from([
-      (swc_atoms::js_word!("Math"), NameId::Builtin(Builtin::Math)),
       (
-        swc_atoms::JsWord::from("Debug"),
-        NameId::Builtin(Builtin::Debug),
+        swc_atoms::js_word!("Math"),
+        NameId::Builtin(Builtin {
+          name: "Math".to_string(),
+        }),
       ),
       (
-        swc_atoms::js_word!("undefined"),
-        NameId::Builtin(Builtin::undefined),
+        swc_atoms::JsWord::from("Debug"),
+        NameId::Builtin(Builtin {
+          name: "Debug".to_string(),
+        }),
       ),
     ]),
     parent: None,

@@ -428,7 +428,7 @@ impl Instruction {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
   Void,
   Undefined,
@@ -465,7 +465,7 @@ impl std::fmt::Display for Value {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Builtin {
   pub name: String,
 }
@@ -476,7 +476,7 @@ impl std::fmt::Display for Builtin {
   }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Array {
   pub values: Vec<Value>,
 }
@@ -494,7 +494,7 @@ impl std::fmt::Display for Array {
   }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Object {
   pub properties: Vec<(Value, Value)>,
 }
