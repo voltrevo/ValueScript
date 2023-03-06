@@ -1157,7 +1157,7 @@ impl<'a> ExpressionCompiler<'a> {
               match &qfn.functionish {
                 Functionish::Fn(fn_) => fn_.span,
                 Functionish::Arrow(arrow) => arrow.span,
-                Functionish::Constructor(_, constructor) => constructor.span,
+                Functionish::Constructor(constructor) => constructor.span,
               },
               &qfn.definition_pointer,
               &qfn.capture_params,
@@ -1313,7 +1313,7 @@ impl<'a> ExpressionCompiler<'a> {
         match &qfn.functionish {
           Functionish::Fn(fn_) => fn_.span,
           Functionish::Arrow(arrow) => arrow.span,
-          Functionish::Constructor(_, constructor) => constructor.span,
+          Functionish::Constructor(constructor) => constructor.span,
         },
         &qfn.definition_pointer,
         &qfn.capture_params,

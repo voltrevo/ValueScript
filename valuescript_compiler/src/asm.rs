@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Module {
   pub definitions: Vec<Definition>,
 }
@@ -103,7 +103,7 @@ impl std::fmt::Display for Class {
       Value::Object(object) => {
         write!(f, "{{\n")?;
         for (name, method) in &object.properties {
-          write!(f, "  {}: {}\n", name, method)?;
+          write!(f, "  {}: {},\n", name, method)?;
         }
         write!(f, "}})\n")?;
       }

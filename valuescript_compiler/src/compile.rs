@@ -7,7 +7,10 @@ use swc_common::{errors::Handler, FileName, SourceMap, Spanned};
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
-use crate::asm::{Instruction, Pointer, Register, Value};
+use crate::asm::{
+  Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Module, Object,
+  Pointer, Register, Value,
+};
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::expression_compiler::{CompiledExpression, ExpressionCompiler};
@@ -71,24 +74,16 @@ pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
   let mut compiler = Compiler::default();
   compiler.compile_program(&program);
 
-  let mut assembly = Vec::<String>::new();
-  let mut first = true;
+  let mut module = Module::default();
+  module.definitions.append(&mut compiler.definitions);
 
-  for def in compiler.definitions {
-    if first {
-      first = false;
-    } else {
-      assembly.push("".to_string());
-    }
-
-    for line in def {
-      assembly.push(line);
-    }
-  }
+  let assembly_str = module.to_string();
+  let assembly_lines = assembly_str.split("\n");
+  let assembly_lines_vec = assembly_lines.map(|s| s.to_string()).collect();
 
   return CompilerOutput {
     diagnostics: compiler.diagnostics,
-    assembly,
+    assembly: assembly_lines_vec,
   };
 }
 
@@ -110,7 +105,7 @@ pub fn compile(source: &str) -> CompilerOutput {
 struct Compiler {
   diagnostics: Vec<Diagnostic>,
   definition_allocator: Rc<RefCell<NameAllocator>>,
-  definitions: Vec<Vec<String>>,
+  definitions: Vec<Definition>,
 }
 
 impl Compiler {
@@ -730,7 +725,7 @@ impl Compiler {
     functionish: Functionish,
     parent_scope: &Scope,
   ) {
-    let (defn, mut diagnostics) = FunctionCompiler::compile(
+    let (mut defn, mut diagnostics) = FunctionCompiler::compile(
       defn_pointer,
       fn_name,
       functionish,
@@ -738,12 +733,14 @@ impl Compiler {
       parent_scope,
     );
 
-    self.definitions.push(defn);
+    self.definitions.append(&mut defn);
     self.diagnostics.append(&mut diagnostics);
   }
 
   fn compile_class_decl(&mut self, class_decl: &swc_ecma_ast::ClassDecl, parent_scope: &Scope) {
-    let mut defn = Vec::<String>::new();
+    let mut constructor: Value = Value::Void;
+    let mut methods: Object = Object::default();
+    let mut dependent_definitions: Vec<Definition>;
 
     let class_name = class_decl.ident.sym.to_string();
 
@@ -759,8 +756,6 @@ impl Compiler {
         return;
       }
     };
-
-    let mut constructor_defn_name: Option<Pointer> = None;
 
     let mut member_initializers_fnc = FunctionCompiler::new(self.definition_allocator.clone());
 
@@ -806,11 +801,12 @@ impl Compiler {
       }
     }
 
-    let mut member_initializers_assembly = Vec::<String>::new();
-    member_initializers_assembly.append(&mut member_initializers_fnc.lines);
+    let mut member_initializers_assembly = Vec::<InstructionOrLabel>::new();
+    member_initializers_assembly.append(&mut member_initializers_fnc.current.body);
 
+    // Include any other definitions that were created by the member initializers
     member_initializers_fnc.process_queue(parent_scope);
-    defn.append(&mut member_initializers_fnc.lines);
+    dependent_definitions = std::mem::take(&mut member_initializers_fnc.definitions);
 
     let mut has_constructor = false;
 
@@ -824,11 +820,9 @@ impl Compiler {
           self.compile_fn(
             ctor_defn_name.clone(),
             None,
-            Functionish::Constructor(member_initializers_assembly.clone(), constructor.clone()),
+            Functionish::Constructor(constructor.clone()),
             parent_scope,
           );
-
-          constructor_defn_name = Some(ctor_defn_name);
         }
         _ => {}
       }
@@ -837,26 +831,15 @@ impl Compiler {
     if member_initializers_assembly.len() > 0 && !has_constructor {
       let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", class_name));
 
-      defn.push(format!("{} = function() {{", ctor_defn_name));
-
-      for line in member_initializers_assembly {
-        defn.push(line.clone());
-      }
-
-      defn.push("}".to_string());
-      defn.push("".to_string());
-
-      constructor_defn_name = Some(ctor_defn_name);
+      constructor = Value::Pointer(ctor_defn_name.clone());
+      dependent_definitions.push(Definition {
+        pointer: ctor_defn_name.clone(),
+        content: DefinitionContent::Function(Function {
+          parameters: vec![],
+          body: member_initializers_assembly,
+        }),
+      });
     }
-
-    defn.push(format!(
-      "{} = class({}, {{",
-      defn_name,
-      match constructor_defn_name {
-        None => "void".to_string(),
-        Some(d) => d.to_string(),
-      },
-    ));
 
     for class_member in &class_decl.class.body {
       use swc_ecma_ast::ClassMember::*;
@@ -886,7 +869,9 @@ impl Compiler {
             parent_scope,
           );
 
-          defn.push(format!("  {}: {},", Value::String(name), method_defn_name,));
+          methods
+            .properties
+            .push((Value::String(name), Value::Pointer(method_defn_name)));
         }
         PrivateMethod(private_method) => {
           self.diagnostics.push(Diagnostic {
@@ -921,8 +906,14 @@ impl Compiler {
       }
     }
 
-    defn.push("})".to_string());
+    self.definitions.push(Definition {
+      pointer: defn_name,
+      content: DefinitionContent::Class(Class {
+        constructor,
+        methods: Value::Object(Box::new(methods)),
+      }),
+    });
 
-    self.definitions.push(defn);
+    self.definitions.append(&mut dependent_definitions);
   }
 }

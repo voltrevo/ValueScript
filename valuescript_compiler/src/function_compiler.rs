@@ -5,7 +5,10 @@ use std::rc::Rc;
 
 use swc_common::Spanned;
 
-use crate::asm::{Instruction, Label, Pointer, Register, Value};
+use crate::asm::{
+  Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Label, Pointer,
+  Register, Value,
+};
 use crate::scope::scope_reg;
 
 use super::capture_finder::CaptureFinder;
@@ -19,7 +22,7 @@ use super::scope::{init_std_scope, MappedName, Scope};
 pub enum Functionish {
   Fn(swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
-  Constructor(Vec<String>, swc_ecma_ast::Constructor),
+  Constructor(swc_ecma_ast::Constructor),
 }
 
 #[derive(Clone, Debug)]
@@ -36,7 +39,8 @@ pub struct LoopLabels {
 }
 
 pub struct FunctionCompiler {
-  pub lines: Vec<String>,
+  pub current: Function,
+  pub definitions: Vec<Definition>,
   pub definition_allocator: Rc<RefCell<NameAllocator>>,
   pub reg_allocator: NameAllocator,
   pub label_allocator: NameAllocator,
@@ -53,7 +57,8 @@ impl FunctionCompiler {
     reg_allocator.allocate(&"ignore".to_string());
 
     return FunctionCompiler {
-      lines: vec![],
+      current: Function::default(),
+      definitions: vec![],
       definition_allocator,
       reg_allocator,
       label_allocator: NameAllocator::default(),
@@ -64,11 +69,14 @@ impl FunctionCompiler {
   }
 
   pub fn push(&mut self, instruction: Instruction) {
-    self.lines.push(format!("  {}", instruction));
+    self
+      .current
+      .body
+      .push(InstructionOrLabel::Instruction(instruction));
   }
 
   pub fn label(&mut self, label: Label) {
-    self.lines.push(format!("{}", label));
+    self.current.body.push(InstructionOrLabel::Label(label));
   }
 
   pub fn todo(&mut self, span: swc_common::Span, message: &str) {
@@ -134,7 +142,7 @@ impl FunctionCompiler {
     functionish: Functionish,
     definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
-  ) -> (Vec<String>, Vec<Diagnostic>) {
+  ) -> (Vec<Definition>, Vec<Diagnostic>) {
     let mut self_ = FunctionCompiler::new(definition_allocator);
 
     self_
@@ -149,7 +157,7 @@ impl FunctionCompiler {
 
     self_.process_queue(parent_scope);
 
-    return (self_.lines, self_.diagnostics);
+    return (self_.definitions, self_.diagnostics);
   }
 
   pub fn process_queue(&mut self, parent_scope: &Scope) {
@@ -188,22 +196,11 @@ impl FunctionCompiler {
       None => {}
     }
 
-    let mut heading = format!("{} = function(", definition_pointer);
-
-    let mut param_count = 0;
-
     for cap_param in &capture_params {
-      if param_count != 0 {
-        heading += ", ";
-      }
-
       let reg = self.allocate_reg(cap_param);
 
-      heading += &reg.to_string();
-
+      self.current.parameters.push(reg.clone());
       scope.set(cap_param.clone(), MappedName::Register(reg));
-
-      param_count += 1;
     }
 
     self.populate_fn_scope_params(functionish, &scope);
@@ -211,17 +208,8 @@ impl FunctionCompiler {
     let param_registers = self.allocate_param_registers(functionish, &scope);
 
     for reg in &param_registers {
-      if param_count != 0 {
-        heading += ", ";
-      }
-
-      heading += &reg.to_string();
-      param_count += 1;
+      self.current.parameters.push(reg.clone());
     }
-
-    heading += ") {";
-
-    self.lines.push(heading);
 
     self.add_param_code(functionish, &param_registers, &scope);
 
@@ -259,7 +247,7 @@ impl FunctionCompiler {
           expression_compiler.compile(expr, Some(Register::Return));
         }
       },
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(constructor) => {
         match &constructor.body {
           Some(block) => {
             handle_block_body(block);
@@ -267,9 +255,12 @@ impl FunctionCompiler {
           None => self.todo(constructor.span(), "constructor without body"),
         };
       }
-    }
+    };
 
-    self.lines.push("}".to_string());
+    self.definitions.push(Definition {
+      pointer: definition_pointer,
+      content: DefinitionContent::Function(std::mem::take(&mut self.current)),
+    });
   }
 
   fn populate_fn_scope_params(&mut self, functionish: &Functionish, scope: &Scope) {
@@ -284,7 +275,7 @@ impl FunctionCompiler {
           self.populate_scope_pat(p, scope);
         }
       }
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
@@ -333,7 +324,7 @@ impl FunctionCompiler {
           param_registers.push(self.get_pattern_register(p, scope));
         }
       }
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
@@ -402,7 +393,7 @@ impl FunctionCompiler {
           ec.pat(p, &param_registers[i], false, scope);
         }
       }
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(constructor) => {
         for (i, potspp) in constructor.params.iter().enumerate() {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
