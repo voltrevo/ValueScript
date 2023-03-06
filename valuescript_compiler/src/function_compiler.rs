@@ -110,7 +110,7 @@ impl FunctionCompiler {
   }
 
   pub fn allocate_tmp(&mut self) -> Register {
-    return Register::Named(self.reg_allocator.allocate(&"_tmp".to_string()));
+    return Register::Named(self.reg_allocator.allocate_numbered(&"_tmp".to_string()));
   }
 
   pub fn allocate_reg(&mut self, based_on: &String) -> Register {
