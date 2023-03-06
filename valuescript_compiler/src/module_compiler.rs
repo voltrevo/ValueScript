@@ -244,13 +244,7 @@ impl ModuleCompiler {
               span: block.span,
             });
           }
-          Stmt::Empty(empty) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Empty statement".to_string(),
-              span: empty.span,
-            });
-          }
+          Stmt::Empty(_) => {}
           Stmt::Debugger(debugger) => {
             self.diagnostics.push(Diagnostic {
               level: DiagnosticLevel::InternalError,
@@ -450,13 +444,7 @@ impl ModuleCompiler {
           span: block.span,
         });
       }
-      Empty(empty) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Empty statement".to_string(),
-          span: empty.span,
-        });
-      }
+      Empty(_) => {}
       Debugger(debugger) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
