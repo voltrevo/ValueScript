@@ -36,7 +36,7 @@ pub struct LoopLabels {
 }
 
 pub struct FunctionCompiler {
-  pub definition: Vec<String>,
+  pub lines: Vec<String>,
   pub definition_allocator: Rc<RefCell<NameAllocator>>,
   pub reg_allocator: NameAllocator,
   pub label_allocator: NameAllocator,
@@ -53,7 +53,7 @@ impl FunctionCompiler {
     reg_allocator.allocate(&"ignore".to_string());
 
     return FunctionCompiler {
-      definition: Vec::new(),
+      lines: vec![],
       definition_allocator,
       reg_allocator,
       label_allocator: NameAllocator::default(),
@@ -61,6 +61,14 @@ impl FunctionCompiler {
       loop_labels: vec![],
       diagnostics: vec![],
     };
+  }
+
+  pub fn push(&mut self, instruction: Instruction) {
+    self.lines.push(format!("  {}", instruction));
+  }
+
+  pub fn label(&mut self, label: Label) {
+    self.lines.push(format!("{}", label));
   }
 
   pub fn todo(&mut self, span: swc_common::Span, message: &str) {
@@ -141,7 +149,7 @@ impl FunctionCompiler {
 
     self_.process_queue(parent_scope);
 
-    return (self_.definition, self_.diagnostics);
+    return (self_.lines, self_.diagnostics);
   }
 
   pub fn process_queue(&mut self, parent_scope: &Scope) {
@@ -213,7 +221,7 @@ impl FunctionCompiler {
 
     heading += ") {";
 
-    self.definition.push(heading);
+    self.lines.push(heading);
 
     self.add_param_code(functionish, &param_registers, &scope);
 
@@ -261,7 +269,7 @@ impl FunctionCompiler {
       }
     }
 
-    self.definition.push("}".to_string());
+    self.lines.push("}".to_string());
   }
 
   fn populate_fn_scope_params(&mut self, functionish: &Functionish, scope: &Scope) {
@@ -721,7 +729,7 @@ impl FunctionCompiler {
       Return(ret_stmt) => match &ret_stmt.arg {
         None => {
           // TODO: Skip if fn_last
-          self.definition.push("  end".to_string());
+          self.push(Instruction::End);
         }
         Some(expr) => {
           let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
@@ -729,7 +737,7 @@ impl FunctionCompiler {
           expression_compiler.compile(expr, Some(Register::Return));
 
           if !fn_last {
-            self.definition.push("  end".to_string());
+            self.push(Instruction::End);
           }
         }
       },
@@ -747,9 +755,7 @@ impl FunctionCompiler {
 
         match loop_labels {
           Some(loop_labels) => {
-            self
-              .definition
-              .push(Instruction::Jmp(loop_labels.break_.ref_()).to_string());
+            self.push(Instruction::Jmp(loop_labels.break_.ref_()));
           }
           None => {
             self.diagnostics.push(Diagnostic {
@@ -769,9 +775,7 @@ impl FunctionCompiler {
 
         match self.loop_labels.last() {
           Some(loop_labels) => {
-            self
-              .definition
-              .push(Instruction::Jmp(loop_labels.continue_.ref_()).to_string());
+            self.push(Instruction::Jmp(loop_labels.continue_.ref_()));
           }
           None => {
             self.diagnostics.push(Diagnostic {
@@ -798,17 +802,16 @@ impl FunctionCompiler {
         let cond_reg = self.allocate_numbered_reg("_cond");
 
         // TODO: Add negated jmpif instruction to avoid this
-        self
-          .definition
-          .push(Instruction::OpNot(condition_asm, cond_reg.clone()).to_string());
+        self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
 
         let else_label = Label {
           name: self.label_allocator.allocate_numbered(&"else".to_string()),
         };
 
-        self.definition.push(
-          Instruction::JmpIf(Value::Register(cond_reg.clone()), else_label.ref_()).to_string(),
-        );
+        self.push(Instruction::JmpIf(
+          Value::Register(cond_reg.clone()),
+          else_label.ref_(),
+        ));
 
         self.release_reg(&cond_reg);
 
@@ -816,7 +819,7 @@ impl FunctionCompiler {
 
         match &if_.alt {
           None => {
-            self.definition.push(std::format!("{}", else_label));
+            self.label(else_label);
           }
           Some(alt) => {
             let after_else_label = Label {
@@ -825,13 +828,11 @@ impl FunctionCompiler {
                 .allocate_numbered(&"after_else".to_string()),
             };
 
-            self
-              .definition
-              .push(Instruction::Jmp(after_else_label.ref_()).to_string());
+            self.push(Instruction::Jmp(after_else_label.ref_()));
 
-            self.definition.push(std::format!("{}", else_label));
+            self.label(else_label);
             self.statement(&*alt, false, scope);
-            self.definition.push(std::format!("{}", after_else_label));
+            self.label(after_else_label);
           }
         }
       }
@@ -854,7 +855,7 @@ impl FunctionCompiler {
           break_: end_label.clone(),
         });
 
-        self.definition.push(std::format!("{}", start_label));
+        self.label(start_label.clone());
 
         let mut expression_compiler = ExpressionCompiler {
           fnc: self,
@@ -871,23 +872,17 @@ impl FunctionCompiler {
         let cond_reg = self.allocate_numbered_reg(&"_cond".to_string());
 
         // TODO: Add negated jmpif instruction to avoid this
-        self
-          .definition
-          .push(Instruction::OpNot(condition_asm, cond_reg.clone()).to_string());
+        self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
 
-        self.definition.push(
-          Instruction::JmpIf(Value::Register(cond_reg.clone()), end_label.ref_()).to_string(),
-        );
+        self.push(Instruction::JmpIf(
+          Value::Register(cond_reg.clone()),
+          end_label.ref_(),
+        ));
 
         self.release_reg(&cond_reg);
-
         self.statement(&*while_.body, false, scope);
-
-        self
-          .definition
-          .push(Instruction::Jmp(start_label.ref_()).to_string());
-
-        self.definition.push(std::format!("{}", end_label));
+        self.push(Instruction::Jmp(start_label.ref_()));
+        self.label(end_label);
 
         self.loop_labels.pop();
       }
@@ -915,7 +910,7 @@ impl FunctionCompiler {
           break_: end_label.clone(),
         });
 
-        self.definition.push(std::format!("{}", start_label));
+        self.label(start_label.clone());
 
         self.statement(&*do_while.body, false, scope);
 
@@ -926,12 +921,12 @@ impl FunctionCompiler {
 
         let condition = expression_compiler.compile(&*do_while.test, None);
 
-        self.definition.push(format!("{}", continue_label));
+        self.label(continue_label);
 
         let jmpif = Instruction::JmpIf(self.use_(condition), start_label.ref_());
-        self.definition.push(jmpif.to_string());
+        self.push(jmpif);
 
-        self.definition.push(format!("{}", end_label));
+        self.label(end_label);
 
         self.loop_labels.pop();
       }
@@ -975,7 +970,7 @@ impl FunctionCompiler {
             .allocate_numbered(&"for_end".to_string()),
         };
 
-        self.definition.push(format!("{}", &for_test_label));
+        self.label(for_test_label.clone());
 
         self.loop_labels.push(LoopLabels {
           continue_: for_continue_label.clone(),
@@ -999,14 +994,12 @@ impl FunctionCompiler {
             let cond_reg = self.allocate_numbered_reg("_cond");
 
             // TODO: Add negated jmpif instruction to avoid this
-            self
-              .definition
-              .push(std::format!("  op! {} {}", condition_asm, cond_reg));
+            self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
 
-            self.definition.push(
-              Instruction::JmpIf(Value::Register(cond_reg.clone()), for_end_label.ref_())
-                .to_string(),
-            );
+            self.push(Instruction::JmpIf(
+              Value::Register(cond_reg.clone()),
+              for_end_label.ref_(),
+            ));
 
             self.release_reg(&cond_reg);
           }
@@ -1015,18 +1008,16 @@ impl FunctionCompiler {
 
         self.statement(&for_.body, false, &for_scope);
 
-        self.definition.push(format!("{}", for_continue_label));
+        self.label(for_continue_label);
 
         match &for_.update {
           Some(update) => self.expression(update, &for_scope),
           None => {}
         }
 
-        self
-          .definition
-          .push(Instruction::Jmp(for_test_label.ref_()).to_string());
+        self.push(Instruction::Jmp(for_test_label.ref_()));
 
-        self.definition.push(format!("{}", for_end_label));
+        self.label(for_end_label);
 
         self.loop_labels.pop();
       }

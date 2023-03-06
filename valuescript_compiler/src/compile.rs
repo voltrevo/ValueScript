@@ -7,7 +7,7 @@ use swc_common::{errors::Handler, FileName, SourceMap, Spanned};
 use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
-use crate::asm::{Pointer, Value};
+use crate::asm::{Instruction, Pointer, Register, Value};
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::expression_compiler::{CompiledExpression, ExpressionCompiler};
@@ -793,8 +793,7 @@ impl Compiler {
           let value_asm = ec.fnc.use_(compiled_value);
 
           ec.fnc
-            .definition
-            .push(format!("  submov {} {} %this", key_asm, value_asm));
+            .push(Instruction::SubMov(key_asm, value_asm, Register::This));
         }
         swc_ecma_ast::ClassMember::PrivateProp(private_prop) => {
           self.diagnostics.push(Diagnostic {
@@ -808,10 +807,10 @@ impl Compiler {
     }
 
     let mut member_initializers_assembly = Vec::<String>::new();
-    member_initializers_assembly.append(&mut member_initializers_fnc.definition);
+    member_initializers_assembly.append(&mut member_initializers_fnc.lines);
 
     member_initializers_fnc.process_queue(parent_scope);
-    defn.append(&mut member_initializers_fnc.definition);
+    defn.append(&mut member_initializers_fnc.lines);
 
     let mut has_constructor = false;
 
