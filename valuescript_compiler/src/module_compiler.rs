@@ -102,6 +102,14 @@ struct ModuleCompiler {
 }
 
 impl ModuleCompiler {
+  fn todo(&mut self, span: swc_common::Span, message: &str) {
+    self.diagnostics.push(Diagnostic {
+      level: DiagnosticLevel::InternalError,
+      message: format!("TODO: {}", message),
+      span,
+    });
+  }
+
   fn allocate_defn(&mut self, name: &str) -> Pointer {
     let allocated_name = self
       .definition_allocator
@@ -159,20 +167,10 @@ impl ModuleCompiler {
     for module_item in &module.body {
       match module_item {
         ModuleItem::ModuleDecl(module_decl) => match module_decl {
-          ModuleDecl::Import(import) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: Import module declaration".to_string(),
-              span: import.span,
-            });
-          }
+          ModuleDecl::Import(import) => self.todo(import.span, "Import module declaration"),
           ModuleDecl::ExportDecl(export_decl) => self.populate_scope_decl(&export_decl.decl, scope),
           ModuleDecl::ExportNamed(export_named) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: ExportNamed module declaration".to_string(),
-              span: export_named.span,
-            });
+            self.todo(export_named.span, "ExportNamed module declaration")
           }
           ModuleDecl::ExportDefaultDecl(edd) => {
             match &edd.decl {
@@ -185,179 +183,52 @@ impl ModuleCompiler {
                 }
               }
               swc_ecma_ast::DefaultDecl::Class(class) => {
-                self.diagnostics.push(Diagnostic {
-                  level: DiagnosticLevel::InternalError,
-                  message: "TODO: Class default export".to_string(),
-                  span: class.class.span,
-                });
+                self.todo(class.class.span, "Class default export")
               }
               swc_ecma_ast::DefaultDecl::TsInterfaceDecl(ts_interface_decl) => {
-                self.diagnostics.push(Diagnostic {
-                  level: DiagnosticLevel::InternalError,
-                  message: "TODO: TsInterfaceDecl default export".to_string(),
-                  span: ts_interface_decl.span,
-                });
+                self.todo(ts_interface_decl.span, "TsInterfaceDecl default export")
               }
             };
           }
-          ModuleDecl::ExportDefaultExpr(export_default_expr) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: ExportDefaultExpr module declaration".to_string(),
-              span: export_default_expr.span,
-            });
-          }
+          ModuleDecl::ExportDefaultExpr(export_default_expr) => self.todo(
+            export_default_expr.span,
+            "ExportDefaultExpr module declaration",
+          ),
           ModuleDecl::ExportAll(export_all) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: ExportAll module declaration".to_string(),
-              span: export_all.span,
-            });
+            self.todo(export_all.span, "ExportAll module declaration")
           }
           ModuleDecl::TsImportEquals(ts_import_equals) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: TsImportEquals module declaration".to_string(),
-              span: ts_import_equals.span,
-            });
+            self.todo(ts_import_equals.span, "TsImportEquals module declaration")
           }
-          ModuleDecl::TsExportAssignment(ts_export_assignment) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: TsExportAssignment module declaration".to_string(),
-              span: ts_export_assignment.span,
-            });
-          }
-          ModuleDecl::TsNamespaceExport(ts_namespace_export) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: TsNamespaceExport module declaration".to_string(),
-              span: ts_namespace_export.span,
-            });
-          }
+          ModuleDecl::TsExportAssignment(ts_export_assignment) => self.todo(
+            ts_export_assignment.span,
+            "TsExportAssignment module declaration",
+          ),
+          ModuleDecl::TsNamespaceExport(ts_namespace_export) => self.todo(
+            ts_namespace_export.span,
+            "TsNamespaceExport module declaration",
+          ),
         },
         ModuleItem::Stmt(stmt) => match stmt {
-          Stmt::Block(block) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Block statement".to_string(),
-              span: block.span,
-            });
-          }
+          Stmt::Block(block) => self.todo(block.span, "module level Block statement"),
           Stmt::Empty(_) => {}
-          Stmt::Debugger(debugger) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Debugger statement".to_string(),
-              span: debugger.span,
-            });
-          }
-          Stmt::With(with) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level With statement".to_string(),
-              span: with.span,
-            });
-          }
-          Stmt::Return(return_) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Return statement".to_string(),
-              span: return_.span,
-            });
-          }
-          Stmt::Labeled(labeled) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Labeled statement".to_string(),
-              span: labeled.span,
-            });
-          }
-          Stmt::Break(break_) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Break statement".to_string(),
-              span: break_.span,
-            });
-          }
-          Stmt::Continue(continue_) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Continue statement".to_string(),
-              span: continue_.span,
-            });
-          }
-          Stmt::If(if_) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level If statement".to_string(),
-              span: if_.span,
-            });
-          }
-          Stmt::Switch(switch) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Switch statement".to_string(),
-              span: switch.span,
-            });
-          }
-          Stmt::Throw(throw) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Throw statement".to_string(),
-              span: throw.span,
-            });
-          }
-          Stmt::Try(try_) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Try statement".to_string(),
-              span: try_.span,
-            });
-          }
-          Stmt::While(while_) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level While statement".to_string(),
-              span: while_.span,
-            });
-          }
-          Stmt::DoWhile(do_while) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level DoWhile statement".to_string(),
-              span: do_while.span,
-            });
-          }
-          Stmt::For(for_) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level For statement".to_string(),
-              span: for_.span,
-            });
-          }
-          Stmt::ForIn(for_in) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level ForIn statement".to_string(),
-              span: for_in.span,
-            });
-          }
-          Stmt::ForOf(for_of) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level ForOf statement".to_string(),
-              span: for_of.span,
-            });
-          }
+          Stmt::Debugger(debugger) => self.todo(debugger.span, "module level Debugger statement"),
+          Stmt::With(with) => self.todo(with.span, "module level With statement"),
+          Stmt::Return(return_) => self.todo(return_.span, "module level Return statement"),
+          Stmt::Labeled(labeled) => self.todo(labeled.span, "module level Labeled statement"),
+          Stmt::Break(break_) => self.todo(break_.span, "module level Break statement"),
+          Stmt::Continue(continue_) => self.todo(continue_.span, "module level Continue statement"),
+          Stmt::If(if_) => self.todo(if_.span, "module level If statement"),
+          Stmt::Switch(switch) => self.todo(switch.span, "module level Switch statement"),
+          Stmt::Throw(throw) => self.todo(throw.span, "module level Throw statement"),
+          Stmt::Try(try_) => self.todo(try_.span, "module level Try statement"),
+          Stmt::While(while_) => self.todo(while_.span, "module level While statement"),
+          Stmt::DoWhile(do_while) => self.todo(do_while.span, "module level DoWhile statement"),
+          Stmt::For(for_) => self.todo(for_.span, "module level For statement"),
+          Stmt::ForIn(for_in) => self.todo(for_in.span, "module level ForIn statement"),
+          Stmt::ForOf(for_of) => self.todo(for_of.span, "module level ForOf statement"),
           Stmt::Decl(decl) => self.populate_scope_decl(decl, scope),
-          Stmt::Expr(expr) => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: module level Expr statement".to_string(),
-              span: expr.span,
-            });
-          }
+          Stmt::Expr(expr) => self.todo(expr.span, "module level Expr statement"),
         },
       };
     }
@@ -381,29 +252,13 @@ impl ModuleCompiler {
       }
       Decl::Var(var_decl) => {
         if !var_decl.declare {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: non-declare module level var declaration".to_string(),
-            span: var_decl.span,
-          });
+          self.todo(var_decl.span, "non-declare module level var declaration");
         }
       }
       Decl::TsInterface(_) => {}
       Decl::TsTypeAlias(_) => {}
-      Decl::TsEnum(ts_enum) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level TsEnum declaration".to_string(),
-          span: ts_enum.span,
-        });
-      }
-      Decl::TsModule(ts_module) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level TsModule declaration".to_string(),
-          span: ts_module.span,
-        });
-      }
+      Decl::TsEnum(ts_enum) => self.todo(ts_enum.span, "module level TsEnum declaration"),
+      Decl::TsModule(ts_module) => self.todo(ts_module.span, "module level TsModule declaration"),
     };
   }
 
@@ -421,13 +276,7 @@ impl ModuleCompiler {
 
     match module_decl {
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
-      _ => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: non-default module declaration".to_string(),
-          span: module_decl.span(),
-        });
-      }
+      _ => self.todo(module_decl.span(), "non-export default module declaration"),
     }
   }
 
@@ -436,127 +285,24 @@ impl ModuleCompiler {
 
     match stmt {
       Decl(decl) => self.compile_module_level_decl(decl, scope),
-
-      Block(block) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Block statement".to_string(),
-          span: block.span,
-        });
-      }
+      Block(block) => self.todo(block.span, "module level Block statement"),
       Empty(_) => {}
-      Debugger(debugger) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Debugger statement".to_string(),
-          span: debugger.span,
-        });
-      }
-      With(with) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level With statement".to_string(),
-          span: with.span,
-        });
-      }
-      Return(return_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Return statement".to_string(),
-          span: return_.span,
-        });
-      }
-      Labeled(labeled) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Labeled statement".to_string(),
-          span: labeled.span,
-        });
-      }
-      Break(break_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Break statement".to_string(),
-          span: break_.span,
-        });
-      }
-      Continue(continue_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Continue statement".to_string(),
-          span: continue_.span,
-        });
-      }
-      If(if_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level If statement".to_string(),
-          span: if_.span,
-        });
-      }
-      Switch(switch) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Switch statement".to_string(),
-          span: switch.span,
-        });
-      }
-      Throw(throw) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Throw statement".to_string(),
-          span: throw.span,
-        });
-      }
-      Try(try_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Try statement".to_string(),
-          span: try_.span,
-        });
-      }
-      While(while_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level While statement".to_string(),
-          span: while_.span,
-        });
-      }
-      DoWhile(do_while) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level DoWhile statement".to_string(),
-          span: do_while.span,
-        });
-      }
-      For(for_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level For statement".to_string(),
-          span: for_.span,
-        });
-      }
-      ForIn(for_in) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level ForIn statement".to_string(),
-          span: for_in.span,
-        });
-      }
-      ForOf(for_of) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level ForOf statement".to_string(),
-          span: for_of.span,
-        });
-      }
-      Expr(expr) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: module level Expr statement".to_string(),
-          span: expr.span,
-        });
-      }
+      Debugger(debugger) => self.todo(debugger.span, "module level Debugger statement"),
+      With(with) => self.todo(with.span, "module level With statement"),
+      Return(return_) => self.todo(return_.span, "module level Return statement"),
+      Labeled(labeled) => self.todo(labeled.span, "module level Labeled statement"),
+      Break(break_) => self.todo(break_.span, "module level Break statement"),
+      Continue(continue_) => self.todo(continue_.span, "module level Continue statement"),
+      If(if_) => self.todo(if_.span, "module level If statement"),
+      Switch(switch) => self.todo(switch.span, "module level Switch statement"),
+      Throw(throw) => self.todo(throw.span, "module level Throw statement"),
+      Try(try_) => self.todo(try_.span, "module level Try statement"),
+      While(while_) => self.todo(while_.span, "module level While statement"),
+      DoWhile(do_while) => self.todo(do_while.span, "module level DoWhile statement"),
+      For(for_) => self.todo(for_.span, "module level For statement"),
+      ForIn(for_in) => self.todo(for_in.span, "module level ForIn statement"),
+      ForOf(for_of) => self.todo(for_of.span, "module level ForOf statement"),
+      Expr(expr) => self.todo(expr.span, "module level Expr statement"),
     };
   }
 
@@ -568,29 +314,13 @@ impl ModuleCompiler {
       Fn(fn_) => self.compile_fn_decl(fn_, scope),
       Var(var_decl) => {
         if !var_decl.declare {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: non-declare module level var declaration".to_string(),
-            span: var_decl.span,
-          });
+          self.todo(var_decl.span, "non-declare module level var declaration");
         }
       }
       TsInterface(_) => {}
       TsTypeAlias(_) => {}
-      TsEnum(ts_enum) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: TsEnum declaration".to_string(),
-          span: ts_enum.span,
-        });
-      }
-      TsModule(ts_module) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: TsModule declaration".to_string(),
-          span: ts_module.span,
-        });
-      }
+      TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
+      TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration"),
     };
   }
 
@@ -622,13 +352,7 @@ impl ModuleCompiler {
     use swc_ecma_ast::DefaultDecl;
 
     match &edd.decl {
-      DefaultDecl::Class(_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: DefaultDecl::Class".to_string(),
-          span: edd.span,
-        });
-      }
+      DefaultDecl::Class(_) => self.todo(edd.span, "DefaultDecl::Class"),
       DefaultDecl::Fn(fn_) => {
         let (fn_name, defn) = match &fn_.ident {
           Some(ident) => {
@@ -707,11 +431,7 @@ impl ModuleCompiler {
       match class_member {
         swc_ecma_ast::ClassMember::ClassProp(class_prop) => {
           if class_prop.is_static {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: static props".to_string(),
-              span: class_prop.span,
-            });
+            self.todo(class_prop.span, "static props");
 
             continue;
           }
@@ -735,11 +455,7 @@ impl ModuleCompiler {
             .push(Instruction::SubMov(key_asm, value_asm, Register::This));
         }
         swc_ecma_ast::ClassMember::PrivateProp(private_prop) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: private props".to_string(),
-            span: private_prop.span,
-          });
+          self.todo(private_prop.span, "private props")
         }
         _ => {}
       }
@@ -796,12 +512,7 @@ impl ModuleCompiler {
           let name = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => ident.sym.to_string(),
             _ => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "TODO: Non-identifier method name".to_string(),
-                span: method.span,
-              });
-
+              self.todo(method.span, "Non-identifier method name");
               continue;
             }
           };
@@ -819,13 +530,7 @@ impl ModuleCompiler {
             .properties
             .push((Value::String(name), Value::Pointer(method_defn_name)));
         }
-        PrivateMethod(private_method) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: PrivateMethod".to_string(),
-            span: private_method.span,
-          });
-        }
+        PrivateMethod(private_method) => self.todo(private_method.span, "PrivateMethod"),
 
         // Handled first because they need to be compiled before the
         // constructor, regardless of syntax order
@@ -833,21 +538,13 @@ impl ModuleCompiler {
 
         PrivateProp(prop) => {
           if prop.value.is_some() {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "TODO: class property initializers".to_string(),
-              span: prop.span,
-            });
+            self.todo(prop.span, "class property initializers");
           }
         }
         TsIndexSignature(_) => {}
         Empty(_) => {}
         StaticBlock(static_block) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: StaticBlock".to_string(),
-            span: static_block.span,
-          });
+          self.todo(static_block.span, "StaticBlock");
         }
       }
     }

@@ -83,7 +83,7 @@ impl FunctionCompiler {
     self.diagnostics.push(Diagnostic {
       level: DiagnosticLevel::InternalError,
       message: format!("TODO: {}", message),
-      span: span,
+      span,
     });
   }
 
