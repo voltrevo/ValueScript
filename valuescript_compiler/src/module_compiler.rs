@@ -144,12 +144,19 @@ impl ModuleCompiler {
     self.diagnostics.append(&mut scope_analysis.diagnostics);
     let scope = init_std_scope();
 
+    self.populate_scope(module, &scope);
+
+    for module_item in &module.body {
+      self.compile_module_item(module_item, &scope);
+    }
+  }
+
+  fn populate_scope(&mut self, module: &swc_ecma_ast::Module, scope: &Scope) {
     use swc_ecma_ast::Decl;
     use swc_ecma_ast::ModuleDecl;
     use swc_ecma_ast::ModuleItem;
     use swc_ecma_ast::Stmt;
 
-    // Populate scope with top-level declarations
     for module_item in &module.body {
       match module_item {
         ModuleItem::ModuleDecl(module_decl) => match module_decl {
@@ -400,10 +407,6 @@ impl ModuleCompiler {
           }
         },
       };
-    }
-
-    for module_item in &module.body {
-      self.compile_module_item(module_item, &scope);
     }
   }
 
