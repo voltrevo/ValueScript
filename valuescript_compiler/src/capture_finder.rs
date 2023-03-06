@@ -37,7 +37,7 @@ impl CaptureFinder {
     };
 
     match self.outside_scope.get(&name) {
-      None => std::panic!("Unresolved name"),
+      None => std::panic!("Unresolved name {}", name),
       Some(MappedName::Definition(_)) => {} // Not capture - just definition
       Some(MappedName::Register(_)) => insert(&name),
       Some(MappedName::QueuedFunction(qfn)) => {
