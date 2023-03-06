@@ -4,8 +4,8 @@ mod tests {
   use std::fs;
   use std::path::{Path, PathBuf};
 
-  use valuescript_compiler::assemble;
   use valuescript_compiler::compile;
+  use valuescript_compiler::{assemble, parse_module};
   use valuescript_vm::ValTrait;
   use valuescript_vm::VirtualMachine;
 
@@ -57,8 +57,16 @@ mod tests {
             }
           }
 
-          // TODO: Also test rendering and parsing assembly
           let bytecode = assemble(&compiler_output.module);
+
+          let assembly = compiler_output.module.to_string();
+          let parsed_assembly = parse_module(&assembly);
+          let bytecode_via_assembly = assemble(&parsed_assembly);
+
+          if bytecode != bytecode_via_assembly {
+            println!("  Bytecode mismatch between original and parsed assembly");
+            failed_paths.insert(file_path.clone());
+          }
 
           let mut vm = VirtualMachine::new();
           let result = vm.run(&bytecode, &[]);
