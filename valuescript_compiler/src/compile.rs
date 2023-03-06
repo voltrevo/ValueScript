@@ -77,13 +77,9 @@ pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
   let mut module = Module::default();
   module.definitions.append(&mut compiler.definitions);
 
-  let assembly_str = module.to_string();
-  let assembly_lines = assembly_str.split("\n");
-  let assembly_lines_vec = assembly_lines.map(|s| s.to_string()).collect();
-
   return CompilerOutput {
     diagnostics: compiler.diagnostics,
-    assembly: assembly_lines_vec,
+    assembly: module.as_lines(),
   };
 }
 

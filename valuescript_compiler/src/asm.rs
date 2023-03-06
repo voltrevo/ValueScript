@@ -3,10 +3,28 @@ pub struct Module {
   pub definitions: Vec<Definition>,
 }
 
+impl Module {
+  pub fn as_lines(&self) -> Vec<String> {
+    let assembly_str = self.to_string();
+    let assembly_lines = assembly_str.split("\n");
+    let assembly_lines_vec = assembly_lines.map(|s| s.to_string()).collect();
+
+    return assembly_lines_vec;
+  }
+}
+
 impl std::fmt::Display for Module {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    let mut first = true;
+
     for definition in &self.definitions {
-      write!(f, "{}\n", definition)?;
+      if first {
+        first = false;
+      } else {
+        write!(f, "\n\n")?;
+      }
+
+      write!(f, "{}", definition)?;
     }
 
     return Ok(());
@@ -105,10 +123,10 @@ impl std::fmt::Display for Class {
         for (name, method) in &object.properties {
           write!(f, "  {}: {},\n", name, method)?;
         }
-        write!(f, "}})\n")?;
+        write!(f, "}})")?;
       }
       _ => {
-        write!(f, "{})\n", self.methods)?;
+        write!(f, "{})", self.methods)?;
       }
     }
 
