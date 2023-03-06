@@ -50,11 +50,12 @@ impl FunctionCompiler {
     let mut reg_allocator = NameAllocator::default();
     reg_allocator.allocate(&"return".to_string());
     reg_allocator.allocate(&"this".to_string());
+    reg_allocator.allocate(&"ignore".to_string());
 
     return FunctionCompiler {
       definition: Vec::new(),
-      definition_allocator: definition_allocator,
-      reg_allocator: reg_allocator,
+      definition_allocator,
+      reg_allocator,
       label_allocator: NameAllocator::default(),
       queue: Queue::new(),
       loop_labels: vec![],
@@ -110,9 +111,9 @@ impl FunctionCompiler {
       .queue
       .add(QueuedFunction {
         definition_name: definition_name.clone(),
-        fn_name: fn_name,
+        fn_name,
         capture_params: Vec::new(),
-        functionish: functionish,
+        functionish,
       })
       .expect("Failed to queue function");
 
@@ -839,20 +840,20 @@ impl FunctionCompiler {
         // from the condition
         let condition_asm = self.use_(condition);
 
-        let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
+        let cond_reg = self.allocate_numbered_reg(&"_cond".to_string());
 
         // TODO: Add negated jmpif instruction to avoid this
         self
           .definition
-          .push(std::format!("  op! {} %{}", condition_asm, cond_reg));
+          .push(std::format!("  op! {} {}", condition_asm, cond_reg));
 
-        let mut jmpif_instr = "  jmpif %".to_string();
-        jmpif_instr += &cond_reg;
+        let mut jmpif_instr = "  jmpif ".to_string();
+        jmpif_instr += &format!("{}", cond_reg);
         jmpif_instr += " :";
         jmpif_instr += &end_label;
         self.definition.push(jmpif_instr);
 
-        self.reg_allocator.release(&cond_reg);
+        self.release_reg(&cond_reg);
 
         self.statement(&*while_.body, false, scope);
         self.definition.push(std::format!("  jmp :{}", start_label));
@@ -957,20 +958,20 @@ impl FunctionCompiler {
             // from the condition
             let condition_asm = self.use_(condition);
 
-            let cond_reg = self.reg_allocator.allocate_numbered(&"_cond".to_string());
+            let cond_reg = self.allocate_numbered_reg("_cond");
 
             // TODO: Add negated jmpif instruction to avoid this
             self
               .definition
-              .push(std::format!("  op! {} %{}", condition_asm, cond_reg));
+              .push(std::format!("  op! {} {}", condition_asm, cond_reg));
 
-            let mut jmpif_instr = "  jmpif %".to_string();
-            jmpif_instr += &cond_reg;
+            let mut jmpif_instr = "  jmpif ".to_string();
+            jmpif_instr += &format!("{}", cond_reg);
             jmpif_instr += " :";
             jmpif_instr += &for_end_label;
             self.definition.push(jmpif_instr);
 
-            self.reg_allocator.release(&cond_reg);
+            self.release_reg(&cond_reg);
           }
           None => {}
         }
