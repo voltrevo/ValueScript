@@ -273,7 +273,7 @@ impl<'a> ExpressionCompiler<'a> {
     let mut instr = "  ".to_string();
     instr += unary_op_str;
     instr += " ";
-    instr += &format!("{}", self.fnc.use_(arg));
+    instr += &self.fnc.use_(arg).to_string();
 
     let target: Register = match &target_register {
       None => {
@@ -309,9 +309,9 @@ impl<'a> ExpressionCompiler<'a> {
     instr += get_binary_op_str(bin.op);
 
     instr += " ";
-    instr += &format!("{}", self.fnc.use_(left));
+    instr += &self.fnc.use_(left).to_string();
     instr += " ";
-    instr += &format!("{}", self.fnc.use_(right));
+    instr += &self.fnc.use_(right).to_string();
 
     let target: Register = match &target_register {
       None => {
@@ -831,7 +831,7 @@ impl<'a> ExpressionCompiler<'a> {
     sub_nested_registers.append(&mut callee.nested_registers);
 
     let mut instr = "  call ".to_string();
-    instr += &format!("{}", callee.value);
+    instr += &callee.value.to_string();
     instr += " ";
 
     let mut args = Array::default();
@@ -864,7 +864,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    instr += &format!("{}", dest);
+    instr += &dest.to_string();
 
     self.fnc.definition.push(instr);
 
@@ -891,7 +891,7 @@ impl<'a> ExpressionCompiler<'a> {
     sub_nested_registers.append(&mut callee.nested_registers);
 
     let mut instr = "  new ".to_string();
-    instr += &format!("{}", callee.value);
+    instr += &callee.value.to_string();
     instr += " ";
 
     let mut args = Array::default();
@@ -925,7 +925,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    instr += &format!("{}", dest);
+    instr += &dest.to_string();
 
     self.fnc.definition.push(instr);
 
@@ -1002,7 +1002,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    instr += &format!("{}", dest);
+    instr += &dest.to_string();
 
     self.fnc.definition.push(instr);
 
@@ -1496,7 +1496,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let compiled = self.compile(expr, Some(register.clone()));
 
-    if format!("{}", self.fnc.use_(compiled)) != format!("{}", register) {
+    if self.fnc.use_(compiled).to_string() != register.to_string() {
       self.fnc.diagnostics.push(Diagnostic {
         level: DiagnosticLevel::InternalError,
         message: "Default expression not compiled into target register (not sure whether this is possible in this case)".to_string(),
@@ -1671,7 +1671,7 @@ impl TargetAccessor {
     match self {
       Register(reg) => {
         // TODO: Should value just derive from Eq?
-        if format!("{}", value) != format!("{}", reg) {
+        if value.to_string() != reg.to_string() {
           ec.fnc.definition.push(format!("  mov {} {}", value, reg));
         }
       }

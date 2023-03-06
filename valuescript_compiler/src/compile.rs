@@ -855,7 +855,7 @@ impl Compiler {
       defn_name,
       match constructor_defn_name {
         None => "void".to_string(),
-        Some(d) => format!("{}", d),
+        Some(d) => d.to_string(),
       },
     ));
 

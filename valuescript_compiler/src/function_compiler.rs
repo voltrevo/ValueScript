@@ -191,7 +191,7 @@ impl FunctionCompiler {
 
       let reg = self.allocate_reg(cap_param);
 
-      heading += &format!("{}", reg);
+      heading += &reg.to_string();
 
       scope.set(cap_param.clone(), MappedName::Register(reg));
 
@@ -207,7 +207,7 @@ impl FunctionCompiler {
         heading += ", ";
       }
 
-      heading += &format!("{}", reg);
+      heading += &reg.to_string();
       param_count += 1;
     }
 
@@ -805,7 +805,7 @@ impl FunctionCompiler {
         let else_label = self.label_allocator.allocate_numbered(&"else".to_string());
 
         let mut jmpif_instr = "  jmpif ".to_string();
-        jmpif_instr += &format!("{}", cond_reg);
+        jmpif_instr += &cond_reg.to_string();
         jmpif_instr += " :";
         jmpif_instr += &else_label;
         self.definition.push(jmpif_instr);
@@ -868,7 +868,7 @@ impl FunctionCompiler {
           .push(std::format!("  op! {} {}", condition_asm, cond_reg));
 
         let mut jmpif_instr = "  jmpif ".to_string();
-        jmpif_instr += &format!("{}", cond_reg);
+        jmpif_instr += &cond_reg.to_string();
         jmpif_instr += " :";
         jmpif_instr += &end_label;
         self.definition.push(jmpif_instr);
@@ -914,7 +914,7 @@ impl FunctionCompiler {
         self.definition.push(format!("{}:", continue_label));
 
         let mut jmpif_instr = "  jmpif ".to_string();
-        jmpif_instr += &format!("{}", self.use_(condition));
+        jmpif_instr += &self.use_(condition).to_string();
         jmpif_instr += " :";
         jmpif_instr += &start_label;
         self.definition.push(jmpif_instr);
@@ -986,7 +986,7 @@ impl FunctionCompiler {
               .push(std::format!("  op! {} {}", condition_asm, cond_reg));
 
             let mut jmpif_instr = "  jmpif ".to_string();
-            jmpif_instr += &format!("{}", cond_reg);
+            jmpif_instr += &cond_reg.to_string();
             jmpif_instr += " :";
             jmpif_instr += &for_end_label;
             self.definition.push(jmpif_instr);
