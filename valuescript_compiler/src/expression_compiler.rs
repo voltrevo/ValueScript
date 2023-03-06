@@ -350,9 +350,11 @@ impl<'a> ExpressionCompiler<'a> {
     is_top_level: bool,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    match get_assign_op_str(assign_expr.op) {
+    match get_binary_op_for_assign_op(assign_expr.op) {
       None => self.assign_expr_eq(assign_expr, is_top_level, target_register),
-      Some(op_str) => self.assign_expr_compound(assign_expr, is_top_level, op_str, target_register),
+      Some(binary_op) => {
+        self.assign_expr_compound(assign_expr, is_top_level, binary_op, target_register)
+      }
     }
   }
 
@@ -380,7 +382,6 @@ impl<'a> ExpressionCompiler<'a> {
       self
         .fnc
         .definition
-        // .push(format!("  mov {} {}", rhs.value, target_reg));
         .push(Instruction::Mov(rhs.value.clone(), target_reg).to_string());
     }
 
@@ -426,7 +427,7 @@ impl<'a> ExpressionCompiler<'a> {
     &mut self,
     assign_expr: &swc_ecma_ast::AssignExpr,
     is_top_level: bool,
-    op_str: &str,
+    binary_op: swc_ecma_ast::BinaryOp,
     target_register: Option<Register>,
   ) -> CompiledExpression {
     use swc_ecma_ast::Pat;
@@ -461,10 +462,15 @@ impl<'a> ExpressionCompiler<'a> {
 
     let target_read = target.read(self);
 
-    self.fnc.definition.push(format!(
-      "  {} {} {} {}",
-      op_str, target_read, tmp_reg, target_read,
-    ));
+    self.fnc.definition.push(
+      make_binary_op(
+        binary_op,
+        Value::Register(target_read.clone()),
+        Value::Register(tmp_reg.clone()),
+        target_read.clone(),
+      )
+      .to_string(),
+    );
 
     self.fnc.release_reg(&tmp_reg);
 
@@ -473,7 +479,6 @@ impl<'a> ExpressionCompiler<'a> {
         match target_register {
           None => {}
           Some(tr) => {
-            // self.fnc.definition.push(format!("  mov {} {}", treg, tr));
             self
               .fnc
               .definition
@@ -489,7 +494,6 @@ impl<'a> ExpressionCompiler<'a> {
           self
             .fnc
             .definition
-            // .push(format!("  mov {} {}", treg, result_reg));
             .push(Instruction::Mov(Value::Register(treg.clone()), result_reg.clone()).to_string());
 
           nested_registers.push(result_reg.clone());
@@ -1587,52 +1591,6 @@ impl<'a> ExpressionCompiler<'a> {
   }
 }
 
-pub fn get_binary_op_str(op: swc_ecma_ast::BinaryOp) -> &'static str {
-  use swc_ecma_ast::BinaryOp::*;
-
-  return match op {
-    EqEq => "op==",
-    NotEq => "op!=",
-    EqEqEq => "op===",
-    NotEqEq => "op!==",
-    Lt => "op<",
-    LtEq => "op<=",
-    Gt => "op>",
-    GtEq => "op>=",
-    LShift => "op<<",
-    RShift => "op>>",
-    ZeroFillRShift => "op>>>",
-    Add => "op+",
-    Sub => "op-",
-    Mul => "op*",
-    Div => "op/",
-    Mod => "op%",
-    BitOr => "op|",
-    BitXor => "op^",
-    BitAnd => "op&",
-    LogicalOr => "op||",
-    LogicalAnd => "op&&",
-    In => "in",
-    InstanceOf => "instanceof",
-    Exp => "op**",
-    NullishCoalescing => "op??",
-  };
-}
-
-pub fn get_unary_op_str(op: swc_ecma_ast::UnaryOp) -> Option<&'static str> {
-  use swc_ecma_ast::UnaryOp::*;
-
-  return match op {
-    Minus => Some("unary-"),
-    Plus => Some("unary+"),
-    Bang => Some("op!"),
-    Tilde => Some("op~"),
-    TypeOf => Some("typeof"),
-    Void => None,   // TODO
-    Delete => None, // TODO
-  };
-}
-
 pub fn make_unary_op(op: swc_ecma_ast::UnaryOp, arg: Value, dst: Register) -> Option<Instruction> {
   use swc_ecma_ast::UnaryOp::*;
 
@@ -1684,26 +1642,29 @@ pub fn make_binary_op(
   }
 }
 
-pub fn get_assign_op_str(op: swc_ecma_ast::AssignOp) -> Option<&'static str> {
-  use swc_ecma_ast::AssignOp::*;
+pub fn get_binary_op_for_assign_op(
+  assign_op: swc_ecma_ast::AssignOp,
+) -> Option<swc_ecma_ast::BinaryOp> {
+  use swc_ecma_ast::AssignOp;
+  use swc_ecma_ast::BinaryOp;
 
-  return match op {
-    Assign => None,
-    AddAssign => Some("op+"),
-    SubAssign => Some("op-"),
-    MulAssign => Some("op*"),
-    DivAssign => Some("op/"),
-    ModAssign => Some("op%"),
-    LShiftAssign => Some("op<<"),
-    RShiftAssign => Some("op>>"),
-    ZeroFillRShiftAssign => Some("op>>>"),
-    BitOrAssign => Some("op|"),
-    BitXorAssign => Some("op^"),
-    BitAndAssign => Some("op&"),
-    ExpAssign => Some("op**"),
-    AndAssign => Some("op&&"),
-    OrAssign => Some("op||"),
-    NullishAssign => Some("op??"),
+  return match assign_op {
+    AssignOp::Assign => None,
+    AssignOp::AddAssign => Some(BinaryOp::Add),
+    AssignOp::SubAssign => Some(BinaryOp::Sub),
+    AssignOp::MulAssign => Some(BinaryOp::Mul),
+    AssignOp::DivAssign => Some(BinaryOp::Div),
+    AssignOp::ModAssign => Some(BinaryOp::Mod),
+    AssignOp::LShiftAssign => Some(BinaryOp::LShift),
+    AssignOp::RShiftAssign => Some(BinaryOp::RShift),
+    AssignOp::ZeroFillRShiftAssign => Some(BinaryOp::ZeroFillRShift),
+    AssignOp::BitOrAssign => Some(BinaryOp::BitOr),
+    AssignOp::BitXorAssign => Some(BinaryOp::BitXor),
+    AssignOp::BitAndAssign => Some(BinaryOp::BitAnd),
+    AssignOp::ExpAssign => Some(BinaryOp::Exp),
+    AssignOp::AndAssign => Some(BinaryOp::LogicalAnd),
+    AssignOp::OrAssign => Some(BinaryOp::LogicalOr),
+    AssignOp::NullishAssign => Some(BinaryOp::NullishCoalescing),
   };
 }
 
