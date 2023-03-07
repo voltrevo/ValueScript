@@ -110,6 +110,14 @@ impl ModuleCompiler {
     });
   }
 
+  fn not_supported(&mut self, span: swc_common::Span, message: &str) {
+    self.diagnostics.push(Diagnostic {
+      level: DiagnosticLevel::Error,
+      message: format!("Not supported: {}", message),
+      span,
+    });
+  }
+
   fn allocate_defn(&mut self, name: &str) -> Pointer {
     let allocated_name = self
       .definition_allocator
@@ -167,10 +175,10 @@ impl ModuleCompiler {
     for module_item in &module.body {
       match module_item {
         ModuleItem::ModuleDecl(module_decl) => match module_decl {
-          ModuleDecl::Import(import) => self.todo(import.span, "Import module declaration"),
+          ModuleDecl::Import(import) => self.populate_scope_import(import, scope),
           ModuleDecl::ExportDecl(export_decl) => self.populate_scope_decl(&export_decl.decl, scope),
-          ModuleDecl::ExportNamed(export_named) => {
-            self.todo(export_named.span, "ExportNamed module declaration")
+          ModuleDecl::ExportNamed(_) => {
+            // Nothing to do
           }
           ModuleDecl::ExportDefaultDecl(edd) => {
             match &edd.decl {
@@ -185,28 +193,27 @@ impl ModuleCompiler {
               swc_ecma_ast::DefaultDecl::Class(class) => {
                 self.todo(class.class.span, "Class default export")
               }
-              swc_ecma_ast::DefaultDecl::TsInterfaceDecl(ts_interface_decl) => {
-                self.todo(ts_interface_decl.span, "TsInterfaceDecl default export")
+              swc_ecma_ast::DefaultDecl::TsInterfaceDecl(_) => {
+                // Nothing to do
               }
             };
           }
-          ModuleDecl::ExportDefaultExpr(export_default_expr) => self.todo(
-            export_default_expr.span,
-            "ExportDefaultExpr module declaration",
-          ),
-          ModuleDecl::ExportAll(export_all) => {
-            self.todo(export_all.span, "ExportAll module declaration")
+          ModuleDecl::ExportDefaultExpr(_) => {
+            // Nothing to do
+          }
+          ModuleDecl::ExportAll(_) => {
+            // Nothing to do
           }
           ModuleDecl::TsImportEquals(ts_import_equals) => {
-            self.todo(ts_import_equals.span, "TsImportEquals module declaration")
+            self.not_supported(ts_import_equals.span, "TsImportEquals module declaration")
           }
-          ModuleDecl::TsExportAssignment(ts_export_assignment) => self.todo(
+          ModuleDecl::TsExportAssignment(ts_export_assignment) => self.not_supported(
             ts_export_assignment.span,
             "TsExportAssignment module declaration",
           ),
           ModuleDecl::TsNamespaceExport(ts_namespace_export) => self.todo(
             ts_namespace_export.span,
-            "TsNamespaceExport module declaration",
+            "TsNamespaceExport module declaration (what is this?)",
           ),
         },
         ModuleItem::Stmt(stmt) => match stmt {
@@ -231,6 +238,33 @@ impl ModuleCompiler {
           Stmt::Expr(expr) => self.todo(expr.span, "module level Expr statement"),
         },
       };
+    }
+  }
+
+  fn populate_scope_import(&mut self, import: &swc_ecma_ast::ImportDecl, scope: &Scope) {
+    use swc_ecma_ast::ImportSpecifier::*;
+
+    for specifier in &import.specifiers {
+      match specifier {
+        Named(named) => {
+          scope.set(
+            named.local.sym.to_string(),
+            MappedName::Definition(self.allocate_defn(&named.local.sym.to_string())),
+          );
+        }
+        Default(default) => {
+          scope.set(
+            default.local.sym.to_string(),
+            MappedName::Definition(self.allocate_defn(&default.local.sym.to_string())),
+          );
+        }
+        Namespace(namespace) => {
+          scope.set(
+            namespace.local.sym.to_string(),
+            MappedName::Definition(self.allocate_defn(&namespace.local.sym.to_string())),
+          );
+        }
+      }
     }
   }
 
