@@ -5,7 +5,7 @@ use std::{
 
 use crate::asm::{
   Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
-  Label, LabelRef, Module, Object, Pointer, Register, Value,
+  Label, LabelRef, Lazy, Module, Object, Pointer, Register, Value,
 };
 
 pub fn assemble(module: &Module) -> Rc<Vec<u8>> {
@@ -58,6 +58,9 @@ impl Assembler {
       DefinitionContent::Value(value) => {
         self.value(value);
       }
+      DefinitionContent::Lazy(lazy) => {
+        self.lazy(lazy);
+      }
     }
   }
 
@@ -86,6 +89,33 @@ impl Assembler {
     }
 
     for instruction_or_label in &function.body {
+      match instruction_or_label {
+        InstructionOrLabel::Instruction(instruction) => {
+          self.instruction(instruction);
+        }
+        InstructionOrLabel::Label(label) => {
+          self.label(label);
+        }
+      }
+    }
+
+    self.output.push(Instruction::End.byte());
+
+    // TODO: Handle >255 registers
+    // +3: return, this, ignore
+    self.output[self.fn_data.register_count_pos] = (self.fn_data.register_map.len() + 3) as u8;
+
+    self.fn_data.labels_map.resolve(&mut self.output);
+  }
+
+  fn lazy(&mut self, lazy: &Lazy) {
+    self.output.push(ValueType::Lazy as u8);
+
+    self.fn_data = Default::default();
+    self.fn_data.register_count_pos = self.output.len();
+    self.output.push(0xff); // Placeholder for register count
+
+    for instruction_or_label in &lazy.body {
       match instruction_or_label {
         InstructionOrLabel::Instruction(instruction) => {
           self.instruction(instruction);
@@ -344,6 +374,7 @@ enum ValueType {
   // External = 0x0f,
   Builtin = 0x10,
   Class = 0x11,
+  Lazy = 0x12,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone)]

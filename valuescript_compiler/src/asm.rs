@@ -64,6 +64,7 @@ pub enum DefinitionContent {
   Function(Function),
   Class(Class),
   Value(Value),
+  Lazy(Lazy),
 }
 
 impl std::fmt::Display for DefinitionContent {
@@ -77,6 +78,9 @@ impl std::fmt::Display for DefinitionContent {
       }
       DefinitionContent::Value(value) => {
         write!(f, "{}", value)
+      }
+      DefinitionContent::Lazy(lazy) => {
+        write!(f, "{}", lazy)
       }
     }
   }
@@ -496,6 +500,30 @@ impl std::fmt::Display for Value {
       Value::Pointer(value) => write!(f, "{}", value),
       Value::Builtin(value) => write!(f, "{}", value),
     }
+  }
+}
+
+#[derive(Debug)]
+pub struct Lazy {
+  pub body: Vec<InstructionOrLabel>,
+}
+
+impl std::fmt::Display for Lazy {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "lazy {{\n")?;
+
+    for instruction_or_label in &self.body {
+      match instruction_or_label {
+        InstructionOrLabel::Instruction(instruction) => {
+          write!(f, "  {}\n", instruction)?;
+        }
+        InstructionOrLabel::Label(label) => {
+          write!(f, "{}\n", label)?;
+        }
+      }
+    }
+
+    write!(f, "}}")
   }
 }
 
