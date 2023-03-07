@@ -276,6 +276,7 @@ impl ModuleCompiler {
 
     match module_decl {
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
+      ExportDecl(ed) => self.compile_export_decl(ed, scope),
       _ => self.todo(module_decl.span(), "non-export default module declaration"),
     }
   }
@@ -310,8 +311,8 @@ impl ModuleCompiler {
     use swc_ecma_ast::Decl::*;
 
     match decl {
-      Class(class) => self.compile_class_decl(class, scope),
-      Fn(fn_) => self.compile_fn_decl(fn_, scope),
+      Class(class) => self.compile_class_decl(false, class, scope),
+      Fn(fn_) => self.compile_fn_decl(false, fn_, scope),
       Var(var_decl) => {
         if !var_decl.declare {
           self.todo(var_decl.span, "non-declare module level var declaration");
@@ -324,7 +325,7 @@ impl ModuleCompiler {
     };
   }
 
-  fn compile_fn_decl(&mut self, fn_: &swc_ecma_ast::FnDecl, scope: &Scope) {
+  fn compile_fn_decl(&mut self, export: bool, fn_: &swc_ecma_ast::FnDecl, scope: &Scope) {
     let fn_name = fn_.ident.sym.to_string();
 
     let defn = match scope.get_defn(&fn_name) {
@@ -340,9 +341,17 @@ impl ModuleCompiler {
       }
     };
 
+    if export {
+      self
+        .module
+        .export_star
+        .properties
+        .push((Value::String(fn_name.clone()), Value::Pointer(defn.clone())));
+    }
+
     self.compile_fn(
       defn,
-      Some(fn_.ident.sym.to_string()),
+      Some(fn_name),
       Functionish::Fn(fn_.function.clone()),
       scope,
     );
@@ -386,6 +395,27 @@ impl ModuleCompiler {
     }
   }
 
+  fn compile_export_decl(&mut self, ed: &swc_ecma_ast::ExportDecl, scope: &Scope) {
+    use swc_ecma_ast::Decl;
+
+    match &ed.decl {
+      Decl::Class(class) => self.compile_class_decl(true, class, scope),
+      Decl::Fn(fn_) => self.compile_fn_decl(true, fn_, scope),
+      Decl::Var(var_decl) => {
+        if !var_decl.declare {
+          self.todo(
+            var_decl.span,
+            "non-declare module level var declaration in export",
+          );
+        }
+      }
+      Decl::TsInterface(_) => {}
+      Decl::TsTypeAlias(_) => {}
+      Decl::TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration in export"),
+      Decl::TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration in export"),
+    };
+  }
+
   fn compile_fn(
     &mut self,
     defn_pointer: Pointer,
@@ -405,7 +435,12 @@ impl ModuleCompiler {
     self.diagnostics.append(&mut diagnostics);
   }
 
-  fn compile_class_decl(&mut self, class_decl: &swc_ecma_ast::ClassDecl, parent_scope: &Scope) {
+  fn compile_class_decl(
+    &mut self,
+    export: bool,
+    class_decl: &swc_ecma_ast::ClassDecl,
+    parent_scope: &Scope,
+  ) {
     let mut constructor: Value = Value::Void;
     let mut methods: Object = Object::default();
     let mut dependent_definitions: Vec<Definition>;
@@ -424,6 +459,13 @@ impl ModuleCompiler {
         return;
       }
     };
+
+    if export {
+      self.module.export_star.properties.push((
+        Value::String(class_name.clone()),
+        Value::Pointer(defn_name.clone()),
+      ));
+    }
 
     let mut member_initializers_fnc = FunctionCompiler::new(self.definition_allocator.clone());
 

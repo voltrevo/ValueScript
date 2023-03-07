@@ -30,7 +30,7 @@ impl std::fmt::Display for Module {
     if self.export_star.properties.len() == 0 {
       write!(f, "export {} {}", self.export_default, self.export_star)?;
     } else {
-      write!(f, "export {} * {{\n", self.export_default)?;
+      write!(f, "export {} {{\n", self.export_default)?;
 
       for (name, value) in &self.export_star.properties {
         write!(f, "  {}: {},\n", name, value)?;
