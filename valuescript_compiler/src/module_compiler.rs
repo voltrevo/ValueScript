@@ -349,12 +349,14 @@ impl ModuleCompiler {
         .push((Value::String(fn_name.clone()), Value::Pointer(defn.clone())));
     }
 
-    self.compile_fn(
+    let mut fn_defns = self.compile_fn(
       defn,
       Some(fn_name),
       Functionish::Fn(fn_.function.clone()),
       scope,
     );
+
+    self.module.definitions.append(&mut fn_defns);
   }
 
   fn compile_export_default_decl(&mut self, edd: &swc_ecma_ast::ExportDefaultDecl, scope: &Scope) {
@@ -387,7 +389,10 @@ impl ModuleCompiler {
 
         self.module.export_default = Value::Pointer(defn.clone());
 
-        self.compile_fn(defn, fn_name, Functionish::Fn(fn_.function.clone()), scope);
+        let mut fn_defns =
+          self.compile_fn(defn, fn_name, Functionish::Fn(fn_.function.clone()), scope);
+
+        self.module.definitions.append(&mut fn_defns);
       }
       DefaultDecl::TsInterfaceDecl(_) => {
         // Nothing to do
@@ -422,8 +427,8 @@ impl ModuleCompiler {
     fn_name: Option<String>,
     functionish: Functionish,
     parent_scope: &Scope,
-  ) {
-    let (mut defn, mut diagnostics) = FunctionCompiler::compile(
+  ) -> Vec<Definition> {
+    let (defn, mut diagnostics) = FunctionCompiler::compile(
       defn_pointer,
       fn_name,
       functionish,
@@ -431,8 +436,9 @@ impl ModuleCompiler {
       parent_scope,
     );
 
-    self.module.definitions.append(&mut defn);
     self.diagnostics.append(&mut diagnostics);
+
+    defn
   }
 
   fn compile_class_decl(
@@ -519,12 +525,12 @@ impl ModuleCompiler {
 
           let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", class_name));
 
-          self.compile_fn(
+          dependent_definitions.append(&mut self.compile_fn(
             ctor_defn_name.clone(),
             None,
             Functionish::Constructor(member_initializers_assembly.clone(), ctor.clone()),
             parent_scope,
-          );
+          ));
 
           constructor = Value::Pointer(ctor_defn_name);
         }
@@ -561,12 +567,12 @@ impl ModuleCompiler {
 
           let method_defn_name = self.allocate_defn(&format!("{}_{}", defn_name.name, name));
 
-          self.compile_fn(
+          dependent_definitions.append(&mut self.compile_fn(
             method_defn_name.clone(),
             None,
             Functionish::Fn(method.function.clone()),
             parent_scope,
-          );
+          ));
 
           methods
             .properties
