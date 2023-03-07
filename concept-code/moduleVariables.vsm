@@ -1,0 +1,61 @@
+// test_output! [1, 2, 3, 12586269025]
+
+export @main {}
+
+@main = function() {
+  call @counter [] %_tmp0
+  call @counter [] %_tmp1
+  call @counter [] %_tmp2
+  call @fib [50] %_tmp3
+
+  mov [%_tmp0, %_tmp1, %_tmp2, %_tmp3]
+}
+
+// module variables are not directly accessible because they allow violation of the language's
+// guarantees:
+@counter = function() {
+  op!== module.counter undefined %return
+  jmpif %return :counter_initialized
+  module_mov 0 module.counter
+counter_initialized:
+  op+ module.counter 1 %return
+  module_mov %return module.counter
+}
+
+/*
+
+// but allowing them in the runtime could allow the compiler to implement things like @memoize
+
+@memoize
+function fib(n: number) {
+  if (n < 2) {
+    return n;
+  }
+
+  return fib(n - 1) + fib(n - 2);
+}
+
+*/
+@fib = function(%n) {
+  op=== module.fib_results undefined %_tmp0
+  jmp_if_not %_tmp0 :fib_results_initialized
+  init_hash_map module.fib_results
+fib_results_initialized:
+  hash %n %input_hash
+  hash_map_lookup module.fib_results %input_hash %found %return
+  jmp_if_not %found :calculate
+  end
+calculate:
+  op< %n 2 %n_lt_2
+  jmp_if_not %n_lt_2 :recurse
+  mov %n %return
+  jmp :update_memory
+recurse:
+  op-- %n
+  call @fib [%n] %return
+  op-- %n
+  call @fib [%n] %previous
+  op+ %return %previous %return
+update_memory:
+  hash_submov %input_hash %return module.fib_results
+}
