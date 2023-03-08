@@ -19,4 +19,5 @@ about it :).
 ## Contributing Bigger Things
 
 If you want to get involved with something bigger than a good-first-issue, we'll
-be very happy to discuss that with you once you've done a few good-first-issues.
+be very happy to discuss that with you once you've done at least one
+good-first-issue.
