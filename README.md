@@ -1,17 +1,21 @@
 # ValueScript
 
+A dialect of TypeScript with value semantics.
+
 ## [Playground](https://valuescript.org/playground)
 
-Try ValueScript instantly using your web browser.
+[Try ValueScript instantly using your web browser.](https://valuescript.org/playground)
 
 ## About
 
-ValueScript is a dialect of TypeScript with value semantics.
+ValueScript uses TypeScript syntax, but it compiles to a bytecode that runs in a
+different virtual machine.
 
-The syntax is the same, in fact we use [SWC](https://swc.rs/)'s TypeScript
-parser, but the engine that evaluates the code is different.
+The syntax is identical, not just similar. We use [SWC](https://swc.rs/)'s
+TypeScript parser. This means you can use your IDE's TypeScript functionality
+when writing ValueScript.
 
-The big idea is that variables change, but data does not. For example:
+This program shows the core difference between ValueScript and TypeScript:
 
 ```ts
 export default function main() {
@@ -28,7 +32,7 @@ export default function main() {
 
 In TypeScript, `"peach"` is in the left bowl because TypeScript interprets
 `rightBowl = leftBowl` to mean that there is one bowl and both variables point
-to the same bowl. That bowl can then change.
+to the same bowl. That one bowl is changed by `.push("peach")`.
 
 In ValueScript, objects never change this way, only variables change. Pushing
 onto `rightBowl` is interpreted as a change to the `rightBowl` variable itself,
@@ -45,6 +49,19 @@ cargo build -p vstc
 export PATH="$PATH:$(pwd)/target/debug"
 vstc run inputs/passing/readme-demo.ts
 ```
+
+One way to understand this is to imagine that things like `=` and passing
+parameters are implemented by deep copying. We don't implement it that way, but
+it would work the same if we did (just a lot slower).
+
+Instead, we implement `rightBowl = leftBowl` by sharing the memory, but there's
+also a reference count attached to that memory. When `rightBowl` is mutated, the
+VM can see that it's using shared memory, and does some bookkeeping to represent
+`rightBowl`'s updated value without mutating the shared memory.
+
+By the same token, if `leftBowl` had gone out of scope or was optimized away,
+the VM would see that `rightBowl` has the only reference to that memory, and
+would mutate it directly.
 
 ## No Side Effects
 
@@ -400,3 +417,8 @@ A lot of the essential language features are implemented, including:
 ValueScript doesn't yet bind to the outside world (including TypeScript
 interop), except that excess command line arguments are passed to the main
 function as strings.
+
+## Contributing
+
+We'd be thrilled to have your help! Please see
+[CONTRIBUTING.md](CONTRIBUTING.md).
