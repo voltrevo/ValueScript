@@ -20,35 +20,19 @@ export default function main() {
   let rightBowl = leftBowl;
   rightBowl.push("peach");
 
-  return { leftBowl, rightBowl };
+  return leftBowl.includes("peach");
+  // TypeScript:  true
+  // ValueScript: false
 }
 ```
 
-In TypeScript, `main()` produces:
+In TypeScript, `"peach"` is in the left bowl because TypeScript interprets
+`rightBowl = leftBowl` to mean that there is one bowl and both variables point
+to the same bowl. That bowl can then change.
 
-```js
-{
-  leftBowl: ['apple', 'mango', 'peach'],
-  rightBowl: ['apple', 'mango', 'peach'],
-}
-```
-
-This is because TypeScript interprets the code to mean that `leftBowl` and
-`rightBowl` are the _same_ object, and that object _changes_.
-
-In ValueScript, objects do not change, but variables do. Pushing onto
-`rightBowl` is interpreted as a change to the `rightBowl` variable itself, not
-the data it points to. `rightBowl` points to some new data, which may reference
-the old data, but only as a performance optimization.
-
-This is how ValueScript achieves the output below for the same input program:
-
-```js
-{
-  leftBowl: ['apple', 'mango'],
-  rightBowl: ['apple', 'mango', 'peach'],
-}
-```
+In ValueScript, objects never change this way, only variables change. Pushing
+onto `rightBowl` is interpreted as a change to the `rightBowl` variable itself,
+not the data it points to.
 
 You can
 [see this in the playground](https://valuescript.org/playground/#tutorial/valueSemantics.ts),

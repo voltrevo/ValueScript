@@ -1,10 +1,12 @@
-// test_output! {"leftBowl":["apple","mango"],"rightBowl":["apple","mango","peach"]}
+// test_output! false
 
 export default function main() {
-  const leftBowl = ['apple', 'mango'];
+  const leftBowl = ["apple", "mango"];
 
   let rightBowl = leftBowl;
-  rightBowl.push('peach');
+  rightBowl.push("peach");
 
-  return { leftBowl, rightBowl };
+  return leftBowl.includes("peach");
+  // TypeScript:  true
+  // ValueScript: false
 }
