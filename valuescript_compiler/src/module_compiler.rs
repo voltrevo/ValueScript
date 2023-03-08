@@ -8,8 +8,8 @@ use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
 use crate::asm::{
-  Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Module, Object,
-  Pointer, Register, Value,
+  Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Lazy, Module,
+  Object, Pointer, Register, Value,
 };
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
@@ -311,6 +311,7 @@ impl ModuleCompiler {
     match module_decl {
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
       ExportDecl(ed) => self.compile_export_decl(ed, scope),
+      Import(import) => self.compile_import(import, scope),
       _ => self.todo(module_decl.span(), "non-export default module declaration"),
     }
   }
@@ -453,6 +454,89 @@ impl ModuleCompiler {
       Decl::TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration in export"),
       Decl::TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration in export"),
     };
+  }
+
+  fn compile_import(&mut self, import: &swc_ecma_ast::ImportDecl, scope: &Scope) {
+    let import_path = import.src.value.to_string();
+
+    for specifier in &import.specifiers {
+      use swc_ecma_ast::ImportSpecifier::*;
+      use swc_ecma_ast::ModuleExportName;
+
+      match specifier {
+        Named(named) => {
+          let local_name = named.local.sym.to_string();
+
+          let external_name = match &named.imported {
+            Some(ModuleExportName::Ident(ident)) => ident.sym.to_string(),
+            Some(ModuleExportName::Str(str_)) => {
+              self.todo(
+                str_.span,
+                "importing a module export by string (is this a real thing?)",
+              );
+
+              "_todo_import_string".to_string()
+            }
+            None => local_name.clone(),
+          };
+
+          let pointer = scope
+            .get_defn(&local_name)
+            .expect("imported name should have been in scope");
+
+          self.module.definitions.push(Definition {
+            pointer,
+            content: DefinitionContent::Lazy(Lazy {
+              body: vec![
+                InstructionOrLabel::Instruction(Instruction::ImportStar(
+                  Value::String(import_path.clone()),
+                  Register::Return,
+                )),
+                InstructionOrLabel::Instruction(Instruction::Sub(
+                  Value::Register(Register::Return),
+                  Value::String(external_name),
+                  Register::Return,
+                )),
+              ],
+            }),
+          });
+        }
+        Default(default) => {
+          let local_name = default.local.sym.to_string();
+
+          let pointer = scope
+            .get_defn(&local_name)
+            .expect("imported name should have been in scope");
+
+          self.module.definitions.push(Definition {
+            pointer,
+            content: DefinitionContent::Lazy(Lazy {
+              body: vec![InstructionOrLabel::Instruction(Instruction::Import(
+                Value::String(import_path.clone()),
+                Register::Return,
+              ))],
+            }),
+          });
+        }
+        Namespace(namespace) => {
+          let local_name = namespace.local.sym.to_string();
+
+          let pointer = scope
+            .get_defn(&local_name)
+            .expect("imported name should have been in scope");
+
+          self.module.definitions.push(Definition {
+            pointer,
+            content: DefinitionContent::Lazy(Lazy {
+              body: vec![InstructionOrLabel::Instruction(Instruction::ImportStar(
+                Value::String(import_path.clone()),
+                Register::Return,
+              ))],
+            }),
+          });
+        }
+      }
+    }
   }
 
   fn compile_fn(

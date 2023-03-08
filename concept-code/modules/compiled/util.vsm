@@ -1,4 +1,5 @@
 export void { "dist": @dist }
+
 @dist = function(%x, %y) {
   op* %x %x %_tmp0
   op* %y %y %_tmp1

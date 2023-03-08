@@ -279,6 +279,8 @@ pub enum Instruction {
   UnaryPlus(Value, Register),
   UnaryMinus(Value, Register),
   New(Value, Value, Register),
+  Import(Value, Register),
+  ImportStar(Value, Register),
 }
 
 impl std::fmt::Display for Instruction {
@@ -408,6 +410,12 @@ impl std::fmt::Display for Instruction {
       Instruction::New(value, args, register) => {
         write!(f, "new {} {} {}", value, args, register)
       }
+      Instruction::Import(value, register) => {
+        write!(f, "import {} {}", value, register)
+      }
+      Instruction::ImportStar(value, register) => {
+        write!(f, "import* {} {}", value, register)
+      }
     }
   }
 }
@@ -462,6 +470,8 @@ impl Instruction {
       UnaryPlus(..) => 0x29,
       UnaryMinus(..) => 0x2a,
       New(..) => 0x2b,
+      Import(..) => 0x2c,
+      ImportStar(..) => 0x2d,
     }
   }
 }

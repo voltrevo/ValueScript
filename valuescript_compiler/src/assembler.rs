@@ -164,7 +164,9 @@ impl Assembler {
       | OpBitNot(arg, dst)
       | TypeOf(arg, dst)
       | UnaryPlus(arg, dst)
-      | UnaryMinus(arg, dst) => {
+      | UnaryMinus(arg, dst)
+      | Import(arg, dst)
+      | ImportStar(arg, dst) => {
         self.value(arg);
         self.register(dst);
       }
