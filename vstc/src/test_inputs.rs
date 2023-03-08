@@ -34,9 +34,7 @@ mod tests {
         if first_line.starts_with("// test_output! ") {
           println!("\nTesting {} ...", file_path.to_str().unwrap());
 
-          let output_str = first_line
-            .splitn(2, "// test_output! ")
-            .nth(1)
+          let output_str = first_line.split_once("// test_output! ").map(|x| x.1)
             .unwrap_or("");
 
           let compiler_output = compile(&file_contents);

@@ -45,33 +45,33 @@ fn main() {
 
 fn show_help() {
   println!("ValueScript toolchain 0.1.0");
-  println!("");
+  println!();
   println!("USAGE:");
   println!("    vstc [OPTIONS] [SUBCOMMAND]");
-  println!("");
+  println!();
   println!("OPTIONS:");
   println!("    -h, --help");
   println!("            Print help information");
-  println!("");
+  println!();
   println!("    -V, --version");
   println!("            Print version information");
-  println!("");
+  println!();
   println!("SUBCOMMANDS:");
   println!("    compile");
   println!("            Compile an entry point");
-  println!("");
+  println!();
   println!("    assemble");
   println!("            Convert assembly to bytecode");
-  println!("");
+  println!();
   println!("    disassemble");
   println!("            Convert bytecode to assembly");
-  println!("");
+  println!();
   println!("    run");
   println!("            Run a program");
-  println!("");
+  println!();
   println!("    repl");
   println!("            Read Eval Print Loop");
-  println!("");
+  println!();
   println!("    host");
   println!("            Start database server");
 }

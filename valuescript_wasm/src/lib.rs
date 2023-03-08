@@ -40,10 +40,10 @@ fn run_to_result(source: &str) -> RunResult {
   let mut vm = valuescript_vm::VirtualMachine::new();
   let result = vm.run(&bytecode, &[]);
 
-  return RunResult {
+  RunResult {
     diagnostics: compiler_output.diagnostics,
     output: Ok(result.codify()),
-  };
+  }
 }
 
 #[derive(serde::Serialize)]
@@ -65,12 +65,12 @@ impl CompilerOutputWasm {
 pub fn compile(source: &str) -> String {
   let output = valuescript_compiler::compile(source);
 
-  return serde_json::to_string(&CompilerOutputWasm::from_compiler_output(output))
-    .expect("Failed json serialization");
+  serde_json::to_string(&CompilerOutputWasm::from_compiler_output(output))
+    .expect("Failed json serialization")
 }
 
 #[wasm_bindgen]
 pub fn run(source: &str) -> String {
   let result = run_to_result(source);
-  return serde_json::to_string(&result).expect("Failed json serialization");
+  serde_json::to_string(&result).expect("Failed json serialization")
 }

@@ -29,9 +29,9 @@ pub fn compile_command(args: &Vec<String>) {
 
 fn show_help() {
   println!("vstc compile");
-  println!("");
+  println!();
   println!("Compile ValueScript");
-  println!("");
+  println!();
   println!("USAGE:");
   println!("    vstc compile <entry point>");
 }

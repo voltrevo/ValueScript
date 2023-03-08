@@ -94,5 +94,5 @@ fn pos_to_line_col(text: &String, pos: u32) -> (u32, u32) {
     }
   }
 
-  return (line, col);
+  (line, col)
 }

@@ -73,47 +73,47 @@ fn format_from_path(file_path: &String) -> RunFormat {
 }
 
 fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
-  return match format {
+  match format {
     RunFormat::TypeScript => {
       let source = std::fs::read_to_string(file_path).expect("Failed to read file");
       let compiler_output = compile(&source);
       handle_diagnostics_cli(file_path, &compiler_output.diagnostics);
 
-      return assemble(&compiler_output.module);
+      assemble(&compiler_output.module)
     }
 
     RunFormat::Assembly => {
-      let file_content = std::fs::read_to_string(&file_path)
-        .expect(&std::format!("Failed to read file {}", file_path));
+      let file_content = std::fs::read_to_string(file_path)
+        .unwrap_or_else(|_| panic!("Failed to read file {}", file_path));
 
       let module = parse_module(&file_content);
       assemble(&module)
     }
 
     RunFormat::Bytecode => {
-      Rc::new(std::fs::read(&file_path).expect(&std::format!("Failed to read file {}", file_path)))
+      Rc::new(std::fs::read(file_path).unwrap_or_else(|_| panic!("Failed to read file {}", file_path)))
     }
-  };
+  }
 }
 
 fn show_help() {
   println!("vstc run");
-  println!("");
+  println!();
   println!("Run a ValueScript program");
-  println!("");
+  println!();
   println!("USAGE:");
   println!("    vstc run [OPTIONS] <file>");
-  println!("");
+  println!();
   println!("OPTIONS:");
   println!("    --assembly");
   println!("            Interpret <file> as assembly");
-  println!("");
+  println!();
   println!("    --bytecode");
   println!("            Interpret <file> as bytecode");
-  println!("");
+  println!();
   println!("    --typescript");
   println!("            Interpret <file> as typescript");
-  println!("");
+  println!();
   println!("NOTE:");
   println!("    <file> will be interpreted based on file extension if not otherwise specified");
 }

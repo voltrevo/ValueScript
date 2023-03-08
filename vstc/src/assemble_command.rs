@@ -37,9 +37,9 @@ pub fn assemble_command(args: &Vec<String>) {
 
 fn show_help() {
   println!("vstc assemble");
-  println!("");
+  println!();
   println!("Convert ValueScript assembly to bytecode");
-  println!("");
+  println!();
   println!("USAGE:");
   println!("    vstc assemble <file>");
 }
