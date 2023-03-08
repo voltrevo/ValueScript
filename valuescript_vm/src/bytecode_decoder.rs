@@ -18,7 +18,7 @@ pub struct BytecodeDecoder {
 }
 
 #[repr(u8)]
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum BytecodeType {
   End = 0x00,
   Void = 0x01,
@@ -36,31 +36,32 @@ pub enum BytecodeType {
   Register = 0x0e,
   Builtin = 0x10,
   Class = 0x11,
+  Unrecognized = 0xff,
 }
 
 impl BytecodeType {
-  fn from_byte(byte: u8) -> Option<BytecodeType> {
+  fn from_byte(byte: u8) -> BytecodeType {
     use BytecodeType::*;
 
     return match byte {
-      0x00 => Some(End),
-      0x01 => Some(Void),
-      0x02 => Some(Undefined),
-      0x03 => Some(Null),
-      0x04 => Some(False),
-      0x05 => Some(True),
-      0x06 => Some(SignedByte),
-      0x07 => Some(Number),
-      0x08 => Some(String),
-      0x09 => Some(Array),
-      0x0a => Some(Object),
-      0x0b => Some(Function),
-      0x0d => Some(Pointer),
-      0x0e => Some(Register),
-      0x10 => Some(Builtin),
-      0x11 => Some(Class),
+      0x00 => End,
+      0x01 => Void,
+      0x02 => Undefined,
+      0x03 => Null,
+      0x04 => False,
+      0x05 => True,
+      0x06 => SignedByte,
+      0x07 => Number,
+      0x08 => String,
+      0x09 => Array,
+      0x0a => Object,
+      0x0b => Function,
+      0x0d => Pointer,
+      0x0e => Register,
+      0x10 => Builtin,
+      0x11 => Class,
 
-      _ => None,
+      _ => Unrecognized,
     };
   }
 }
@@ -77,13 +78,11 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_type(&mut self) -> BytecodeType {
-    return BytecodeType::from_byte(self.decode_byte())
-      .expect(format!("Unrecognized bytecode type at {}", self.pos - 1).as_str());
+    return BytecodeType::from_byte(self.decode_byte());
   }
 
   pub fn peek_type(&self) -> BytecodeType {
-    return BytecodeType::from_byte(self.peek_byte())
-      .expect(format!("Unrecognized bytecode type at {}", self.pos).as_str());
+    return BytecodeType::from_byte(self.peek_byte());
   }
 
   pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
@@ -133,6 +132,7 @@ impl BytecodeDecoder {
         constructor: self.decode_val(registers),
         instance_prototype: self.decode_val(registers),
       })),
+      BytecodeType::Unrecognized => std::panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
   }
 
@@ -205,10 +205,14 @@ impl BytecodeDecoder {
     let pos = self.decode_pos();
 
     if pos < from_pos {
-      if self.clone_at(pos).decode_type() != BytecodeType::Function
-        && self.clone_at(pos).decode_type() != BytecodeType::Class
-      {
-        std::panic!("Invalid: non-function pointer that points backwards");
+      // Question: Why is this different from self.peek_type()?
+      let type_ = self.clone_at(pos).decode_type();
+
+      match type_ {
+        BytecodeType::Function | BytecodeType::Class | BytecodeType::Unrecognized => {}
+        _ => {
+          std::panic!("Invalid: {:?} pointer that points backwards", type_);
+        }
       }
     }
 

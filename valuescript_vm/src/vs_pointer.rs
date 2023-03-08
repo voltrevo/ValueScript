@@ -1,11 +1,11 @@
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
-use super::vs_value::{Val, ValTrait, VsType, LoadFunctionResult};
 use super::bytecode_decoder::{BytecodeDecoder, BytecodeType};
-use super::vs_object::VsObject;
 use super::vs_array::VsArray;
 use super::vs_class::VsClass;
+use super::vs_object::VsObject;
+use super::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 pub struct VsPointer {
   bytecode: Rc<Vec<u8>>,
@@ -68,7 +68,8 @@ impl ValTrait for VsPointer {
       BytecodeType::Register => std::panic!("Invalid: pointer to register"),
       BytecodeType::Builtin => std::panic!("Invalid: pointer to builtin"),
       BytecodeType::Class => VsType::Class,
-    }
+      BytecodeType::Unrecognized => std::panic!("Unrecognized bytecode type at {}", self.pos - 1),
+    };
   }
 
   fn val_to_string(&self) -> String {
@@ -94,7 +95,7 @@ impl ValTrait for VsPointer {
       VsType::Object => false,
       VsType::Function => false,
       VsType::Class => false,
-    }
+    };
   }
 
   fn to_primitive(&self) -> Val {
