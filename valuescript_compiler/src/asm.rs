@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Module {
   pub export_default: Value,
   pub export_star: Object,
@@ -47,7 +47,7 @@ impl std::fmt::Display for Module {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Definition {
   pub pointer: Pointer,
   pub content: DefinitionContent,
@@ -59,7 +59,7 @@ impl std::fmt::Display for Definition {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DefinitionContent {
   Function(Function),
   Class(Class),
@@ -97,7 +97,7 @@ impl std::fmt::Display for Pointer {
   }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Function {
   pub parameters: Vec<Register>,
   pub body: Vec<InstructionOrLabel>,
@@ -127,7 +127,7 @@ impl std::fmt::Display for Function {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Class {
   pub constructor: Value,
   pub methods: Value,
@@ -513,7 +513,7 @@ impl std::fmt::Display for Value {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lazy {
   pub body: Vec<InstructionOrLabel>,
 }
