@@ -4,12 +4,13 @@ mod tests {
   use std::fs;
   use std::path::{Path, PathBuf};
 
-  use valuescript_compiler::compile_module;
+  use valuescript_compiler::compile;
   use valuescript_compiler::{assemble, parse_module};
   use valuescript_vm::ValTrait;
   use valuescript_vm::VirtualMachine;
 
   use crate::handle_diagnostics_cli::handle_diagnostics_cli;
+  use crate::resolve_entry_path::resolve_entry_path;
 
   #[test]
   fn test_inputs() {
@@ -39,27 +40,39 @@ mod tests {
             .map(|x| x.1)
             .unwrap_or("");
 
-          let compiler_output = compile_module(&file_contents);
-
-          handle_diagnostics_cli(
-            &file_path.to_str().expect("").to_string(),
-            &compiler_output.diagnostics,
+          let resolved_path = resolve_entry_path(
+            &file_path
+              .to_str()
+              .expect("Failed to convert to str")
+              .to_string(),
           );
 
-          for diagnostic in &compiler_output.diagnostics {
-            use valuescript_compiler::DiagnosticLevel;
+          let compile_result = compile(resolved_path, |path| {
+            fs::read_to_string(path).map_err(|err| err.to_string())
+          });
 
-            match diagnostic.level {
-              DiagnosticLevel::Error | DiagnosticLevel::InternalError => {
-                failed_paths.insert(file_path.clone());
+          for (path, diagnostics) in compile_result.diagnostics.iter() {
+            handle_diagnostics_cli(&path.path, diagnostics);
+
+            for diagnostic in diagnostics {
+              use valuescript_compiler::DiagnosticLevel;
+
+              match diagnostic.level {
+                DiagnosticLevel::Error | DiagnosticLevel::InternalError => {
+                  failed_paths.insert(file_path.clone());
+                }
+                DiagnosticLevel::Lint | DiagnosticLevel::CompilerDebug => {}
               }
-              DiagnosticLevel::Lint | DiagnosticLevel::CompilerDebug => {}
             }
           }
 
-          let bytecode = assemble(&compiler_output.module);
+          let module = compile_result
+            .module
+            .expect("Should have exited if module is None");
 
-          let assembly = compiler_output.module.to_string();
+          let bytecode = assemble(&module);
+
+          let assembly = module.to_string();
           let parsed_assembly = parse_module(&assembly);
           let bytecode_via_assembly = assemble(&parsed_assembly);
 

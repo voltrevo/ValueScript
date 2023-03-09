@@ -21,7 +21,7 @@ where
 
   result
     .diagnostics
-    .entry(entry_point.clone())
+    .entry(entry_point)
     .or_default()
     .append(&mut link_module_result.diagnostics);
 
