@@ -191,7 +191,12 @@ impl ModuleCompiler {
                 }
               }
               swc_ecma_ast::DefaultDecl::Class(class) => {
-                self.todo(class.class.span, "Class default export")
+                if let Some(id) = &class.ident {
+                  scope.set(
+                    id.sym.to_string(),
+                    MappedName::Definition(self.allocate_defn(&id.sym.to_string())),
+                  );
+                }
               }
               swc_ecma_ast::DefaultDecl::TsInterfaceDecl(_) => {
                 // Nothing to do
@@ -346,7 +351,9 @@ impl ModuleCompiler {
     use swc_ecma_ast::Decl::*;
 
     match decl {
-      Class(class) => self.compile_class_decl(false, class, scope),
+      Class(class) => {
+        self.compile_class(None, Some(class.ident.sym.to_string()), &class.class, scope);
+      }
       Fn(fn_) => self.compile_fn_decl(false, fn_, scope),
       Var(var_decl) => {
         if !var_decl.declare {
@@ -398,7 +405,15 @@ impl ModuleCompiler {
     use swc_ecma_ast::DefaultDecl;
 
     match &edd.decl {
-      DefaultDecl::Class(_) => self.todo(edd.span, "DefaultDecl::Class"),
+      DefaultDecl::Class(class) => {
+        let class_name = match &class.ident {
+          Some(ident) => Some(ident.sym.to_string()),
+          None => None,
+        };
+
+        let pointer = self.compile_class(None, class_name, &class.class, scope);
+        self.module.export_default = Value::Pointer(pointer);
+      }
       DefaultDecl::Fn(fn_) => {
         let (fn_name, defn) = match &fn_.ident {
           Some(ident) => {
@@ -439,7 +454,16 @@ impl ModuleCompiler {
     use swc_ecma_ast::Decl;
 
     match &ed.decl {
-      Decl::Class(class) => self.compile_class_decl(true, class, scope),
+      Decl::Class(class) => {
+        let class_name = class.ident.sym.to_string();
+
+        self.compile_class(
+          Some(class_name.clone()),
+          Some(class_name),
+          &class.class,
+          scope,
+        );
+      }
       Decl::Fn(fn_) => self.compile_fn_decl(true, fn_, scope),
       Decl::Var(var_decl) => {
         if !var_decl.declare {
@@ -559,41 +583,47 @@ impl ModuleCompiler {
     defn
   }
 
-  fn compile_class_decl(
+  fn compile_class(
     &mut self,
-    export: bool,
-    class_decl: &swc_ecma_ast::ClassDecl,
+    export_name: Option<String>,
+    class_name: Option<String>,
+    class: &swc_ecma_ast::Class,
     parent_scope: &Scope,
-  ) {
+  ) -> Pointer {
     let mut constructor: Value = Value::Void;
     let mut methods: Object = Object::default();
     let mut dependent_definitions: Vec<Definition>;
 
-    let class_name = class_decl.ident.sym.to_string();
+    let defn_name = 'block: {
+      let class_name = match class_name {
+        Some(class_name) => class_name,
+        None => break 'block self.allocate_defn_numbered("_anon"),
+      };
 
-    let defn_name = match parent_scope.get(&class_name) {
-      Some(MappedName::Definition(d)) => d,
-      _ => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!("Definition for {} should have been in scope", class_name),
-          span: class_decl.ident.span,
-        });
+      match parent_scope.get(&class_name) {
+        Some(MappedName::Definition(d)) => d,
+        _ => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: format!("Definition for {} should have been in scope", class_name),
+            span: class.span, // FIXME: make class_name ident and use that span
+          });
 
-        return;
+          return self.allocate_defn_numbered("_scope_error");
+        }
       }
     };
 
-    if export {
+    if let Some(export_name) = export_name {
       self.module.export_star.properties.push((
-        Value::String(class_name.clone()),
+        Value::String(export_name),
         Value::Pointer(defn_name.clone()),
       ));
     }
 
     let mut member_initializers_fnc = FunctionCompiler::new(self.definition_allocator.clone());
 
-    for class_member in &class_decl.class.body {
+    for class_member in &class.body {
       match class_member {
         swc_ecma_ast::ClassMember::ClassProp(class_prop) => {
           if class_prop.is_static {
@@ -636,12 +666,12 @@ impl ModuleCompiler {
 
     let mut has_constructor = false;
 
-    for class_member in &class_decl.class.body {
+    for class_member in &class.body {
       match class_member {
         swc_ecma_ast::ClassMember::Constructor(ctor) => {
           has_constructor = true;
 
-          let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", class_name));
+          let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
 
           dependent_definitions.append(&mut self.compile_fn(
             ctor_defn_name.clone(),
@@ -657,7 +687,7 @@ impl ModuleCompiler {
     }
 
     if member_initializers_assembly.len() > 0 && !has_constructor {
-      let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", class_name));
+      let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
 
       constructor = Value::Pointer(ctor_defn_name.clone());
       dependent_definitions.push(Definition {
@@ -669,7 +699,7 @@ impl ModuleCompiler {
       });
     }
 
-    for class_member in &class_decl.class.body {
+    for class_member in &class.body {
       use swc_ecma_ast::ClassMember::*;
 
       match class_member {
@@ -716,7 +746,7 @@ impl ModuleCompiler {
     }
 
     self.module.definitions.push(Definition {
-      pointer: defn_name,
+      pointer: defn_name.clone(),
       content: DefinitionContent::Class(Class {
         constructor,
         methods: Value::Object(Box::new(methods)),
@@ -724,5 +754,7 @@ impl ModuleCompiler {
     });
 
     self.module.definitions.append(&mut dependent_definitions);
+
+    defn_name
   }
 }
