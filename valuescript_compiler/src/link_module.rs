@@ -12,7 +12,7 @@ use crate::{asm::Module, Diagnostic};
 
 pub struct LinkModuleResult {
   pub module: Option<Module>,
-  pub diagnostics: Vec<Diagnostic>,
+  pub diagnostics: Vec<Diagnostic>, // TODO: Associate paths/spans properly
 }
 
 pub fn link_module(

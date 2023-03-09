@@ -3,8 +3,7 @@ use std::io::Write;
 use std::process::exit;
 
 use super::handle_diagnostics_cli::handle_diagnostics_cli;
-use valuescript_compiler::gather_modules;
-use valuescript_compiler::link_module;
+use valuescript_compiler::compile;
 use valuescript_compiler::resolve_path;
 use valuescript_compiler::ResolvedPath;
 
@@ -31,20 +30,15 @@ pub fn compile_command(args: &Vec<String>) {
 
   let resolved_entry_path = resolve_path(&cwd_file, entry_path);
 
-  let gm = gather_modules(resolved_entry_path, |path| {
+  let compile_result = compile(resolved_entry_path, |path| {
     std::fs::read_to_string(path).map_err(|err| err.to_string())
   });
 
-  for (path, diagnostics) in gm.diagnostics.iter() {
+  for (path, diagnostics) in compile_result.diagnostics.iter() {
     handle_diagnostics_cli(&path.path, diagnostics);
   }
 
-  let link_module_result = link_module(&gm.entry_point, &gm.modules);
-
-  // FIXME: Diagnostics from link_module should have paths associated
-  handle_diagnostics_cli(&gm.entry_point.path, &link_module_result.diagnostics);
-
-  let module = link_module_result
+  let module = compile_result
     .module
     .expect("Should have exited if module is None");
 

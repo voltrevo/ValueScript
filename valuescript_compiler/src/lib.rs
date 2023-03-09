@@ -2,6 +2,7 @@ mod asm;
 mod assembler;
 mod assembly_parser;
 mod capture_finder;
+mod compile;
 mod diagnostic;
 mod expression_compiler;
 mod function_compiler;
@@ -16,6 +17,7 @@ mod scope_analysis;
 
 pub use assembler::assemble;
 pub use assembly_parser::parse_module;
+pub use compile::compile;
 pub use diagnostic::Diagnostic;
 pub use diagnostic::DiagnosticLevel;
 pub use gather_modules::gather_modules;
