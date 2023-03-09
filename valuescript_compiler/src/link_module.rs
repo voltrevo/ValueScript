@@ -106,7 +106,7 @@ pub fn link_module(
     &mut result.diagnostics,
   );
 
-  // TODO: collapse_pointers_of_pointers(&mut path_and_module.module);
+  collapse_pointers_of_pointers(&mut path_and_module.module);
   // TODO: shake_tree(&mut path_and_module.module);
 
   result.module = Some(path_and_module.module);
@@ -141,6 +141,7 @@ where
   pointer_visitor.module(module);
 }
 
+#[derive(PartialEq)]
 enum PointerKind {
   Definition,
   Reference,
@@ -380,4 +381,36 @@ fn link_import_patterns(
 
     *definition = new_definition;
   }
+}
+
+fn collapse_pointers_of_pointers(module: &mut Module) {
+  let mut double_pointer_map = HashMap::<Pointer, Pointer>::new();
+
+  for definition in &mut module.definitions {
+    let pointer = match &definition.content {
+      DefinitionContent::Value(Value::Pointer(pointer)) => pointer,
+      _ => continue,
+    };
+
+    double_pointer_map.insert(definition.pointer.clone(), pointer.clone());
+  }
+
+  visit_pointers(module, |kind, pointer| {
+    if kind == PointerKind::Definition {
+      return;
+    }
+
+    let mut mapped_pointer: &Pointer = pointer;
+
+    loop {
+      if let Some(new_pointer) = double_pointer_map.get(mapped_pointer) {
+        mapped_pointer = new_pointer;
+        continue;
+      }
+
+      break;
+    }
+
+    *pointer = mapped_pointer.clone();
+  });
 }
