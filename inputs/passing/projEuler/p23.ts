@@ -16,7 +16,7 @@ export default function main() {
       nonAbundantSums.push(i);
     }
 
-    // To see progress (takes a few minutes)
+    // Uncomment to see progress (program takes ~30s with a release build)
     // if (i % 1000 === 0) {
     //   Debug.log(i);
     // }
@@ -37,8 +37,30 @@ function hasAbundantSum(n: number, abundantNumbers: number[]) {
       return false;
     }
 
-    if (abundantNumbers.includes(n - abundantNumber)) {
+    if (binarySearch(abundantNumbers, n - abundantNumber)) {
       return true;
+    }
+  }
+
+  return false;
+}
+
+function binarySearch(array: number[], value: number) {
+  let min = 0;
+  let max = array.length - 1;
+
+  while (min <= max) {
+    const mid = Math.floor((min + max) / 2);
+    const guess = array[mid];
+
+    if (guess === value) {
+      return true;
+    }
+
+    if (guess > value) {
+      max = mid - 1;
+    } else {
+      min = mid + 1;
     }
   }
 
