@@ -4,7 +4,7 @@ use queues::{IsQueue, Queue};
 
 use crate::{
   asm::Module,
-  compile,
+  compile_module,
   import_pattern::ImportPattern,
   resolve_path::{resolve_path, ResolvedPath},
   Diagnostic, DiagnosticLevel,
@@ -82,7 +82,7 @@ where
       }
     };
 
-    let mut compiler_output = compile(&file_contents);
+    let mut compiler_output = compile_module(&file_contents);
 
     gm.diagnostics
       .entry(dependency.path.clone())

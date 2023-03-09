@@ -16,7 +16,7 @@ struct RunResult {
 }
 
 fn run_to_result(source: &str) -> RunResult {
-  let compiler_output = valuescript_compiler::compile(source);
+  let compiler_output = valuescript_compiler::compile_module(source);
 
   let mut have_compiler_errors = false;
 
@@ -63,7 +63,7 @@ impl CompilerOutputWasm {
 
 #[wasm_bindgen]
 pub fn compile(source: &str) -> String {
-  let output = valuescript_compiler::compile(source);
+  let output = valuescript_compiler::compile_module(source);
 
   serde_json::to_string(&CompilerOutputWasm::from_compiler_output(output))
     .expect("Failed json serialization")

@@ -4,7 +4,7 @@ mod tests {
   use std::fs;
   use std::path::{Path, PathBuf};
 
-  use valuescript_compiler::compile;
+  use valuescript_compiler::compile_module;
   use valuescript_compiler::{assemble, parse_module};
   use valuescript_vm::ValTrait;
   use valuescript_vm::VirtualMachine;
@@ -34,10 +34,12 @@ mod tests {
         if first_line.starts_with("// test_output! ") {
           println!("\nTesting {} ...", file_path.to_str().unwrap());
 
-          let output_str = first_line.split_once("// test_output! ").map(|x| x.1)
+          let output_str = first_line
+            .split_once("// test_output! ")
+            .map(|x| x.1)
             .unwrap_or("");
 
-          let compiler_output = compile(&file_contents);
+          let compiler_output = compile_module(&file_contents);
 
           handle_diagnostics_cli(
             &file_path.to_str().expect("").to_string(),

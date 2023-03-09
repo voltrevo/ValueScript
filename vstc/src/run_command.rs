@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::{ffi::OsStr, path::Path, process::exit};
 
-use valuescript_compiler::{assemble, compile, parse_module};
+use valuescript_compiler::{assemble, compile_module, parse_module};
 use valuescript_vm::VirtualMachine;
 
 use super::handle_diagnostics_cli::handle_diagnostics_cli;
@@ -76,7 +76,7 @@ fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
   match format {
     RunFormat::TypeScript => {
       let source = std::fs::read_to_string(file_path).expect("Failed to read file");
-      let compiler_output = compile(&source);
+      let compiler_output = compile_module(&source);
       handle_diagnostics_cli(file_path, &compiler_output.diagnostics);
 
       assemble(&compiler_output.module)
@@ -90,9 +90,9 @@ fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
       assemble(&module)
     }
 
-    RunFormat::Bytecode => {
-      Rc::new(std::fs::read(file_path).unwrap_or_else(|_| panic!("Failed to read file {}", file_path)))
-    }
+    RunFormat::Bytecode => Rc::new(
+      std::fs::read(file_path).unwrap_or_else(|_| panic!("Failed to read file {}", file_path)),
+    ),
   }
 }
 

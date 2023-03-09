@@ -80,7 +80,7 @@ pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
   };
 }
 
-pub fn compile(source: &str) -> CompilerOutput {
+pub fn compile_module(source: &str) -> CompilerOutput {
   let (program_optional, mut diagnostics) = parse(source);
 
   let mut compiler_output = match program_optional {
