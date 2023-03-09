@@ -1,34 +1,41 @@
-use std::{
-  collections::{HashMap, HashSet},
-  path::{Path, PathBuf},
-};
+use std::collections::{HashMap, HashSet};
 
 use queues::{IsQueue, Queue};
 
 use crate::{
-  asm::{DefinitionContent, Instruction, InstructionOrLabel, Module, Value},
-  compile, Diagnostic, DiagnosticLevel,
+  asm::Module,
+  compile,
+  import_pattern::ImportPattern,
+  resolve_path::{resolve_path, ResolvedPath},
+  Diagnostic, DiagnosticLevel,
 };
 
 #[derive(Clone, Debug)]
 enum DependencyReason {
   EntryPoint,
-  ImportedBy(String),
+  ImportedBy(ResolvedPath),
 }
 
 #[derive(Clone)]
 struct Dependency {
-  path: String,
+  path: ResolvedPath,
   reason: DependencyReason,
 }
 
-pub struct GatheredModules {
-  pub entry_point: String,
-  pub modules: HashMap<String, Module>,
-  pub diagnostics: HashMap<String, Vec<Diagnostic>>,
+#[derive(Clone)]
+pub struct PathAndModule {
+  // FIXME: This should just be something like CompiledModule, and also include diagnostics
+  pub path: ResolvedPath,
+  pub module: Module,
 }
 
-pub fn gather_modules<ReadFile>(entry_point: String, read_file: ReadFile) -> GatheredModules
+pub struct GatheredModules {
+  pub entry_point: ResolvedPath,
+  pub modules: HashMap<ResolvedPath, PathAndModule>,
+  pub diagnostics: HashMap<ResolvedPath, Vec<Diagnostic>>,
+}
+
+pub fn gather_modules<ReadFile>(entry_point: ResolvedPath, read_file: ReadFile) -> GatheredModules
 where
   ReadFile: Fn(&str) -> Result<String, String>,
 {
@@ -53,9 +60,10 @@ where
       Err(_) => break,
     };
 
-    let file_contents = match read_file(&dependency.path) {
+    let file_contents = match read_file(&dependency.path.path) {
       Ok(file_contents) => file_contents,
       Err(err) => {
+        // FIXME: This diagnostic should really be attached to the import statement
         gm.diagnostics
           .entry(dependency.path.clone())
           .or_insert(vec![])
@@ -64,7 +72,7 @@ where
             message: match dependency.reason {
               DependencyReason::EntryPoint => format!("File read failed: {}", err),
               DependencyReason::ImportedBy(importer) => {
-                format!("Error reading file imported by {}: {}", importer, err)
+                format!("File read failed: {} (imported by: {})", err, importer)
               }
             },
             span: swc_common::DUMMY_SP,
@@ -81,10 +89,12 @@ where
       .or_insert(vec![])
       .append(&mut compiler_output.diagnostics);
 
-    for imported_path in get_imported_paths(
-      &compiler_output.module,
-      &DependencyReason::ImportedBy(dependency.path.clone()),
-    ) {
+    let path_and_module = PathAndModule {
+      path: dependency.path.clone(),
+      module: compiler_output.module,
+    };
+
+    for imported_path in get_imported_paths(&path_and_module) {
       if gm.modules.contains_key(&imported_path) {
         continue;
       }
@@ -97,53 +107,22 @@ where
         .expect("Failed to add to queue");
     }
 
-    gm.modules.insert(dependency.path, compiler_output.module);
+    gm.modules.insert(dependency.path, path_and_module);
   }
 
   gm
 }
 
-fn get_imported_paths(module: &Module, reason: &DependencyReason) -> HashSet<String> {
-  let mut imported_paths = HashSet::<String>::new();
+pub fn get_imported_paths(path_and_module: &PathAndModule) -> HashSet<ResolvedPath> {
+  let mut imported_paths = HashSet::<ResolvedPath>::new();
 
-  for definition in &module.definitions {
-    let lazy = match &definition.content {
-      DefinitionContent::Lazy(lazy) => lazy,
-      _ => continue,
+  for definition in &path_and_module.module.definitions {
+    let import_pattern = match ImportPattern::decode(definition) {
+      Some(import_pattern) => import_pattern,
+      None => continue,
     };
 
-    match lazy.body.first() {
-      Some(InstructionOrLabel::Instruction(instruction)) => {
-        match instruction {
-          Instruction::Import(import_path, _) | Instruction::ImportStar(import_path, _) => {
-            match import_path {
-              Value::String(import_path) => {
-                let resolved_path = match reason {
-                  DependencyReason::EntryPoint => import_path.clone(),
-                  DependencyReason::ImportedBy(importer) => {
-                    let importer_path = PathBuf::from(importer);
-                    let parent = importer_path.parent().unwrap_or_else(|| Path::new("/"));
-
-                    parent
-                      .join(import_path)
-                      .canonicalize()
-                      .expect("Failed to canonicalize path")
-                      .to_str()
-                      .expect("Failed to convert path to string")
-                      .to_string()
-                  }
-                };
-
-                imported_paths.insert(resolved_path);
-              }
-              _ => {}
-            }
-          }
-          _ => {}
-        };
-      }
-      _ => {}
-    }
+    imported_paths.insert(resolve_path(&path_and_module.path, &import_pattern.path));
   }
 
   imported_paths

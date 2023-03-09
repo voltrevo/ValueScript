@@ -587,3 +587,23 @@ impl std::fmt::Display for Object {
     write!(f, " }}")
   }
 }
+
+impl Object {
+  pub fn try_resolve_key(&self, key: &String) -> Option<&Value> {
+    let mut result: Option<&Value> = None;
+
+    for (k, v) in &self.properties {
+      if let Value::String(k) = k {
+        if k == key {
+          result = Some(v);
+        }
+      } else {
+        // If the key is not a string, it's possible that the result we found earlier is overwritten
+        // here, so we have to set back to None.
+        result = None;
+      }
+    }
+
+    result
+  }
+}
