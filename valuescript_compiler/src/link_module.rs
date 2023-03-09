@@ -126,45 +126,50 @@ fn rewrite_pointers(module: &mut Module, pointer_allocator: &mut NameAllocator) 
     }
   }
 
-  visit_pointers(module, |_kind, pointer| {
-    if let Some(mapped_pointer) = pointer_map.get(&pointer) {
-      *pointer = mapped_pointer.clone();
+  visit_pointers(module, |visitation| match visitation {
+    PointerVisitation::Export(pointer)
+    | PointerVisitation::Definition(pointer)
+    | PointerVisitation::Reference(_, pointer) => {
+      if let Some(mapped_pointer) = pointer_map.get(pointer) {
+        *pointer = mapped_pointer.clone();
+      }
     }
   });
 }
 
 fn visit_pointers<Visitor>(module: &mut Module, visitor: Visitor)
 where
-  Visitor: Fn(PointerKind, &mut Pointer) -> (),
+  Visitor: Fn(PointerVisitation) -> (),
 {
   let pointer_visitor = VisitPointerImpl::new(visitor);
   pointer_visitor.module(module);
 }
 
 #[derive(PartialEq)]
-enum PointerKind {
-  Definition,
-  Reference,
+enum PointerVisitation<'a> {
+  Export(&'a mut Pointer),
+  Definition(&'a mut Pointer),
+  Reference(&'a Pointer, &'a mut Pointer),
 }
 
 struct VisitPointerImpl<Visitor>
 where
-  Visitor: Fn(PointerKind, &mut Pointer) -> (),
+  Visitor: Fn(PointerVisitation) -> (),
 {
   visitor: Visitor,
 }
 
 impl<Visitor> VisitPointerImpl<Visitor>
 where
-  Visitor: Fn(PointerKind, &mut Pointer) -> (),
+  Visitor: Fn(PointerVisitation) -> (),
 {
   fn new(visitor: Visitor) -> Self {
     Self { visitor }
   }
 
   pub fn module(&self, module: &mut Module) {
-    self.value(&mut module.export_default);
-    self.object(&mut module.export_star);
+    self.value(None, &mut module.export_default);
+    self.object(None, &mut module.export_star);
 
     for definition in &mut module.definitions {
       self.definition(definition);
@@ -172,39 +177,39 @@ where
   }
 
   fn definition(&self, definition: &mut Definition) {
-    (self.visitor)(PointerKind::Definition, &mut definition.pointer);
+    (self.visitor)(PointerVisitation::Definition(&mut definition.pointer));
 
     match &mut definition.content {
       DefinitionContent::Function(function) => {
-        self.body(&mut function.body);
+        self.body(&definition.pointer, &mut function.body);
       }
       DefinitionContent::Class(class) => {
-        self.value(&mut class.constructor);
-        self.value(&mut class.methods);
+        self.value(Some(&definition.pointer), &mut class.constructor);
+        self.value(Some(&definition.pointer), &mut class.methods);
       }
       DefinitionContent::Value(value) => {
-        self.value(value);
+        self.value(Some(&definition.pointer), value);
       }
       DefinitionContent::Lazy(lazy) => {
-        self.body(&mut lazy.body);
+        self.body(&definition.pointer, &mut lazy.body);
       }
     }
   }
 
-  fn array(&self, array: &mut Array) {
+  fn array(&self, owner: Option<&Pointer>, array: &mut Array) {
     for value in &mut array.values {
-      self.value(value);
+      self.value(owner, value);
     }
   }
 
-  fn object(&self, object: &mut Object) {
+  fn object(&self, owner: Option<&Pointer>, object: &mut Object) {
     for (key, value) in object.properties.iter_mut() {
-      self.value(key);
-      self.value(value);
+      self.value(owner, key);
+      self.value(owner, value);
     }
   }
 
-  fn value(&self, value: &mut Value) {
+  fn value(&self, owner: Option<&Pointer>, value: &mut Value) {
     use Value::*;
 
     match value {
@@ -215,20 +220,23 @@ where
       Number(_) => {}
       String(_) => {}
       Array(array) => {
-        self.array(array);
+        self.array(owner, array);
       }
       Object(object) => {
-        self.object(object);
+        self.object(owner, object);
       }
       Register(_) => {}
       Pointer(pointer) => {
-        (self.visitor)(PointerKind::Reference, pointer);
+        (self.visitor)(match owner {
+          Some(owner) => PointerVisitation::Reference(owner, pointer),
+          None => PointerVisitation::Export(pointer),
+        });
       }
       Builtin(_) => {}
     }
   }
 
-  fn instruction(&self, instruction: &mut Instruction) {
+  fn instruction(&self, owner: &Pointer, instruction: &mut Instruction) {
     use Instruction::*;
 
     match instruction {
@@ -242,7 +250,7 @@ where
       | UnaryMinus(arg, _)
       | Import(arg, _)
       | ImportStar(arg, _) => {
-        self.value(arg);
+        self.value(Some(owner), arg);
       }
       OpPlus(arg1, arg2, _)
       | OpMinus(arg1, arg2, _)
@@ -275,26 +283,26 @@ where
       | Sub(arg1, arg2, _)
       | SubMov(arg1, arg2, _)
       | New(arg1, arg2, _) => {
-        self.value(arg1);
-        self.value(arg2);
+        self.value(Some(owner), arg1);
+        self.value(Some(owner), arg2);
       }
       Apply(arg1, arg2, arg3, _) | SubCall(arg1, arg2, arg3, _) => {
-        self.value(arg1);
-        self.value(arg2);
-        self.value(arg3);
+        self.value(Some(owner), arg1);
+        self.value(Some(owner), arg2);
+        self.value(Some(owner), arg3);
       }
       Jmp(_) => {}
       JmpIf(arg, _) => {
-        self.value(arg);
+        self.value(Some(owner), arg);
       }
     };
   }
 
-  fn body(&self, body: &mut Vec<InstructionOrLabel>) {
+  fn body(&self, owner: &Pointer, body: &mut Vec<InstructionOrLabel>) {
     for instruction_or_label in body {
       match instruction_or_label {
         InstructionOrLabel::Instruction(instruction) => {
-          self.instruction(instruction);
+          self.instruction(owner, instruction);
         }
         InstructionOrLabel::Label(_) => {}
       }
@@ -395,22 +403,21 @@ fn collapse_pointers_of_pointers(module: &mut Module) {
     double_pointer_map.insert(definition.pointer.clone(), pointer.clone());
   }
 
-  visit_pointers(module, |kind, pointer| {
-    if kind == PointerKind::Definition {
-      return;
-    }
+  visit_pointers(module, |visitation| match visitation {
+    PointerVisitation::Definition(_) => {}
+    PointerVisitation::Export(pointer) | PointerVisitation::Reference(_, pointer) => {
+      let mut mapped_pointer: &Pointer = pointer;
 
-    let mut mapped_pointer: &Pointer = pointer;
+      loop {
+        if let Some(new_pointer) = double_pointer_map.get(mapped_pointer) {
+          mapped_pointer = new_pointer;
+          continue;
+        }
 
-    loop {
-      if let Some(new_pointer) = double_pointer_map.get(mapped_pointer) {
-        mapped_pointer = new_pointer;
-        continue;
+        break;
       }
 
-      break;
+      *pointer = mapped_pointer.clone();
     }
-
-    *pointer = mapped_pointer.clone();
   });
 }
