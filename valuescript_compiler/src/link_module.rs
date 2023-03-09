@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::asm::{
   Array, Definition, DefinitionContent, Instruction, InstructionOrLabel, Object, Pointer, Value,
@@ -107,7 +107,7 @@ pub fn link_module(
   );
 
   collapse_pointers_of_pointers(&mut path_and_module.module);
-  // TODO: shake_tree(&mut path_and_module.module);
+  shake_tree(&mut path_and_module.module);
 
   result.module = Some(path_and_module.module);
   result
@@ -139,13 +139,13 @@ fn rewrite_pointers(module: &mut Module, pointer_allocator: &mut NameAllocator) 
 
 fn visit_pointers<Visitor>(module: &mut Module, visitor: Visitor)
 where
-  Visitor: Fn(PointerVisitation) -> (),
+  Visitor: FnMut(PointerVisitation) -> (),
 {
-  let pointer_visitor = VisitPointerImpl::new(visitor);
+  let mut pointer_visitor = VisitPointerImpl::new(visitor);
   pointer_visitor.module(module);
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 enum PointerVisitation<'a> {
   Export(&'a mut Pointer),
   Definition(&'a mut Pointer),
@@ -154,20 +154,20 @@ enum PointerVisitation<'a> {
 
 struct VisitPointerImpl<Visitor>
 where
-  Visitor: Fn(PointerVisitation) -> (),
+  Visitor: FnMut(PointerVisitation) -> (),
 {
   visitor: Visitor,
 }
 
 impl<Visitor> VisitPointerImpl<Visitor>
 where
-  Visitor: Fn(PointerVisitation) -> (),
+  Visitor: FnMut(PointerVisitation) -> (),
 {
   fn new(visitor: Visitor) -> Self {
     Self { visitor }
   }
 
-  pub fn module(&self, module: &mut Module) {
+  pub fn module(&mut self, module: &mut Module) {
     self.value(None, &mut module.export_default);
     self.object(None, &mut module.export_star);
 
@@ -176,7 +176,7 @@ where
     }
   }
 
-  fn definition(&self, definition: &mut Definition) {
+  fn definition(&mut self, definition: &mut Definition) {
     (self.visitor)(PointerVisitation::Definition(&mut definition.pointer));
 
     match &mut definition.content {
@@ -196,20 +196,20 @@ where
     }
   }
 
-  fn array(&self, owner: Option<&Pointer>, array: &mut Array) {
+  fn array(&mut self, owner: Option<&Pointer>, array: &mut Array) {
     for value in &mut array.values {
       self.value(owner, value);
     }
   }
 
-  fn object(&self, owner: Option<&Pointer>, object: &mut Object) {
+  fn object(&mut self, owner: Option<&Pointer>, object: &mut Object) {
     for (key, value) in object.properties.iter_mut() {
       self.value(owner, key);
       self.value(owner, value);
     }
   }
 
-  fn value(&self, owner: Option<&Pointer>, value: &mut Value) {
+  fn value(&mut self, owner: Option<&Pointer>, value: &mut Value) {
     use Value::*;
 
     match value {
@@ -236,7 +236,7 @@ where
     }
   }
 
-  fn instruction(&self, owner: &Pointer, instruction: &mut Instruction) {
+  fn instruction(&mut self, owner: &Pointer, instruction: &mut Instruction) {
     use Instruction::*;
 
     match instruction {
@@ -298,7 +298,7 @@ where
     };
   }
 
-  fn body(&self, owner: &Pointer, body: &mut Vec<InstructionOrLabel>) {
+  fn body(&mut self, owner: &Pointer, body: &mut Vec<InstructionOrLabel>) {
     for instruction_or_label in body {
       match instruction_or_label {
         InstructionOrLabel::Instruction(instruction) => {
@@ -420,4 +420,51 @@ fn collapse_pointers_of_pointers(module: &mut Module) {
       *pointer = mapped_pointer.clone();
     }
   });
+}
+
+fn shake_tree(module: &mut Module) {
+  let mut dependency_graph = HashMap::<Pointer, HashSet<Pointer>>::new();
+  let mut pointers_to_include = Vec::<Pointer>::new();
+
+  visit_pointers(module, |visitation| match visitation {
+    PointerVisitation::Export(exported_pointer) => {
+      pointers_to_include.push(exported_pointer.clone());
+    }
+    PointerVisitation::Definition(_) => {}
+    PointerVisitation::Reference(owner, pointer) => {
+      dependency_graph
+        .entry(owner.clone())
+        .or_default()
+        .insert(pointer.clone());
+    }
+  });
+
+  let mut pointers_included = HashSet::<Pointer>::new();
+  let mut pointers_to_include_i = 0;
+
+  while pointers_to_include_i < pointers_to_include.len() {
+    let pointer = &pointers_to_include[pointers_to_include_i];
+    pointers_to_include_i += 1;
+
+    pointers_included.insert(pointer.clone());
+
+    if let Some(dependencies) = dependency_graph.get(pointer) {
+      for dependency in dependencies {
+        if !pointers_included.contains(dependency) {
+          pointers_to_include.push(dependency.clone());
+        }
+      }
+    }
+  }
+
+  let previous_definitions = std::mem::take(&mut module.definitions);
+  let mut new_definitions = Vec::<Definition>::new();
+
+  for definition in previous_definitions {
+    if pointers_included.contains(&definition.pointer) {
+      new_definitions.push(definition);
+    }
+  }
+
+  module.definitions = new_definitions;
 }
