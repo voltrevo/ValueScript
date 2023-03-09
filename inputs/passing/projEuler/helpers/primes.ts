@@ -21,6 +21,34 @@ export function factorize(n: number): number[] {
   }
 }
 
+export function factorizeAsPowers(n: number): [number, number][] {
+  const factors = factorize(n);
+
+  if (factors.length === 0) {
+    return [];
+  }
+
+  const result: [number, number][] = [];
+  let currentFactor = factors[0];
+  let currentPower = 1;
+
+  for (let i = 1; i < factors.length; i++) {
+    const factor = factors[i];
+
+    if (factor === currentFactor) {
+      currentPower += 1;
+    } else {
+      result.push([currentFactor, currentPower]);
+      currentFactor = factor;
+      currentPower = 1;
+    }
+  }
+
+  result.push([currentFactor, currentPower]);
+
+  return result;
+}
+
 export function nextOddPrime(n: number): number {
   n += 1 + (n % 2); // Next odd number
 
