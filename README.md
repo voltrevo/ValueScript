@@ -413,10 +413,14 @@ A lot of the essential language features are implemented, including:
 - Closures
 - Loops
 - Recursion
+- Local imports¹
+- Tree shaking¹
 
 ValueScript doesn't yet bind to the outside world (including TypeScript
 interop), except that excess command line arguments are passed to the main
 function as strings.
+
+¹ Not in the playground yet.
 
 ## Contributing
 
