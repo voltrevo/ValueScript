@@ -3,21 +3,17 @@
 export default function main() {
   let sum = 0;
 
-  let fa = 0;
-  let fb = 1;
+  let [fibLast, fib] = [0, 1];
 
   while (true) {
-    const f = fa + fb;
+    [fibLast, fib] = [fib, fibLast + fib];
 
-    if (f > 4000000) {
+    if (fib > 4000000) {
       return sum;
     }
 
-    if (f % 2 === 0) {
-      sum += f;
+    if (fib % 2 === 0) {
+      sum += fib;
     }
-
-    fa = fb;
-    fb = f;
   }
 }
