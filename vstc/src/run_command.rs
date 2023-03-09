@@ -1,8 +1,10 @@
 use std::rc::Rc;
 use std::{ffi::OsStr, path::Path, process::exit};
 
-use valuescript_compiler::{assemble, compile_module, parse_module};
+use valuescript_compiler::{assemble, compile, parse_module};
 use valuescript_vm::VirtualMachine;
+
+use crate::resolve_entry_path::resolve_entry_path;
 
 use super::handle_diagnostics_cli::handle_diagnostics_cli;
 
@@ -75,11 +77,21 @@ fn format_from_path(file_path: &String) -> RunFormat {
 fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
   match format {
     RunFormat::TypeScript => {
-      let source = std::fs::read_to_string(file_path).expect("Failed to read file");
-      let compiler_output = compile_module(&source);
-      handle_diagnostics_cli(file_path, &compiler_output.diagnostics);
+      let resolved_entry_path = resolve_entry_path(file_path);
 
-      assemble(&compiler_output.module)
+      let compile_result = compile(resolved_entry_path, |path| {
+        std::fs::read_to_string(path).map_err(|err| err.to_string())
+      });
+
+      for (path, diagnostics) in compile_result.diagnostics.iter() {
+        handle_diagnostics_cli(&path.path, diagnostics);
+      }
+
+      assemble(
+        &compile_result
+          .module
+          .expect("Should have exited if module is None"),
+      )
     }
 
     RunFormat::Assembly => {

@@ -2,10 +2,10 @@ use std::fs::File;
 use std::io::Write;
 use std::process::exit;
 
+use crate::resolve_entry_path::resolve_entry_path;
+
 use super::handle_diagnostics_cli::handle_diagnostics_cli;
 use valuescript_compiler::compile;
-use valuescript_compiler::resolve_path;
-use valuescript_compiler::ResolvedPath;
 
 pub fn compile_command(args: &Vec<String>) {
   if args.len() != 3 {
@@ -14,21 +14,7 @@ pub fn compile_command(args: &Vec<String>) {
     exit(1);
   }
 
-  let entry_path = &args[2];
-
-  // Like cwd (current working dir), but it's cwd/file.
-  // This is a bit of a hack so we can use resolve_path to get the absolute path of the entry point.
-  let cwd_file = ResolvedPath {
-    path: std::env::current_dir()
-      .expect("Failed to get current directory")
-      .as_path()
-      .join("file")
-      .to_str()
-      .expect("Failed to convert to str")
-      .to_string(),
-  };
-
-  let resolved_entry_path = resolve_path(&cwd_file, entry_path);
+  let resolved_entry_path = resolve_entry_path(&args[2]);
 
   let compile_result = compile(resolved_entry_path, |path| {
     std::fs::read_to_string(path).map_err(|err| err.to_string())

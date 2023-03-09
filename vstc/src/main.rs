@@ -1,6 +1,7 @@
 mod assemble_command;
 mod compile_command;
 mod handle_diagnostics_cli;
+mod resolve_entry_path;
 mod run_command;
 mod test_inputs;
 
