@@ -26,4 +26,26 @@ export default class SillyBigInt {
       this.data[i] = sum;
     }
   }
+
+  toString() {
+    let str = "";
+
+    for (let i = 0; i < this.data.length - 1; i++) {
+      str = padStart(`${this.data[i]}`, 15, "0") + str;
+    }
+
+    // FIXME: There's a bug here when using template strings
+    str = this.data[this.data.length - 1] + str;
+
+    return str;
+  }
+}
+
+// TODO: Support String.prototype.padStart
+function padStart(str: string, targetLength: number, padChar: string) {
+  while (str.length < targetLength) {
+    str = padChar + str;
+  }
+
+  return str;
 }
