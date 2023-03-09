@@ -100,46 +100,68 @@ pub fn link_module(
       .append(&mut including_path_and_module.module.definitions);
   }
 
-  result.module = Some(rewrite_import_patterns(
-    path_and_module.module,
+  link_import_patterns(
+    &mut path_and_module.module,
     &included_modules,
     &mut result.diagnostics,
-  ));
+  );
 
+  // TODO: collapse_pointers_of_pointers(&mut path_and_module.module);
+  // TODO: shake_tree(&mut path_and_module.module);
+
+  result.module = Some(path_and_module.module);
   result
 }
 
 fn rewrite_pointers(module: &mut Module, pointer_allocator: &mut NameAllocator) {
-  let mut pointer_rewriter = PointerRewriter::init(module, pointer_allocator);
-  pointer_rewriter.module(module);
-}
+  let mut pointer_map = HashMap::<Pointer, Pointer>::new();
 
-struct PointerRewriter {
-  pointer_map: HashMap<Pointer, Pointer>,
-}
-
-impl PointerRewriter {
-  pub fn init(module: &Module, pointer_allocator: &mut NameAllocator) -> Self {
-    let mut self_ = Self {
-      pointer_map: HashMap::new(),
+  for definition in &module.definitions {
+    let mapped_pointer = Pointer {
+      name: pointer_allocator.allocate(&definition.pointer.name),
     };
 
-    for definition in &module.definitions {
-      let mapped_pointer = Pointer {
-        name: pointer_allocator.allocate(&definition.pointer.name),
-      };
-
-      if mapped_pointer != definition.pointer {
-        self_
-          .pointer_map
-          .insert(definition.pointer.clone(), mapped_pointer);
-      }
+    if mapped_pointer != definition.pointer {
+      pointer_map.insert(definition.pointer.clone(), mapped_pointer);
     }
-
-    self_
   }
 
-  pub fn module(&mut self, module: &mut Module) {
+  visit_pointers(module, |_kind, pointer| {
+    if let Some(mapped_pointer) = pointer_map.get(&pointer) {
+      *pointer = mapped_pointer.clone();
+    }
+  });
+}
+
+fn visit_pointers<Visitor>(module: &mut Module, visitor: Visitor)
+where
+  Visitor: Fn(PointerKind, &mut Pointer) -> (),
+{
+  let pointer_visitor = VisitPointerImpl::new(visitor);
+  pointer_visitor.module(module);
+}
+
+enum PointerKind {
+  Definition,
+  Reference,
+}
+
+struct VisitPointerImpl<Visitor>
+where
+  Visitor: Fn(PointerKind, &mut Pointer) -> (),
+{
+  visitor: Visitor,
+}
+
+impl<Visitor> VisitPointerImpl<Visitor>
+where
+  Visitor: Fn(PointerKind, &mut Pointer) -> (),
+{
+  fn new(visitor: Visitor) -> Self {
+    Self { visitor }
+  }
+
+  pub fn module(&self, module: &mut Module) {
     self.value(&mut module.export_default);
     self.object(&mut module.export_star);
 
@@ -148,8 +170,8 @@ impl PointerRewriter {
     }
   }
 
-  fn definition(&mut self, definition: &mut Definition) {
-    self.pointer(&mut definition.pointer);
+  fn definition(&self, definition: &mut Definition) {
+    (self.visitor)(PointerKind::Definition, &mut definition.pointer);
 
     match &mut definition.content {
       DefinitionContent::Function(function) => {
@@ -168,26 +190,20 @@ impl PointerRewriter {
     }
   }
 
-  fn pointer(&mut self, pointer: &mut Pointer) {
-    if let Some(mapped_pointer) = self.pointer_map.get(&pointer) {
-      *pointer = mapped_pointer.clone();
-    }
-  }
-
-  fn array(&mut self, array: &mut Array) {
+  fn array(&self, array: &mut Array) {
     for value in &mut array.values {
       self.value(value);
     }
   }
 
-  fn object(&mut self, object: &mut Object) {
+  fn object(&self, object: &mut Object) {
     for (key, value) in object.properties.iter_mut() {
       self.value(key);
       self.value(value);
     }
   }
 
-  fn value(&mut self, value: &mut Value) {
+  fn value(&self, value: &mut Value) {
     use Value::*;
 
     match value {
@@ -205,13 +221,13 @@ impl PointerRewriter {
       }
       Register(_) => {}
       Pointer(pointer) => {
-        self.pointer(pointer);
+        (self.visitor)(PointerKind::Reference, pointer);
       }
       Builtin(_) => {}
     }
   }
 
-  fn instruction(&mut self, instruction: &mut Instruction) {
+  fn instruction(&self, instruction: &mut Instruction) {
     use Instruction::*;
 
     match instruction {
@@ -273,7 +289,7 @@ impl PointerRewriter {
     };
   }
 
-  fn body(&mut self, body: &mut Vec<InstructionOrLabel>) {
+  fn body(&self, body: &mut Vec<InstructionOrLabel>) {
     for instruction_or_label in body {
       match instruction_or_label {
         InstructionOrLabel::Instruction(instruction) => {
@@ -318,11 +334,11 @@ fn resolve_and_rewrite_import_patterns(path_and_module: &mut PathAndModule) -> V
   resolved_paths
 }
 
-fn rewrite_import_patterns(
-  mut module: Module,
+fn link_import_patterns(
+  module: &mut Module,
   included_modules: &HashMap<ResolvedPath, (Value, Object)>,
   diagnostics: &mut Vec<Diagnostic>,
-) -> Module {
+) {
   for definition in &mut module.definitions {
     let import_pattern = match ImportPattern::decode(definition) {
       Some(import_pattern) => import_pattern,
@@ -364,6 +380,4 @@ fn rewrite_import_patterns(
 
     *definition = new_definition;
   }
-
-  module
 }
