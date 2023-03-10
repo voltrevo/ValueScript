@@ -2182,6 +2182,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "valuescript_program_embed"
+version = "0.1.0"
+dependencies = [
+ "valuescript_vm",
+]
+
+[[package]]
 name = "valuescript_vm"
 version = "0.1.0"
 
