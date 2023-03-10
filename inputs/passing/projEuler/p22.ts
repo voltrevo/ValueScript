@@ -1,3 +1,5 @@
+import plus from "./helpers/plus.ts";
+
 export default function main() {
   return nameListScore([
     /* insert names here */
@@ -9,7 +11,7 @@ function nameListScore(names: string[]) {
 
   return names
     .map((name, i) => (i + 1) * nameScore(name))
-    .reduce((a, b) => a + b);
+    .reduce(plus);
 }
 
 function nameScore(name: string) {

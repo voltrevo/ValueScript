@@ -1,3 +1,4 @@
+import plus from "./helpers/plus.ts";
 import { properFactorSum } from "./helpers/properFactorSum.ts";
 
 export default function main() {
@@ -9,7 +10,7 @@ export default function main() {
     }
   }
 
-  return amicableNumbers.reduce((a, b) => a + b);
+  return amicableNumbers.reduce(plus);
 }
 
 function isAmicable(n: number) {

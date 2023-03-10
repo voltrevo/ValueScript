@@ -1,3 +1,4 @@
+import plus from "./helpers/plus.ts";
 import { properFactorSum } from "./helpers/properFactorSum.ts";
 
 export default function main() {
@@ -22,7 +23,7 @@ export default function main() {
     // }
   }
 
-  return nonAbundantSums.reduce((a, b) => a + b);
+  return nonAbundantSums.reduce(plus);
 }
 
 function isAbundant(n: number) {

@@ -1,3 +1,4 @@
+import plus from "./helpers/plus.ts";
 import SillyBigInt from "./helpers/SillyBigInt.ts";
 
 export default function main() {
@@ -7,7 +8,7 @@ export default function main() {
     sbi.add(sbi);
   }
 
-  return sbi.data.map(digitSum).reduce((a, b) => a + b);
+  return sbi.data.map(digitSum).reduce(plus);
 }
 
 function digitSum(n: number) {
