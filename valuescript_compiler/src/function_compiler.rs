@@ -465,7 +465,18 @@ impl FunctionCompiler {
         self.populate_fn_scope_statement(&for_.body, scope);
       }
       ForIn(for_in) => self.todo(for_in.span, "ForIn statement"),
-      ForOf(for_of) => self.todo(for_of.span, "ForOf statement"),
+      ForOf(for_of) => {
+        use swc_ecma_ast::VarDeclOrPat::*;
+
+        match &for_of.left {
+          VarDecl(var_decl) => {
+            self.populate_fn_scope_var_decl(var_decl, scope);
+          }
+          Pat(_) => {}
+        };
+
+        self.populate_fn_scope_statement(&for_of.body, scope);
+      }
       Decl(decl) => {
         use swc_ecma_ast::Decl::*;
 
@@ -781,12 +792,227 @@ impl FunctionCompiler {
         }
       }
       If(if_) => {
-        let mut expression_compiler = ExpressionCompiler {
-          fnc: self,
-          scope: scope,
+        self.if_(if_, scope);
+      }
+      Switch(switch) => self.todo(switch.span, "Switch statement"),
+      Throw(throw) => self.todo(throw.span, "Throw statement"),
+      Try(try_) => self.todo(try_.span, "Try statement"),
+      While(while_) => {
+        self.while_(while_, scope);
+      }
+      DoWhile(do_while) => {
+        self.do_while(do_while, scope);
+      }
+      For(for_) => {
+        self.for_(for_, scope);
+      }
+      ForIn(for_in) => self.todo(for_in.span, "ForIn statement"),
+      ForOf(for_of) => self.todo(for_of.span, "ForOf statement"),
+      Decl(decl) => {
+        self.declaration(decl, scope);
+      }
+      Expr(expr) => {
+        self.expression(&expr.expr, scope);
+      }
+    }
+  }
+
+  fn if_(&mut self, if_: &swc_ecma_ast::IfStmt, scope: &Scope) {
+    let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
+
+    let condition = expression_compiler.compile(&*if_.test, None);
+
+    // Usually we wouldn't capture the value_assembly before release, but
+    // it's safe to do so here, and allows cond_reg to re-use a register
+    // from the condition
+    let condition_asm = self.use_(condition);
+
+    let cond_reg = self.allocate_numbered_reg("_cond");
+
+    // TODO: Add negated jmpif instruction to avoid this
+    self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
+
+    let else_label = Label {
+      name: self.label_allocator.allocate_numbered(&"else".to_string()),
+    };
+
+    self.push(Instruction::JmpIf(
+      Value::Register(cond_reg.clone()),
+      else_label.ref_(),
+    ));
+
+    self.release_reg(&cond_reg);
+
+    self.statement(&*if_.cons, false, scope);
+
+    match &if_.alt {
+      None => {
+        self.label(else_label);
+      }
+      Some(alt) => {
+        let after_else_label = Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"after_else".to_string()),
         };
 
-        let condition = expression_compiler.compile(&*if_.test, None);
+        self.push(Instruction::Jmp(after_else_label.ref_()));
+
+        self.label(else_label);
+        self.statement(&*alt, false, scope);
+        self.label(after_else_label);
+      }
+    }
+  }
+
+  fn while_(self: &mut Self, while_: &swc_ecma_ast::WhileStmt, scope: &Scope) {
+    let start_label = Label {
+      name: self.label_allocator.allocate_numbered(&"while".to_string()),
+    };
+
+    let end_label = Label {
+      name: self
+        .label_allocator
+        .allocate_numbered(&"while_end".to_string()),
+    };
+
+    self.loop_labels.push(LoopLabels {
+      continue_: start_label.clone(),
+      break_: end_label.clone(),
+    });
+
+    self.label(start_label.clone());
+
+    let mut expression_compiler = ExpressionCompiler {
+      fnc: self,
+      scope: scope,
+    };
+
+    let condition = expression_compiler.compile(&*while_.test, None);
+
+    // Usually we wouldn't capture the value_assembly before release, but
+    // it's safe to do so here, and allows cond_reg to re-use a register
+    // from the condition
+    let condition_asm = self.use_(condition);
+
+    let cond_reg = self.allocate_numbered_reg(&"_cond".to_string());
+
+    // TODO: Add negated jmpif instruction to avoid this
+    self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
+
+    self.push(Instruction::JmpIf(
+      Value::Register(cond_reg.clone()),
+      end_label.ref_(),
+    ));
+
+    self.release_reg(&cond_reg);
+    self.statement(&*while_.body, false, scope);
+    self.push(Instruction::Jmp(start_label.ref_()));
+    self.label(end_label);
+
+    self.loop_labels.pop();
+  }
+
+  fn do_while(self: &mut Self, do_while: &swc_ecma_ast::DoWhileStmt, scope: &Scope) {
+    let start_label = Label {
+      name: self
+        .label_allocator
+        .allocate_numbered(&"do_while".to_string()),
+    };
+
+    let continue_label = Label {
+      name: self
+        .label_allocator
+        .allocate_numbered(&"do_while_continue".to_string()),
+    };
+
+    let end_label = Label {
+      name: self
+        .label_allocator
+        .allocate_numbered(&"do_while_end".to_string()),
+    };
+
+    self.loop_labels.push(LoopLabels {
+      continue_: continue_label.clone(),
+      break_: end_label.clone(),
+    });
+
+    self.label(start_label.clone());
+
+    self.statement(&*do_while.body, false, scope);
+
+    let mut expression_compiler = ExpressionCompiler {
+      fnc: self,
+      scope: scope,
+    };
+
+    let condition = expression_compiler.compile(&*do_while.test, None);
+
+    self.label(continue_label);
+
+    let jmpif = Instruction::JmpIf(self.use_(condition), start_label.ref_());
+    self.push(jmpif);
+
+    self.label(end_label);
+
+    self.loop_labels.pop();
+  }
+
+  fn for_(&mut self, for_: &swc_ecma_ast::ForStmt, scope: &Scope) {
+    let for_scope = scope.nest();
+
+    match &for_.init {
+      Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) => {
+        self.populate_block_scope_var_decl(var_decl, &for_scope);
+      }
+      _ => {}
+    }
+
+    match &for_.init {
+      Some(var_decl_or_expr) => match var_decl_or_expr {
+        swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl) => {
+          self.var_declaration(var_decl, &for_scope);
+        }
+        swc_ecma_ast::VarDeclOrExpr::Expr(expr) => {
+          self.expression(expr, &for_scope);
+        }
+      },
+      None => {}
+    }
+
+    let for_test_label = Label {
+      name: self
+        .label_allocator
+        .allocate_numbered(&"for_test".to_string()),
+    };
+
+    let for_continue_label = Label {
+      name: self
+        .label_allocator
+        .allocate_numbered(&"for_continue".to_string()),
+    };
+
+    let for_end_label = Label {
+      name: self
+        .label_allocator
+        .allocate_numbered(&"for_end".to_string()),
+    };
+
+    self.label(for_test_label.clone());
+
+    self.loop_labels.push(LoopLabels {
+      continue_: for_continue_label.clone(),
+      break_: for_end_label.clone(),
+    });
+
+    match &for_.test {
+      Some(cond) => {
+        let mut ec = ExpressionCompiler {
+          fnc: self,
+          scope: &for_scope,
+        };
+
+        let condition = ec.compile(cond, None);
 
         // Usually we wouldn't capture the value_assembly before release, but
         // it's safe to do so here, and allows cond_reg to re-use a register
@@ -798,232 +1024,30 @@ impl FunctionCompiler {
         // TODO: Add negated jmpif instruction to avoid this
         self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
 
-        let else_label = Label {
-          name: self.label_allocator.allocate_numbered(&"else".to_string()),
-        };
-
         self.push(Instruction::JmpIf(
           Value::Register(cond_reg.clone()),
-          else_label.ref_(),
+          for_end_label.ref_(),
         ));
 
         self.release_reg(&cond_reg);
-
-        self.statement(&*if_.cons, false, scope);
-
-        match &if_.alt {
-          None => {
-            self.label(else_label);
-          }
-          Some(alt) => {
-            let after_else_label = Label {
-              name: self
-                .label_allocator
-                .allocate_numbered(&"after_else".to_string()),
-            };
-
-            self.push(Instruction::Jmp(after_else_label.ref_()));
-
-            self.label(else_label);
-            self.statement(&*alt, false, scope);
-            self.label(after_else_label);
-          }
-        }
       }
-      Switch(switch) => self.todo(switch.span, "Switch statement"),
-      Throw(throw) => self.todo(throw.span, "Throw statement"),
-      Try(try_) => self.todo(try_.span, "Try statement"),
-      While(while_) => {
-        let start_label = Label {
-          name: self.label_allocator.allocate_numbered(&"while".to_string()),
-        };
-
-        let end_label = Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"while_end".to_string()),
-        };
-
-        self.loop_labels.push(LoopLabels {
-          continue_: start_label.clone(),
-          break_: end_label.clone(),
-        });
-
-        self.label(start_label.clone());
-
-        let mut expression_compiler = ExpressionCompiler {
-          fnc: self,
-          scope: scope,
-        };
-
-        let condition = expression_compiler.compile(&*while_.test, None);
-
-        // Usually we wouldn't capture the value_assembly before release, but
-        // it's safe to do so here, and allows cond_reg to re-use a register
-        // from the condition
-        let condition_asm = self.use_(condition);
-
-        let cond_reg = self.allocate_numbered_reg(&"_cond".to_string());
-
-        // TODO: Add negated jmpif instruction to avoid this
-        self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
-
-        self.push(Instruction::JmpIf(
-          Value::Register(cond_reg.clone()),
-          end_label.ref_(),
-        ));
-
-        self.release_reg(&cond_reg);
-        self.statement(&*while_.body, false, scope);
-        self.push(Instruction::Jmp(start_label.ref_()));
-        self.label(end_label);
-
-        self.loop_labels.pop();
-      }
-      DoWhile(do_while) => {
-        let start_label = Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"do_while".to_string()),
-        };
-
-        let continue_label = Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"do_while_continue".to_string()),
-        };
-
-        let end_label = Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"do_while_end".to_string()),
-        };
-
-        self.loop_labels.push(LoopLabels {
-          continue_: continue_label.clone(),
-          break_: end_label.clone(),
-        });
-
-        self.label(start_label.clone());
-
-        self.statement(&*do_while.body, false, scope);
-
-        let mut expression_compiler = ExpressionCompiler {
-          fnc: self,
-          scope: scope,
-        };
-
-        let condition = expression_compiler.compile(&*do_while.test, None);
-
-        self.label(continue_label);
-
-        let jmpif = Instruction::JmpIf(self.use_(condition), start_label.ref_());
-        self.push(jmpif);
-
-        self.label(end_label);
-
-        self.loop_labels.pop();
-      }
-      For(for_) => {
-        let for_scope = scope.nest();
-
-        match &for_.init {
-          Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) => {
-            self.populate_block_scope_var_decl(var_decl, &for_scope);
-          }
-          _ => {}
-        }
-
-        match &for_.init {
-          Some(var_decl_or_expr) => match var_decl_or_expr {
-            swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl) => {
-              self.var_declaration(var_decl, &for_scope);
-            }
-            swc_ecma_ast::VarDeclOrExpr::Expr(expr) => {
-              self.expression(expr, &for_scope);
-            }
-          },
-          None => {}
-        }
-
-        let for_test_label = Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"for_test".to_string()),
-        };
-
-        let for_continue_label = Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"for_continue".to_string()),
-        };
-
-        let for_end_label = Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"for_end".to_string()),
-        };
-
-        self.label(for_test_label.clone());
-
-        self.loop_labels.push(LoopLabels {
-          continue_: for_continue_label.clone(),
-          break_: for_end_label.clone(),
-        });
-
-        match &for_.test {
-          Some(cond) => {
-            let mut ec = ExpressionCompiler {
-              fnc: self,
-              scope: &for_scope,
-            };
-
-            let condition = ec.compile(cond, None);
-
-            // Usually we wouldn't capture the value_assembly before release, but
-            // it's safe to do so here, and allows cond_reg to re-use a register
-            // from the condition
-            let condition_asm = self.use_(condition);
-
-            let cond_reg = self.allocate_numbered_reg("_cond");
-
-            // TODO: Add negated jmpif instruction to avoid this
-            self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
-
-            self.push(Instruction::JmpIf(
-              Value::Register(cond_reg.clone()),
-              for_end_label.ref_(),
-            ));
-
-            self.release_reg(&cond_reg);
-          }
-          None => {}
-        }
-
-        self.statement(&for_.body, false, &for_scope);
-
-        self.label(for_continue_label);
-
-        match &for_.update {
-          Some(update) => self.expression(update, &for_scope),
-          None => {}
-        }
-
-        self.push(Instruction::Jmp(for_test_label.ref_()));
-
-        self.label(for_end_label);
-
-        self.loop_labels.pop();
-      }
-      ForIn(for_in) => self.todo(for_in.span, "ForIn statement"),
-      ForOf(for_of) => self.todo(for_of.span, "ForOf statement"),
-      Decl(decl) => {
-        self.declaration(decl, scope);
-      }
-      Expr(expr) => {
-        self.expression(&expr.expr, scope);
-      }
+      None => {}
     }
+
+    self.statement(&for_.body, false, &for_scope);
+
+    self.label(for_continue_label);
+
+    match &for_.update {
+      Some(update) => self.expression(update, &for_scope),
+      None => {}
+    }
+
+    self.push(Instruction::Jmp(for_test_label.ref_()));
+
+    self.label(for_end_label);
+
+    self.loop_labels.pop();
   }
 
   fn declaration(&mut self, decl: &swc_ecma_ast::Decl, scope: &Scope) {
