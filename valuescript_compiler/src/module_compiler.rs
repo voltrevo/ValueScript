@@ -314,10 +314,17 @@ impl ModuleCompiler {
     use swc_ecma_ast::ModuleDecl::*;
 
     match module_decl {
-      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
-      ExportDecl(ed) => self.compile_export_decl(ed, scope),
       Import(import) => self.compile_import(import, scope),
-      _ => self.todo(module_decl.span(), "non-export default module declaration"),
+      ExportDecl(ed) => self.compile_export_decl(ed, scope),
+      ExportNamed(_) => self.todo(module_decl.span(), "ExportNamed declaration"),
+      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
+      ExportDefaultExpr(_) => self.todo(module_decl.span(), "ExportDefaultExpr declaration"),
+      ExportAll(_) => self.todo(module_decl.span(), "ExportAll declaration"),
+      TsImportEquals(_) => self.not_supported(module_decl.span(), "TsImportEquals declaration"),
+      TsExportAssignment(_) => {
+        self.not_supported(module_decl.span(), "TsExportAssignment declaration")
+      }
+      TsNamespaceExport(_) => self.todo(module_decl.span(), "TsNamespaceExport declaration"),
     }
   }
 
