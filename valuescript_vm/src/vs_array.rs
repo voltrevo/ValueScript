@@ -1,26 +1,23 @@
+use std::cmp::{max, min};
 use std::rc::Rc;
-use std::cmp::{min, max};
 
-use super::vs_value::{
-  Val,
-  VsType,
-  ValTrait,
-  LoadFunctionResult,
-};
-use super::vs_object::VsObject;
-use super::vs_class::VsClass;
-use super::native_function::NativeFunction;
-use super::operations::op_triple_eq_impl;
-use super::array_higher_functions::array_map::MAP;
+use crate::helpers::{to_unchecked_wrapping_index, to_wrapping_index};
+
 use super::array_higher_functions::array_every::EVERY;
-use super::array_higher_functions::array_some::SOME;
 use super::array_higher_functions::array_filter::FILTER;
 use super::array_higher_functions::array_find::FIND;
 use super::array_higher_functions::array_find_index::FIND_INDEX;
 use super::array_higher_functions::array_flat_map::FLAT_MAP;
+use super::array_higher_functions::array_map::MAP;
 use super::array_higher_functions::array_reduce::REDUCE;
 use super::array_higher_functions::array_reduce_right::REDUCE_RIGHT;
+use super::array_higher_functions::array_some::SOME;
 use super::array_higher_functions::array_sort::SORT;
+use super::native_function::NativeFunction;
+use super::operations::op_triple_eq_impl;
+use super::vs_class::VsClass;
+use super::vs_object::VsObject;
+use super::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -45,20 +42,44 @@ pub struct ArrayPrototype {}
 static ARRAY_PROTOTYPE: ArrayPrototype = ArrayPrototype {};
 
 impl ValTrait for ArrayPrototype {
-  fn typeof_(&self) -> VsType { VsType::Object }
-  fn val_to_string(&self) -> String { "".to_string() }
-  fn to_number(&self) -> f64 { 0_f64 }
-  fn to_index(&self) -> Option<usize> { None }
-  fn is_primitive(&self) -> bool { false }
-  fn to_primitive(&self) -> Val { Val::String(Rc::new("".to_string())) }
-  fn is_truthy(&self) -> bool { true }
-  fn is_nullish(&self) -> bool { false }
+  fn typeof_(&self) -> VsType {
+    VsType::Object
+  }
+  fn val_to_string(&self) -> String {
+    "".to_string()
+  }
+  fn to_number(&self) -> f64 {
+    0_f64
+  }
+  fn to_index(&self) -> Option<usize> {
+    None
+  }
+  fn is_primitive(&self) -> bool {
+    false
+  }
+  fn to_primitive(&self) -> Val {
+    Val::String(Rc::new("".to_string()))
+  }
+  fn is_truthy(&self) -> bool {
+    true
+  }
+  fn is_nullish(&self) -> bool {
+    false
+  }
 
-  fn bind(&self, _params: Vec<Val>) -> Option<Val> { None }
+  fn bind(&self, _params: Vec<Val>) -> Option<Val> {
+    None
+  }
 
-  fn as_array_data(&self) -> Option<Rc<VsArray>> { None }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> { None }
-  fn as_class_data(&self) -> Option<Rc<VsClass>> { None }
+  fn as_array_data(&self) -> Option<Rc<VsArray>> {
+    None
+  }
+  fn as_object_data(&self) -> Option<Rc<VsObject>> {
+    None
+  }
+  fn as_class_data(&self) -> Option<Rc<VsClass>> {
+    None
+  }
 
   fn load_function(&self) -> LoadFunctionResult {
     LoadFunctionResult::NotAFunction
@@ -116,21 +137,6 @@ impl ValTrait for ArrayPrototype {
   }
 }
 
-fn to_unchecked_wrapping_index(index: &Val, len: usize) -> isize {
-  let index_num = index.to_number();
-
-  let mut floored_index = index_num.trunc();
-  let f64_len = len as f64;
-
-  if floored_index < 0_f64 {
-    floored_index += f64_len;
-  }
-
-  // TODO: Investigate potential pitfalls for arrays with length exceeding max
-  // isize.
-  return floored_index as isize;
-}
-
 fn to_wrapping_index_clamped(index: &Val, len: usize) -> isize {
   let wrapping_index = to_unchecked_wrapping_index(index, len);
 
@@ -147,32 +153,16 @@ fn to_wrapping_index_clamped(index: &Val, len: usize) -> isize {
   return wrapping_index;
 }
 
-fn to_wrapping_index(index: Option<&Val>, len: usize) -> Option<usize> {
-  let unchecked = match index {
-    None => { return None; }
-    Some(i) => to_unchecked_wrapping_index(i, len),
-  };
-
-  if unchecked < 0 || unchecked as usize >= len {
-    return None;
-  }
-
-  return Some(unchecked as usize);
-}
-
 static AT: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Array(array_data) => match to_wrapping_index(
-        params.get(0),
-        array_data.elements.len(),
-      ) {
+      Val::Array(array_data) => match to_wrapping_index(params.get(0), array_data.elements.len()) {
         None => Val::Undefined,
         Some(i) => array_data.elements[i].clone(),
       },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     }
-  }
+  },
 };
 
 static CONCAT: NativeFunction = NativeFunction {
@@ -185,20 +175,20 @@ static CONCAT: NativeFunction = NativeFunction {
           match &p.as_array_data() {
             None => {
               new_array.elements.push(p);
-            },
+            }
             Some(p_array_data) => {
               for elem in &p_array_data.elements {
                 new_array.elements.push(elem.clone());
               }
-            },
+            }
           }
         }
 
         return Val::Array(Rc::new(new_array));
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static COPY_WITHIN: NativeFunction = NativeFunction {
@@ -239,8 +229,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
         if target <= start || target >= end {
           while target < ilen && start < end {
             array_data_mut.elements[target as usize] =
-              array_data_mut.elements[start as usize].clone()
-            ;
+              array_data_mut.elements[start as usize].clone();
 
             target += 1;
             start += 1;
@@ -260,8 +249,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 
           while target >= 0 && end >= start {
             array_data_mut.elements[target as usize] =
-              array_data_mut.elements[end as usize].clone()
-            ;
+              array_data_mut.elements[end as usize].clone();
 
             target -= 1;
             end -= 1;
@@ -269,10 +257,10 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
         }
 
         return this.clone();
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static ENTRIES: NativeFunction = NativeFunction {
@@ -280,10 +268,10 @@ static ENTRIES: NativeFunction = NativeFunction {
     match this {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: ENTRIES");
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static FILL: NativeFunction = NativeFunction {
@@ -310,10 +298,10 @@ static FILL: NativeFunction = NativeFunction {
         }
 
         return this.clone();
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static FLAT: NativeFunction = NativeFunction {
@@ -330,20 +318,20 @@ static FLAT: NativeFunction = NativeFunction {
           match &el.as_array_data() {
             None => {
               new_elems.push(el.clone());
-            },
+            }
             Some(p_array_data) => {
               for elem in &p_array_data.elements {
                 new_elems.push(elem.clone());
               }
-            },
+            }
           }
         }
 
         return Val::Array(Rc::new(VsArray::from(new_elems)));
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static INCLUDES: NativeFunction = NativeFunction {
@@ -359,10 +347,10 @@ static INCLUDES: NativeFunction = NativeFunction {
         }
 
         return Val::Bool(false);
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static INDEX_OF: NativeFunction = NativeFunction {
@@ -372,19 +360,16 @@ static INDEX_OF: NativeFunction = NativeFunction {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
         for i in 0..array_data.elements.len() {
-          if op_triple_eq_impl(
-            array_data.elements[i].clone(),
-            search_param.clone(),
-          ) {
+          if op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone()) {
             return Val::Number(i as f64);
           }
         }
 
         return Val::Number(-1_f64);
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static JOIN: NativeFunction = NativeFunction {
@@ -394,7 +379,7 @@ static JOIN: NativeFunction = NativeFunction {
         if vals.elements.len() == 0 {
           return Val::String(Rc::new("".to_string()));
         }
-        
+
         if vals.elements.len() == 1 {
           return Val::String(Rc::new(vals.elements[0].val_to_string()));
         }
@@ -413,16 +398,18 @@ static JOIN: NativeFunction = NativeFunction {
           res += &separator_str;
 
           match val.typeof_() {
-            VsType::Undefined => {},
-            _ => { res += &val.val_to_string(); },
+            VsType::Undefined => {}
+            _ => {
+              res += &val.val_to_string();
+            }
           };
         }
 
         return Val::String(Rc::new(res));
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static KEYS: NativeFunction = NativeFunction {
@@ -430,10 +417,10 @@ static KEYS: NativeFunction = NativeFunction {
     match this {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: KEYS");
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static LAST_INDEX_OF: NativeFunction = NativeFunction {
@@ -443,19 +430,16 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
         for i in (0..array_data.elements.len()).rev() {
-          if op_triple_eq_impl(
-            array_data.elements[i].clone(),
-            search_param.clone(),
-          ) {
+          if op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone()) {
             return Val::Number(i as f64);
           }
         }
 
         return Val::Number(-1_f64);
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static POP: NativeFunction = NativeFunction {
@@ -468,18 +452,18 @@ static POP: NativeFunction = NativeFunction {
 
         let array_data_mut = Rc::make_mut(array_data);
 
-        let removed_el = array_data_mut.elements.remove(
-          array_data_mut.elements.len() - 1,
-        );
+        let removed_el = array_data_mut
+          .elements
+          .remove(array_data_mut.elements.len() - 1);
 
         return match removed_el {
           Val::Void => Val::Undefined,
           _ => removed_el,
         };
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static PUSH: NativeFunction = NativeFunction {
@@ -493,10 +477,10 @@ static PUSH: NativeFunction = NativeFunction {
         }
 
         return Val::Number(array_data_mut.elements.len() as f64);
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static REVERSE: NativeFunction = NativeFunction {
@@ -520,10 +504,10 @@ static REVERSE: NativeFunction = NativeFunction {
         }
 
         return this.clone();
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static SHIFT: NativeFunction = NativeFunction {
@@ -537,10 +521,10 @@ static SHIFT: NativeFunction = NativeFunction {
         let array_data_mut = Rc::make_mut(array_data);
 
         return array_data_mut.elements.remove(0);
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static SLICE: NativeFunction = NativeFunction {
@@ -564,10 +548,10 @@ static SLICE: NativeFunction = NativeFunction {
         }
 
         return Val::Array(Rc::new(VsArray::from(new_elems)));
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static SPLICE: NativeFunction = NativeFunction {
@@ -610,7 +594,7 @@ static SPLICE: NativeFunction = NativeFunction {
           }
 
           let gap = insert_len - replace_len;
-          
+
           for _ in 0..gap {
             array_data_mut.elements.push(Val::Void);
           }
@@ -641,10 +625,10 @@ static SPLICE: NativeFunction = NativeFunction {
         }
 
         return Val::Array(Rc::new(VsArray::from(deleted_elements)));
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static TO_LOCALE_STRING: NativeFunction = NativeFunction {
@@ -652,16 +636,16 @@ static TO_LOCALE_STRING: NativeFunction = NativeFunction {
     match this {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: TO_LOCALE_STRING");
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
     return Val::String(Rc::new(this.val_to_string()));
-  }
+  },
 };
 
 static UNSHIFT: NativeFunction = NativeFunction {
@@ -678,10 +662,10 @@ static UNSHIFT: NativeFunction = NativeFunction {
         }
 
         return Val::Number(array_data_mut.elements.len() as f64);
-      },
-      _ => std::panic!("Not implemented: exceptions/array indirection")
+      }
+      _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
 
 static VALUES: NativeFunction = NativeFunction {
@@ -689,8 +673,8 @@ static VALUES: NativeFunction = NativeFunction {
     match this {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: VALUES");
-      },
+      }
       _ => std::panic!("Not implemented: exceptions/array indirection"),
     };
-  }
+  },
 };
