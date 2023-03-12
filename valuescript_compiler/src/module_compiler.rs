@@ -316,7 +316,7 @@ impl ModuleCompiler {
     match module_decl {
       Import(import) => self.compile_import(import, scope),
       ExportDecl(ed) => self.compile_export_decl(ed, scope),
-      ExportNamed(_) => self.todo(module_decl.span(), "ExportNamed declaration"),
+      ExportNamed(en) => self.compile_named_export(en, scope),
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
       ExportDefaultExpr(_) => self.todo(module_decl.span(), "ExportDefaultExpr declaration"),
       ExportAll(_) => self.todo(module_decl.span(), "ExportAll declaration"),
@@ -485,6 +485,72 @@ impl ModuleCompiler {
       Decl::TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration in export"),
       Decl::TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration in export"),
     };
+  }
+
+  fn compile_named_export(&mut self, en: &swc_ecma_ast::NamedExport, scope: &Scope) {
+    use swc_ecma_ast::ExportSpecifier::*;
+    use swc_ecma_ast::ModuleExportName;
+
+    for specifier in &en.specifiers {
+      match specifier {
+        Named(named) => {
+          let orig_name = match &named.orig {
+            ModuleExportName::Ident(ident) => ident.sym.to_string(),
+            ModuleExportName::Str(_) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "exporting a non-identifier".to_string(),
+                span: named.span,
+              });
+
+              "_todo_export_non_ident".to_string()
+            }
+          };
+
+          let export_name = match &named.exported {
+            Some(ModuleExportName::Ident(ident)) => ident.sym.to_string(),
+            Some(ModuleExportName::Str(str_)) => {
+              self.todo(str_.span, "exporting a non-identifier");
+              "_todo_export_non_ident".to_string()
+            }
+            None => orig_name.clone(),
+          };
+
+          let defn = match &en.src {
+            Some(src) => {
+              self.todo(src.span, "exporting a module export from another module");
+              None
+            }
+            None => match scope.get_defn(&orig_name) {
+              Some(found_defn) => Some(found_defn),
+              None => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: format!("Definition for {} should have been in scope", orig_name),
+                  span: named.orig.span(),
+                });
+
+                None
+              }
+            },
+          };
+
+          if let Some(defn) = defn {
+            self
+              .module
+              .export_star
+              .properties
+              .push((Value::String(export_name), Value::Pointer(defn)));
+          }
+        }
+        Default(_) => {
+          self.todo(specifier.span(), "exporting a default module export");
+        }
+        Namespace(_) => {
+          self.todo(specifier.span(), "exporting a namespace module export");
+        }
+      }
+    }
   }
 
   fn compile_import(&mut self, import: &swc_ecma_ast::ImportDecl, scope: &Scope) {
