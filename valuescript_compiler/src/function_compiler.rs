@@ -807,7 +807,9 @@ impl FunctionCompiler {
         self.for_(for_, scope);
       }
       ForIn(for_in) => self.todo(for_in.span, "ForIn statement"),
-      ForOf(for_of) => self.todo(for_of.span, "ForOf statement"),
+      ForOf(for_of) => {
+        self.for_of(for_of, scope);
+      }
       Decl(decl) => {
         self.declaration(decl, scope);
       }
@@ -1043,6 +1045,110 @@ impl FunctionCompiler {
       None => {}
     }
 
+    self.push(Instruction::Jmp(for_test_label.ref_()));
+
+    self.label(for_end_label);
+
+    self.loop_labels.pop();
+  }
+
+  fn for_of(&mut self, for_of: &swc_ecma_ast::ForOfStmt, scope: &Scope) {
+    let for_scope = scope.nest();
+
+    let index_reg = self.allocate_numbered_reg(&"_for_of_i".to_string());
+    self.push(Instruction::Mov(Value::Number(0.0), index_reg.clone()));
+
+    let array_reg = self.allocate_numbered_reg(&"_for_of_array".to_string());
+
+    let mut ec = ExpressionCompiler {
+      fnc: self,
+      scope: &for_scope,
+    };
+
+    ec.compile(&for_of.right, Some(array_reg.clone()));
+
+    let len_reg = ec.fnc.allocate_numbered_reg(&"_for_of_len".to_string());
+
+    ec.fnc.push(Instruction::Sub(
+      Value::Register(array_reg.clone()),
+      Value::String("length".to_string()),
+      len_reg.clone(),
+    ));
+
+    match &for_of.left {
+      swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
+        ec.fnc.populate_block_scope_var_decl(var_decl, &for_scope);
+      }
+      _ => {}
+    }
+
+    let for_test_label = Label {
+      name: ec
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"for_test".to_string()),
+    };
+
+    let for_continue_label = Label {
+      name: ec
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"for_continue".to_string()),
+    };
+
+    let for_end_label = Label {
+      name: ec
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"for_end".to_string()),
+    };
+
+    ec.fnc.label(for_test_label.clone());
+
+    ec.fnc.loop_labels.push(LoopLabels {
+      continue_: for_continue_label.clone(),
+      break_: for_end_label.clone(),
+    });
+
+    let cond_reg = ec.fnc.allocate_numbered_reg(&"_for_of_cond".to_string());
+
+    ec.fnc.push(Instruction::OpTripleEq(
+      Value::Register(index_reg.clone()),
+      Value::Register(len_reg.clone()),
+      cond_reg.clone(),
+    ));
+
+    ec.fnc.push(Instruction::JmpIf(
+      Value::Register(cond_reg.clone()),
+      for_end_label.ref_(),
+    ));
+
+    let pat = match &for_of.left {
+      swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
+        if var_decl.decls.len() != 1 {
+          panic!("Unexpected number of declarations on left side of for-of loop");
+        }
+
+        &var_decl.decls[0].name
+      }
+      swc_ecma_ast::VarDeclOrPat::Pat(pat) => pat,
+    };
+
+    let element_reg = ec.fnc.get_pattern_register(pat, &for_scope);
+
+    ec.fnc.push(Instruction::Sub(
+      Value::Register(array_reg.clone()),
+      Value::Register(index_reg.clone()),
+      element_reg.clone(),
+    ));
+
+    ec.pat(pat, &element_reg, true, &for_scope);
+
+    self.statement(&for_of.body, false, &for_scope);
+
+    self.label(for_continue_label);
+
+    self.push(Instruction::OpInc(index_reg.clone()));
     self.push(Instruction::Jmp(for_test_label.ref_()));
 
     self.label(for_end_label);
