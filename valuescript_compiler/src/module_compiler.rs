@@ -518,8 +518,26 @@ impl ModuleCompiler {
 
           let defn = match &en.src {
             Some(src) => {
-              self.todo(src.span, "exporting a module export from another module");
-              None
+              let defn = self.allocate_defn(&export_name);
+
+              self.module.definitions.push(Definition {
+                pointer: defn.clone(),
+                content: DefinitionContent::Lazy(Lazy {
+                  body: vec![
+                    InstructionOrLabel::Instruction(Instruction::ImportStar(
+                      Value::String(src.value.to_string()),
+                      Register::Return,
+                    )),
+                    InstructionOrLabel::Instruction(Instruction::Sub(
+                      Value::Register(Register::Return),
+                      Value::String(orig_name.clone()),
+                      Register::Return,
+                    )),
+                  ],
+                }),
+              });
+
+              Some(defn)
             }
             None => match scope.get_defn(&orig_name) {
               Some(found_defn) => Some(found_defn),
