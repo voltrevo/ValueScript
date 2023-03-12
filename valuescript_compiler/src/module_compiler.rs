@@ -523,17 +523,23 @@ impl ModuleCompiler {
               self.module.definitions.push(Definition {
                 pointer: defn.clone(),
                 content: DefinitionContent::Lazy(Lazy {
-                  body: vec![
-                    InstructionOrLabel::Instruction(Instruction::ImportStar(
+                  body: match orig_name == "default" {
+                    true => vec![InstructionOrLabel::Instruction(Instruction::Import(
                       Value::String(src.value.to_string()),
                       Register::Return,
-                    )),
-                    InstructionOrLabel::Instruction(Instruction::Sub(
-                      Value::Register(Register::Return),
-                      Value::String(orig_name.clone()),
-                      Register::Return,
-                    )),
-                  ],
+                    ))],
+                    false => vec![
+                      InstructionOrLabel::Instruction(Instruction::ImportStar(
+                        Value::String(src.value.to_string()),
+                        Register::Return,
+                      )),
+                      InstructionOrLabel::Instruction(Instruction::Sub(
+                        Value::Register(Register::Return),
+                        Value::String(orig_name.clone()),
+                        Register::Return,
+                      )),
+                    ],
+                  },
                 }),
               });
 
