@@ -572,10 +572,59 @@ impl ModuleCompiler {
           }
         }
         Default(_) => {
+          // It's not clear if this can actually be hit. The SWC docs suggest:
+          // `export v from 'mod';`
+          // but then it refuses to actually parse that.
           self.todo(specifier.span(), "exporting a default module export");
         }
-        Namespace(_) => {
-          self.todo(specifier.span(), "exporting a namespace module export");
+        Namespace(namespace) => {
+          let namespace_name = match &namespace.name {
+            ModuleExportName::Ident(ident) => ident.sym.to_string(),
+            ModuleExportName::Str(_) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "exporting a non-identifier".to_string(),
+                span: namespace.span,
+              });
+
+              "_todo_export_non_ident".to_string()
+            }
+          };
+
+          let defn = self.allocate_defn(&namespace_name);
+
+          let src = match &en.src {
+            Some(src) => src.value.to_string(),
+            None => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "exporting a namespace without a source".to_string(),
+                span: namespace.span,
+              });
+
+              "_error_export_namespace_without_src".to_string()
+            }
+          };
+
+          self.module.definitions.push(Definition {
+            pointer: defn.clone(),
+            content: DefinitionContent::Lazy(Lazy {
+              body: vec![InstructionOrLabel::Instruction(Instruction::ImportStar(
+                Value::String(src),
+                Register::Return,
+              ))],
+            }),
+          });
+
+          if namespace_name == "default" {
+            self.module.export_default = Value::Pointer(defn);
+          } else {
+            self
+              .module
+              .export_star
+              .properties
+              .push((Value::String(namespace_name), Value::Pointer(defn)));
+          }
         }
       }
     }
