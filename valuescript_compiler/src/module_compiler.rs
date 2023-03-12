@@ -560,11 +560,15 @@ impl ModuleCompiler {
           };
 
           if let Some(defn) = defn {
-            self
-              .module
-              .export_star
-              .properties
-              .push((Value::String(export_name), Value::Pointer(defn)));
+            if export_name == "default" {
+              self.module.export_default = Value::Pointer(defn);
+            } else {
+              self
+                .module
+                .export_star
+                .properties
+                .push((Value::String(export_name), Value::Pointer(defn)));
+            }
           }
         }
         Default(_) => {
