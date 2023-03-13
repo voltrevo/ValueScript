@@ -407,12 +407,13 @@ ValueScript is in early development. There may be some descriptions of
 ValueScript elsewhere here that represent how ValueScript is intended to work,
 not the subset of ValueScript that has actually been implemented.
 
-A lot of the essential language features are implemented, including:
+Lots of things are implemented though, including:
 
 - Classes
 - Closures
 - Loops
 - Recursion
+- Destructuring
 - Local imports¹
 - Tree shaking¹
 
