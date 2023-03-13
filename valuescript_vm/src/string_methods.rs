@@ -50,6 +50,9 @@ pub fn get_string_method(method: &str) -> Val {
     "includes" => Val::Static(&INCLUDES),
     "indexOf" => Val::Static(&INDEX_OF),
     "lastIndexOf" => Val::Static(&LAST_INDEX_OF),
+    "localeCompare" => Val::Static(&LOCALE_COMPARE), // (TODO)
+    "match" => Val::Static(&TODO_REGEXES),           // (TODO: regex)
+    "matchAll" => Val::Static(&TODO_REGEXES),        // (TODO: regex)
     _ => Val::Undefined,
   }
 }
@@ -70,7 +73,7 @@ static AT: NativeFunction = NativeFunction {
           None => Val::String(Rc::new(String::from(""))),
         }
       }
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
+      _ => panic!("TODO: exceptions/string indirection"),
     }
   },
 };
@@ -94,7 +97,7 @@ static CODE_POINT_AT: NativeFunction = NativeFunction {
           None => Val::Undefined,
         }
       }
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
+      _ => panic!("TODO: exceptions/string indirection"),
     }
   },
 };
@@ -111,7 +114,7 @@ static CONCAT: NativeFunction = NativeFunction {
 
         Val::String(Rc::new(result))
       }
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
+      _ => panic!("TODO: exceptions/string indirection"),
     }
   },
 };
@@ -154,7 +157,7 @@ static ENDS_WITH: NativeFunction = NativeFunction {
 
         Val::Bool(true)
       }
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
+      _ => panic!("TODO: exceptions/string indirection"),
     }
   },
 };
@@ -186,7 +189,7 @@ static INCLUDES: NativeFunction = NativeFunction {
           None => Val::Bool(false),
         }
       }
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
+      _ => panic!("TODO: exceptions/string indirection"),
     }
   },
 };
@@ -218,7 +221,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
           None => Val::Number(-1.0),
         }
       }
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
+      _ => panic!("TODO: exceptions/string indirection"),
     }
   },
 };
@@ -250,7 +253,29 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
           None => Val::Number(-1.0),
         }
       }
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static LOCALE_COMPARE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(_string_data) => {
+        panic!("TODO: localeCompare");
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static TODO_REGEXES: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(_string_data) => {
+        panic!("TODO: regexes");
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
     }
   },
 };
