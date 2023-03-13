@@ -29,7 +29,7 @@ pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
 }
 
 pub fn get_string_method(method: &str) -> Val {
-  // Not supported: charAt, charCodeAt, fromCharCode.
+  // Not supported: charAt, charCodeAt.
   //
   // These methods are inherently about utf16, which is not how strings work in ValueScript. They
   // also have some particularly strange behavior, like:
@@ -47,7 +47,6 @@ pub fn get_string_method(method: &str) -> Val {
     "codePointAt" => Val::Static(&CODE_POINT_AT),
     "concat" => Val::Static(&CONCAT),
     "endsWith" => Val::Static(&ENDS_WITH),
-    // "fromCharCode" => Val::Static(&FROM_CHAR_CODE),
     _ => Val::Undefined,
   }
 }

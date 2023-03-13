@@ -56,8 +56,12 @@ impl ValTrait for StringBuiltin {
   }
 
   fn sub(&self, key: Val) -> Val {
+    // Not supported: fromCharCode.
+    // See charAt etc in string_methods.rs.
+
     match key.val_to_string().as_str() {
       "fromCodePoint" => Val::Static(&FROM_CODE_POINT),
+      // "fromCharCode" => Val::Static(&FROM_CHAR_CODE),
       _ => Val::Undefined,
     }
   }
