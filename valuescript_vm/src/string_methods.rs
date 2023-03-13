@@ -2,6 +2,29 @@ use std::rc::Rc;
 
 use crate::{helpers::to_wrapping_index, native_function::NativeFunction, vs_value::Val, ValTrait};
 
+pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
+  let right_index = match subscript.to_index() {
+    None => {
+      let method = subscript.val_to_string();
+      let method_str = method.as_str();
+
+      return match method_str {
+        "length" => Val::Number(string_data.len() as f64),
+        _ => get_string_method(method_str),
+      };
+    }
+    Some(i) => i,
+  };
+
+  let string_bytes = string_data.as_bytes();
+
+  if right_index >= string_bytes.len() {
+    return Val::Undefined;
+  }
+
+  string_from_byte(string_bytes[right_index])
+}
+
 pub fn get_string_method(method: &str) -> Val {
   match method {
     "at" => Val::Static(&AT),
@@ -83,5 +106,10 @@ fn byte_at(string: &String, index_param: Option<&Val>) -> Option<u8> {
 }
 
 fn string_from_byte(byte: u8) -> Val {
+  // TODO: Val::Strings need to change to not use rust's string type,
+  // because they need to represent an actual byte array underneath. This
+  // occurs for invalid utf8 sequences which are getting converted to U+FFFD
+  // here. To be analogous to js, the information of the actual byte needs
+  // to be preserved, but that can't be represented in rust's string type.
   Val::String(Rc::new(String::from_utf8_lossy(&[byte]).into_owned()))
 }

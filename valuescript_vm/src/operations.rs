@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::string_methods::get_string_method;
+use crate::string_methods::op_sub_string;
 
 use super::vs_value::Val;
 use super::vs_value::ValTrait;
@@ -242,35 +242,7 @@ pub fn op_sub(left: Val, right: Val) -> Val {
     Val::Null => std::panic!("Not implemented: exceptions"),
     Val::Bool(_) => Val::Undefined,   // TODO: toString etc
     Val::Number(_) => Val::Undefined, // TODO: toString etc
-    Val::String(string_data) => {
-      let right_index = match right.to_index() {
-        None => {
-          let method = right.val_to_string();
-          let method_str = method.as_str();
-
-          return match method_str {
-            "length" => Val::Number(string_data.len() as f64),
-            _ => get_string_method(method_str),
-          };
-        }
-        Some(i) => i,
-      };
-
-      let string_bytes = string_data.as_bytes();
-
-      if right_index >= string_bytes.len() {
-        return Val::Undefined;
-      }
-
-      let byte = string_bytes[right_index];
-
-      // TODO: Val::Strings need to change to not use rust's string type,
-      // because they need to represent an actual byte array underneath. This
-      // occurs for invalid utf8 sequences which are getting converted to U+FFFD
-      // here. To be analogous to js, the information of the actual byte needs
-      // to be preserved, but that can't be represented in rust's string type.
-      return Val::String(Rc::new(String::from_utf8_lossy(&[byte]).into_owned()));
-    }
+    Val::String(string_data) => op_sub_string(&string_data, &right),
     Val::Array(array_data) => {
       let right_index = match right.to_index() {
         None => {
