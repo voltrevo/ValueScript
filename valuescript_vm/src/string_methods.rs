@@ -47,6 +47,7 @@ pub fn get_string_method(method: &str) -> Val {
     // "charCodeAt" => Val::Static(&CHAR_CODE_AT),
     //
     "codePointAt" => Val::Static(&CODE_POINT_AT),
+    "concat" => Val::Static(&CONCAT),
     _ => Val::Undefined,
   }
 }
@@ -90,6 +91,23 @@ static CODE_POINT_AT: NativeFunction = NativeFunction {
           Some(code_point) => Val::Number(code_point as f64),
           None => Val::Undefined,
         }
+      }
+      _ => std::panic!("Not implemented: exceptions/string indirection"),
+    }
+  },
+};
+
+static CONCAT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let mut result = string_data.as_str().to_string();
+
+        for param in params {
+          result.push_str(param.val_to_string().as_str());
+        }
+
+        Val::String(Rc::new(result))
       }
       _ => std::panic!("Not implemented: exceptions/string indirection"),
     }
