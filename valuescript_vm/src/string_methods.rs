@@ -48,6 +48,7 @@ pub fn get_string_method(method: &str) -> Val {
     "concat" => Val::Static(&CONCAT),
     "endsWith" => Val::Static(&ENDS_WITH),
     "includes" => Val::Static(&INCLUDES),
+    "indexOf" => Val::Static(&INDEX_OF),
     _ => Val::Undefined,
   }
 }
@@ -168,49 +169,89 @@ static INCLUDES: NativeFunction = NativeFunction {
           _ => return Val::Bool(false),
         };
 
+        let search_bytes = search_string.as_bytes();
+
         let start_pos = match params.get(1) {
           Some(p) => match p.to_index() {
             // FIXME: to_index isn't quite right here
-            None => return Val::Bool(false),
             Some(i) => i,
+            None => return Val::Bool(false),
           },
           _ => 0,
         };
 
-        let search_bytes = search_string.as_bytes();
-
-        let search_length = search_bytes.len();
-
-        if search_length == 0 {
-          // TODO: Even if start_pos is out of bounds?
-          return Val::Bool(true);
+        match index_of(string_bytes, search_bytes, start_pos) {
+          Some(_) => Val::Bool(true),
+          None => Val::Bool(false),
         }
-
-        if start_pos + search_length > string_bytes.len() {
-          return Val::Bool(false);
-        }
-
-        for i in start_pos..(string_bytes.len() - search_length + 1) {
-          let mut found = true;
-
-          for j in 0..search_length {
-            if string_bytes[i + j] != search_bytes[j] {
-              found = false;
-              break;
-            }
-          }
-
-          if found {
-            return Val::Bool(true);
-          }
-        }
-
-        Val::Bool(false)
       }
       _ => std::panic!("Not implemented: exceptions/string indirection"),
     }
   },
 };
+
+static INDEX_OF: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let string_bytes = string_data.as_bytes();
+
+        let search_string = match params.get(0) {
+          Some(s) => s.val_to_string(),
+          _ => return Val::Number(-1.0),
+        };
+
+        let search_bytes = search_string.as_bytes();
+
+        let start_pos = match params.get(1) {
+          Some(p) => match p.to_index() {
+            // FIXME: to_index isn't quite right here
+            Some(i) => i,
+            None => return Val::Number(-1.0),
+          },
+          _ => 0,
+        };
+
+        match index_of(string_bytes, search_bytes, start_pos) {
+          Some(i) => Val::Number(i as f64),
+          None => Val::Number(-1.0),
+        }
+      }
+      _ => std::panic!("Not implemented: exceptions/string indirection"),
+    }
+  },
+};
+
+fn index_of(string_bytes: &[u8], search_bytes: &[u8], start_pos: usize) -> Option<usize> {
+  let search_length = search_bytes.len();
+
+  if start_pos + search_length > string_bytes.len() {
+    // TODO: If search_length is 0, we should apparently return the length of the string instead of
+    // returning none (why??)
+    return None;
+  }
+
+  if search_length == 0 {
+    return Some(0);
+  }
+
+  for i in start_pos..(string_bytes.len() - search_length + 1) {
+    let mut found = true;
+
+    for j in 0..search_length {
+      if string_bytes[i + j] != search_bytes[j] {
+        found = false;
+        break;
+      }
+    }
+
+    if found {
+      return Some(i);
+    }
+  }
+
+  None
+}
 
 fn unicode_at(bytes: &[u8], index: usize) -> Option<String> {
   match code_point_at(bytes, index) {
