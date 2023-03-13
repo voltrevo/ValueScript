@@ -31,8 +31,21 @@ pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
 pub fn get_string_method(method: &str) -> Val {
   match method {
     "at" => Val::Static(&AT),
-    "charAt" => Val::Static(&CHAR_AT),
-    "charCodeAt" => Val::Static(&CHAR_CODE_AT),
+    //
+    // Not supported: charAt, charCodeAt.
+    //
+    // These methods are inherently about utf16, which is not how strings work in ValueScript. They
+    // also have some particularly strange behavior, like:
+    //
+    //     "foo".charAt(NaN) // "f"
+    //
+    // Usually we include JavaScript behavior as much as possible, but since strings are utf8,
+    // there's more license to reinterpret strings and leave out things like this which aren't
+    // desirable.
+    //
+    // "charAt" => Val::Static(&CHAR_AT),
+    // "charCodeAt" => Val::Static(&CHAR_CODE_AT),
+    //
     "codePointAt" => Val::Static(&CODE_POINT_AT),
     _ => Val::Undefined,
   }
@@ -54,33 +67,6 @@ static AT: NativeFunction = NativeFunction {
           None => Val::String(Rc::new(String::from(""))),
         }
       }
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
-    }
-  },
-};
-
-static CHAR_AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
-      Val::String(string_data) => match byte_at(string_data, params.get(0)) {
-        Some(byte) => match std::char::from_u32(byte as u32) {
-          Some(c) => Val::String(Rc::new(c.to_string())),
-          None => Val::String(Rc::new(String::from(""))),
-        },
-        None => Val::String(Rc::new(String::from(""))),
-      },
-      _ => std::panic!("Not implemented: exceptions/string indirection"),
-    }
-  },
-};
-
-static CHAR_CODE_AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
-      Val::String(string_data) => match byte_at(string_data, params.get(0)) {
-        Some(byte) => Val::Number(byte as f64),
-        None => Val::Number(std::f64::NAN),
-      },
       _ => std::panic!("Not implemented: exceptions/string indirection"),
     }
   },
@@ -151,31 +137,4 @@ fn code_point_at(bytes: &[u8], index: usize) -> Option<u32> {
   }
 
   Some(value)
-}
-
-fn byte_at(string: &String, index_param: Option<&Val>) -> Option<u8> {
-  let mut index = match index_param {
-    Some(i) => i.to_number(),
-    _ => 0 as f64,
-  };
-
-  if index.is_nan() {
-    index = 0 as f64;
-  }
-
-  index = index.trunc();
-
-  if index < 0_f64 {
-    return None;
-  }
-
-  let index_usize = index as usize;
-
-  let string_bytes = string.as_bytes();
-
-  if index_usize >= string_bytes.len() {
-    return None;
-  }
-
-  Some(string_bytes[index_usize])
 }
