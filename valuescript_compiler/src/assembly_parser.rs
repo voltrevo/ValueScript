@@ -747,12 +747,15 @@ impl<'a> AssemblyParser<'a> {
   }
 
   fn assemble_builtin(&mut self) -> Builtin {
-    match self.parse_one_of(&["$Math", "$Debug"]).as_str() {
+    match self.parse_one_of(&["$Math", "$Debug", "$String"]).as_str() {
       "$Math" => Builtin {
         name: "Math".to_string(),
       },
       "$Debug" => Builtin {
         name: "Debug".to_string(),
+      },
+      "$String" => Builtin {
+        name: "String".to_string(),
       },
       _ => panic!("Shouldn't happen"),
     }

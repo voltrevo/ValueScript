@@ -329,6 +329,7 @@ impl Assembler {
     let builtin_code = match builtin.name.as_str() {
       "Math" => 0,
       "Debug" => 1,
+      "String" => 2,
       _ => panic!("Unknown builtin: {}", builtin.name),
     };
 

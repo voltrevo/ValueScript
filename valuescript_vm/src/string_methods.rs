@@ -29,26 +29,25 @@ pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
 }
 
 pub fn get_string_method(method: &str) -> Val {
+  // Not supported: charAt, charCodeAt, fromCharCode.
+  //
+  // These methods are inherently about utf16, which is not how strings work in ValueScript. They
+  // also have some particularly strange behavior, like:
+  //
+  //     "foo".charAt(NaN) // "f"
+  //
+  // Usually we include JavaScript behavior as much as possible, but since ValueScript strings are
+  // utf8, there's more license to reinterpret strings and leave out things like this which aren't
+  // desirable.
+
   match method {
     "at" => Val::Static(&AT),
-    //
-    // Not supported: charAt, charCodeAt.
-    //
-    // These methods are inherently about utf16, which is not how strings work in ValueScript. They
-    // also have some particularly strange behavior, like:
-    //
-    //     "foo".charAt(NaN) // "f"
-    //
-    // Usually we include JavaScript behavior as much as possible, but since strings are utf8,
-    // there's more license to reinterpret strings and leave out things like this which aren't
-    // desirable.
-    //
     // "charAt" => Val::Static(&CHAR_AT),
     // "charCodeAt" => Val::Static(&CHAR_CODE_AT),
-    //
     "codePointAt" => Val::Static(&CODE_POINT_AT),
     "concat" => Val::Static(&CONCAT),
     "endsWith" => Val::Static(&ENDS_WITH),
+    // "fromCharCode" => Val::Static(&FROM_CHAR_CODE),
     _ => Val::Undefined,
   }
 }
@@ -128,6 +127,7 @@ static ENDS_WITH: NativeFunction = NativeFunction {
 
         let end_pos = match params.get(1) {
           Some(p) => match p.to_index() {
+            // FIXME: Using to_index for end_pos is not quite right (eg -1 should be 0)
             None => return Val::Bool(false),
             Some(i) => std::cmp::min(i, string_bytes.len()),
           },

@@ -95,6 +95,12 @@ pub fn init_std_scope() -> Scope {
             name: "Debug".to_string(),
           }),
         ),
+        (
+          "String".to_string(),
+          MappedName::Builtin(Builtin {
+            name: "String".to_string(),
+          }),
+        ),
       ]),
       parent: None,
     })),

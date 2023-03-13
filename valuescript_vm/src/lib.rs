@@ -11,6 +11,7 @@ mod native_frame_function;
 mod native_function;
 mod operations;
 mod stack_frame;
+mod string_builtin;
 mod string_methods;
 mod virtual_machine;
 mod vs_array;
