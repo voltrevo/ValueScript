@@ -53,6 +53,9 @@ pub fn get_string_method(method: &str) -> Val {
     "localeCompare" => Val::Static(&LOCALE_COMPARE), // (TODO)
     "match" => Val::Static(&TODO_REGEXES),           // (TODO: regex)
     "matchAll" => Val::Static(&TODO_REGEXES),        // (TODO: regex)
+    "normalize" => Val::Static(&NORMALIZE),          // (TODO)
+    "padEnd" => Val::Static(&PAD_END),
+    "padStart" => Val::Static(&PAD_START),
     _ => Val::Undefined,
   }
 }
@@ -274,6 +277,128 @@ static TODO_REGEXES: NativeFunction = NativeFunction {
     match this {
       Val::String(_string_data) => {
         panic!("TODO: regexes");
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static NORMALIZE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(_string_data) => {
+        // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
+        panic!("TODO: normalize");
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+// TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
+static PAD_END: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let target_length = match params.get(0) {
+          Some(p) => match p.to_index() {
+            Some(i) => i,
+            None => return Val::String(string_data.clone()),
+          },
+          _ => return Val::String(string_data.clone()),
+        };
+
+        if target_length <= string_data.as_bytes().len() {
+          return Val::String(string_data.clone());
+        }
+
+        let mut string = string_data.to_string();
+
+        let pad_string = match params.get(1) {
+          Some(s) => s.val_to_string(),
+          _ => " ".to_string(),
+        };
+
+        let mut length_deficit = target_length - string.as_bytes().len();
+
+        let whole_copies = length_deficit / pad_string.as_bytes().len();
+
+        for _ in 0..whole_copies {
+          string.push_str(&pad_string);
+        }
+
+        length_deficit -= whole_copies * pad_string.as_bytes().len();
+
+        if length_deficit > 0 {
+          for c in pad_string.chars() {
+            let c_len = c.len_utf8();
+
+            if c_len > length_deficit {
+              break;
+            }
+
+            string.push(c);
+            length_deficit -= c_len;
+          }
+        }
+
+        Val::String(Rc::new(string))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+// TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
+static PAD_START: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let target_length = match params.get(0) {
+          Some(p) => match p.to_index() {
+            Some(i) => i,
+            None => return Val::String(string_data.clone()),
+          },
+          _ => return Val::String(string_data.clone()),
+        };
+
+        if target_length <= string_data.as_bytes().len() {
+          return Val::String(string_data.clone());
+        }
+
+        let pad_string = match params.get(1) {
+          Some(s) => s.val_to_string(),
+          _ => " ".to_string(),
+        };
+
+        let mut length_deficit = target_length - string_data.as_bytes().len();
+
+        let whole_copies = length_deficit / pad_string.as_bytes().len();
+
+        let mut prefix = String::new();
+
+        for _ in 0..whole_copies {
+          prefix.push_str(&pad_string);
+        }
+
+        length_deficit -= whole_copies * pad_string.as_bytes().len();
+
+        if length_deficit > 0 {
+          for c in pad_string.chars() {
+            let c_len = c.len_utf8();
+
+            if c_len > length_deficit {
+              break;
+            }
+
+            prefix.push(c);
+            length_deficit -= c_len;
+          }
+        }
+
+        prefix.push_str(string_data);
+
+        Val::String(Rc::new(prefix))
       }
       _ => panic!("TODO: exceptions/string indirection"),
     }
