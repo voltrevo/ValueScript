@@ -18,7 +18,7 @@ function nameScore(name: string) {
   let sum = 0;
 
   for (const c of name) {
-    sum += c.charCodeAt(0) - "A".charCodeAt(0) + 1;
+    sum += c.codePointAt(0)! - "A".codePointAt(0)! + 1;
   }
 
   return sum;
