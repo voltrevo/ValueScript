@@ -48,6 +48,7 @@ pub fn get_string_method(method: &str) -> Val {
     //
     "codePointAt" => Val::Static(&CODE_POINT_AT),
     "concat" => Val::Static(&CONCAT),
+    "endsWith" => Val::Static(&ENDS_WITH),
     _ => Val::Undefined,
   }
 }
@@ -108,6 +109,48 @@ static CONCAT: NativeFunction = NativeFunction {
         }
 
         Val::String(Rc::new(result))
+      }
+      _ => std::panic!("Not implemented: exceptions/string indirection"),
+    }
+  },
+};
+
+static ENDS_WITH: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let string_bytes = string_data.as_bytes();
+
+        let search_string = match params.get(0) {
+          Some(s) => s.val_to_string(),
+          _ => return Val::Bool(false),
+        };
+
+        let end_pos = match params.get(1) {
+          Some(p) => match p.to_index() {
+            None => return Val::Bool(false),
+            Some(i) => std::cmp::min(i, string_bytes.len()),
+          },
+          _ => string_bytes.len(),
+        };
+
+        let search_bytes = search_string.as_bytes();
+
+        let search_length = search_bytes.len();
+
+        if search_length > end_pos {
+          return Val::Bool(false);
+        }
+
+        let start_index = end_pos - search_length;
+
+        for i in 0..search_length {
+          if string_bytes[start_index + i] != search_bytes[i] {
+            return Val::Bool(false);
+          }
+        }
+
+        Val::Bool(true)
       }
       _ => std::panic!("Not implemented: exceptions/string indirection"),
     }
