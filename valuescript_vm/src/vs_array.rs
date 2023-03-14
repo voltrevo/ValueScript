@@ -1,7 +1,7 @@
 use std::cmp::{max, min};
 use std::rc::Rc;
 
-use crate::helpers::{to_unchecked_wrapping_index, to_wrapping_index};
+use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
 
 use super::array_higher_functions::array_every::EVERY;
 use super::array_higher_functions::array_filter::FILTER;
@@ -135,22 +135,6 @@ impl ValTrait for ArrayPrototype {
   fn codify(&self) -> String {
     "Array.prototype".into()
   }
-}
-
-fn to_wrapping_index_clamped(index: &Val, len: usize) -> isize {
-  let wrapping_index = to_unchecked_wrapping_index(index, len);
-
-  if wrapping_index < 0 {
-    return 0;
-  }
-
-  if wrapping_index > len as isize {
-    // len-1 would be a mistake. The end of the array is a meaningful index even
-    // though there is no data there.
-    return len as isize;
-  }
-
-  return wrapping_index;
 }
 
 static AT: NativeFunction = NativeFunction {

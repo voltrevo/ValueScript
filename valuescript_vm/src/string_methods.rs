@@ -1,6 +1,11 @@
 use std::rc::Rc;
 
-use crate::{helpers::to_wrapping_index, native_function::NativeFunction, vs_value::Val, ValTrait};
+use crate::{
+  helpers::{to_wrapping_index, to_wrapping_index_clamped},
+  native_function::NativeFunction,
+  vs_value::Val,
+  ValTrait,
+};
 
 pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
   let right_index = match subscript.to_index() {
@@ -22,8 +27,8 @@ pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
     return Val::Undefined;
   }
 
-  match unicode_at(string_bytes, right_index) {
-    Some(string) => Val::String(Rc::new(string)),
+  match unicode_at(string_bytes, string_bytes.len(), right_index) {
+    Some(char) => Val::String(Rc::new(char.to_string())),
     None => Val::String(Rc::new(String::from(""))),
   }
 }
@@ -57,6 +62,10 @@ pub fn get_string_method(method: &str) -> Val {
     "padEnd" => Val::Static(&PAD_END),
     "padStart" => Val::Static(&PAD_START),
     "repeat" => Val::Static(&REPEAT),
+    "replace" => Val::Static(&TODO_REGEXES), // (TODO: regex)
+    "replaceAll" => Val::Static(&TODO_REGEXES), // (TODO: regex)
+    "search" => Val::Static(&TODO_REGEXES),  // (TODO: regex)
+    "slice" => Val::Static(&SLICE),
     _ => Val::Undefined,
   }
 }
@@ -72,8 +81,8 @@ static AT: NativeFunction = NativeFunction {
           Some(i) => i,
         };
 
-        match unicode_at(string_bytes, index) {
-          Some(string) => Val::String(Rc::new(string)),
+        match unicode_at(string_bytes, string_bytes.len(), index) {
+          Some(char) => Val::String(Rc::new(char.to_string())),
           None => Val::String(Rc::new(String::from(""))),
         }
       }
@@ -96,7 +105,7 @@ static CODE_POINT_AT: NativeFunction = NativeFunction {
           _ => return Val::Undefined,
         };
 
-        match code_point_at(string_bytes, index) {
+        match code_point_at(string_bytes, string_bytes.len(), index) {
           Some(code_point) => Val::Number(code_point as f64),
           None => Val::Undefined,
         }
@@ -431,6 +440,40 @@ static REPEAT: NativeFunction = NativeFunction {
   },
 };
 
+static SLICE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let string_bytes = string_data.as_bytes();
+
+        let start = match params.get(0) {
+          None => 0,
+          Some(v) => to_wrapping_index_clamped(v, string_bytes.len()),
+        };
+
+        let end = match params.get(1) {
+          None => string_bytes.len() as isize,
+          Some(v) => to_wrapping_index_clamped(v, string_bytes.len()),
+        };
+
+        let mut new_string = String::new();
+
+        // FIXME: This is a slow way of doing it. Part of the reason is that we're using rust's
+        // string type, so we can't just find the relevant byte range and copy it in one go.
+        for i in start..end {
+          match unicode_at(string_bytes, end as usize, i as usize) {
+            Some(c) => new_string.push(c),
+            None => {}
+          }
+        }
+
+        Val::String(Rc::new(new_string))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
 fn index_of(string_bytes: &[u8], search_bytes: &[u8], start_pos: usize) -> Option<usize> {
   let search_length = search_bytes.len();
 
@@ -481,19 +524,17 @@ fn last_index_of(string_bytes: &[u8], search_bytes: &[u8], at_least_pos: usize) 
   None
 }
 
-fn unicode_at(bytes: &[u8], index: usize) -> Option<String> {
-  match code_point_at(bytes, index) {
+fn unicode_at(bytes: &[u8], len: usize, index: usize) -> Option<char> {
+  match code_point_at(bytes, len, index) {
     Some(code_point) => Some(
-      std::char::from_u32(code_point)
-        .expect("Invalid code point") // TODO: Find out if this is reachable and what to do about it
-        .to_string(),
+      std::char::from_u32(code_point).expect("Invalid code point"), // TODO: Find out if this is reachable and what to do about it
     ),
     None => None,
   }
 }
 
-fn code_point_at(bytes: &[u8], index: usize) -> Option<u32> {
-  if index >= bytes.len() {
+fn code_point_at(bytes: &[u8], len: usize, index: usize) -> Option<u32> {
+  if index >= len {
     return None;
   }
 
@@ -505,7 +546,7 @@ fn code_point_at(bytes: &[u8], index: usize) -> Option<u32> {
     return Some(byte as u32);
   }
 
-  if leading_ones == 1 || leading_ones > 4 || index + leading_ones > bytes.len() {
+  if leading_ones == 1 || leading_ones > 4 || index + leading_ones > len {
     return None;
   }
 
