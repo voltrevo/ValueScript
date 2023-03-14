@@ -62,6 +62,7 @@ impl ValTrait for StringBuiltin {
     match key.val_to_string().as_str() {
       "fromCodePoint" => Val::Static(&FROM_CODE_POINT),
       // "fromCharCode" => Val::Static(&FROM_CHAR_CODE),
+      // "raw" => Val::Static(&RAW),                     // TODO
       _ => Val::Undefined,
     }
   }

@@ -56,6 +56,7 @@ pub fn get_string_method(method: &str) -> Val {
     "normalize" => Val::Static(&NORMALIZE),          // (TODO)
     "padEnd" => Val::Static(&PAD_END),
     "padStart" => Val::Static(&PAD_START),
+    "repeat" => Val::Static(&REPEAT),
     _ => Val::Undefined,
   }
 }
@@ -399,6 +400,31 @@ static PAD_START: NativeFunction = NativeFunction {
         prefix.push_str(string_data);
 
         Val::String(Rc::new(prefix))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static REPEAT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let count = match params.get(0) {
+          Some(p) => match p.to_index() {
+            Some(i) => i,
+            None => return Val::String(string_data.clone()),
+          },
+          _ => return Val::String(string_data.clone()),
+        };
+
+        let mut result = String::new();
+
+        for _ in 0..count {
+          result.push_str(string_data);
+        }
+
+        Val::String(Rc::new(result))
       }
       _ => panic!("TODO: exceptions/string indirection"),
     }
