@@ -1,8 +1,9 @@
-use std::rc::Rc;
+use std::{rc::Rc, str::Chars};
 
 use crate::{
   helpers::{to_wrapping_index, to_wrapping_index_clamped},
   native_function::NativeFunction,
+  vs_array::VsArray,
   vs_value::Val,
   ValTrait,
 };
@@ -66,6 +67,7 @@ pub fn get_string_method(method: &str) -> Val {
     "replaceAll" => Val::Static(&TODO_REGEXES), // (TODO: regex)
     "search" => Val::Static(&TODO_REGEXES),  // (TODO: regex)
     "slice" => Val::Static(&SLICE),
+    "split" => Val::Static(&SPLIT),
     _ => Val::Undefined,
   }
 }
@@ -473,6 +475,101 @@ static SLICE: NativeFunction = NativeFunction {
     }
   },
 };
+
+static SPLIT: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let separator = match params.get(0) {
+          Some(s) => s.val_to_string(), // TODO: Regexes
+          None => return Val::String(string_data.clone()),
+        };
+
+        let limit = match params.get(1) {
+          // FIXME: to_index isn't quite right
+          Some(l) => match l.to_index() {
+            Some(i) => i,
+            None => string_data.as_bytes().len() + 1,
+          },
+          None => string_data.as_bytes().len() + 1,
+        };
+
+        let mut result = Vec::<Val>::new();
+
+        if limit == 0 {
+          return Val::Array(Rc::new(VsArray::from(result)));
+        }
+
+        if separator.is_empty() {
+          for c in string_data.chars() {
+            result.push(Val::String(Rc::new(c.to_string())));
+
+            if result.len() == limit {
+              break;
+            }
+          }
+
+          return Val::Array(Rc::new(VsArray::from(result)));
+        }
+
+        let mut part = String::new();
+        let mut str_chars = string_data.chars();
+
+        loop {
+          if match_chars(&mut str_chars, &separator) {
+            let mut new_part = String::new();
+            std::mem::swap(&mut new_part, &mut part);
+            result.push(Val::String(Rc::new(new_part)));
+
+            if result.len() == limit {
+              break;
+            }
+          } else {
+            match str_chars.next() {
+              Some(c) => part.push(c),
+              None => {
+                result.push(Val::String(Rc::new(part)));
+                break;
+              }
+            }
+          }
+        }
+
+        Val::Array(Rc::new(VsArray::from(result)))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+/**
+ * Tries to match str_chars_param against matcher.
+ * - Successful match: Advances str_chars_param and returns true.
+ * - Unsuccessful match: Does not advance str_chars_param and returns false.
+ */
+fn match_chars(str_chars_param: &mut Chars, matcher: &String) -> bool {
+  let mut str_chars = str_chars_param.clone();
+  let mut matcher_chars = matcher.chars();
+
+  loop {
+    let matcher_char = match matcher_chars.next() {
+      Some(c) => c,
+      None => {
+        *str_chars_param = str_chars;
+        return true;
+      }
+    };
+
+    let str_char = match str_chars.next() {
+      Some(c) => c,
+      None => return false,
+    };
+
+    if str_char != matcher_char {
+      return false;
+    }
+  }
+}
 
 fn index_of(string_bytes: &[u8], search_bytes: &[u8], start_pos: usize) -> Option<usize> {
   let search_length = search_bytes.len();
