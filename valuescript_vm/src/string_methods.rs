@@ -68,6 +68,7 @@ pub fn get_string_method(method: &str) -> Val {
     "search" => Val::Static(&TODO_REGEXES),  // (TODO: regex)
     "slice" => Val::Static(&SLICE),
     "split" => Val::Static(&SPLIT),
+    "startsWith" => Val::Static(&STARTS_WITH),
     _ => Val::Undefined,
   }
 }
@@ -536,6 +537,47 @@ static SPLIT: NativeFunction = NativeFunction {
         }
 
         Val::Array(Rc::new(VsArray::from(result)))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static STARTS_WITH: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let string_bytes = string_data.as_bytes();
+
+        let search_string = match params.get(0) {
+          Some(s) => s.val_to_string(),
+          _ => return Val::Bool(false),
+        };
+
+        let pos = match params.get(1) {
+          Some(p) => match p.to_index() {
+            // FIXME: Using to_index is not quite right
+            None => return Val::Bool(false),
+            Some(i) => std::cmp::min(i, string_bytes.len()),
+          },
+          _ => 0,
+        };
+
+        let search_bytes = search_string.as_bytes();
+
+        let search_length = search_bytes.len();
+
+        if search_length > string_bytes.len() - pos {
+          return Val::Bool(false);
+        }
+
+        for i in 0..search_length {
+          if string_bytes[pos + i] != search_bytes[i] {
+            return Val::Bool(false);
+          }
+        }
+
+        Val::Bool(true)
       }
       _ => panic!("TODO: exceptions/string indirection"),
     }
