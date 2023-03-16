@@ -407,7 +407,8 @@ ValueScript is in early development. There may be some descriptions of
 ValueScript elsewhere here that represent how ValueScript is intended to work,
 not the subset of ValueScript that has actually been implemented.
 
-Lots of things are implemented though, including:
+<details>
+<summary>Implemented</summary>
 
 - Classes
 - Closures
@@ -434,7 +435,10 @@ Lots of things are implemented though, including:
     strategy, subject to
     [community feedback](https://github.com/voltrevo/ValueScript/issues/new).)
 
-Things that aren't implemented _yet_:
+</details>
+
+<details>
+<summary>Not yet implemented</summary>
 
 - Foreign functions
 - Standardized foreign function packages for web/node/deno-like APIs
@@ -481,7 +485,10 @@ Things that aren't implemented _yet_:
   - (Even when this is implemented, many modules won't work due to their
     intention to run in a JS environment though. At least at first.)
 
-Things that aren't expected to be implemented, _ever_:
+</details>
+
+<details>
+<summary>Not planned</summary>
 
 - Prototype pollution
 - Mutating imported variables
@@ -489,8 +496,11 @@ Things that aren't expected to be implemented, _ever_:
 - Mutating captured variables
 - The `with` keyword
 - utf16-based operations on native strings
+  - (But see `jsˋˋ` workaround in not-yet section)
 - `Math.random` (except as an opt-in foreign function)
 - `Date.now` (except as an opt-in foreign function)
+
+</details>
 
 ## Contributing
 
