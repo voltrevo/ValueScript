@@ -56,10 +56,10 @@ pub fn get_string_method(method: &str) -> Val {
     "includes" => Val::Static(&INCLUDES),
     "indexOf" => Val::Static(&INDEX_OF),
     "lastIndexOf" => Val::Static(&LAST_INDEX_OF),
-    "localeCompare" => Val::Static(&LOCALE_COMPARE), // (TODO)
-    "match" => Val::Static(&TODO_REGEXES),           // (TODO: regex)
-    "matchAll" => Val::Static(&TODO_REGEXES),        // (TODO: regex)
-    "normalize" => Val::Static(&NORMALIZE),          // (TODO)
+    "localeCompare" => Val::Static(&TODO_LOCALE), // (TODO)
+    "match" => Val::Static(&TODO_REGEXES),        // (TODO: regex)
+    "matchAll" => Val::Static(&TODO_REGEXES),     // (TODO: regex)
+    "normalize" => Val::Static(&NORMALIZE),       // (TODO)
     "padEnd" => Val::Static(&PAD_END),
     "padStart" => Val::Static(&PAD_START),
     "repeat" => Val::Static(&REPEAT),
@@ -69,6 +69,16 @@ pub fn get_string_method(method: &str) -> Val {
     "slice" => Val::Static(&SLICE),
     "split" => Val::Static(&SPLIT),
     "startsWith" => Val::Static(&STARTS_WITH),
+    "substring" => Val::Static(&SUBSTRING),
+    "toLocaleLowerCase" => Val::Static(&TODO_LOCALE),
+    "toLocaleUpperCase" => Val::Static(&TODO_LOCALE),
+    "toLowerCase" => Val::Static(&TO_LOWER_CASE),
+    "toString" => Val::Static(&TO_STRING),
+    "toUpperCase" => Val::Static(&TO_UPPER_CASE),
+    "trim" => Val::Static(&TRIM),
+    "trimEnd" => Val::Static(&TRIM_END),
+    "trimStart" => Val::Static(&TRIM_START),
+    "valueOf" => Val::Static(&VALUE_OF),
     _ => Val::Undefined,
   }
 }
@@ -274,11 +284,11 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
   },
 };
 
-static LOCALE_COMPARE: NativeFunction = NativeFunction {
+static TODO_LOCALE: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
     match this {
       Val::String(_string_data) => {
-        panic!("TODO: localeCompare");
+        panic!("TODO: locale");
       }
       _ => panic!("TODO: exceptions/string indirection"),
     }
@@ -579,6 +589,127 @@ static STARTS_WITH: NativeFunction = NativeFunction {
 
         Val::Bool(true)
       }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static SUBSTRING: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let string_bytes = string_data.as_bytes();
+
+        let start = match params.get(0) {
+          Some(v) => match v.to_index() {
+            Some(i) => std::cmp::min(i, string_bytes.len()),
+            None => 0,
+          },
+          None => 0,
+        };
+
+        let end = match params.get(1) {
+          Some(v) => match v.to_index() {
+            Some(i) => std::cmp::min(i, string_bytes.len()),
+            None => string_bytes.len(),
+          },
+          None => string_bytes.len(),
+        };
+
+        let substring_start = std::cmp::min(start, end);
+        let substring_end = std::cmp::max(start, end);
+
+        let mut new_string = String::new();
+
+        // FIXME: This is a slow way of doing it. Part of the reason is that we're using rust's
+        // string type, so we can't just find the relevant byte range and copy it in one go.
+        for i in substring_start..substring_end {
+          match unicode_at(string_bytes, substring_end, i) {
+            Some(c) => new_string.push(c),
+            None => {}
+          }
+        }
+
+        Val::String(Rc::new(new_string))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static TO_LOWER_CASE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let lowercased_string = string_data.to_lowercase();
+        Val::String(Rc::new(lowercased_string))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static TO_STRING: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => Val::String(string_data.clone()),
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static TO_UPPER_CASE: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let uppercased_string = string_data.to_uppercase();
+        Val::String(Rc::new(uppercased_string))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static TRIM: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let trimmed_string = string_data.trim();
+        Val::String(Rc::new(trimmed_string.to_owned()))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static TRIM_END: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let trimmed_string = string_data.trim_end();
+        Val::String(Rc::new(trimmed_string.to_owned()))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static TRIM_START: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => {
+        let trimmed_string = string_data.trim_start();
+        Val::String(Rc::new(trimmed_string.to_owned()))
+      }
+      _ => panic!("TODO: exceptions/string indirection"),
+    }
+  },
+};
+
+static VALUE_OF: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::String(string_data) => Val::String(string_data.clone()),
       _ => panic!("TODO: exceptions/string indirection"),
     }
   },
