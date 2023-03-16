@@ -102,7 +102,7 @@ Because ValueScript shares the same syntax as TypeScript, you'll be able to
 inline ValueScript code into TypeScript like this:
 
 ```ts
-const points = runValueScript(() => {
+const points = inlineValueScript(() => {
   const x = [3, 5];
   const y = x;
   y[0]--;
@@ -414,14 +414,83 @@ Lots of things are implemented though, including:
 - Loops
 - Recursion
 - Destructuring
-- Local imports¹
-- Tree shaking¹
+- Local imports (not yet in the playground)
+- Tree shaking (not yet in the playground)
+- Copy-on-write optimizations
+- utf8 strings (_not_ JS's utf16 strings)
+  - `"🫣".length -> 4`
+  - (JS: `-> 2`)
+  - `[0, 1, 2, 3, 4].map(i => "🫣"[i]) -> ["🫣", "", "", "", undefined]`
+  - (JS: `-> ["\ud83e", "\udee3", undefined, undefined, undefined]`)
+- `Math`
+- Array standard methods (`.sort`, `.map`, `.filter`, etc.)
+- Most string standard methods (`.includes`, `.slice`, `.split`, etc.)
+- Many unusual JS things:
+  - `[] + [] -> ""`
+  - `[10, 1, 3].sort() -> [1, 10, 3]`
+  - `"b" + "a" + +"a" + "a" -> "baNaNa"`
+  - (With few exceptions like utf8, the goal is to just do things the JS way, to
+    maximize familiarity for people coming from JS. We're open to revising this
+    strategy, subject to
+    [community feedback](https://github.com/voltrevo/ValueScript/issues/new).)
 
-ValueScript doesn't yet bind to the outside world (including TypeScript
-interop), except that excess command line arguments are passed to the main
-function as strings.
+Things that aren't implemented _yet_:
 
-¹ Not in the playground yet.
+- Foreign functions
+- Standardized foreign function packages for web/node/deno-like APIs
+  - Sadly, there's currently _zero_ access to the host environment
+  - We consider this extremely important, but want the language itself to be
+    more robust before embarking on this enormous category of work
+  - (Some small & strategic host access will probably be implemented earlier)
+- Tools for embedding ValueScript in other languages
+  - (The playground kinda does this, but the solution is purpose-built for the
+    playground, and not intended to be used in other projects (you're welcome to
+    try it of course, but better solutions are planned))
+  - Webpack integration
+    - `import immutableStuff from "ValueScript:./path/to/immutableStuff";`
+  - Building JavaScript bundles containing ValueScript via embedded WebAssembly
+    (or importing the required WebAssembly)
+  - Transpiling ValueScript into JavaScript
+    - E.g. `a.b.c++` -> `a = { ...a, b: { ...a.b, c: a.b.c + 1 } }`
+  - `inlineValueScript(() => { /* ValueScript */ })`
+    - Uses `.toString()` to get the source code and compiles and runs it in
+      WebAssembly
+  - C libraries, and bindings for python etc
+- Structural comparison
+  - `{} === {} -> true`
+  - JS: `-> false`
+  - This is a value semantics thing - objects don't have identity
+- Iterators
+- Rest and spread
+- Generators
+- Async functions
+- TypeScript enums
+- TypeScript namespaces
+- Capturing `this` in arrow functions
+- `export * from`
+  - (`export { name } from` _does_ work)
+- `import.meta`
+- Dynamic imports
+- Unusual JS things like passing unintended types to standard functions
+- A workaround for JavaScript's utf16 strings
+  - `jsˋ🫣ˋ.length -> 2`
+  - `[0, 1, 2].map(i => jsˋ🫣ˋ[i]) -> [jsˋ\ud83eˋ, jsˋ\udee3ˋ, undefined]`
+  - (To be fair to js, note that iteration uses code points:
+    `[...jsˋ🫣🚀ˋ] -> [jsˋ🫣ˋ, jsˋ🚀ˋ]`)
+- Importing modules from npm
+  - (Even when this is implemented, many modules won't work due to their
+    intention to run in a JS environment though. At least at first.)
+
+Things that aren't expected to be implemented, _ever_:
+
+- Prototype pollution
+- Mutating imported variables
+- Reference semantics
+- Mutating captured variables
+- The `with` keyword
+- utf16-based operations on native strings
+- `Math.random` (except as an opt-in foreign function)
+- `Date.now` (except as an opt-in foreign function)
 
 ## Contributing
 
