@@ -9,6 +9,7 @@ mod instruction;
 mod math;
 mod native_frame_function;
 mod native_function;
+mod number_builtin;
 mod operations;
 mod stack_frame;
 mod string_builtin;

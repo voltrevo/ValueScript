@@ -101,6 +101,12 @@ pub fn init_std_scope() -> Scope {
             name: "String".to_string(),
           }),
         ),
+        (
+          "Number".to_string(),
+          MappedName::Builtin(Builtin {
+            name: "Number".to_string(),
+          }),
+        ),
       ]),
       parent: None,
     })),

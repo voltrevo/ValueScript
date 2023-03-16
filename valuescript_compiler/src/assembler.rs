@@ -330,6 +330,7 @@ impl Assembler {
       "Math" => 0,
       "Debug" => 1,
       "String" => 2,
+      "Number" => 3,
       _ => panic!("Unknown builtin: {}", builtin.name),
     };
 

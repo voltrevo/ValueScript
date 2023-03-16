@@ -1,3 +1,4 @@
+use crate::number_builtin::NUMBER_BUILTIN;
 use crate::string_builtin::STRING_BUILTIN;
 
 use super::debug::DEBUG;
@@ -11,6 +12,7 @@ pub fn get_builtin(index: usize) -> &'static dyn ValTrait {
     0 => &MATH,
     1 => &DEBUG,
     2 => &STRING_BUILTIN,
+    3 => &NUMBER_BUILTIN,
     _ => std::panic!(""),
   };
 }

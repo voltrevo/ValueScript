@@ -57,7 +57,7 @@ impl ScopeAnalysis {
     let mut sa = ScopeAnalysis::default();
     let scope = init_std_scope();
 
-    for builtin_name in vec!["Debug", "Math", "String"] {
+    for builtin_name in vec!["Debug", "Math", "String", "Number"] {
       let builtin = Builtin {
         name: builtin_name.to_string(),
       };
@@ -1633,6 +1633,12 @@ fn init_std_scope() -> XScope {
         swc_atoms::JsWord::from("String"),
         NameId::Builtin(Builtin {
           name: "String".to_string(),
+        }),
+      ),
+      (
+        swc_atoms::JsWord::from("Number"),
+        NameId::Builtin(Builtin {
+          name: "Number".to_string(),
         }),
       ),
     ]),
