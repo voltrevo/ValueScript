@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::number_methods::op_sub_number;
 use crate::string_methods::op_sub_string;
 
 use super::vs_value::Val;
@@ -240,8 +241,8 @@ pub fn op_sub(left: Val, right: Val) -> Val {
     Val::Void => std::panic!("Shouldn't happen"),
     Val::Undefined => std::panic!("Not implemented: exceptions"),
     Val::Null => std::panic!("Not implemented: exceptions"),
-    Val::Bool(_) => Val::Undefined,   // TODO: toString etc
-    Val::Number(_) => Val::Undefined, // TODO: toString etc
+    Val::Bool(_) => Val::Undefined, // TODO: toString etc
+    Val::Number(number) => op_sub_number(number, &right),
     Val::String(string_data) => op_sub_string(&string_data, &right),
     Val::Array(array_data) => {
       let right_index = match right.to_index() {
