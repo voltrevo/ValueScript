@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::native_function::NativeFunction;
 use crate::number_methods::op_sub_number;
 use crate::string_methods::op_sub_string;
 
@@ -241,7 +242,11 @@ pub fn op_sub(left: Val, right: Val) -> Val {
     Val::Void => std::panic!("Shouldn't happen"),
     Val::Undefined => std::panic!("Not implemented: exceptions"),
     Val::Null => std::panic!("Not implemented: exceptions"),
-    Val::Bool(_) => Val::Undefined, // TODO: toString etc
+    Val::Bool(_) => match right.val_to_string().as_str() {
+      "toString" => Val::Static(&BOOL_TO_STRING),
+      "valueOf" => Val::Static(&BOOL_VALUE_OF),
+      _ => Val::Undefined,
+    },
     Val::Number(number) => op_sub_number(number, &right),
     Val::String(string_data) => op_sub_string(&string_data, &right),
     Val::Array(array_data) => {
@@ -320,3 +325,21 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
     Val::Custom(_) => std::panic!("Not implemented"),
   }
 }
+
+static BOOL_TO_STRING: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _args: Vec<Val>| -> Val {
+    match &this {
+      Val::Bool(b) => Val::String(Rc::new(b.to_string())),
+      _ => std::panic!("Not implemented: exceptions/bool indirection"),
+    }
+  },
+};
+
+static BOOL_VALUE_OF: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _args: Vec<Val>| -> Val {
+    match &this {
+      Val::Bool(b) => Val::Bool(*b),
+      _ => std::panic!("Not implemented: exceptions/bool indirection"),
+    }
+  },
+};
