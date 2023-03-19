@@ -2,6 +2,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use valuescript_common::BUILTIN_NAMES;
+
 use crate::asm::{Builtin, Pointer, Register};
 
 use super::function_compiler::QueuedFunction;
@@ -82,32 +84,17 @@ pub fn _init_scope() -> Scope {
 pub fn init_std_scope() -> Scope {
   Scope {
     rc: Rc::new(RefCell::new(ScopeData {
-      name_map: HashMap::from([
-        (
-          "Math".to_string(),
-          MappedName::Builtin(Builtin {
-            name: "Math".to_string(),
-          }),
-        ),
-        (
-          "Debug".to_string(),
-          MappedName::Builtin(Builtin {
-            name: "Debug".to_string(),
-          }),
-        ),
-        (
-          "String".to_string(),
-          MappedName::Builtin(Builtin {
-            name: "String".to_string(),
-          }),
-        ),
-        (
-          "Number".to_string(),
-          MappedName::Builtin(Builtin {
-            name: "Number".to_string(),
-          }),
-        ),
-      ]),
+      name_map: BUILTIN_NAMES
+        .iter()
+        .map(|name| {
+          (
+            name.to_string(),
+            MappedName::Builtin(Builtin {
+              name: name.to_string(),
+            }),
+          )
+        })
+        .collect(),
       parent: None,
     })),
   }

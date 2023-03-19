@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use valuescript_common::BUILTIN_NAMES;
+
 use crate::asm::{
   Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
   Label, LabelRef, Module, Object, Pointer, Register, Value,
@@ -747,23 +749,10 @@ impl<'a> AssemblyParser<'a> {
   }
 
   fn assemble_builtin(&mut self) -> Builtin {
-    match self
-      .parse_one_of(&["$Math", "$Debug", "$String", "$Number"])
-      .as_str()
-    {
-      "$Math" => Builtin {
-        name: "Math".to_string(),
-      },
-      "$Debug" => Builtin {
-        name: "Debug".to_string(),
-      },
-      "$String" => Builtin {
-        name: "String".to_string(),
-      },
-      "$Number" => Builtin {
-        name: "Number".to_string(),
-      },
-      _ => panic!("Shouldn't happen"),
+    self.parse_exact("$");
+
+    Builtin {
+      name: self.parse_one_of(&BUILTIN_NAMES),
     }
   }
 

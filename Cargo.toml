@@ -3,6 +3,7 @@
 members = [
   "valuescript_vm",
   "valuescript_compiler",
+  "valuescript_common",
   "valuescript_program_embed",
   "valuescript_wasm",
   "vstc",

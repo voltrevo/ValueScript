@@ -1,6 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 
 use swc_common::Spanned;
+use valuescript_common::BUILTIN_NAMES;
 
 use crate::asm::Builtin;
 
@@ -57,7 +58,7 @@ impl ScopeAnalysis {
     let mut sa = ScopeAnalysis::default();
     let scope = init_std_scope();
 
-    for builtin_name in vec!["Debug", "Math", "String", "Number"] {
+    for builtin_name in BUILTIN_NAMES {
       let builtin = Builtin {
         name: builtin_name.to_string(),
       };
@@ -1614,35 +1615,20 @@ impl XScopeTrait for XScope {
 }
 
 fn init_std_scope() -> XScope {
-  return Rc::new(RefCell::new(XScopeData {
+  Rc::new(RefCell::new(XScopeData {
     owner_id: OwnerId::Module,
-    name_map: HashMap::from([
-      (
-        swc_atoms::js_word!("Math"),
-        NameId::Builtin(Builtin {
-          name: "Math".to_string(),
-        }),
-      ),
-      (
-        swc_atoms::JsWord::from("Debug"),
-        NameId::Builtin(Builtin {
-          name: "Debug".to_string(),
-        }),
-      ),
-      (
-        swc_atoms::JsWord::from("String"),
-        NameId::Builtin(Builtin {
-          name: "String".to_string(),
-        }),
-      ),
-      (
-        swc_atoms::JsWord::from("Number"),
-        NameId::Builtin(Builtin {
-          name: "Number".to_string(),
-        }),
-      ),
-    ]),
+    name_map: BUILTIN_NAMES
+      .iter()
+      .map(|name| {
+        (
+          swc_atoms::JsWord::from(*name),
+          NameId::Builtin(Builtin {
+            name: name.to_string(),
+          }),
+        )
+      })
+      .collect(),
     parent: None,
   }))
-  .nest(None);
+  .nest(None)
 }

@@ -14,3 +14,5 @@ swc_ecma_parser = "0.102.2"
 swc = "0.168.3"
 swc_ecma_ast = "0.76.0"
 queues = "1.0.2"
+
+valuescript_common = { path = "../valuescript_common" }
