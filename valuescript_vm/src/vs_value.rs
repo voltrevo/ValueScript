@@ -209,7 +209,7 @@ impl ValTrait for Val {
       Undefined => false,
       Null => false,
       Bool(b) => *b,
-      Number(x) => *x != 0_f64,
+      Number(x) => *x != 0_f64 && !x.is_nan(),
       String(s) => s.len() > 0,
       Array(_) => true,
       Object(_) => true,
