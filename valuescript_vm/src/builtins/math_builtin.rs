@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use super::native_function::NativeFunction;
-use super::operations::to_u32;
-use super::vs_array::VsArray;
-use super::vs_class::VsClass;
-use super::vs_object::VsObject;
-use super::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
+use crate::native_function::NativeFunction;
+use crate::operations::to_u32;
+use crate::vs_array::VsArray;
+use crate::vs_class::VsClass;
+use crate::vs_object::VsObject;
+use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 pub struct MathBuiltin {}
 
