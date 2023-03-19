@@ -15,6 +15,7 @@ mod operations;
 mod stack_frame;
 mod string_builtin;
 mod string_methods;
+mod todo_fn;
 mod virtual_machine;
 mod vs_array;
 mod vs_class;

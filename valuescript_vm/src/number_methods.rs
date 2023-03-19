@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use crate::{
   native_function::NativeFunction,
+  todo_fn::TODO,
   vs_value::{Val, ValTrait},
 };
 
@@ -10,6 +11,9 @@ pub fn op_sub_number(_number: f64, subscript: &Val) -> Val {
     "toExponential" => Val::Static(&TO_EXPONENTIAL),
     "toFixed" => Val::Static(&TO_FIXED),
     "toLocaleString" => Val::Static(&TODO_LOCALE),
+    "toPrecision" => Val::Static(&TODO),
+    "toString" => Val::Static(&TO_STRING),
+    "valueOf" => Val::Static(&VALUE_OF),
     _ => Val::Undefined,
   }
 }
@@ -61,6 +65,29 @@ static TODO_LOCALE: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
     match this {
       Val::Number(_number) => panic!("TODO: locale"),
+      _ => panic!("TODO: exceptions/number indirection"),
+    }
+  },
+};
+
+static TO_STRING: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
+    match this {
+      Val::Number(number) => match params.get(0) {
+        Some(_) => {
+          panic!("TODO: toString with radix");
+        }
+        None => Val::String(Rc::new(this.val_to_string())),
+      },
+      _ => panic!("TODO: exceptions/number indirection"),
+    }
+  },
+};
+
+static VALUE_OF: NativeFunction = NativeFunction {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+    match this {
+      Val::Number(number) => Val::Number(*number),
       _ => panic!("TODO: exceptions/number indirection"),
     }
   },
