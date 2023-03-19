@@ -52,7 +52,7 @@ impl ValTrait for StringBuiltin {
   }
 
   fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NotAFunction // TODO: Converts input to string
+    LoadFunctionResult::NativeFunction(to_string)
   }
 
   fn sub(&self, key: Val) -> Val {
@@ -98,3 +98,11 @@ static FROM_CODE_POINT: NativeFunction = NativeFunction {
     Val::String(Rc::new(result))
   },
 };
+
+fn to_string(_: &mut Val, params: Vec<Val>) -> Val {
+  if let Some(value) = params.get(0) {
+    Val::String(Rc::new(value.val_to_string()))
+  } else {
+    Val::String(Rc::new("".to_string()))
+  }
+}

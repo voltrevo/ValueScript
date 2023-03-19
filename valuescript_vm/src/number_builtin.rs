@@ -52,7 +52,7 @@ impl ValTrait for NumberBuiltin {
   }
 
   fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NotAFunction // TODO: Converts input to number
+    LoadFunctionResult::NativeFunction(to_number)
   }
 
   fn sub(&self, key: Val) -> Val {
@@ -188,3 +188,11 @@ static PARSE_INT: NativeFunction = NativeFunction {
     }
   },
 };
+
+fn to_number(_: &mut Val, params: Vec<Val>) -> Val {
+  if let Some(value) = params.get(0) {
+    Val::Number(value.to_number())
+  } else {
+    Val::Number(0.0)
+  }
+}

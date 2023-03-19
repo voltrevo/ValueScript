@@ -73,7 +73,7 @@ static TODO_LOCALE: NativeFunction = NativeFunction {
 static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
-      Val::Number(number) => match params.get(0) {
+      Val::Number(_) => match params.get(0) {
         Some(_) => {
           panic!("TODO: toString with radix");
         }
