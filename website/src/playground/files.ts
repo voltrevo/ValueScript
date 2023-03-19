@@ -37,8 +37,7 @@ const files: Record<string, string | nil> = {
     // Welcome to the ValueScript playground!
     //
     // This playground also acts as a tutorial by describing a variety of
-    // examples. Please go ahead and make edits to the code, you should see
-    // the results in real-time!
+    // examples. All examples are editable with live updates to their outputs.
     //
     // Keeping with tradition, here is the hello world program.
 
@@ -56,26 +55,15 @@ const files: Record<string, string | nil> = {
       let rightBowl = leftBowl;
       rightBowl.push('peach');
 
-      return {
-        leftBowl,
-        rightBowl,
-      };
+      return leftBowl.includes("peach");
+      // TypeScript:  true
+      // ValueScript: false
     }
 
-    // In TypeScript, leftBowl also contains 'peach':
-    //
-    // {
-    //   leftBowl: ['apple', 'mango', 'peach'],
-    //   rightBowl: ['apple', 'mango', 'peach'],
-    // }
-    //
-    // This is because TypeScript interprets the code to mean that leftBowl and
-    // rightBowl are the same object, and that object changes.
-    //
-    // In ValueScript, objects do not change, but variables do. Pushing onto
-    // rightBowl is interpreted as a change to the rightBowl variable itself,
-    // not the data it points to. rightBowl points to some new data, which may
-    // reference the old data, but only as a performance optimization.
+    // In TypeScript, \`leftBowl\` and \`rightBowl\` are the same object, and
+    // that object changes. In ValueScript, objects are just data, they don't
+    // change. When you change \`rightBowl\`, you are changing the *variable*
+    // and therefore \`leftBowl\` doesn't change.
   `),
 
   "examples/factorial.ts": blockTrim(`
