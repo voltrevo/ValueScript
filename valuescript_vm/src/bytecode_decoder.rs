@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use super::builtins::get_builtin;
+use crate::builtins::BUILTIN_VALS;
+
 use super::instruction::Instruction;
 use super::vs_array::VsArray;
 use super::vs_class::VsClass;
@@ -127,7 +128,7 @@ impl BytecodeDecoder {
       BytecodeType::Function => self.decode_function_header(),
       BytecodeType::Pointer => self.decode_pointer(),
       BytecodeType::Register => registers[self.decode_register_index().unwrap()].clone(),
-      BytecodeType::Builtin => Val::Static(get_builtin(self.decode_varsize_uint())),
+      BytecodeType::Builtin => Val::Static(BUILTIN_VALS[self.decode_varsize_uint()]),
       BytecodeType::Class => Val::Class(Rc::new(VsClass {
         constructor: self.decode_val(registers),
         instance_prototype: self.decode_val(registers),

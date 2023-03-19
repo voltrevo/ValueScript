@@ -1,7 +1,10 @@
 use std::{
   collections::{HashMap, HashSet},
   rc::Rc,
+  str::FromStr,
 };
+
+use valuescript_common::BuiltinName;
 
 use crate::asm::{
   Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
@@ -326,15 +329,10 @@ impl Assembler {
   fn builtin(&mut self, builtin: &Builtin) {
     self.output.push(ValueType::Builtin as u8);
 
-    let builtin_code = match builtin.name.as_str() {
-      "Math" => 0,
-      "Debug" => 1,
-      "String" => 2,
-      "Number" => 3,
-      _ => panic!("Unknown builtin: {}", builtin.name),
-    };
+    let builtin_name = BuiltinName::from_str(&builtin.name)
+      .expect(format!("Unknown builtin: {}", builtin.name).as_str());
 
-    self.varsize_uint(builtin_code);
+    self.varsize_uint(builtin_name.to_code());
   }
 
   fn array(&mut self, array: &Array) {

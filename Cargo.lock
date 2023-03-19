@@ -2231,6 +2231,9 @@ dependencies = [
 [[package]]
 name = "valuescript_vm"
 version = "0.1.0"
+dependencies = [
+ "valuescript_common",
+]
 
 [[package]]
 name = "valuescript_wasm"
