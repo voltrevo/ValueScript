@@ -426,6 +426,7 @@ not the subset of ValueScript that has actually been implemented.
 - `Math`
 - Array standard methods (`.sort`, `.map`, `.filter`, etc.)
 - Most string standard methods (`.includes`, `.slice`, `.split`, etc.)
+- BigInt
 - Many unusual JS things:
   - `[] + [] -> ""`
   - `[10, 1, 3].sort() -> [1, 10, 3]`
@@ -464,6 +465,7 @@ not the subset of ValueScript that has actually been implemented.
   - `{} === {} -> true`
   - JS: `-> false`
   - This is a value semantics thing - objects don't have identity
+- Exceptions
 - Iterators
 - Rest and spread
 - Generators

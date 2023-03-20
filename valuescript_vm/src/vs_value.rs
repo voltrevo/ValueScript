@@ -351,7 +351,7 @@ impl ValTrait for Val {
       Val::Null => "null".into(),
       Val::Bool(_) => self.val_to_string(),
       Val::Number(_) => self.val_to_string(),
-      Val::BigInt(_) => self.val_to_string(),
+      Val::BigInt(_) => self.val_to_string() + "n",
       Val::String(str) => stringify_string(str),
       Val::Array(vals) => {
         if vals.elements.len() == 0 {
