@@ -62,6 +62,7 @@ impl ValTrait for NumberBuiltin {
 
   fn sub(&self, key: Val) -> Val {
     match key.val_to_string().as_str() {
+      "EPSILON" => Val::Number(core::f64::EPSILON),
       "MAX_VALUE" => Val::Number(core::f64::MAX),
       "MAX_SAFE_INTEGER" => Val::Number(2f64.powi(53) - 1f64),
       "MIN_SAFE_INTEGER" => Val::Number(-(2f64.powi(53) - 1f64)),
