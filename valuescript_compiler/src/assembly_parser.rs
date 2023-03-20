@@ -668,7 +668,16 @@ impl<'a> AssemblyParser<'a> {
       Some(ref_c) => {
         let c = *ref_c;
 
-        let parsed = self.parse_one_of(&["void", "undefined", "null", "false", "true", ""]);
+        let parsed = self.parse_one_of(&[
+          "void",
+          "undefined",
+          "null",
+          "false",
+          "true",
+          "Infinity",
+          "NaN",
+          "",
+        ]);
 
         match parsed.as_str() {
           "void" => Value::Void,
@@ -676,6 +685,8 @@ impl<'a> AssemblyParser<'a> {
           "null" => Value::Null,
           "false" => Value::Bool(false),
           "true" => Value::Bool(true),
+          "Infinity" => Value::Number(f64::INFINITY),
+          "NaN" => Value::Number(f64::NAN),
 
           // TODO: Finish implementing the different values
           _ => {
@@ -791,6 +802,10 @@ impl<'a> AssemblyParser<'a> {
   }
 
   fn assemble_number(&mut self) -> f64 {
+    if self.parse_one_of(&["-Infinity", ""]) == "-Infinity" {
+      return f64::NEG_INFINITY;
+    }
+
     let mut num_string = "".to_string();
 
     loop {

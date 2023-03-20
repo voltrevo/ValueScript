@@ -13,6 +13,6 @@ export default function () {
     1,
     null,
     undefined,
-    0 / 0,
+    NaN,
   ].map(Boolean);
 }

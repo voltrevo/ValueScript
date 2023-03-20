@@ -50,6 +50,7 @@ impl CaptureFinder {
         }
       }
       Some(MappedName::Builtin(_)) => {}
+      Some(MappedName::Constant(_)) => {}
     }
   }
 

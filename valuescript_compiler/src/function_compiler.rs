@@ -715,9 +715,10 @@ impl FunctionCompiler {
             MappedName::Register(reg) => {
               self.release_reg(reg);
             }
-            MappedName::Definition(_) => {}
-            MappedName::QueuedFunction(_) => {}
-            MappedName::Builtin(_) => {}
+            MappedName::Definition(_)
+            | MappedName::QueuedFunction(_)
+            | MappedName::Builtin(_)
+            | MappedName::Constant(_) => {}
           }
         }
       }

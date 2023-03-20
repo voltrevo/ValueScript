@@ -26,8 +26,8 @@ export default function () {
   ];
 
   const negative = [
-    (0 / 0).toExponential(),
-    // (1 / 0).toExponential(), TODO: Fix "inf", should be "Infinity"
+    (NaN).toExponential(),
+    // (Infinity).toExponential(), TODO: Fix "inf", should be "Infinity"
   ];
 
   return [withoutPrecision, withPrecision, negative];

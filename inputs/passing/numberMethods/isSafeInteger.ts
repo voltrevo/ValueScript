@@ -17,9 +17,9 @@ export default function () {
     Number.isSafeInteger(maxSafe + 1),
     Number.isSafeInteger(minSafe - 1),
     Number.isSafeInteger(0.1),
-    Number.isSafeInteger(0 / 0),
-    Number.isSafeInteger(1 / 0),
-    Number.isSafeInteger(-1 / 0),
+    Number.isSafeInteger(NaN),
+    Number.isSafeInteger(Infinity),
+    Number.isSafeInteger(-Infinity),
   ];
 
   return [safe_integers, not_safe_integers];

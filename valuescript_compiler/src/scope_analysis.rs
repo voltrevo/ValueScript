@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
 use swc_common::Spanned;
 use valuescript_common::BUILTIN_NAMES;
 
-use crate::asm::Builtin;
+use crate::{asm::Builtin, constants::CONSTANTS};
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 
@@ -11,6 +11,7 @@ use super::diagnostic::{Diagnostic, DiagnosticLevel};
 pub enum NameId {
   Span(swc_common::Span),
   Builtin(Builtin),
+  Constant(&'static str),
 }
 
 // TODO: Make use of these in the next phase of the compiler, remove the
@@ -34,6 +35,7 @@ enum NameType {
   Class,
   Import,
   Builtin,
+  Constant,
 }
 
 #[derive(Clone)]
@@ -76,6 +78,20 @@ impl ScopeAnalysis {
       );
     }
 
+    for (name, _) in CONSTANTS {
+      sa.names.insert(
+        NameId::Constant(name),
+        Name {
+          id: NameId::Constant(name),
+          owner_id: OwnerId::Module,
+          sym: swc_atoms::JsWord::from(name),
+          type_: NameType::Constant,
+          mutations: vec![],
+          captures: vec![],
+        },
+      );
+    }
+
     sa.module_level_hoists(&scope, module);
 
     for module_item in &module.body {
@@ -97,10 +113,10 @@ impl ScopeAnalysis {
                 span: *span,
               });
             }
-            NameId::Builtin(_) => {
+            NameId::Builtin(_) | NameId::Constant(_) => {
               sa.diagnostics.push(Diagnostic {
                 level: DiagnosticLevel::InternalError,
-                message: "Builtin should not have type_ let".to_string(),
+                message: "Builtin/constant should not have type_ let".to_string(),
                 span: swc_common::DUMMY_SP,
               });
             }
@@ -1615,19 +1631,24 @@ impl XScopeTrait for XScope {
 }
 
 fn init_std_scope() -> XScope {
+  let mut name_map = HashMap::new();
+
+  for name in BUILTIN_NAMES {
+    name_map.insert(
+      swc_atoms::JsWord::from(name),
+      NameId::Builtin(Builtin {
+        name: name.to_string(),
+      }),
+    );
+  }
+
+  for (name, _) in CONSTANTS {
+    name_map.insert(swc_atoms::JsWord::from(name), NameId::Constant(name));
+  }
+
   Rc::new(RefCell::new(XScopeData {
     owner_id: OwnerId::Module,
-    name_map: BUILTIN_NAMES
-      .iter()
-      .map(|name| {
-        (
-          swc_atoms::JsWord::from(*name),
-          NameId::Builtin(Builtin {
-            name: name.to_string(),
-          }),
-        )
-      })
-      .collect(),
+    name_map,
     parent: None,
   }))
   .nest(None)

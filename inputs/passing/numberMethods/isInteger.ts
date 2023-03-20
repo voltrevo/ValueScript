@@ -14,9 +14,9 @@ export default function () {
   const notIntegers = [
     Number.isInteger(0.1),
     Number.isInteger(-0.1),
-    Number.isInteger(0 / 0),
-    Number.isInteger(1 / 0),
-    Number.isInteger(-1 / 0),
+    Number.isInteger(NaN),
+    Number.isInteger(Infinity),
+    Number.isInteger(-Infinity),
   ];
 
   return [integers, notIntegers];

@@ -324,7 +324,9 @@ impl<'a> ExpressionCompiler<'a> {
       Some(MappedName::Definition(_)) => (None, Some("Invalid: definition mutation")),
       Some(MappedName::QueuedFunction(_)) => (None, Some("Invalid: declaration mutation")),
       Some(MappedName::Register(reg)) => (Some(reg), None),
-      Some(MappedName::Builtin(_)) => (None, Some("Invalid: builtin mutation")),
+      Some(MappedName::Builtin(_) | MappedName::Constant(_)) => {
+        (None, Some("Invalid: builtin/constant mutation"))
+      }
     };
 
     if let Some(err_msg) = err_msg {
@@ -1169,11 +1171,11 @@ impl<'a> ExpressionCompiler<'a> {
 
             compiled_ref.value
           }
-          Some(MappedName::Builtin(_)) => {
+          Some(MappedName::Builtin(_) | MappedName::Constant(_)) => {
             self.fnc.diagnostics.push(Diagnostic {
               level: DiagnosticLevel::InternalError,
               message: format!(
-                "Captured name {} resolved to a builtin (this should never happen)",
+                "Captured name {} resolved to a builtin/constant (this should never happen)",
                 captured_name
               ),
               span,
@@ -1320,6 +1322,7 @@ impl<'a> ExpressionCompiler<'a> {
         target_register,
       ),
       MappedName::Builtin(builtin) => self.inline(Value::Builtin(builtin), target_register),
+      MappedName::Constant(value) => self.inline(value, target_register),
     };
   }
 
@@ -1610,6 +1613,7 @@ impl TargetAccessor {
         Some(MappedName::QueuedFunction(_)) => false,
         Some(MappedName::Register(_)) => true,
         Some(MappedName::Builtin(_)) => false,
+        Some(MappedName::Constant(_)) => false,
       },
       This(_) => true,
       Member(member) => TargetAccessor::is_eligible_expr(ec, &member.obj),

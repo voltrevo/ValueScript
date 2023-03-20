@@ -3,6 +3,7 @@ mod assembler;
 mod assembly_parser;
 mod capture_finder;
 mod compile;
+mod constants;
 mod diagnostic;
 mod expression_compiler;
 mod function_compiler;

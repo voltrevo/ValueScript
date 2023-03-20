@@ -13,8 +13,8 @@ export default function () {
   ];
 
   const negative = [
-    (0 / 0).toFixed(2),
-    // (1 / 0).toFixed(2), TODO: Fix "inf", should be "Infinity"
+    (NaN).toFixed(2),
+    // (Infinity).toFixed(2), TODO: Fix "inf", should be "Infinity"
   ];
 
   return [positive, negative];

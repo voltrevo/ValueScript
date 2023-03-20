@@ -4,7 +4,10 @@ use std::rc::Rc;
 
 use valuescript_common::BUILTIN_NAMES;
 
-use crate::asm::{Builtin, Pointer, Register};
+use crate::{
+  asm::{Builtin, Pointer, Register, Value},
+  constants::CONSTANTS,
+};
 
 use super::function_compiler::QueuedFunction;
 
@@ -14,6 +17,7 @@ pub enum MappedName {
   Definition(Pointer),
   QueuedFunction(QueuedFunction),
   Builtin(Builtin),
+  Constant(Value),
 }
 
 pub fn scope_reg(name: String) -> MappedName {
@@ -82,19 +86,24 @@ pub fn _init_scope() -> Scope {
 }
 
 pub fn init_std_scope() -> Scope {
+  let mut name_map: HashMap<String, MappedName> = Default::default();
+
+  for name in BUILTIN_NAMES {
+    name_map.insert(
+      name.to_string(),
+      MappedName::Builtin(Builtin {
+        name: name.to_string(),
+      }),
+    );
+  }
+
+  for (name, value) in CONSTANTS {
+    name_map.insert(name.to_string(), MappedName::Constant(value.clone()));
+  }
+
   Scope {
     rc: Rc::new(RefCell::new(ScopeData {
-      name_map: BUILTIN_NAMES
-        .iter()
-        .map(|name| {
-          (
-            name.to_string(),
-            MappedName::Builtin(Builtin {
-              name: name.to_string(),
-            }),
-          )
-        })
-        .collect(),
+      name_map,
       parent: None,
     })),
   }
