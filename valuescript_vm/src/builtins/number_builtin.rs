@@ -87,7 +87,7 @@ impl ValTrait for NumberBuiltin {
   }
 }
 
-static IS_FINITE: NativeFunction = NativeFunction {
+pub static IS_FINITE: NativeFunction = NativeFunction {
   fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
     if let Some(value) = params.get(0) {
       let number = value.to_number();
@@ -112,7 +112,7 @@ static IS_INTEGER: NativeFunction = NativeFunction {
   },
 };
 
-static IS_NAN: NativeFunction = NativeFunction {
+pub static IS_NAN: NativeFunction = NativeFunction {
   fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
     if let Some(value) = params.get(0) {
       let number = value.to_number();
@@ -140,7 +140,7 @@ static IS_SAFE_INTEGER: NativeFunction = NativeFunction {
   },
 };
 
-static PARSE_FLOAT: NativeFunction = NativeFunction {
+pub static PARSE_FLOAT: NativeFunction = NativeFunction {
   fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
     if let Some(value) = params.get(0) {
       let string_value = value.val_to_string().trim().to_string();
@@ -155,7 +155,7 @@ static PARSE_FLOAT: NativeFunction = NativeFunction {
   },
 };
 
-static PARSE_INT: NativeFunction = NativeFunction {
+pub static PARSE_INT: NativeFunction = NativeFunction {
   fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
     if let Some(value) = params.get(0) {
       let string_value = value.val_to_string().trim_start().to_string();

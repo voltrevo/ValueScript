@@ -16,4 +16,8 @@ pub static BUILTIN_VALS: [&'static (dyn ValTrait + Sync); BUILTIN_COUNT] = [
   &number_builtin::NUMBER_BUILTIN,
   &boolean_builtin::BOOLEAN_BUILTIN,
   &array_builtin::ARRAY_BUILTIN,
+  &number_builtin::IS_FINITE,
+  &number_builtin::IS_NAN,
+  &number_builtin::PARSE_FLOAT,
+  &number_builtin::PARSE_INT,
 ];

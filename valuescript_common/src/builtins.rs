@@ -9,10 +9,32 @@ pub enum BuiltinName {
   Number,
   Boolean,
   Array,
+
+  #[allow(non_camel_case_types)]
+  isFinite,
+
+  #[allow(non_camel_case_types)]
+  isNaN,
+
+  #[allow(non_camel_case_types)]
+  parseFloat,
+
+  #[allow(non_camel_case_types)]
+  parseInt,
 }
 
-pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] =
-  ["Debug", "Math", "String", "Number", "Boolean", "Array"];
+pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
+  "Debug",
+  "Math",
+  "String",
+  "Number",
+  "Boolean",
+  "Array",
+  "isFinite",
+  "isNaN",
+  "parseFloat",
+  "parseInt",
+];
 
 pub const BUILTIN_COUNT: usize = BuiltinName::COUNT;
 
