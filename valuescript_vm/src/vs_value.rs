@@ -96,7 +96,17 @@ impl ValTrait for Val {
       Undefined => "undefined".to_string(),
       Null => "null".to_string(),
       Bool(b) => b.to_string(),
-      Number(x) => x.to_string(), // TODO: Match js's number string format
+      Number(x) => {
+        if x.is_infinite() {
+          if x.is_sign_positive() {
+            "Infinity".to_string()
+          } else {
+            "-Infinity".to_string()
+          }
+        } else {
+          x.to_string()
+        }
+      } // TODO: Match js's number string format
       String(s) => s.to_string(),
       Array(vals) => {
         if vals.elements.len() == 0 {

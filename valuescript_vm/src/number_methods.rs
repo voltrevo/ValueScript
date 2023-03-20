@@ -22,6 +22,14 @@ static TO_FIXED: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, params: Vec<Val>| -> Val {
     match this {
       Val::Number(number) => {
+        if number.is_infinite() {
+          return if number.is_sign_positive() {
+            Val::String(Rc::new("Infinity".to_string()))
+          } else {
+            Val::String(Rc::new("-Infinity".to_string()))
+          };
+        }
+
         let mut precision = match params.get(0) {
           Some(p) => p.to_number(),
           _ => return Val::String(Rc::new(this.val_to_string())),
@@ -94,6 +102,14 @@ static VALUE_OF: NativeFunction = NativeFunction {
 };
 
 fn format_exponential(number: f64, precision: Option<usize>) -> Val {
+  if number.is_infinite() {
+    return if number.is_sign_positive() {
+      Val::String(Rc::new("Infinity".to_string()))
+    } else {
+      Val::String(Rc::new("-Infinity".to_string()))
+    };
+  }
+
   let exp_format = match precision {
     Some(p) => format!("{:.*e}", p, number),
     None => format!("{:e}", number),

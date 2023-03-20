@@ -1,4 +1,4 @@
-// test_output! [["0.00","1.23","123.00","0.01","0.00123","12345.68","3.14","-1.00"],["NaN"]]
+// test_output! [["0.00","1.23","123.00","0.01","0.00123","12345.68","3.14","-1.00"],["NaN","Infinity"]]
 
 export default function () {
   const positive = [
@@ -14,7 +14,7 @@ export default function () {
 
   const negative = [
     (NaN).toFixed(2),
-    // (Infinity).toFixed(2), TODO: Fix "inf", should be "Infinity"
+    (Infinity).toFixed(2),
   ];
 
   return [positive, negative];

@@ -499,11 +499,11 @@ impl std::fmt::Display for Value {
       Value::Null => write!(f, "null"),
       Value::Bool(value) => write!(f, "{}", value),
       Value::Number(value) => {
-        if f64::is_infinite(*value) {
-          if *value < 0.0 {
-            write!(f, "-Infinity")
-          } else {
+        if value.is_infinite() {
+          if value.is_sign_positive() {
             write!(f, "Infinity")
+          } else {
+            write!(f, "-Infinity")
           }
         } else {
           write!(f, "{}", value)
