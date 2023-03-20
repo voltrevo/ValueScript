@@ -35,6 +35,16 @@ impl VsArray {
       },
     };
   }
+
+  pub fn new() -> VsArray {
+    return VsArray {
+      elements: vec![],
+      object: VsObject {
+        string_map: Default::default(),
+        prototype: Some(Val::Static(&ARRAY_PROTOTYPE)),
+      },
+    };
+  }
 }
 
 pub struct ArrayPrototype {}

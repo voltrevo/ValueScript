@@ -8,10 +8,11 @@ pub enum BuiltinName {
   String,
   Number,
   Boolean,
+  Array,
 }
 
 pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] =
-  ["Debug", "Math", "String", "Number", "Boolean"];
+  ["Debug", "Math", "String", "Number", "Boolean", "Array"];
 
 pub const BUILTIN_COUNT: usize = BuiltinName::COUNT;
 

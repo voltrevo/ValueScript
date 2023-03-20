@@ -1,12 +1,12 @@
 use std::rc::Rc;
 
-use super::vs_value::{Val, ValTrait, LoadFunctionResult};
-use super::vs_object::VsObject;
-use super::operations;
 use super::bytecode_decoder::BytecodeDecoder;
 use super::bytecode_decoder::BytecodeType;
 use super::instruction::Instruction;
-use super::stack_frame::{StackFrame, StackFrameTrait, FrameStepResult, CallResult};
+use super::operations;
+use super::stack_frame::{CallResult, FrameStepResult, StackFrame, StackFrameTrait};
+use super::vs_object::VsObject;
+use super::vs_value::{LoadFunctionResult, Val, ValTrait};
 
 pub struct BytecodeStackFrame {
   pub decoder: BytecodeDecoder,
@@ -18,10 +18,7 @@ pub struct BytecodeStackFrame {
 }
 
 impl BytecodeStackFrame {
-  pub fn apply_unary_op(
-    &mut self,
-    op: fn(input: Val) -> Val,
-  ) {
+  pub fn apply_unary_op(&mut self, op: fn(input: Val) -> Val) {
     let input = self.decoder.decode_val(&self.registers);
 
     let register_index = self.decoder.decode_register_index();
@@ -31,10 +28,7 @@ impl BytecodeStackFrame {
     }
   }
 
-  pub fn apply_binary_op(
-    &mut self,
-    op: fn(left: Val, right: Val) -> Val,
-  ) {
+  pub fn apply_binary_op(&mut self, op: fn(left: Val, right: Val) -> Val) {
     let left = self.decoder.decode_val(&self.registers);
     let right = self.decoder.decode_val(&self.registers);
 
@@ -45,41 +39,36 @@ impl BytecodeStackFrame {
     }
   }
 
-  pub fn transfer_parameters(
-    &mut self,
-    new_frame: &mut StackFrame,
-  ) {
+  pub fn transfer_parameters(&mut self, new_frame: &mut StackFrame) {
     let bytecode_type = self.decoder.decode_type();
-  
+
     if bytecode_type != BytecodeType::Array {
       std::panic!("Not implemented: call instruction not using inline array");
     }
-  
+
     while self.decoder.peek_type() != BytecodeType::End {
       let p = self.decoder.decode_val(&self.registers);
       new_frame.write_param(p);
     }
-  
+
     self.decoder.decode_type(); // End (TODO: assert)
   }
 
-  pub fn decode_parameters(
-    &mut self,
-  ) -> Vec<Val> {
+  pub fn decode_parameters(&mut self) -> Vec<Val> {
     let mut res = Vec::<Val>::new();
-  
+
     let bytecode_type = self.decoder.decode_type();
-  
+
     if bytecode_type != BytecodeType::Array {
       std::panic!("Not implemented: call instruction not using inline array");
     }
-  
+
     while self.decoder.peek_type() != BytecodeType::End {
       res.push(self.decoder.decode_val(&self.registers));
     }
-  
+
     self.decoder.decode_type(); // End (TODO: assert)
-  
+
     return res;
   }
 }
@@ -105,7 +94,7 @@ impl StackFrameTrait for BytecodeStackFrame {
           return_: self.registers[0].clone(),
           this: self.registers[1].clone(),
         });
-      },
+      }
 
       Mov => {
         let val = self.decoder.decode_val(&self.registers);
@@ -114,21 +103,21 @@ impl StackFrameTrait for BytecodeStackFrame {
         if register_index.is_some() {
           self.registers[register_index.unwrap()] = val;
         }
-      },
+      }
 
       OpInc => {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut val = self.registers[register_index].clone();
         val = operations::op_plus(val, Val::Number(1_f64));
         self.registers[register_index] = val;
-      },
+      }
 
       OpDec => {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut val = self.registers[register_index].clone();
         val = operations::op_minus(val, Val::Number(1_f64));
         self.registers[register_index] = val;
-      },
+      }
 
       OpPlus => self.apply_binary_op(operations::op_plus),
       OpMinus => self.apply_binary_op(operations::op_minus),
@@ -170,30 +159,27 @@ impl StackFrameTrait for BytecodeStackFrame {
         let fn_ = self.decoder.decode_val(&self.registers);
 
         match fn_.load_function() {
-          LoadFunctionResult::NotAFunction => 
+          LoadFunctionResult::NotAFunction => {
             std::panic!("Not implemented: throw exception (fn_ is not a function)")
-          ,
+          }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             self.transfer_parameters(&mut new_frame);
-    
+
             self.return_target = self.decoder.decode_register_index();
             self.this_target = None;
-    
+
             return FrameStepResult::Push(new_frame);
-          },
+          }
           LoadFunctionResult::NativeFunction(native_fn) => {
-            let res = native_fn(
-              &mut Val::Undefined,
-              self.decode_parameters(),
-            );
+            let res = native_fn(&mut Val::Undefined, self.decode_parameters());
 
             match self.decoder.decode_register_index() {
               Some(return_target) => {
                 self.registers[return_target] = res;
-              },
-              None => {},
+              }
+              None => {}
             };
-          },
+          }
         };
       }
 
@@ -201,15 +187,15 @@ impl StackFrameTrait for BytecodeStackFrame {
         let fn_ = self.decoder.decode_val(&self.registers);
 
         match fn_.load_function() {
-          LoadFunctionResult::NotAFunction => 
+          LoadFunctionResult::NotAFunction => {
             std::panic!("Not implemented: throw exception (fn_ is not a function)")
-          ,
+          }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             if self.decoder.peek_type() == BytecodeType::Register {
               self.decoder.decode_type();
               let this_target = self.decoder.decode_register_index();
               self.this_target = this_target;
-    
+
               if this_target.is_some() {
                 new_frame.write_this(self.registers[this_target.unwrap()].clone());
               }
@@ -217,16 +203,16 @@ impl StackFrameTrait for BytecodeStackFrame {
               self.this_target = None;
               new_frame.write_this(self.decoder.decode_val(&self.registers));
             }
-    
+
             self.transfer_parameters(&mut new_frame);
-    
+
             self.return_target = self.decoder.decode_register_index();
-    
+
             return FrameStepResult::Push(new_frame);
-          },
+          }
           LoadFunctionResult::NativeFunction(_native_fn) => {
             std::panic!("Not implemented");
-          },
+          }
         }
       }
 
@@ -254,30 +240,28 @@ impl StackFrameTrait for BytecodeStackFrame {
         if register_index.is_some() {
           self.registers[register_index.unwrap()] = bound_fn.unwrap();
         }
-      },
+      }
 
       Sub => self.apply_binary_op(operations::op_sub),
 
       SubMov => {
         let subscript = self.decoder.decode_val(&self.registers);
         let value = self.decoder.decode_val(&self.registers);
-    
+
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut target = self.registers[register_index].clone(); // TODO: Lift
 
         operations::op_submov(&mut target, subscript, value);
         self.registers[register_index] = target;
-      },
+      }
 
       SubCall => {
         let mut obj = match self.decoder.peek_type() {
           BytecodeType::Register => {
             self.decoder.decode_type();
 
-            ThisArg::Register(
-              self.decoder.decode_register_index().unwrap()
-            )
-          },
+            ThisArg::Register(self.decoder.decode_register_index().unwrap())
+          }
           _ => ThisArg::Val(self.decoder.decode_val(&self.registers)),
         };
 
@@ -292,9 +276,9 @@ impl StackFrameTrait for BytecodeStackFrame {
         );
 
         match fn_.load_function() {
-          LoadFunctionResult::NotAFunction => 
+          LoadFunctionResult::NotAFunction => {
             std::panic!("Not implemented: throw exception (fn_ is not a function)")
-          ,
+          }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             self.transfer_parameters(&mut new_frame);
 
@@ -302,43 +286,35 @@ impl StackFrameTrait for BytecodeStackFrame {
               ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
               ThisArg::Val(val) => val.clone(),
             });
-    
+
             self.return_target = self.decoder.decode_register_index();
 
             self.this_target = match obj {
               ThisArg::Register(reg_i) => Some(reg_i),
               ThisArg::Val(_) => None,
             };
-    
+
             return FrameStepResult::Push(new_frame);
-          },
+          }
           LoadFunctionResult::NativeFunction(native_fn) => {
             let params = self.decode_parameters();
 
             let res = match &mut obj {
               ThisArg::Register(reg_i) => {
-                native_fn(
-                  self.registers.get_mut(reg_i.clone()).unwrap(),
-                  params,
-                )
-              },
-              ThisArg::Val(val) => {
-                native_fn(
-                  val,
-                  params,
-                )
-              },
+                native_fn(self.registers.get_mut(reg_i.clone()).unwrap(), params)
+              }
+              ThisArg::Val(val) => native_fn(val, params),
             };
-            
+
             match self.decoder.decode_register_index() {
               Some(return_target) => {
                 self.registers[return_target] = res;
-              },
-              None => {},
+              }
+              None => {}
             };
-          },
+          }
         };
-      },
+      }
 
       Jmp => {
         let dst = self.decoder.decode_pos();
@@ -358,10 +334,14 @@ impl StackFrameTrait for BytecodeStackFrame {
       UnaryMinus => self.apply_unary_op(operations::op_unary_minus),
 
       New => {
-        let class = self.decoder.decode_val(&self.registers)
+        // TODO: new Array
+
+        let class = self
+          .decoder
+          .decode_val(&self.registers)
           .as_class_data()
           .expect("Not implemented: throw exception (not constructible)");
-        
+
         let mut instance = Val::Object(Rc::new(VsObject {
           string_map: Default::default(),
           prototype: Some(class.instance_prototype.clone()),
@@ -374,36 +354,33 @@ impl StackFrameTrait for BytecodeStackFrame {
             let target_register = self.decoder.decode_register_index();
 
             match target_register {
-              None => {},
+              None => {}
               Some(tr) => self.registers[tr] = instance,
             };
-          },
+          }
           _ => match class.constructor.load_function() {
-            LoadFunctionResult::NotAFunction => 
+            LoadFunctionResult::NotAFunction => {
               std::panic!("Not implemented: throw exception (class.constructor is not a function)")
-            ,
+            }
             LoadFunctionResult::StackFrame(mut new_frame) => {
               self.transfer_parameters(&mut new_frame);
               new_frame.write_this(instance);
-  
+
               self.return_target = None;
               self.this_target = self.decoder.decode_register_index();
-  
+
               return FrameStepResult::Push(new_frame);
-            },
+            }
             LoadFunctionResult::NativeFunction(native_fn) => {
-              native_fn(
-                &mut instance,
-                self.decode_parameters(),
-              );
+              native_fn(&mut instance, self.decode_parameters());
 
               match self.decoder.decode_register_index() {
                 Some(target) => {
                   self.registers[target] = instance;
-                },
-                None => {},
+                }
+                None => {}
               };
-            },
+            }
           },
         };
       }
@@ -414,17 +391,17 @@ impl StackFrameTrait for BytecodeStackFrame {
 
   fn apply_call_result(&mut self, call_result: CallResult) {
     match self.this_target {
-      None => {},
+      None => {}
       Some(tt) => {
         self.registers[tt] = call_result.this;
-      },
+      }
     };
 
     match self.return_target {
-      None => {},
+      None => {}
       Some(rt) => {
         self.registers[rt] = call_result.return_;
-      },
+      }
     };
   }
 
