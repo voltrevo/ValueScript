@@ -1,9 +1,10 @@
 use std::rc::Rc;
 
-use super::bytecode_decoder::BytecodeDecoder;
-use super::first_stack_frame::FirstStackFrame;
-use super::stack_frame::{FrameStepResult, StackFrame};
-use super::vs_value::{LoadFunctionResult, Val, ValTrait};
+use crate::bytecode_decoder::BytecodeDecoder;
+use crate::first_stack_frame::FirstStackFrame;
+use crate::stack_frame::FrameStepOk;
+use crate::stack_frame::StackFrame;
+use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
 pub struct VirtualMachine {
   pub frame: StackFrame,
@@ -11,7 +12,7 @@ pub struct VirtualMachine {
 }
 
 impl VirtualMachine {
-  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>, params: &[String]) -> Val {
+  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>, params: &[String]) -> Result<Val, Val> {
     let mut bd = BytecodeDecoder {
       data: bytecode.clone(),
       pos: 0,
@@ -31,10 +32,10 @@ impl VirtualMachine {
     self.push(frame);
 
     while self.stack.len() > 0 {
-      self.step();
+      self.step()?;
     }
 
-    return self.frame.get_call_result().return_;
+    return Ok(self.frame.get_call_result().return_);
   }
 
   pub fn new() -> VirtualMachine {
@@ -48,17 +49,19 @@ impl VirtualMachine {
     };
   }
 
-  pub fn step(&mut self) {
-    match self.frame.step() {
-      FrameStepResult::Continue => {}
-      FrameStepResult::Pop(call_result) => {
+  pub fn step(&mut self) -> Result<(), Val> {
+    match self.frame.step()? {
+      FrameStepOk::Continue => {}
+      FrameStepOk::Pop(call_result) => {
         self.pop();
         self.frame.apply_call_result(call_result);
       }
-      FrameStepResult::Push(new_frame) => {
+      FrameStepOk::Push(new_frame) => {
         self.push(new_frame);
       }
-    };
+    }
+
+    Ok(())
   }
 
   pub fn push(&mut self, mut frame: StackFrame) {

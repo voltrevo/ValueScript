@@ -82,7 +82,15 @@ mod tests {
           }
 
           let mut vm = VirtualMachine::new();
-          let result = vm.run(&bytecode, &[]);
+
+          let result = match vm.run(&bytecode, &[]) {
+            Ok(result) => result,
+            Err(err) => {
+              println!("  Uncaught exception: {}", err);
+              failed_paths.insert(file_path.clone());
+              continue;
+            }
+          };
 
           let result_str = result.codify();
 

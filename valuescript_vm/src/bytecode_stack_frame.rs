@@ -1,12 +1,14 @@
 use std::rc::Rc;
 
-use super::bytecode_decoder::BytecodeDecoder;
-use super::bytecode_decoder::BytecodeType;
-use super::instruction::Instruction;
-use super::operations;
-use super::stack_frame::{CallResult, FrameStepResult, StackFrame, StackFrameTrait};
-use super::vs_object::VsObject;
-use super::vs_value::{LoadFunctionResult, Val, ValTrait};
+use crate::bytecode_decoder::BytecodeDecoder;
+use crate::bytecode_decoder::BytecodeType;
+use crate::instruction::Instruction;
+use crate::operations;
+use crate::stack_frame::FrameStepOk;
+use crate::stack_frame::FrameStepResult;
+use crate::stack_frame::{CallResult, StackFrame, StackFrameTrait};
+use crate::vs_object::VsObject;
+use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
 pub struct BytecodeStackFrame {
   pub decoder: BytecodeDecoder,
@@ -90,10 +92,10 @@ impl StackFrameTrait for BytecodeStackFrame {
 
     match self.decoder.decode_instruction() {
       End => {
-        return FrameStepResult::Pop(CallResult {
+        return Ok(FrameStepOk::Pop(CallResult {
           return_: self.registers[0].clone(),
           this: self.registers[1].clone(),
-        });
+        }));
       }
 
       Mov => {
@@ -168,7 +170,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             self.return_target = self.decoder.decode_register_index();
             self.this_target = None;
 
-            return FrameStepResult::Push(new_frame);
+            return Ok(FrameStepOk::Push(new_frame));
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
             let res = native_fn(&mut Val::Undefined, self.decode_parameters());
@@ -208,7 +210,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
             self.return_target = self.decoder.decode_register_index();
 
-            return FrameStepResult::Push(new_frame);
+            return Ok(FrameStepOk::Push(new_frame));
           }
           LoadFunctionResult::NativeFunction(_native_fn) => {
             std::panic!("Not implemented");
@@ -294,7 +296,7 @@ impl StackFrameTrait for BytecodeStackFrame {
               ThisArg::Val(_) => None,
             };
 
-            return FrameStepResult::Push(new_frame);
+            return Ok(FrameStepOk::Push(new_frame));
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
             let params = self.decode_parameters();
@@ -369,7 +371,7 @@ impl StackFrameTrait for BytecodeStackFrame {
               self.return_target = None;
               self.this_target = self.decoder.decode_register_index();
 
-              return FrameStepResult::Push(new_frame);
+              return Ok(FrameStepOk::Push(new_frame));
             }
             LoadFunctionResult::NativeFunction(native_fn) => {
               native_fn(&mut instance, self.decode_parameters());
@@ -386,7 +388,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
     };
 
-    return FrameStepResult::Continue;
+    return Ok(FrameStepOk::Continue);
   }
 
   fn apply_call_result(&mut self, call_result: CallResult) {

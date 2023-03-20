@@ -37,9 +37,16 @@ pub fn run_command(args: &Vec<String>) {
   let bytecode = to_bytecode(format, file_path);
 
   let mut vm = VirtualMachine::new();
-  let result = vm.run(&bytecode, &args[argpos..]);
 
-  println!("{}", result);
+  match vm.run(&bytecode, &args[argpos..]) {
+    Ok(result) => {
+      println!("{}", result);
+    }
+    Err(err) => {
+      println!("Uncaught exception: {}", err);
+      exit(1);
+    }
+  }
 }
 
 enum RunFormat {

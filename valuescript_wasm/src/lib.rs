@@ -42,7 +42,10 @@ fn run_to_result(source: &str) -> RunResult {
 
   RunResult {
     diagnostics: compiler_output.diagnostics,
-    output: Ok(result.codify()),
+    output: match result {
+      Ok(result) => Ok(result.codify()),
+      Err(err) => Err(err.codify()),
+    },
   }
 }
 

@@ -8,11 +8,13 @@ pub struct CallResult {
   pub this: Val,
 }
 
-pub enum FrameStepResult {
+pub enum FrameStepOk {
   Continue,
   Pop(CallResult),
   Push(StackFrame),
 }
+
+pub type FrameStepResult = Result<FrameStepOk, Val>;
 
 pub trait StackFrameTrait {
   fn write_this(&mut self, this: Val);

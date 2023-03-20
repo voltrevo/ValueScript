@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{process::exit, rc::Rc};
 
 use valuescript_vm::VirtualMachine;
 
@@ -50,5 +50,11 @@ pub fn main() {
     &[],
   );
 
-  println!("{}", result);
+  match result {
+    Ok(result) => println!("{}", result),
+    Err(err) => {
+      println!("Uncaught exception: {}", err);
+      exit(1);
+    }
+  }
 }
