@@ -4,6 +4,8 @@ use std::{
   str::FromStr,
 };
 
+use num_bigint::{BigInt, Sign};
+
 use valuescript_common::BuiltinName;
 
 use crate::asm::{
@@ -231,6 +233,7 @@ impl Assembler {
         self.register(register);
       }
       Value::Number(number) => self.number(*number),
+      Value::BigInt(bigint) => self.bigint(bigint),
       Value::String(string) => self.string(string),
       Value::Bool(boolean) => match boolean {
         false => self.output.push(ValueType::False as u8),
@@ -310,6 +313,21 @@ impl Assembler {
     }
   }
 
+  fn bigint(&mut self, value: &BigInt) {
+    self.output.push(ValueType::BigInt as u8);
+
+    let (sign, mut bytes) = value.to_bytes_le();
+
+    self.output.push(match sign {
+      Sign::Minus => 0,
+      Sign::NoSign => 1,
+      Sign::Plus => 2,
+    });
+
+    self.varsize_uint(bytes.len());
+    self.output.append(&mut bytes);
+  }
+
   fn string(&mut self, value: &String) {
     self.output.push(ValueType::String as u8);
     self.varsize_uint(value.len());
@@ -377,6 +395,7 @@ enum ValueType {
   Builtin = 0x10,
   Class = 0x11,
   Lazy = 0x12,
+  BigInt = 0x13,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone)]

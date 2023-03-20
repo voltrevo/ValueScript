@@ -1,14 +1,16 @@
-import SillyBigInt from "./helpers/SillyBigInt.ts";
+// test_output! 4782
 
 export default function main() {
-  let fibLast = new SillyBigInt(1);
-  let fib = new SillyBigInt(1);
+  let fibLast = 1n;
+  let fib = 1n;
   let fibIndex = 2;
 
-  while (fib.toString().length < 1000) {
-    const tmp = fib;
-    fib.add(fibLast);
-    fibLast = tmp;
+  // TODO: Remove the temptation pull out this constant (optimization to eval
+  // known expressions).
+  const threshold = 10n ** 999n;
+
+  while (fib < threshold) {
+    [fib, fibLast] = [fib + fibLast, fib];
     fibIndex++;
   }
 

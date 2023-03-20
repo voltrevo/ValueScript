@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use num_bigint::BigInt;
 use valuescript_common::BUILTIN_NAMES;
 
 use crate::asm::{
@@ -662,7 +663,7 @@ impl<'a> AssemblyParser<'a> {
       }
       Some('$') => Value::Builtin(self.assemble_builtin()),
       Some('[') => Value::Array(Box::new(self.assemble_array())),
-      Some('-' | '.' | '0'..='9') => Value::Number(self.assemble_number()),
+      Some('-' | '.' | '0'..='9') => self.assemble_number(),
       Some('"') => Value::String(self.parse_string_literal()),
       Some('{') => Value::Object(Box::new(self.assemble_object())),
       Some(ref_c) => {
@@ -801,20 +802,37 @@ impl<'a> AssemblyParser<'a> {
     LabelRef { name }
   }
 
-  fn assemble_number(&mut self) -> f64 {
+  fn assemble_number(&mut self) -> Value {
     if self.parse_one_of(&["-Infinity", ""]) == "-Infinity" {
-      return f64::NEG_INFINITY;
+      return Value::Number(f64::NEG_INFINITY);
     }
 
     let mut num_string = "".to_string();
 
     loop {
       match self.pos.peek() {
-        Some('-' | '.' | 'e' | '0'..='9') => {
+        Some('-' | '.' | 'e' | 'n' | '0'..='9') => {
           num_string.push(self.pos.next().unwrap());
         }
         _ => {
           break;
+        }
+      }
+    }
+
+    if num_string.chars().last() == Some('n') {
+      num_string.pop();
+
+      match BigInt::parse_bytes(num_string.as_bytes(), 10) {
+        Some(bigint) => return Value::BigInt(bigint),
+        None => {
+          panic!(
+            "{}",
+            self.render_pos(
+              -(num_string.len() as isize + 1),
+              &format!("Expected valid number")
+            )
+          );
         }
       }
     }
@@ -831,7 +849,7 @@ impl<'a> AssemblyParser<'a> {
       );
     }
 
-    value_result.unwrap()
+    Value::Number(value_result.unwrap())
   }
 
   fn assemble_object(&mut self) -> Object {

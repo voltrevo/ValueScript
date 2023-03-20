@@ -85,6 +85,7 @@ static TO_STRING: NativeFunction = NativeFunction {
         Some(_) => {
           panic!("TODO: toString with radix");
         }
+
         None => Val::String(Rc::new(this.val_to_string())),
       },
       _ => panic!("TODO: exceptions/number indirection"),

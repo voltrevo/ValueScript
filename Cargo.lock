@@ -2210,6 +2210,8 @@ dependencies = [
 name = "valuescript_compiler"
 version = "0.1.0"
 dependencies = [
+ "num-bigint",
+ "num-traits",
  "queues",
  "serde",
  "serde_json",
@@ -2232,6 +2234,8 @@ dependencies = [
 name = "valuescript_vm"
 version = "0.1.0"
 dependencies = [
+ "num-bigint",
+ "num-traits",
  "valuescript_common",
 ]
 

@@ -1334,7 +1334,7 @@ impl<'a> ExpressionCompiler<'a> {
       Bool(bool_) => return Value::Bool(bool_.value),
       Null(_) => return Value::Null,
       Num(num) => return Value::Number(num.value),
-      BigInt(_) => ("_todo_bigint_literal", "BigInt literals"),
+      BigInt(bigint) => return Value::BigInt(bigint.value.clone()),
       Regex(_) => ("_todo_regex_literal", "Regex literals"),
       JSXText(_) => ("_todo_jsxtext_literal", "JSXText literals"),
     };

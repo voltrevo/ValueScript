@@ -1,6 +1,10 @@
 use std::rc::Rc;
 use std::str::FromStr;
 
+use num_bigint::BigInt;
+use num_traits::cast::ToPrimitive;
+use num_traits::Zero;
+
 use super::operations::{op_sub, op_submov};
 use super::stack_frame::StackFrame;
 use super::vs_array::VsArray;
@@ -15,6 +19,7 @@ pub enum Val {
   Null,
   Bool(bool),
   Number(f64),
+  BigInt(BigInt),
   String(Rc<String>),
   Array(Rc<VsArray>),
   Object(Rc<VsObject>),
@@ -30,6 +35,7 @@ pub enum VsType {
   Null,
   Bool,
   Number,
+  BigInt,
   String,
   Array,
   Object,
@@ -55,6 +61,7 @@ pub trait ValTrait {
 
   fn bind(&self, params: Vec<Val>) -> Option<Val>;
 
+  fn as_bigint_data(&self) -> Option<BigInt>;
   fn as_array_data(&self) -> Option<Rc<VsArray>>;
   fn as_object_data(&self) -> Option<Rc<VsObject>>;
   fn as_class_data(&self) -> Option<Rc<VsClass>>;
@@ -78,6 +85,7 @@ impl ValTrait for Val {
       Null => VsType::Null,
       Bool(_) => VsType::Bool,
       Number(_) => VsType::Number,
+      BigInt(_) => VsType::BigInt,
       String(_) => VsType::String,
       Array(_) => VsType::Array,
       Object(_) => VsType::Object,
@@ -107,6 +115,7 @@ impl ValTrait for Val {
           x.to_string()
         }
       } // TODO: Match js's number string format
+      BigInt(x) => x.to_string(),
       String(s) => s.to_string(),
       Array(vals) => {
         if vals.elements.len() == 0 {
@@ -148,6 +157,7 @@ impl ValTrait for Val {
       Null => 0_f64,
       Bool(b) => *b as u8 as f64,
       Number(x) => *x,
+      BigInt(x) => x.to_f64().unwrap_or(f64::NAN),
       String(s) => f64::from_str(s).unwrap_or(f64::NAN),
       Array(vals) => match vals.elements.len() {
         0 => 0_f64,
@@ -171,6 +181,7 @@ impl ValTrait for Val {
       Null => None,
       Bool(_) => None,
       Number(x) => number_to_index(*x),
+      BigInt(b) => number_to_index(b.to_f64().unwrap_or(f64::NAN)),
       String(s) => match f64::from_str(s) {
         Ok(x) => number_to_index(x),
         Err(_) => None,
@@ -193,6 +204,7 @@ impl ValTrait for Val {
       Null => true,
       Bool(_) => true,
       Number(_) => true,
+      BigInt(_) => true,
       String(_) => true,
       Array(_) => false,
       Object(_) => false,
@@ -220,6 +232,7 @@ impl ValTrait for Val {
       Null => false,
       Bool(b) => *b,
       Number(x) => *x != 0_f64 && !x.is_nan(),
+      BigInt(x) => !x.is_zero(),
       String(s) => s.len() > 0,
       Array(_) => true,
       Object(_) => true,
@@ -239,6 +252,7 @@ impl ValTrait for Val {
       Null => true,
       Bool(_) => false,
       Number(_) => false,
+      BigInt(_) => false,
       String(_) => false,
       Array(_) => false,
       Object(_) => false,
@@ -255,6 +269,18 @@ impl ValTrait for Val {
     return match self {
       Function(f) => Some(Val::Function(Rc::new(f.bind(params)))),
       Custom(val) => val.bind(params),
+
+      _ => None,
+    };
+  }
+
+  fn as_bigint_data(&self) -> Option<BigInt> {
+    use Val::*;
+
+    return match self {
+      BigInt(b) => Some(b.clone()),
+      // TODO: Static? Others too?
+      Custom(val) => val.as_bigint_data(),
 
       _ => None,
     };
@@ -325,6 +351,7 @@ impl ValTrait for Val {
       Val::Null => "null".into(),
       Val::Bool(_) => self.val_to_string(),
       Val::Number(_) => self.val_to_string(),
+      Val::BigInt(_) => self.val_to_string(),
       Val::String(str) => stringify_string(str),
       Val::Array(vals) => {
         if vals.elements.len() == 0 {
@@ -386,6 +413,7 @@ impl std::fmt::Display for Val {
       Val::Null => write!(f, "\x1b[1mnull\x1b[22m"),
       Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
       Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
+      Val::BigInt(_) => write!(f, "\x1b[33m{}n\x1b[39m", self.val_to_string()),
       Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.codify()),
       Val::Array(array) => {
         if array.elements.len() == 0 {

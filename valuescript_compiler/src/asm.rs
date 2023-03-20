@@ -1,3 +1,5 @@
+use num_bigint::BigInt;
+
 #[derive(Debug, Clone)]
 pub struct Module {
   pub export_default: Value,
@@ -483,6 +485,7 @@ pub enum Value {
   Null,
   Bool(bool),
   Number(f64),
+  BigInt(BigInt),
   String(String),
   Array(Box<Array>),
   Object(Box<Object>),
@@ -509,6 +512,7 @@ impl std::fmt::Display for Value {
           write!(f, "{}", value)
         }
       }
+      Value::BigInt(value) => write!(f, "{}n", value),
       Value::String(value) => write!(
         f,
         "{}",

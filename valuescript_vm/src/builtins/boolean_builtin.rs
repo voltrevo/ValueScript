@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use num_bigint::BigInt;
+
 use crate::{
   vs_array::VsArray,
   vs_class::VsClass,
@@ -40,6 +42,9 @@ impl ValTrait for BooleanBuiltin {
   fn bind(&self, _params: Vec<Val>) -> Option<Val> {
     None
   }
+  fn as_bigint_data(&self) -> Option<BigInt> {
+    None
+  }
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
     None
   }
@@ -59,7 +64,7 @@ impl ValTrait for BooleanBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("Not implemented: exceptions");
+    std::panic!("TODO: Exceptions");
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -1,5 +1,9 @@
 use std::rc::Rc;
 
+use num_bigint::Sign;
+use num_traits::ToPrimitive;
+
+use crate::bigint_methods::op_sub_bigint;
 use crate::native_function::NativeFunction;
 use crate::number_methods::op_sub_number;
 use crate::string_methods::op_sub_string;
@@ -12,86 +16,156 @@ pub fn op_plus(left: Val, right: Val) -> Val {
   let left_prim = left.to_primitive();
   let right_prim = right.to_primitive();
 
-  if left_prim.typeof_() == VsType::String || right_prim.typeof_() == VsType::String {
+  let left_type = left_prim.typeof_();
+  let right_type = right_prim.typeof_();
+
+  if left_type == VsType::String || right_type == VsType::String {
     return Val::String(Rc::new(
       left_prim.val_to_string() + &right_prim.val_to_string(),
     ));
+  }
+
+  if left_type == VsType::BigInt || right_type == VsType::BigInt {
+    if left_type != right_type {
+      std::panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)");
+    }
+
+    match (left_prim.as_bigint_data(), right_prim.as_bigint_data()) {
+      (Some(left_bigint), Some(right_bigint)) => {
+        return Val::BigInt(left_bigint + right_bigint);
+      }
+      _ => std::panic!("Not implemented"),
+    }
   }
 
   return Val::Number(left_prim.to_number() + right_prim.to_number());
 }
 
 pub fn op_unary_plus(input: Val) -> Val {
-  return Val::Number(input.to_number());
+  match input.as_bigint_data() {
+    Some(bigint) => Val::BigInt(bigint),
+    _ => Val::Number(input.to_number()),
+  }
 }
 
 pub fn op_minus(left: Val, right: Val) -> Val {
-  return Val::Number(left.to_number() - right.to_number());
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => Val::BigInt(left_bigint - right_bigint),
+    (Some(_), None) | (None, Some(_)) => {
+      std::panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => Val::Number(left.to_number() - right.to_number()),
+  }
 }
 
 pub fn op_unary_minus(input: Val) -> Val {
-  return Val::Number(-input.to_number());
+  match input.as_bigint_data() {
+    Some(bigint) => Val::BigInt(-bigint),
+    _ => Val::Number(-input.to_number()),
+  }
 }
 
 pub fn op_mul(left: Val, right: Val) -> Val {
-  return Val::Number(left.to_number() * right.to_number());
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => Val::BigInt(left_bigint * right_bigint),
+    (Some(_), None) | (None, Some(_)) => {
+      std::panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => Val::Number(left.to_number() * right.to_number()),
+  }
 }
 
 pub fn op_div(left: Val, right: Val) -> Val {
-  return Val::Number(left.to_number() / right.to_number());
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => Val::BigInt(left_bigint / right_bigint),
+    (Some(_), None) | (None, Some(_)) => {
+      std::panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => Val::Number(left.to_number() / right.to_number()),
+  }
 }
 
 pub fn op_mod(left: Val, right: Val) -> Val {
-  return Val::Number(left.to_number() % right.to_number());
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => Val::BigInt(left_bigint % right_bigint),
+    (Some(_), None) | (None, Some(_)) => {
+      std::panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => Val::Number(left.to_number() % right.to_number()),
+  }
 }
 
 pub fn op_exp(left: Val, right: Val) -> Val {
-  return Val::Number(left.to_number().powf(right.to_number()));
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => {
+      if right_bigint.sign() == Sign::Minus {
+        std::panic!("TODO: Exceptions (RangeError: Exponent must be non-negative)");
+      }
+
+      let exp = match right_bigint.to_u32() {
+        Some(exp) => exp,
+        None => {
+          std::panic!("TODO: Exceptions (RangeError: Exponent must be less than 2^32)")
+        }
+      };
+
+      Val::BigInt(left_bigint.pow(exp))
+    }
+    (Some(_), None) | (None, Some(_)) => {
+      std::panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => Val::Number(left.to_number().powf(right.to_number())),
+  }
 }
 
 pub fn op_eq(left: Val, right: Val) -> Val {
-  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
-    std::panic!("Not implemented");
-  }
-
-  return Val::Bool(left.to_number() == right.to_number());
+  Val::Bool(match (left, right) {
+    (Val::Undefined, Val::Undefined) => true,
+    (Val::Null, Val::Null) => true,
+    (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool == right_bool,
+    (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
+    (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
+    (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
+    _ => panic!("TODO"),
+  })
 }
 
 pub fn op_ne(left: Val, right: Val) -> Val {
-  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
-    std::panic!("Not implemented");
-  }
-
-  return Val::Bool(left.to_number() != right.to_number());
+  Val::Bool(match (left, right) {
+    (Val::Undefined, Val::Undefined) => false,
+    (Val::Null, Val::Null) => false,
+    (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool != right_bool,
+    (Val::Number(left_number), Val::Number(right_number)) => left_number != right_number,
+    (Val::String(left_string), Val::String(right_string)) => left_string != right_string,
+    (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint != right_bigint,
+    _ => panic!("TODO"),
+  })
 }
 
 pub fn op_triple_eq_impl(left: Val, right: Val) -> bool {
-  let type_ = left.typeof_();
-
-  if right.typeof_() != type_ {
-    return false;
-  }
-
-  match type_ {
-    VsType::Undefined | VsType::Null => {
-      return true;
+  match (&left, &right) {
+    (Val::Undefined, Val::Undefined) => true,
+    (Val::Null, Val::Null) => true,
+    (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool == right_bool,
+    (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
+    (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
+    (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
+    _ => {
+      if left.typeof_() != right.typeof_() {
+        false
+      } else {
+        panic!("TODO")
+      }
     }
-    _ => {}
-  };
-
-  return match (left, right) {
-    (Val::Number(lnum), Val::Number(rnum)) => lnum == rnum,
-    (Val::String(lstr), Val::String(rstr)) => lstr == rstr,
-    _ => std::panic!("Not implemented"),
-  };
+  }
 }
 
 pub fn op_triple_eq(left: Val, right: Val) -> Val {
-  return Val::Bool(op_triple_eq_impl(left, right));
+  Val::Bool(op_triple_eq_impl(left, right))
 }
 
 pub fn op_triple_ne(left: Val, right: Val) -> Val {
-  return Val::Bool(!op_triple_eq_impl(left, right));
+  Val::Bool(!op_triple_eq_impl(left, right))
 }
 
 pub fn op_and(left: Val, right: Val) -> Val {
@@ -107,42 +181,57 @@ pub fn op_not(input: Val) -> Val {
 }
 
 pub fn op_less(left: Val, right: Val) -> Val {
-  let left_type = left.typeof_();
-  let right_type = right.typeof_();
-
-  if left_type == VsType::Undefined || right_type == VsType::Undefined {
-    return Val::Bool(false);
-  }
-
-  if left_type != VsType::Number || right_type != VsType::Number {
-    std::panic!("Not implemented");
-  }
-
-  return Val::Bool(left.to_number() < right.to_number());
+  Val::Bool(match (&left, &right) {
+    (Val::Undefined, Val::Undefined) => false,
+    (Val::Null, Val::Null) => false,
+    (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool < right_bool,
+    (Val::Number(left_number), Val::Number(right_number)) => left_number < right_number,
+    (Val::String(left_string), Val::String(right_string)) => left_string < right_string,
+    (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint < right_bigint,
+    _ => {
+      if left.typeof_() == VsType::Undefined || right.typeof_() == VsType::Undefined {
+        false
+      } else {
+        panic!("TODO")
+      }
+    }
+  })
 }
 
 pub fn op_less_eq(left: Val, right: Val) -> Val {
-  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
-    std::panic!("Not implemented");
-  }
-
-  return Val::Bool(left.to_number() <= right.to_number());
+  Val::Bool(match (left, right) {
+    (Val::Undefined, Val::Undefined) => false,
+    (Val::Null, Val::Null) => true,
+    (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool <= right_bool,
+    (Val::Number(left_number), Val::Number(right_number)) => left_number <= right_number,
+    (Val::String(left_string), Val::String(right_string)) => left_string <= right_string,
+    (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint <= right_bigint,
+    _ => panic!("TODO"),
+  })
 }
 
 pub fn op_greater(left: Val, right: Val) -> Val {
-  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
-    std::panic!("Not implemented");
-  }
-
-  return Val::Bool(left.to_number() > right.to_number());
+  Val::Bool(match (left, right) {
+    (Val::Undefined, Val::Undefined) => false,
+    (Val::Null, Val::Null) => false,
+    (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool > right_bool,
+    (Val::Number(left_number), Val::Number(right_number)) => left_number > right_number,
+    (Val::String(left_string), Val::String(right_string)) => left_string > right_string,
+    (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint > right_bigint,
+    _ => panic!("TODO"),
+  })
 }
 
 pub fn op_greater_eq(left: Val, right: Val) -> Val {
-  if left.typeof_() != VsType::Number || right.typeof_() != VsType::Number {
-    std::panic!("Not implemented");
-  }
-
-  return Val::Bool(left.to_number() >= right.to_number());
+  Val::Bool(match (left, right) {
+    (Val::Undefined, Val::Undefined) => false,
+    (Val::Null, Val::Null) => true,
+    (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool >= right_bool,
+    (Val::Number(left_number), Val::Number(right_number)) => left_number >= right_number,
+    (Val::String(left_string), Val::String(right_string)) => left_string >= right_string,
+    (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint >= right_bigint,
+    _ => panic!("TODO"),
+  })
 }
 
 pub fn op_nullish_coalesce(left: Val, right: Val) -> Val {
@@ -179,38 +268,97 @@ pub fn to_u32(x: f64) -> u32 {
 }
 
 pub fn op_bit_and(left: Val, right: Val) -> Val {
-  let res_i32 = to_i32(left.to_number()) & to_i32(right.to_number());
-  return Val::Number(res_i32 as f64);
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => Val::BigInt(left_bigint & right_bigint),
+    (Some(_), None) | (None, Some(_)) => {
+      panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => {
+      let res_i32 = to_i32(left.to_number()) & to_i32(right.to_number());
+      Val::Number(res_i32 as f64)
+    }
+  }
 }
 
 pub fn op_bit_or(left: Val, right: Val) -> Val {
-  let res_i32 = to_i32(left.to_number()) | to_i32(right.to_number());
-  return Val::Number(res_i32 as f64);
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => Val::BigInt(left_bigint | right_bigint),
+    (Some(_), None) | (None, Some(_)) => {
+      panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => {
+      let res_i32 = to_i32(left.to_number()) | to_i32(right.to_number());
+      Val::Number(res_i32 as f64)
+    }
+  }
 }
 
 pub fn op_bit_not(input: Val) -> Val {
-  let res_i32 = !to_i32(input.to_number());
-  return Val::Number(res_i32 as f64);
+  match input.as_bigint_data() {
+    Some(bigint) => Val::BigInt(!bigint),
+    None => {
+      let res_i32 = !to_i32(input.to_number());
+      Val::Number(res_i32 as f64)
+    }
+  }
 }
 
 pub fn op_bit_xor(left: Val, right: Val) -> Val {
-  let res_i32 = to_i32(left.to_number()) ^ to_i32(right.to_number());
-  return Val::Number(res_i32 as f64);
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => Val::BigInt(left_bigint ^ right_bigint),
+    (Some(_), None) | (None, Some(_)) => {
+      panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => {
+      let res_i32 = to_i32(left.to_number()) ^ to_i32(right.to_number());
+      Val::Number(res_i32 as f64)
+    }
+  }
 }
 
 pub fn op_left_shift(left: Val, right: Val) -> Val {
-  let res_i32 = to_i32(left.to_number()) << (to_u32(right.to_number()) & 0x1f);
-  return Val::Number(res_i32 as f64);
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => {
+      Val::BigInt(left_bigint << right_bigint.to_i64().expect("TODO"))
+    }
+    (Some(_), None) | (None, Some(_)) => {
+      panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => {
+      let res_i32 = to_i32(left.to_number()) << (to_u32(right.to_number()) & 0x1f);
+      Val::Number(res_i32 as f64)
+    }
+  }
 }
 
 pub fn op_right_shift(left: Val, right: Val) -> Val {
-  let res_i32 = to_i32(left.to_number()) >> (to_u32(right.to_number()) & 0x1f);
-  return Val::Number(res_i32 as f64);
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(left_bigint), Some(right_bigint)) => {
+      Val::BigInt(left_bigint >> right_bigint.to_i64().expect("TODO"))
+    }
+    (Some(_), None) | (None, Some(_)) => {
+      panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => {
+      let res_i32 = to_i32(left.to_number()) >> (to_u32(right.to_number()) & 0x1f);
+      Val::Number(res_i32 as f64)
+    }
+  }
 }
 
 pub fn op_right_shift_unsigned(left: Val, right: Val) -> Val {
-  let res_u32 = to_u32(left.to_number()) >> (to_u32(right.to_number()) & 0x1f);
-  return Val::Number(res_u32 as f64);
+  match (left.as_bigint_data(), right.as_bigint_data()) {
+    (Some(_), Some(_)) => {
+      panic!("TODO: Exceptions (TypeError: BigInts don't support unsigned right shift)")
+    }
+    (Some(_), None) | (None, Some(_)) => {
+      panic!("TODO: Exceptions (TypeError: Cannot mix BigInt with other types)")
+    }
+    _ => {
+      let res_u32 = to_u32(left.to_number()) >> (to_u32(right.to_number()) & 0x1f);
+      Val::Number(res_u32 as f64)
+    }
+  }
 }
 
 pub fn op_typeof(input: Val) -> Val {
@@ -221,6 +369,7 @@ pub fn op_typeof(input: Val) -> Val {
     Null => "object".to_string(),
     Bool => "boolean".to_string(),
     Number => "number".to_string(),
+    BigInt => "bigint".to_string(),
     String => "string".to_string(),
     Array => "object".to_string(),
     Object => "object".to_string(),
@@ -240,14 +389,15 @@ pub fn op_in(_left: Val, _right: Val) -> Val {
 pub fn op_sub(left: Val, right: Val) -> Val {
   return match left {
     Val::Void => std::panic!("Shouldn't happen"),
-    Val::Undefined => std::panic!("Not implemented: exceptions"),
-    Val::Null => std::panic!("Not implemented: exceptions"),
+    Val::Undefined => std::panic!("TODO: Exceptions"),
+    Val::Null => std::panic!("TODO: Exceptions"),
     Val::Bool(_) => match right.val_to_string().as_str() {
       "toString" => Val::Static(&BOOL_TO_STRING),
       "valueOf" => Val::Static(&BOOL_VALUE_OF),
       _ => Val::Undefined,
     },
     Val::Number(number) => op_sub_number(number, &right),
+    Val::BigInt(bigint) => op_sub_bigint(&bigint, &right),
     Val::String(string_data) => op_sub_string(&string_data, &right),
     Val::Array(array_data) => {
       let right_index = match right.to_index() {
@@ -287,11 +437,12 @@ pub fn op_sub(left: Val, right: Val) -> Val {
 pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
   match target {
     Val::Void => std::panic!("Shouldn't happen"),
-    Val::Undefined => std::panic!("Not implemented: exceptions"),
-    Val::Null => std::panic!("Not implemented: exceptions"),
-    Val::Bool(_) => std::panic!("Not implemented: exceptions"),
-    Val::Number(_) => std::panic!("Not implemented: exceptions"),
-    Val::String(_) => std::panic!("Not implemented: exceptions"),
+    Val::Undefined => std::panic!("TODO: Exceptions"),
+    Val::Null => std::panic!("TODO: Exceptions"),
+    Val::Bool(_) => std::panic!("TODO: Exceptions"),
+    Val::Number(_) => std::panic!("TODO: Exceptions"),
+    Val::BigInt(_) => std::panic!("TODO: Exceptions"),
+    Val::String(_) => std::panic!("TODO: Exceptions"),
     Val::Array(array_data) => {
       let subscript_index = match subscript.to_index() {
         None => std::panic!("Not implemented: non-uint array subscript assignment"),
@@ -321,7 +472,7 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) {
     }
     Val::Function(_) => std::panic!("Not implemented: function subscript assignment"),
     Val::Class(_) => std::panic!("Not implemented: class subscript assignment"),
-    Val::Static(_) => std::panic!("Not implemented: exceptions"),
+    Val::Static(_) => std::panic!("TODO: Exceptions"),
     Val::Custom(_) => std::panic!("Not implemented"),
   }
 }
@@ -330,7 +481,7 @@ static BOOL_TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _args: Vec<Val>| -> Val {
     match &this {
       Val::Bool(b) => Val::String(Rc::new(b.to_string())),
-      _ => std::panic!("Not implemented: exceptions/bool indirection"),
+      _ => std::panic!("TODO: Exceptions/bool indirection"),
     }
   },
 };
@@ -339,7 +490,7 @@ static BOOL_VALUE_OF: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _args: Vec<Val>| -> Val {
     match &this {
       Val::Bool(b) => Val::Bool(*b),
-      _ => std::panic!("Not implemented: exceptions/bool indirection"),
+      _ => std::panic!("TODO: Exceptions/bool indirection"),
     }
   },
 };

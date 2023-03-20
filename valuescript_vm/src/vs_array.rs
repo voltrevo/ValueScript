@@ -1,6 +1,8 @@
 use std::cmp::{max, min};
 use std::rc::Rc;
 
+use num_bigint::BigInt;
+
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
 
 use super::array_higher_functions::array_every::EVERY;
@@ -81,6 +83,9 @@ impl ValTrait for ArrayPrototype {
     None
   }
 
+  fn as_bigint_data(&self) -> Option<BigInt> {
+    None
+  }
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
     None
   }
@@ -135,7 +140,7 @@ impl ValTrait for ArrayPrototype {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("Not implemented: exceptions");
+    std::panic!("TODO: Exceptions");
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -154,7 +159,7 @@ static AT: NativeFunction = NativeFunction {
         None => Val::Undefined,
         Some(i) => array_data.elements[i].clone(),
       },
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     }
   },
 };
@@ -180,7 +185,7 @@ static CONCAT: NativeFunction = NativeFunction {
 
         return Val::Array(Rc::new(new_array));
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -252,7 +257,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 
         return this.clone();
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -263,7 +268,7 @@ static ENTRIES: NativeFunction = NativeFunction {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: ENTRIES");
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -293,7 +298,7 @@ static FILL: NativeFunction = NativeFunction {
 
         return this.clone();
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -323,7 +328,7 @@ static FLAT: NativeFunction = NativeFunction {
 
         return Val::Array(Rc::new(VsArray::from(new_elems)));
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -342,7 +347,7 @@ static INCLUDES: NativeFunction = NativeFunction {
 
         return Val::Bool(false);
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -361,7 +366,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
 
         return Val::Number(-1_f64);
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -401,7 +406,7 @@ static JOIN: NativeFunction = NativeFunction {
 
         return Val::String(Rc::new(res));
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -412,7 +417,7 @@ static KEYS: NativeFunction = NativeFunction {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: KEYS");
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -431,7 +436,7 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
 
         return Val::Number(-1_f64);
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -455,7 +460,7 @@ static POP: NativeFunction = NativeFunction {
           _ => removed_el,
         };
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -472,7 +477,7 @@ static PUSH: NativeFunction = NativeFunction {
 
         return Val::Number(array_data_mut.elements.len() as f64);
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -499,7 +504,7 @@ static REVERSE: NativeFunction = NativeFunction {
 
         return this.clone();
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -516,7 +521,7 @@ static SHIFT: NativeFunction = NativeFunction {
 
         return array_data_mut.elements.remove(0);
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -543,7 +548,7 @@ static SLICE: NativeFunction = NativeFunction {
 
         return Val::Array(Rc::new(VsArray::from(new_elems)));
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -620,7 +625,7 @@ static SPLICE: NativeFunction = NativeFunction {
 
         return Val::Array(Rc::new(VsArray::from(deleted_elements)));
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -631,7 +636,7 @@ static TO_LOCALE_STRING: NativeFunction = NativeFunction {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: TO_LOCALE_STRING");
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -657,7 +662,7 @@ static UNSHIFT: NativeFunction = NativeFunction {
 
         return Val::Number(array_data_mut.elements.len() as f64);
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };
@@ -668,7 +673,7 @@ static VALUES: NativeFunction = NativeFunction {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: VALUES");
       }
-      _ => std::panic!("Not implemented: exceptions/array indirection"),
+      _ => std::panic!("TODO: Exceptions/array indirection"),
     };
   },
 };

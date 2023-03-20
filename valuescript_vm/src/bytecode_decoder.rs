@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
+use num_bigint::BigInt;
+use num_bigint::Sign;
+
 use crate::builtins::BUILTIN_VALS;
 
 use super::instruction::Instruction;
@@ -37,6 +40,7 @@ pub enum BytecodeType {
   Register = 0x0e,
   Builtin = 0x10,
   Class = 0x11,
+  BigInt = 0x13,
   Unrecognized = 0xff,
 }
 
@@ -61,6 +65,8 @@ impl BytecodeType {
       0x0e => Register,
       0x10 => Builtin,
       0x11 => Class,
+
+      0x13 => BigInt,
 
       _ => Unrecognized,
     };
@@ -133,6 +139,7 @@ impl BytecodeDecoder {
         constructor: self.decode_val(registers),
         instance_prototype: self.decode_val(registers),
       })),
+      BytecodeType::BigInt => Val::BigInt(self.decode_bigint()),
       BytecodeType::Unrecognized => std::panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
   }
@@ -149,6 +156,22 @@ impl BytecodeDecoder {
     buf.clone_from_slice(&self.data[self.pos..next_pos]);
     self.pos = next_pos;
     return f64::from_le_bytes(buf);
+  }
+
+  pub fn decode_bigint(&mut self) -> BigInt {
+    let sign = match self.decode_byte() {
+      0 => Sign::Minus,
+      1 => Sign::NoSign,
+      2 => Sign::Plus,
+
+      _ => std::panic!("Invalid sign for bigint"),
+    };
+
+    let len = self.decode_varsize_uint();
+    let bytes = &self.data[self.pos..self.pos + len];
+    self.pos += len;
+
+    return BigInt::from_bytes_le(sign, bytes);
   }
 
   pub fn decode_string(&mut self) -> String {

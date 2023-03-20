@@ -213,26 +213,20 @@ where
     use Value::*;
 
     match value {
-      Void => {}
-      Undefined => {}
-      Null => {}
-      Bool(_) => {}
-      Number(_) => {}
-      String(_) => {}
+      Void | Undefined | Null | Bool(_) | Number(_) | BigInt(_) | String(_) | Register(_)
+      | Builtin(_) => {}
       Array(array) => {
         self.array(owner, array);
       }
       Object(object) => {
         self.object(owner, object);
       }
-      Register(_) => {}
       Pointer(pointer) => {
         (self.visitor)(match owner {
           Some(owner) => PointerVisitation::Reference(owner, pointer),
           None => PointerVisitation::Export(pointer),
         });
       }
-      Builtin(_) => {}
     }
   }
 

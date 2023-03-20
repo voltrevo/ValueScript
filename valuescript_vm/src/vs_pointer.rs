@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use num_bigint::BigInt;
+
 use super::bytecode_decoder::{BytecodeDecoder, BytecodeType};
 use super::vs_array::VsArray;
 use super::vs_class::VsClass;
@@ -68,6 +70,7 @@ impl ValTrait for VsPointer {
       BytecodeType::Register => std::panic!("Invalid: pointer to register"),
       BytecodeType::Builtin => std::panic!("Invalid: pointer to builtin"),
       BytecodeType::Class => VsType::Class,
+      BytecodeType::BigInt => VsType::BigInt,
       BytecodeType::Unrecognized => std::panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
   }
@@ -90,6 +93,7 @@ impl ValTrait for VsPointer {
       VsType::Null => true,
       VsType::Bool => true,
       VsType::Number => true,
+      VsType::BigInt => true,
       VsType::String => true,
       VsType::Array => false,
       VsType::Object => false,
@@ -112,6 +116,10 @@ impl ValTrait for VsPointer {
 
   fn is_nullish(&self) -> bool {
     return self.resolve().is_nullish();
+  }
+
+  fn as_bigint_data(&self) -> Option<BigInt> {
+    return self.resolve().as_bigint_data();
   }
 
   fn as_array_data(&self) -> Option<Rc<VsArray>> {

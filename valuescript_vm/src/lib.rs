@@ -1,4 +1,5 @@
 mod array_higher_functions;
+mod bigint_methods;
 mod builtins;
 mod bytecode_decoder;
 mod bytecode_stack_frame;

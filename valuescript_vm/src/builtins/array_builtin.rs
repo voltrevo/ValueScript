@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use num_bigint::BigInt;
+
 use crate::{
   native_function::NativeFunction,
   operations::op_sub,
@@ -42,6 +44,9 @@ impl ValTrait for ArrayBuiltin {
   fn bind(&self, _params: Vec<Val>) -> Option<Val> {
     None
   }
+  fn as_bigint_data(&self) -> Option<BigInt> {
+    None
+  }
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
     None
   }
@@ -66,7 +71,7 @@ impl ValTrait for ArrayBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("Not implemented: exceptions");
+    std::panic!("TODO: Exceptions");
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -111,7 +116,7 @@ static FROM: NativeFunction = NativeFunction {
       Val::Void | Val::Undefined | Val::Null => {
         panic!("TODO: Exceptions (TypeError: items is not iterable)")
       }
-      Val::Bool(..) | Val::Number(..) => Val::Array(Rc::new(VsArray::new())),
+      Val::Bool(..) | Val::Number(..) | Val::BigInt(..) => Val::Array(Rc::new(VsArray::new())),
       Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Custom(..) => {
         let len = op_sub(
           first_param.clone(),

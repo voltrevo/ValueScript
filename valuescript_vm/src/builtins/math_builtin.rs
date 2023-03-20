@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use num_bigint::BigInt;
+
 use crate::native_function::NativeFunction;
 use crate::operations::to_u32;
 use crate::vs_array::VsArray;
@@ -41,6 +43,9 @@ impl ValTrait for MathBuiltin {
     None
   }
 
+  fn as_bigint_data(&self) -> Option<BigInt> {
+    None
+  }
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
     None
   }
@@ -108,7 +113,7 @@ impl ValTrait for MathBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("Not implemented: exceptions");
+    std::panic!("TODO: Exceptions");
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
