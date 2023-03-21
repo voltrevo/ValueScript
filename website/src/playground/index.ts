@@ -145,7 +145,7 @@ editorEl.innerHTML = "";
         if ("Ok" in runResult.output) {
           el.textContent = runResult.output.Ok;
         } else if ("Err" in runResult.output) {
-          el.textContent = runResult.output.Err;
+          el.textContent = `Uncaught exception: ${runResult.output.Err}`;
         } else {
           never(runResult.output);
         }
