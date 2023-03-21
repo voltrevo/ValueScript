@@ -415,6 +415,7 @@ not the subset of ValueScript that has actually been implemented.
 - Loops
 - Recursion
 - Destructuring
+- Throwing exceptions
 - Local imports (not yet in the playground)
 - Tree shaking (not yet in the playground)
 - Copy-on-write optimizations
@@ -465,7 +466,10 @@ not the subset of ValueScript that has actually been implemented.
   - `{} === {} -> true`
   - JS: `-> false`
   - This is a value semantics thing - objects don't have identity
-- Exceptions
+- Catching exceptions
+- Error (and TypeError, RangeError, etc)
+- Enforcing `const`
+- Temporal dead zones
 - Iterators
 - Rest and spread
 - Generators
