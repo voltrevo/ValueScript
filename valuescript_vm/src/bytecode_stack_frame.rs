@@ -1,8 +1,9 @@
 use std::rc::Rc;
 
+use valuescript_common::InstructionByte;
+
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
-use crate::instruction::Instruction;
 use crate::operations;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
@@ -93,7 +94,7 @@ impl StackFrameTrait for BytecodeStackFrame {
   }
 
   fn step(&mut self) -> FrameStepResult {
-    use Instruction::*;
+    use InstructionByte::*;
 
     match self.decoder.decode_instruction() {
       End => {

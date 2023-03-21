@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use num_bigint::BigInt;
-use valuescript_common::BUILTIN_NAMES;
+use valuescript_common::{InstructionByte, BUILTIN_NAMES};
 
 use crate::asm::{
   Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
@@ -917,54 +917,6 @@ pub fn parse_module(content: &str) -> Module {
   };
 
   assembler.module()
-}
-
-#[derive(Debug, Clone)]
-enum InstructionByte {
-  End = 0x00,
-  Mov = 0x01,
-  OpInc = 0x02,
-  OpDec = 0x03,
-  OpPlus = 0x04,
-  OpMinus = 0x05,
-  OpMul = 0x06,
-  OpDiv = 0x07,
-  OpMod = 0x08,
-  OpExp = 0x09,
-  OpEq = 0x0a,
-  OpNe = 0x0b,
-  OpTripleEq = 0x0c,
-  OpTripleNe = 0x0d,
-  OpAnd = 0x0e,
-  OpOr = 0x0f,
-  OpNot = 0x10,
-  OpLess = 0x11,
-  OpLessEq = 0x12,
-  OpGreater = 0x13,
-  OpGreaterEq = 0x14,
-  OpNullishCoalesce = 0x15,
-  OpOptionalChain = 0x16,
-  OpBitAnd = 0x17,
-  OpBitOr = 0x18,
-  OpBitNot = 0x19,
-  OpBitXor = 0x1a,
-  OpLeftShift = 0x1b,
-  OpRightShift = 0x1c,
-  OpRightShiftUnsigned = 0x1d,
-  TypeOf = 0x1e,
-  InstanceOf = 0x1f,
-  In = 0x20,
-  Call = 0x21,
-  Apply = 0x22,
-  Bind = 0x23,
-  Sub = 0x24,
-  SubMov = 0x25,
-  SubCall = 0x26,
-  Jmp = 0x27,
-  JmpIf = 0x28,
-  UnaryPlus = 0x29,
-  UnaryMinus = 0x2a,
-  New = 0x2b,
 }
 
 fn is_leading_identifier_char(c: char) -> bool {

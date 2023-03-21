@@ -1,7 +1,5 @@
-// TODO: Fix duplication with assembler (requires internal crate?)
-
 #[derive(Debug, Clone)]
-pub enum Instruction {
+pub enum InstructionByte {
   End = 0x00,
   Mov = 0x01,
   OpInc = 0x02,
@@ -48,9 +46,9 @@ pub enum Instruction {
   New = 0x2b,
 }
 
-impl Instruction {
-  pub fn from_byte(byte: u8) -> Instruction {
-    use Instruction::*;
+impl InstructionByte {
+  pub fn from_byte(byte: u8) -> InstructionByte {
+    use InstructionByte::*;
 
     return match byte {
       0x00 => End,

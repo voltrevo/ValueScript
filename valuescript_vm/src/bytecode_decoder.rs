@@ -3,17 +3,16 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 use num_bigint::Sign;
+use valuescript_common::InstructionByte;
 
 use crate::builtins::BUILTIN_VALS;
-
-use super::instruction::Instruction;
-use super::vs_array::VsArray;
-use super::vs_class::VsClass;
-use super::vs_function::VsFunction;
-use super::vs_object::VsObject;
-use super::vs_pointer::VsPointer;
-use super::vs_value::Val;
-use super::vs_value::ValTrait;
+use crate::vs_array::VsArray;
+use crate::vs_class::VsClass;
+use crate::vs_function::VsFunction;
+use crate::vs_object::VsObject;
+use crate::vs_pointer::VsPointer;
+use crate::vs_value::Val;
+use crate::vs_value::ValTrait;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -257,7 +256,7 @@ impl BytecodeDecoder {
     }));
   }
 
-  pub fn decode_instruction(&mut self) -> Instruction {
-    return Instruction::from_byte(self.decode_byte());
+  pub fn decode_instruction(&mut self) -> InstructionByte {
+    return InstructionByte::from_byte(self.decode_byte());
   }
 }
