@@ -1398,8 +1398,8 @@ impl ScopeAnalysis {
           }
         }
       }
-      Stmt::Throw(throw_) => {
-        self.expr(&scope, &throw_.arg);
+      Stmt::Throw(throw) => {
+        self.expr(&scope, &throw.arg);
       }
       Stmt::Try(try_) => {
         self.block_stmt(&scope, &try_.block);

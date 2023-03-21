@@ -796,7 +796,14 @@ impl FunctionCompiler {
         self.if_(if_, scope);
       }
       Switch(switch) => self.todo(switch.span, "Switch statement"),
-      Throw(throw) => self.todo(throw.span, "Throw statement"),
+      Throw(throw) => {
+        let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
+
+        let arg = expression_compiler.compile(&throw.arg, None);
+        let instr = Instruction::Throw(self.use_(arg));
+
+        self.push(instr);
+      }
       Try(try_) => self.todo(try_.span, "Try statement"),
       While(while_) => {
         self.while_(while_, scope);

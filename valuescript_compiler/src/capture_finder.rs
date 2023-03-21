@@ -293,7 +293,9 @@ impl CaptureFinder {
         }
       }
       Switch(_) => std::panic!("Not implemented: Switch statement"),
-      Throw(_) => std::panic!("Not implemented: Throw statement"),
+      Throw(throw) => {
+        self.expr(scope, &throw.arg);
+      }
       Try(_) => std::panic!("Not implemented: Try statement"),
       While(while_) => {
         self.expr(scope, &while_.test);
