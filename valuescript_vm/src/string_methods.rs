@@ -84,13 +84,13 @@ pub fn get_string_method(method: &str) -> Val {
 }
 
 static AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
         let index = match to_wrapping_index(params.get(0), string_bytes.len()) {
-          None => return Val::Undefined,
+          None => return Ok(Val::Undefined),
           Some(i) => i,
         };
 
@@ -100,22 +100,22 @@ static AT: NativeFunction = NativeFunction {
         }
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static CODE_POINT_AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
         let index = match params.get(0) {
           Some(i) => match i.to_index() {
-            None => return Val::Undefined,
+            None => return Ok(Val::Undefined),
             Some(i) => i,
           },
-          _ => return Val::Undefined,
+          _ => return Ok(Val::Undefined),
         };
 
         match code_point_at(string_bytes, string_bytes.len(), index) {
@@ -124,13 +124,13 @@ static CODE_POINT_AT: NativeFunction = NativeFunction {
         }
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static CONCAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let mut result = string_data.as_str().to_string();
 
@@ -141,25 +141,25 @@ static CONCAT: NativeFunction = NativeFunction {
         Val::String(Rc::new(result))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static ENDS_WITH: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
           Some(s) => s.val_to_string(),
-          _ => return Val::Bool(false),
+          _ => return Ok(Val::Bool(false)),
         };
 
         let end_pos = match params.get(1) {
           Some(p) => match p.to_index() {
             // FIXME: Using to_index for end_pos is not quite right (eg -1 should be 0)
-            None => return Val::Bool(false),
+            None => return Ok(Val::Bool(false)),
             Some(i) => std::cmp::min(i, string_bytes.len()),
           },
           _ => string_bytes.len(),
@@ -170,33 +170,33 @@ static ENDS_WITH: NativeFunction = NativeFunction {
         let search_length = search_bytes.len();
 
         if search_length > end_pos {
-          return Val::Bool(false);
+          return Ok(Val::Bool(false));
         }
 
         let start_index = end_pos - search_length;
 
         for i in 0..search_length {
           if string_bytes[start_index + i] != search_bytes[i] {
-            return Val::Bool(false);
+            return Ok(Val::Bool(false));
           }
         }
 
         Val::Bool(true)
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static INCLUDES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
           Some(s) => s.val_to_string(),
-          _ => return Val::Bool(false),
+          _ => return Ok(Val::Bool(false)),
         };
 
         let search_bytes = search_string.as_bytes();
@@ -205,7 +205,7 @@ static INCLUDES: NativeFunction = NativeFunction {
           Some(p) => match p.to_index() {
             // FIXME: to_index isn't quite right here
             Some(i) => i,
-            None => return Val::Bool(false),
+            None => return Ok(Val::Bool(false)),
           },
           _ => 0,
         };
@@ -216,19 +216,19 @@ static INCLUDES: NativeFunction = NativeFunction {
         }
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
           Some(s) => s.val_to_string(),
-          _ => return Val::Number(-1.0),
+          _ => return Ok(Val::Number(-1.0)),
         };
 
         let search_bytes = search_string.as_bytes();
@@ -237,7 +237,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
           Some(p) => match p.to_index() {
             // FIXME: to_index isn't quite right here
             Some(i) => i,
-            None => return Val::Number(-1.0),
+            None => return Ok(Val::Number(-1.0)),
           },
           _ => 0,
         };
@@ -248,19 +248,19 @@ static INDEX_OF: NativeFunction = NativeFunction {
         }
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static LAST_INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
           Some(s) => s.val_to_string(),
-          _ => return Val::Number(-1.0),
+          _ => return Ok(Val::Number(-1.0)),
         };
 
         let search_bytes = search_string.as_bytes();
@@ -269,7 +269,7 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
           Some(p) => match p.to_index() {
             // FIXME: to_index isn't quite right here
             Some(i) => i,
-            None => return Val::Number(-1.0),
+            None => return Ok(Val::Number(-1.0)),
           },
           _ => 0,
         };
@@ -280,12 +280,13 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
         }
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static TODO_LOCALE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    // TODO: Ok(...)
     match this {
       Val::String(_string_data) => {
         panic!("TODO: locale");
@@ -296,7 +297,8 @@ static TODO_LOCALE: NativeFunction = NativeFunction {
 };
 
 static TODO_REGEXES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    // TODO: Ok(...)
     match this {
       Val::String(_string_data) => {
         panic!("TODO: regexes");
@@ -307,7 +309,8 @@ static TODO_REGEXES: NativeFunction = NativeFunction {
 };
 
 static NORMALIZE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    // TODO: Ok(...)
     match this {
       Val::String(_string_data) => {
         // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
@@ -320,19 +323,19 @@ static NORMALIZE: NativeFunction = NativeFunction {
 
 // TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
 static PAD_END: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let target_length = match params.get(0) {
           Some(p) => match p.to_index() {
             Some(i) => i,
-            None => return Val::String(string_data.clone()),
+            None => return Ok(Val::String(string_data.clone())),
           },
-          _ => return Val::String(string_data.clone()),
+          _ => return Ok(Val::String(string_data.clone())),
         };
 
         if target_length <= string_data.as_bytes().len() {
-          return Val::String(string_data.clone());
+          return Ok(Val::String(string_data.clone()));
         }
 
         let mut string = string_data.to_string();
@@ -368,25 +371,25 @@ static PAD_END: NativeFunction = NativeFunction {
         Val::String(Rc::new(string))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 // TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
 static PAD_START: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let target_length = match params.get(0) {
           Some(p) => match p.to_index() {
             Some(i) => i,
-            None => return Val::String(string_data.clone()),
+            None => return Ok(Val::String(string_data.clone())),
           },
-          _ => return Val::String(string_data.clone()),
+          _ => return Ok(Val::String(string_data.clone())),
         };
 
         if target_length <= string_data.as_bytes().len() {
-          return Val::String(string_data.clone());
+          return Ok(Val::String(string_data.clone()));
         }
 
         let pad_string = match params.get(1) {
@@ -424,20 +427,20 @@ static PAD_START: NativeFunction = NativeFunction {
         Val::String(Rc::new(prefix))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static REPEAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let count = match params.get(0) {
           Some(p) => match p.to_index() {
             Some(i) => i,
-            None => return Val::String(string_data.clone()),
+            None => return Ok(Val::String(string_data.clone())),
           },
-          _ => return Val::String(string_data.clone()),
+          _ => return Ok(Val::String(string_data.clone())),
         };
 
         let mut result = String::new();
@@ -449,13 +452,13 @@ static REPEAT: NativeFunction = NativeFunction {
         Val::String(Rc::new(result))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static SLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -483,17 +486,17 @@ static SLICE: NativeFunction = NativeFunction {
         Val::String(Rc::new(new_string))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static SPLIT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let separator = match params.get(0) {
           Some(s) => s.val_to_string(), // TODO: Regexes
-          None => return Val::String(string_data.clone()),
+          None => return Ok(Val::String(string_data.clone())),
         };
 
         let limit = match params.get(1) {
@@ -508,7 +511,7 @@ static SPLIT: NativeFunction = NativeFunction {
         let mut result = Vec::<Val>::new();
 
         if limit == 0 {
-          return Val::Array(Rc::new(VsArray::from(result)));
+          return Ok(Val::Array(Rc::new(VsArray::from(result))));
         }
 
         if separator.is_empty() {
@@ -520,7 +523,7 @@ static SPLIT: NativeFunction = NativeFunction {
             }
           }
 
-          return Val::Array(Rc::new(VsArray::from(result)));
+          return Ok(Val::Array(Rc::new(VsArray::from(result))));
         }
 
         let mut part = String::new();
@@ -549,25 +552,25 @@ static SPLIT: NativeFunction = NativeFunction {
         Val::Array(Rc::new(VsArray::from(result)))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static STARTS_WITH: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
           Some(s) => s.val_to_string(),
-          _ => return Val::Bool(false),
+          _ => return Ok(Val::Bool(false)),
         };
 
         let pos = match params.get(1) {
           Some(p) => match p.to_index() {
             // FIXME: Using to_index is not quite right
-            None => return Val::Bool(false),
+            None => return Ok(Val::Bool(false)),
             Some(i) => std::cmp::min(i, string_bytes.len()),
           },
           _ => 0,
@@ -578,25 +581,25 @@ static STARTS_WITH: NativeFunction = NativeFunction {
         let search_length = search_bytes.len();
 
         if search_length > string_bytes.len() - pos {
-          return Val::Bool(false);
+          return Ok(Val::Bool(false));
         }
 
         for i in 0..search_length {
           if string_bytes[pos + i] != search_bytes[i] {
-            return Val::Bool(false);
+            return Ok(Val::Bool(false));
           }
         }
 
         Val::Bool(true)
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static SUBSTRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -633,85 +636,85 @@ static SUBSTRING: NativeFunction = NativeFunction {
         Val::String(Rc::new(new_string))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static TO_LOWER_CASE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let lowercased_string = string_data.to_lowercase();
         Val::String(Rc::new(lowercased_string))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => Val::String(string_data.clone()),
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static TO_UPPER_CASE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let uppercased_string = string_data.to_uppercase();
         Val::String(Rc::new(uppercased_string))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static TRIM: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let trimmed_string = string_data.trim();
         Val::String(Rc::new(trimmed_string.to_owned()))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static TRIM_END: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let trimmed_string = string_data.trim_end();
         Val::String(Rc::new(trimmed_string.to_owned()))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static TRIM_START: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => {
         let trimmed_string = string_data.trim_start();
         Val::String(Rc::new(trimmed_string.to_owned()))
       }
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 
 static VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::String(string_data) => Val::String(string_data.clone()),
       _ => panic!("TODO: exceptions/string indirection"),
-    }
+    })
   },
 };
 

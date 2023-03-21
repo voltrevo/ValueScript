@@ -76,10 +76,10 @@ impl ValTrait for BooleanBuiltin {
   }
 }
 
-fn to_boolean(_: &mut Val, params: Vec<Val>) -> Val {
-  if let Some(value) = params.get(0) {
+fn to_boolean(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
+  Ok(if let Some(value) = params.get(0) {
     Val::Bool(value.is_truthy())
   } else {
     Val::Bool(false)
-  }
+  })
 }

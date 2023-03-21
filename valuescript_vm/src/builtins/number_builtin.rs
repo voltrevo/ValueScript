@@ -94,46 +94,46 @@ impl ValTrait for NumberBuiltin {
 }
 
 pub static IS_FINITE: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
-    if let Some(value) = params.get(0) {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(if let Some(value) = params.get(0) {
       let number = value.to_number();
       Val::Bool(number.is_finite())
     } else {
       Val::Bool(false)
-    }
+    })
   },
 };
 
 static IS_INTEGER: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
     let num = match params.get(0) {
       Some(n) => n.to_number(),
-      None => return Val::Bool(false),
+      None => return Ok(Val::Bool(false)),
     };
 
     let is_finite = num.is_finite();
     let is_integer = num.floor() == num;
 
-    Val::Bool(is_finite && is_integer)
+    Ok(Val::Bool(is_finite && is_integer))
   },
 };
 
 pub static IS_NAN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
-    if let Some(value) = params.get(0) {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(if let Some(value) = params.get(0) {
       let number = value.to_number();
       Val::Bool(number.is_nan())
     } else {
       Val::Bool(false)
-    }
+    })
   },
 };
 
 static IS_SAFE_INTEGER: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
     let num = match params.get(0) {
       Some(n) => n.to_number(),
-      None => return Val::Bool(false),
+      None => return Ok(Val::Bool(false)),
     };
 
     let is_finite = num.is_finite();
@@ -142,13 +142,13 @@ static IS_SAFE_INTEGER: NativeFunction = NativeFunction {
     let max_safe_integer = 2f64.powi(53) - 1f64;
     let in_safe_range = min_safe_integer <= num && num <= max_safe_integer;
 
-    Val::Bool(is_finite && is_integer && in_safe_range)
+    Ok(Val::Bool(is_finite && is_integer && in_safe_range))
   },
 };
 
 pub static PARSE_FLOAT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
-    if let Some(value) = params.get(0) {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(if let Some(value) = params.get(0) {
       let string_value = value.val_to_string().trim().to_string();
 
       match string_value.parse::<f64>() {
@@ -157,18 +157,18 @@ pub static PARSE_FLOAT: NativeFunction = NativeFunction {
       }
     } else {
       Val::Number(core::f64::NAN)
-    }
+    })
   },
 };
 
 pub static PARSE_INT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
-    if let Some(value) = params.get(0) {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(if let Some(value) = params.get(0) {
       let string_value = value.val_to_string().trim_start().to_string();
       let radix = params.get(1).and_then(|v| v.to_index()).unwrap_or(10);
 
       if radix < 2 || radix > 36 {
-        return Val::Number(core::f64::NAN);
+        return Ok(Val::Number(core::f64::NAN));
       }
 
       let (is_negative, string_value) = if string_value.starts_with('-') {
@@ -191,14 +191,14 @@ pub static PARSE_INT: NativeFunction = NativeFunction {
       }
     } else {
       Val::Number(core::f64::NAN)
-    }
+    })
   },
 };
 
-fn to_number(_: &mut Val, params: Vec<Val>) -> Val {
-  if let Some(value) = params.get(0) {
+fn to_number(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
+  Ok(if let Some(value) = params.get(0) {
     Val::Number(value.to_number())
   } else {
     Val::Number(0.0)
-  }
+  })
 }

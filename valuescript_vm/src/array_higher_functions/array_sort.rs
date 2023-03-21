@@ -270,7 +270,7 @@ impl StackFrameTrait for SortFrame {
           std::panic!("Not implemented: exception: comparator is not a function");
         }
         LoadFunctionResult::NativeFunction(native_fn) => {
-          let res = native_fn(&mut Val::Undefined, vec![left, right]).to_number();
+          let res = native_fn(&mut Val::Undefined, vec![left, right])?.to_number();
 
           let should_swap = match res.is_nan() {
             true => false,

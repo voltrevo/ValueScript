@@ -153,20 +153,20 @@ impl ValTrait for ArrayPrototype {
 }
 
 static AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => match to_wrapping_index(params.get(0), array_data.elements.len()) {
         None => Val::Undefined,
         Some(i) => array_data.elements[i].clone(),
       },
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    }
+    })
   },
 };
 
 static CONCAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let mut new_array = array_data.as_ref().clone();
 
@@ -183,16 +183,16 @@ static CONCAT: NativeFunction = NativeFunction {
           }
         }
 
-        return Val::Array(Rc::new(new_array));
+        Val::Array(Rc::new(new_array))
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static COPY_WITHIN: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
         let ulen = array_data_mut.elements.len();
@@ -222,7 +222,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
         let copy_len = end - start;
 
         if copy_len <= 0 {
-          return this.clone();
+          return Ok(this.clone());
         }
 
         if target <= start || target >= end {
@@ -255,15 +255,15 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
           }
         }
 
-        return this.clone();
+        this.clone()
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static ENTRIES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
     match this {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: ENTRIES");
@@ -274,8 +274,8 @@ static ENTRIES: NativeFunction = NativeFunction {
 };
 
 static FILL: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
         let len = array_data_mut.elements.len();
@@ -296,16 +296,16 @@ static FILL: NativeFunction = NativeFunction {
           array_data_mut.elements[i as usize] = fill_val.clone();
         }
 
-        return this.clone();
+        this.clone()
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static FLAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         if params.len() > 0 {
           std::panic!("Not implemented: .flat depth parameter");
@@ -326,16 +326,16 @@ static FLAT: NativeFunction = NativeFunction {
           }
         }
 
-        return Val::Array(Rc::new(VsArray::from(new_elems)));
+        Val::Array(Rc::new(VsArray::from(new_elems)))
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static INCLUDES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
@@ -345,20 +345,20 @@ static INCLUDES: NativeFunction = NativeFunction {
             .unwrap(); // TODO: Exception
 
           if is_eq {
-            return Val::Bool(true);
+            return Ok(Val::Bool(true));
           }
         }
 
-        return Val::Bool(false);
+        Val::Bool(false)
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
@@ -368,27 +368,27 @@ static INDEX_OF: NativeFunction = NativeFunction {
             .unwrap(); // TODO: Exception
 
           if is_eq {
-            return Val::Number(i as f64);
+            return Ok(Val::Number(i as f64));
           }
         }
 
-        return Val::Number(-1_f64);
+        Val::Number(-1.0)
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static JOIN: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(vals) => {
         if vals.elements.len() == 0 {
-          return Val::String(Rc::new("".to_string()));
+          return Ok(Val::String(Rc::new("".to_string())));
         }
 
         if vals.elements.len() == 1 {
-          return Val::String(Rc::new(vals.elements[0].val_to_string()));
+          return Ok(Val::String(Rc::new(vals.elements[0].val_to_string())));
         }
 
         let separator = params.get(0).unwrap_or(&Val::Undefined);
@@ -412,15 +412,16 @@ static JOIN: NativeFunction = NativeFunction {
           };
         }
 
-        return Val::String(Rc::new(res));
+        Val::String(Rc::new(res))
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static KEYS: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    // TODO: Ok(...)
     match this {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: KEYS");
@@ -431,8 +432,8 @@ static KEYS: NativeFunction = NativeFunction {
 };
 
 static LAST_INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
@@ -442,23 +443,23 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
             .unwrap(); // TODO: Exception
 
           if is_eq {
-            return Val::Number(i as f64);
+            return Ok(Val::Number(i as f64));
           }
         }
 
-        return Val::Number(-1_f64);
+        Val::Number(-1_f64)
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static POP: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         if array_data.elements.len() == 0 {
-          return Val::Undefined;
+          return Ok(Val::Undefined);
         }
 
         let array_data_mut = Rc::make_mut(array_data);
@@ -467,19 +468,19 @@ static POP: NativeFunction = NativeFunction {
           .elements
           .remove(array_data_mut.elements.len() - 1);
 
-        return match removed_el {
+        match removed_el {
           Val::Void => Val::Undefined,
           _ => removed_el,
-        };
+        }
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static PUSH: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
 
@@ -487,21 +488,21 @@ static PUSH: NativeFunction = NativeFunction {
           array_data_mut.elements.push(p);
         }
 
-        return Val::Number(array_data_mut.elements.len() as f64);
+        Val::Number(array_data_mut.elements.len() as f64)
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static REVERSE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         if array_data.elements.len() == 0 {
           // Treating this as an edge case because rust protects us from
           // underflow when computing last below.
-          return this.clone();
+          return Ok(this.clone());
         }
 
         let array_data_mut = Rc::make_mut(array_data);
@@ -514,33 +515,33 @@ static REVERSE: NativeFunction = NativeFunction {
           array_data_mut.elements[last - i] = tmp;
         }
 
-        return this.clone();
+        this.clone()
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static SHIFT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         if array_data.elements.len() == 0 {
-          return Val::Undefined;
+          return Ok(Val::Undefined);
         }
 
         let array_data_mut = Rc::make_mut(array_data);
 
-        return array_data_mut.elements.remove(0);
+        array_data_mut.elements.remove(0)
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static SLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let mut new_elems = Vec::<Val>::new();
 
@@ -558,16 +559,16 @@ static SLICE: NativeFunction = NativeFunction {
           new_elems.push(array_data.elements[i as usize].clone());
         }
 
-        return Val::Array(Rc::new(VsArray::from(new_elems)));
+        Val::Array(Rc::new(VsArray::from(new_elems)))
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static SPLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
         let len = array_data_mut.elements.len();
@@ -635,15 +636,16 @@ static SPLICE: NativeFunction = NativeFunction {
           }
         }
 
-        return Val::Array(Rc::new(VsArray::from(deleted_elements)));
+        Val::Array(Rc::new(VsArray::from(deleted_elements)))
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static TO_LOCALE_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    // TODO: Ok(...)
     match this {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: TO_LOCALE_STRING");
@@ -653,15 +655,16 @@ static TO_LOCALE_STRING: NativeFunction = NativeFunction {
   },
 };
 
+// TODO: Share this? (JS doesn't?)
 static TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
-    return Val::String(Rc::new(this.val_to_string()));
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(Val::String(Rc::new(this.val_to_string())))
   },
 };
 
 static UNSHIFT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Val {
-    match this {
+  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
 
@@ -672,15 +675,16 @@ static UNSHIFT: NativeFunction = NativeFunction {
           i += 1;
         }
 
-        return Val::Number(array_data_mut.elements.len() as f64);
+        Val::Number(array_data_mut.elements.len() as f64)
       }
       _ => std::panic!("TODO: Exceptions/array indirection"),
-    };
+    })
   },
 };
 
 static VALUES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Val {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    // TODO: Ok(...)
     match this {
       Val::Array(_array_data) => {
         std::panic!("Not implemented: VALUES");

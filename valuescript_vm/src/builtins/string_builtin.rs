@@ -86,7 +86,7 @@ impl ValTrait for StringBuiltin {
 }
 
 static FROM_CODE_POINT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
     let mut result = String::new();
 
     for param in params {
@@ -100,14 +100,14 @@ static FROM_CODE_POINT: NativeFunction = NativeFunction {
       result.push(char);
     }
 
-    Val::String(Rc::new(result))
+    Ok(Val::String(Rc::new(result)))
   },
 };
 
-fn to_string(_: &mut Val, params: Vec<Val>) -> Val {
-  if let Some(value) = params.get(0) {
+fn to_string(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
+  Ok(if let Some(value) = params.get(0) {
     Val::String(Rc::new(value.val_to_string()))
   } else {
     Val::String(Rc::new("".to_string()))
-  }
+  })
 }

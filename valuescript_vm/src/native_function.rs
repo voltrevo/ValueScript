@@ -8,7 +8,7 @@ use super::vs_object::VsObject;
 use super::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 pub struct NativeFunction {
-  pub fn_: fn(this: &mut Val, params: Vec<Val>) -> Val,
+  pub fn_: fn(this: &mut Val, params: Vec<Val>) -> Result<Val, Val>,
 }
 
 impl ValTrait for NativeFunction {

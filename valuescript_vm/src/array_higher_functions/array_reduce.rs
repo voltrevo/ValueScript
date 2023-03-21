@@ -77,7 +77,7 @@ impl StackFrameTrait for ReduceFrame {
                   Val::Number(array_i as f64),
                   Val::Array(array_data.clone()),
                 ],
-              ));
+              )?);
 
               return Ok(FrameStepOk::Continue);
             }

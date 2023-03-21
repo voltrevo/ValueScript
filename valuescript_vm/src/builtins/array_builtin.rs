@@ -84,19 +84,19 @@ impl ValTrait for ArrayBuiltin {
 }
 
 static IS_ARRAY: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
-    match params.get(0) {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match params.get(0) {
       None => Val::Bool(false),
       Some(p) => match p.as_array_data() {
         None => Val::Bool(false),
         Some(_) => Val::Bool(true),
       },
-    }
+    })
   },
 };
 
 static FROM: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
     let first_param = match params.get(0) {
       None => panic!("TODO: Exceptions (TypeError: undefined is not iterable)"),
       Some(p) => p,
@@ -106,7 +106,7 @@ static FROM: NativeFunction = NativeFunction {
       panic!("TODO: Using Array.from with a map function");
     }
 
-    match first_param {
+    Ok(match first_param {
       Val::Array(arr) => Val::Array(arr.clone()),
       Val::String(s) => Val::Array(Rc::new(VsArray::from(
         s.chars()
@@ -127,7 +127,7 @@ static FROM: NativeFunction = NativeFunction {
         .to_number();
 
         if len.is_sign_negative() || len.is_nan() {
-          return Val::Array(Rc::new(VsArray::new()));
+          return Ok(Val::Array(Rc::new(VsArray::new())));
         }
 
         if len.is_infinite() {
@@ -150,20 +150,22 @@ static FROM: NativeFunction = NativeFunction {
 
         Val::Array(Rc::new(VsArray::from(arr)))
       }
-    }
+    })
   },
 };
 
 static OF: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val { Val::Array(Rc::new(VsArray::from(params))) },
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(Val::Array(Rc::new(VsArray::from(params))))
+  },
 };
 
-fn to_array(_: &mut Val, params: Vec<Val>) -> Val {
+fn to_array(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
   if params.len() != 1 {
-    return Val::Array(Rc::new(VsArray::from(params)));
+    return Ok(Val::Array(Rc::new(VsArray::from(params))));
   }
 
-  match params[0] {
+  Ok(match params[0] {
     Val::Number(number) => {
       if number.is_sign_negative() || number != number.floor() {
         panic!("TODO: Exceptions (RangeError: Invalid array length)")
@@ -180,5 +182,5 @@ fn to_array(_: &mut Val, params: Vec<Val>) -> Val {
       Val::Array(Rc::new(VsArray::from(arr)))
     }
     _ => Val::Array(Rc::new(VsArray::from(params))),
-  }
+  })
 }

@@ -81,11 +81,11 @@ impl ValTrait for DebugBuiltin {
 }
 
 static LOG: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Val {
+  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
     for p in params {
       println!("Debug.log: {}", p);
     }
 
-    return Val::Undefined;
+    Ok(Val::Undefined)
   },
 };

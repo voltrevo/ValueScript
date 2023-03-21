@@ -46,7 +46,7 @@ pub enum VsType {
 pub enum LoadFunctionResult {
   NotAFunction,
   StackFrame(StackFrame),
-  NativeFunction(fn(this: &mut Val, params: Vec<Val>) -> Val),
+  NativeFunction(fn(this: &mut Val, params: Vec<Val>) -> Result<Val, Val>),
 }
 
 pub trait ValTrait {

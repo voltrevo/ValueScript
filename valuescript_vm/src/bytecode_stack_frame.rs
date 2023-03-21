@@ -178,7 +178,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             return Ok(FrameStepOk::Push(new_frame));
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
-            let res = native_fn(&mut Val::Undefined, self.decode_parameters());
+            let res = native_fn(&mut Val::Undefined, self.decode_parameters())?;
 
             match self.decoder.decode_register_index() {
               Some(return_target) => {
@@ -308,9 +308,9 @@ impl StackFrameTrait for BytecodeStackFrame {
 
             let res = match &mut obj {
               ThisArg::Register(reg_i) => {
-                native_fn(self.registers.get_mut(reg_i.clone()).unwrap(), params)
+                native_fn(self.registers.get_mut(reg_i.clone()).unwrap(), params)?
               }
-              ThisArg::Val(val) => native_fn(val, params),
+              ThisArg::Val(val) => native_fn(val, params)?,
             };
 
             match self.decoder.decode_register_index() {
@@ -379,7 +379,7 @@ impl StackFrameTrait for BytecodeStackFrame {
               return Ok(FrameStepOk::Push(new_frame));
             }
             LoadFunctionResult::NativeFunction(native_fn) => {
-              native_fn(&mut instance, self.decode_parameters());
+              native_fn(&mut instance, self.decode_parameters())?;
 
               match self.decoder.decode_register_index() {
                 Some(target) => {

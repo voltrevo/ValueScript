@@ -497,19 +497,19 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val
 }
 
 static BOOL_TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _args: Vec<Val>| -> Val {
-    match &this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match &this {
       Val::Bool(b) => Val::String(Rc::new(b.to_string())),
       _ => std::panic!("TODO: Exceptions/bool indirection"),
-    }
+    })
   },
 };
 
 static BOOL_VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _args: Vec<Val>| -> Val {
-    match &this {
+  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match &this {
       Val::Bool(b) => Val::Bool(*b),
       _ => std::panic!("TODO: Exceptions/bool indirection"),
-    }
+    })
   },
 };

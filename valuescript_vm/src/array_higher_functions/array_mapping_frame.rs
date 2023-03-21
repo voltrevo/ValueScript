@@ -91,7 +91,7 @@ impl StackFrameTrait for ArrayMappingFrame {
                   Val::Number(array_i as f64),
                   Val::Array(array_data.clone()),
                 ],
-              ),
+              )?,
             ) {
               None => Ok(FrameStepOk::Continue),
               Some(val) => Ok(FrameStepOk::Pop(CallResult {
