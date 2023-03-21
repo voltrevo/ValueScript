@@ -50,7 +50,7 @@ impl BytecodeStackFrame {
     let bytecode_type = self.decoder.decode_type();
 
     if bytecode_type != BytecodeType::Array {
-      std::panic!("Not implemented: call instruction not using inline array");
+      panic!("Not implemented: call instruction not using inline array");
     }
 
     while self.decoder.peek_type() != BytecodeType::End {
@@ -67,7 +67,7 @@ impl BytecodeStackFrame {
     let bytecode_type = self.decoder.decode_type();
 
     if bytecode_type != BytecodeType::Array {
-      std::panic!("Not implemented: call instruction not using inline array");
+      panic!("Not implemented: call instruction not using inline array");
     }
 
     while self.decoder.peek_type() != BytecodeType::End {
@@ -167,7 +167,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
-            std::panic!("Not implemented: throw exception (fn_ is not a function)")
+            panic!("Not implemented: throw exception (fn_ is not a function)")
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             self.transfer_parameters(&mut new_frame);
@@ -195,7 +195,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
-            std::panic!("Not implemented: throw exception (fn_ is not a function)")
+            panic!("Not implemented: throw exception (fn_ is not a function)")
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             if self.decoder.peek_type() == BytecodeType::Register {
@@ -218,7 +218,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             return Ok(FrameStepOk::Push(new_frame));
           }
           LoadFunctionResult::NativeFunction(_native_fn) => {
-            std::panic!("Not implemented");
+            panic!("Not implemented");
           }
         }
       }
@@ -233,7 +233,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         if params_array.is_none() {
           // Not sure this needs to be an exception in future since compiled
           // code should never violate this
-          std::panic!("bind params should always be array")
+          panic!("bind params should always be array")
         }
 
         let bound_fn = fn_val.bind((*params_array.unwrap()).elements.clone());
@@ -241,7 +241,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         if bound_fn.is_none() {
           // Not sure this needs to be an exception in future since compiled
           // code should never violate this
-          std::panic!("fn parameter of bind should always be bindable");
+          panic!("fn parameter of bind should always be bindable");
         }
 
         if register_index.is_some() {
@@ -284,7 +284,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
-            std::panic!("Not implemented: throw exception (fn_ is not a function)")
+            panic!("Not implemented: throw exception (fn_ is not a function)")
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             self.transfer_parameters(&mut new_frame);
@@ -367,7 +367,7 @@ impl StackFrameTrait for BytecodeStackFrame {
           }
           _ => match class.constructor.load_function() {
             LoadFunctionResult::NotAFunction => {
-              std::panic!("Not implemented: throw exception (class.constructor is not a function)")
+              panic!("Not implemented: throw exception (class.constructor is not a function)")
             }
             LoadFunctionResult::StackFrame(mut new_frame) => {
               self.transfer_parameters(&mut new_frame);
@@ -413,7 +413,7 @@ impl StackFrameTrait for BytecodeStackFrame {
   }
 
   fn get_call_result(&mut self) -> CallResult {
-    std::panic!("Not appropriate for BytecodeStackFrame")
+    panic!("Not appropriate for BytecodeStackFrame")
   }
 }
 

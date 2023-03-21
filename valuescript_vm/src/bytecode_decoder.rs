@@ -94,7 +94,7 @@ impl BytecodeDecoder {
 
   pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
     return match self.decode_type() {
-      BytecodeType::End => std::panic!("Cannot decode end"),
+      BytecodeType::End => panic!("Cannot decode end"),
       BytecodeType::Void => Val::Void,
       BytecodeType::Undefined => Val::Undefined,
       BytecodeType::Null => Val::Null,
@@ -140,7 +140,7 @@ impl BytecodeDecoder {
         instance_prototype: self.decode_val(registers),
       })),
       BytecodeType::BigInt => Val::BigInt(self.decode_bigint()),
-      BytecodeType::Unrecognized => std::panic!("Unrecognized bytecode type at {}", self.pos - 1),
+      BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
   }
 
@@ -164,7 +164,7 @@ impl BytecodeDecoder {
       1 => Sign::NoSign,
       2 => Sign::Plus,
 
-      _ => std::panic!("Invalid sign for bigint"),
+      _ => panic!("Invalid sign for bigint"),
     };
 
     let len = self.decode_varsize_uint();
@@ -235,7 +235,7 @@ impl BytecodeDecoder {
       match type_ {
         BytecodeType::Function | BytecodeType::Class | BytecodeType::Unrecognized => {}
         _ => {
-          std::panic!("Invalid: {:?} pointer that points backwards", type_);
+          panic!("Invalid: {:?} pointer that points backwards", type_);
         }
       }
     }

@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::format_err;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
@@ -111,7 +112,7 @@ impl SortTreeNode {
             return Some((lval.clone(), rval.clone()));
           }
           _ => {
-            std::panic!("Failed to get compare elements from sorting state");
+            panic!("Failed to get compare elements from sorting state");
           }
         }
       }
@@ -157,7 +158,7 @@ impl SortTreeNode {
       }
 
       SortTreeNodeData::Sorted(_) => {
-        std::panic!("Failed to apply outcome");
+        panic!("Failed to apply outcome");
       }
 
       SortTreeNodeData::Sorting(vals, left, right) => {
@@ -175,7 +176,7 @@ impl SortTreeNode {
               right.pos += 1;
             }
           },
-          _ => std::panic!("Failed to apply outcome"),
+          _ => panic!("Failed to apply outcome"),
         };
 
         if left.pos == left.vec.len() || right.pos == right.vec.len() {
@@ -222,7 +223,7 @@ impl StackFrameTrait for SortFrame {
   fn step(&mut self) -> FrameStepResult {
     if !self.started {
       let array_data = match &mut self.this {
-        None => std::panic!("Not implemented: exception: array fn called on non-array"),
+        None => return format_err!("TypeError: array fn called on non-array"),
         Some(ad) => ad,
       };
 
@@ -251,23 +252,23 @@ impl StackFrameTrait for SortFrame {
       };
     }
 
-    match self.tree.get_compare_elements() {
+    Ok(match self.tree.get_compare_elements() {
       None => match &mut self.tree.data {
         SortTreeNodeData::Sorted(vals) => {
           let mut owned_vals = vec![];
           std::mem::swap(&mut owned_vals, vals);
           let res = Val::Array(Rc::new(VsArray::from(owned_vals)));
 
-          return Ok(FrameStepOk::Pop(CallResult {
+          FrameStepOk::Pop(CallResult {
             return_: res.clone(),
             this: res,
-          }));
+          })
         }
-        _ => std::panic!("This shouldn't happen"),
+        _ => panic!("This shouldn't happen"), // TODO: Internal errors
       },
       Some((left, right)) => match self.comparator.load_function() {
         LoadFunctionResult::NotAFunction => {
-          std::panic!("Not implemented: exception: comparator is not a function");
+          return format_err!("TypeError: comparator is not a function");
         }
         LoadFunctionResult::NativeFunction(native_fn) => {
           let res = native_fn(&mut Val::Undefined, vec![left, right])?.to_number();
@@ -278,15 +279,15 @@ impl StackFrameTrait for SortFrame {
           };
 
           self.tree.apply_outcome(should_swap);
-          return Ok(FrameStepOk::Continue);
+          FrameStepOk::Continue
         }
         LoadFunctionResult::StackFrame(mut new_frame) => {
           new_frame.write_param(left);
           new_frame.write_param(right);
-          return Ok(FrameStepOk::Push(new_frame));
+          FrameStepOk::Push(new_frame)
         }
       },
-    };
+    })
   }
 
   fn apply_call_result(&mut self, call_result: CallResult) {
@@ -301,6 +302,6 @@ impl StackFrameTrait for SortFrame {
   }
 
   fn get_call_result(&mut self) -> CallResult {
-    std::panic!("Not appropriate for SortFrame")
+    panic!("Not appropriate for SortFrame")
   }
 }

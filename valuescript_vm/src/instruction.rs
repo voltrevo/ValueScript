@@ -1,7 +1,6 @@
 // TODO: Fix duplication with assembler (requires internal crate?)
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Instruction {
   End = 0x00,
   Mov = 0x01,
@@ -99,7 +98,7 @@ impl Instruction {
       0x2a => UnaryMinus,
       0x2b => New,
 
-      _ => std::panic!("Unrecognized instruction: {}", byte),
+      _ => panic!("Unrecognized instruction: {}", byte),
     };
   }
 }

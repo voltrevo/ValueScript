@@ -22,7 +22,7 @@ impl VirtualMachine {
 
     let mut frame = match main_fn.load_function() {
       LoadFunctionResult::StackFrame(f) => f,
-      _ => std::panic!("bytecode does start with function"),
+      _ => panic!("bytecode does start with function"),
     };
 
     for p in params {

@@ -4,6 +4,8 @@ use num_bigint::Sign;
 use num_traits::ToPrimitive;
 
 use crate::bigint_methods::op_sub_bigint;
+use crate::format_err;
+use crate::format_val;
 use crate::native_function::NativeFunction;
 use crate::number_methods::op_sub_number;
 use crate::string_methods::op_sub_string;
@@ -11,22 +13,6 @@ use crate::string_methods::op_sub_string;
 use super::vs_value::Val;
 use super::vs_value::ValTrait;
 use super::vs_value::VsType;
-
-macro_rules! format_err {
-  ($fmt:expr $(, $($arg:expr),*)?) => {{
-      let formatted_string = format!($fmt $(, $($arg),*)?);
-
-      // TODO: This should be a proper error type
-      Err(Val::String(Rc::new(formatted_string)))
-  }};
-}
-
-macro_rules! format_string {
-  ($fmt:expr $(, $($arg:expr),*)?) => {{
-      let formatted_string = format!($fmt $(, $($arg),*)?);
-      Val::String(Rc::new(formatted_string))
-  }};
-}
 
 pub fn op_plus(left: Val, right: Val) -> Result<Val, Val> {
   let left_prim = left.to_primitive();
@@ -351,7 +337,7 @@ pub fn op_left_shift(left: Val, right: Val) -> Result<Val, Val> {
 pub fn op_right_shift(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => {
-      let right_i64 = right_bigint.to_i64().ok_or(format_string!("TODO"))?;
+      let right_i64 = right_bigint.to_i64().ok_or(format_val!("TODO"))?;
       Ok(Val::BigInt(left_bigint >> right_i64))
     }
     (Some(_), None) | (None, Some(_)) => {
@@ -397,11 +383,11 @@ pub fn op_typeof(input: Val) -> Val {
 }
 
 pub fn op_instance_of(_left: Val, _right: Val) -> Result<Val, Val> {
-  std::panic!("Not implemented: op_instance_of");
+  format_err!("TODO: op_instance_of")
 }
 
 pub fn op_in(_left: Val, _right: Val) -> Result<Val, Val> {
-  std::panic!("Not implemented: op_in");
+  format_err!("TODO: op_in")
 }
 
 pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
@@ -444,8 +430,8 @@ pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
     }
     Val::Object(object_data) => Ok(object_data.sub(right)),
     Val::Function(_) | Val::Class(_) => Ok(Val::Undefined),
-    Val::Static(s) => Ok(s.sub(right)),
-    Val::Custom(custom_data) => Ok(custom_data.sub(right)),
+    Val::Static(s) => s.sub(right),
+    Val::Custom(custom_data) => custom_data.sub(right),
   };
 }
 
@@ -500,7 +486,7 @@ static BOOL_TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match &this {
       Val::Bool(b) => Val::String(Rc::new(b.to_string())),
-      _ => std::panic!("TODO: Exceptions/bool indirection"),
+      _ => return format_err!("bool indirection"),
     })
   },
 };
@@ -509,7 +495,7 @@ static BOOL_VALUE_OF: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match &this {
       Val::Bool(b) => Val::Bool(*b),
-      _ => std::panic!("TODO: Exceptions/bool indirection"),
+      _ => return format_err!("bool indirection"),
     })
   },
 };

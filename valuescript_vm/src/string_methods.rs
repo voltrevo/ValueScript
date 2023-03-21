@@ -1,6 +1,7 @@
 use std::{rc::Rc, str::Chars};
 
 use crate::{
+  format_err,
   helpers::{to_wrapping_index, to_wrapping_index_clamped},
   native_function::NativeFunction,
   vs_array::VsArray,
@@ -99,7 +100,7 @@ static AT: NativeFunction = NativeFunction {
           None => Val::String(Rc::new(String::from(""))),
         }
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -123,7 +124,7 @@ static CODE_POINT_AT: NativeFunction = NativeFunction {
           None => Val::Undefined,
         }
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -140,7 +141,7 @@ static CONCAT: NativeFunction = NativeFunction {
 
         Val::String(Rc::new(result))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -183,7 +184,7 @@ static ENDS_WITH: NativeFunction = NativeFunction {
 
         Val::Bool(true)
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -215,7 +216,7 @@ static INCLUDES: NativeFunction = NativeFunction {
           None => Val::Bool(false),
         }
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -247,7 +248,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
           None => Val::Number(-1.0),
         }
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -279,7 +280,7 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
           None => Val::Number(-1.0),
         }
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -289,9 +290,9 @@ static TODO_LOCALE: NativeFunction = NativeFunction {
     // TODO: Ok(...)
     match this {
       Val::String(_string_data) => {
-        panic!("TODO: locale");
+        return format_err!("TODO: locale");
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     }
   },
 };
@@ -301,9 +302,9 @@ static TODO_REGEXES: NativeFunction = NativeFunction {
     // TODO: Ok(...)
     match this {
       Val::String(_string_data) => {
-        panic!("TODO: regexes");
+        return format_err!("TODO: regexes");
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     }
   },
 };
@@ -314,9 +315,9 @@ static NORMALIZE: NativeFunction = NativeFunction {
     match this {
       Val::String(_string_data) => {
         // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
-        panic!("TODO: normalize");
+        return format_err!("TODO: normalize");
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     }
   },
 };
@@ -370,7 +371,7 @@ static PAD_END: NativeFunction = NativeFunction {
 
         Val::String(Rc::new(string))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -426,7 +427,7 @@ static PAD_START: NativeFunction = NativeFunction {
 
         Val::String(Rc::new(prefix))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -451,7 +452,7 @@ static REPEAT: NativeFunction = NativeFunction {
 
         Val::String(Rc::new(result))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -485,7 +486,7 @@ static SLICE: NativeFunction = NativeFunction {
 
         Val::String(Rc::new(new_string))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -551,7 +552,7 @@ static SPLIT: NativeFunction = NativeFunction {
 
         Val::Array(Rc::new(VsArray::from(result)))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -592,7 +593,7 @@ static STARTS_WITH: NativeFunction = NativeFunction {
 
         Val::Bool(true)
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -635,7 +636,7 @@ static SUBSTRING: NativeFunction = NativeFunction {
 
         Val::String(Rc::new(new_string))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -647,7 +648,7 @@ static TO_LOWER_CASE: NativeFunction = NativeFunction {
         let lowercased_string = string_data.to_lowercase();
         Val::String(Rc::new(lowercased_string))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -656,7 +657,7 @@ static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this {
       Val::String(string_data) => Val::String(string_data.clone()),
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -668,7 +669,7 @@ static TO_UPPER_CASE: NativeFunction = NativeFunction {
         let uppercased_string = string_data.to_uppercase();
         Val::String(Rc::new(uppercased_string))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -680,7 +681,7 @@ static TRIM: NativeFunction = NativeFunction {
         let trimmed_string = string_data.trim();
         Val::String(Rc::new(trimmed_string.to_owned()))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -692,7 +693,7 @@ static TRIM_END: NativeFunction = NativeFunction {
         let trimmed_string = string_data.trim_end();
         Val::String(Rc::new(trimmed_string.to_owned()))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -704,7 +705,7 @@ static TRIM_START: NativeFunction = NativeFunction {
         let trimmed_string = string_data.trim_start();
         Val::String(Rc::new(trimmed_string.to_owned()))
       }
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };
@@ -713,7 +714,7 @@ static VALUE_OF: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this {
       Val::String(string_data) => Val::String(string_data.clone()),
-      _ => panic!("TODO: exceptions/string indirection"),
+      _ => return format_err!("string indirection"),
     })
   },
 };

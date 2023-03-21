@@ -3,6 +3,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::{
+  format_err,
   native_function::NativeFunction,
   todo_fn::TODO,
   vs_value::{Val, ValTrait},
@@ -22,12 +23,12 @@ static TO_STRING: NativeFunction = NativeFunction {
     Ok(match this {
       Val::BigInt(_) => match params.get(0) {
         Some(_) => {
-          panic!("TODO: toString with radix");
+          return format_err!("TODO: toString with radix");
         }
 
         None => Val::String(Rc::new(this.val_to_string())),
       },
-      _ => panic!("TODO: exceptions/bigint indirection"),
+      _ => return format_err!("TODO: bigint indirection"),
     })
   },
 };
@@ -36,7 +37,7 @@ static VALUE_OF: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this {
       Val::BigInt(bigint) => Val::BigInt(bigint.clone()),
-      _ => panic!("TODO: exceptions/bigint indirection"),
+      _ => return format_err!("TODO: bigint indirection"),
     })
   },
 };

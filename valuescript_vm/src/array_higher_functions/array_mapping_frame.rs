@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::format_err;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
 use crate::vs_array::VsArray;
@@ -12,7 +13,7 @@ pub trait ArrayMappingState {
 
 pub struct ArrayMappingFrame {
   state: Box<dyn ArrayMappingState>,
-  early_exit: Option<Val>,
+  early_exit: Option<Result<Val, Val>>,
 
   this: Option<Rc<VsArray>>,
   array_i: usize,
@@ -57,13 +58,15 @@ impl StackFrameTrait for ArrayMappingFrame {
 
   fn step(&mut self) -> FrameStepResult {
     let array_data = match &self.this {
-      None => std::panic!("Not implemented: exception: array fn called on non-array"),
+      None => return format_err!("TypeError: Array fn called on non-array"),
       Some(ad) => ad,
     };
 
-    for early_exit in &self.early_exit {
+    if let Some(early_exit) = &self.early_exit {
+      let early_exit = early_exit.clone()?;
+
       return Ok(FrameStepOk::Pop(CallResult {
-        return_: early_exit.clone(),
+        return_: early_exit,
         this: Val::Array(array_data.clone()),
       }));
     }
@@ -73,15 +76,13 @@ impl StackFrameTrait for ArrayMappingFrame {
 
     match array_data.elements.get(array_i) {
       Some(el) => match el {
-        Val::Void => {
-          return Ok(FrameStepOk::Continue);
-        }
+        Val::Void => Ok(FrameStepOk::Continue),
         _ => match self.mapper.load_function() {
           LoadFunctionResult::NotAFunction => {
-            std::panic!("Not implemented: exception: map fn is not a function")
+            format_err!("TypeError: map fn is not a function")
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
-            return match self.state.process(
+            match self.state.process(
               array_i,
               el,
               native_fn(
@@ -98,38 +99,42 @@ impl StackFrameTrait for ArrayMappingFrame {
                 return_: val,
                 this: Val::Array(array_data.clone()),
               })),
-            };
+            }
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             new_frame.write_this(self.this_arg.clone());
             new_frame.write_param(el.clone());
             new_frame.write_param(Val::Number(array_i as f64));
             new_frame.write_param(Val::Array(array_data.clone()));
-            return Ok(FrameStepOk::Push(new_frame));
+            Ok(FrameStepOk::Push(new_frame))
           }
         },
       },
-      None => {
-        return Ok(FrameStepOk::Pop(CallResult {
-          return_: self.state.finish(),
-          this: Val::Array(array_data.clone()),
-        }));
-      }
-    };
+      None => Ok(FrameStepOk::Pop(CallResult {
+        return_: self.state.finish(),
+        this: Val::Array(array_data.clone()),
+      })),
+    }
   }
 
   fn apply_call_result(&mut self, call_result: CallResult) {
     let array_i = self.array_i - 1;
 
     let element = match &self.this {
-      None => std::panic!("Not implemented: exception: array fn called on non-array"),
+      None => {
+        self.early_exit = Some(format_err!("TypeError: Array fn called on non-array"));
+        return;
+      }
       Some(ad) => &ad.elements[array_i],
     };
 
-    self.early_exit = self.state.process(array_i, element, call_result.return_);
+    self.early_exit = self
+      .state
+      .process(array_i, element, call_result.return_)
+      .map(|v| Ok(v));
   }
 
   fn get_call_result(&mut self) -> CallResult {
-    std::panic!("Not appropriate for MapFrame")
+    panic!("Not appropriate for MapFrame")
   }
 }

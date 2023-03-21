@@ -68,8 +68,8 @@ pub trait ValTrait {
 
   fn load_function(&self) -> LoadFunctionResult;
 
-  fn sub(&self, key: Val) -> Val;
-  fn submov(&mut self, key: Val, value: Val);
+  fn sub(&self, key: Val) -> Result<Val, Val>;
+  fn submov(&mut self, key: Val, value: Val) -> Result<(), Val>;
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
   fn codify(&self) -> String;
@@ -176,7 +176,7 @@ impl ValTrait for Val {
     use Val::*;
 
     return match self {
-      Void => std::panic!("Shouldn't happen"),
+      Void => panic!("Shouldn't happen"),
       Undefined => None,
       Null => None,
       Bool(_) => None,
@@ -247,7 +247,7 @@ impl ValTrait for Val {
     use Val::*;
 
     return match self {
-      Void => std::panic!("Shouldn't happen"), // TODO: Or just true?
+      Void => panic!("Shouldn't happen"), // TODO: Or just true?
       Undefined => true,
       Null => true,
       Bool(_) => false,
@@ -331,17 +331,13 @@ impl ValTrait for Val {
     };
   }
 
-  fn sub(&self, key: Val) -> Val {
+  fn sub(&self, key: Val) -> Result<Val, Val> {
     // TODO: Avoid cloning?
     op_sub(self.clone(), key)
-      .map_err(|e| e.val_to_string())
-      .unwrap() // TODO: Exception
   }
 
-  fn submov(&mut self, key: Val, value: Val) {
+  fn submov(&mut self, key: Val, value: Val) -> Result<(), Val> {
     op_submov(self, key, value)
-      .map_err(|e| e.val_to_string())
-      .unwrap() // TODO: Exception
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -3,6 +3,8 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::format_err;
+
 use super::bytecode_decoder::{BytecodeDecoder, BytecodeType};
 use super::vs_array::VsArray;
 use super::vs_class::VsClass;
@@ -54,8 +56,8 @@ impl ValTrait for VsPointer {
     };
 
     return match bd.decode_type() {
-      BytecodeType::End => std::panic!("Invalid: pointer to end"),
-      BytecodeType::Void => std::panic!("Invalid: pointer to void"),
+      BytecodeType::End => panic!("Invalid: pointer to end"),
+      BytecodeType::Void => panic!("Invalid: pointer to void"),
       BytecodeType::Undefined => VsType::Undefined,
       BytecodeType::Null => VsType::Null,
       BytecodeType::False => VsType::Bool,
@@ -66,12 +68,12 @@ impl ValTrait for VsPointer {
       BytecodeType::Array => VsType::Array,
       BytecodeType::Object => VsType::Object,
       BytecodeType::Function => VsType::Function,
-      BytecodeType::Pointer => std::panic!("Invalid: pointer to pointer"),
-      BytecodeType::Register => std::panic!("Invalid: pointer to register"),
-      BytecodeType::Builtin => std::panic!("Invalid: pointer to builtin"),
+      BytecodeType::Pointer => panic!("Invalid: pointer to pointer"),
+      BytecodeType::Register => panic!("Invalid: pointer to register"),
+      BytecodeType::Builtin => panic!("Invalid: pointer to builtin"),
       BytecodeType::Class => VsType::Class,
       BytecodeType::BigInt => VsType::BigInt,
-      BytecodeType::Unrecognized => std::panic!("Unrecognized bytecode type at {}", self.pos - 1),
+      BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
   }
 
@@ -138,12 +140,12 @@ impl ValTrait for VsPointer {
     return self.resolve().load_function();
   }
 
-  fn sub(&self, subscript: Val) -> Val {
-    return self.resolve().sub(subscript);
+  fn sub(&self, subscript: Val) -> Result<Val, Val> {
+    self.resolve().sub(subscript)
   }
 
-  fn submov(&mut self, _subscript: Val, _value: Val) {
-    std::panic!("Not implemented");
+  fn submov(&mut self, _subscript: Val, _value: Val) -> Result<(), Val> {
+    format_err!("TODO: Probably an exception, but might be possible")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

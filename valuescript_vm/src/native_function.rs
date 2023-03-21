@@ -2,6 +2,8 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::format_err;
+
 use super::vs_array::VsArray;
 use super::vs_class::VsClass;
 use super::vs_object::VsObject;
@@ -38,7 +40,7 @@ impl ValTrait for NativeFunction {
   }
 
   fn bind(&self, _params: Vec<Val>) -> Option<Val> {
-    std::panic!("Not implemented");
+    panic!("Not implemented");
   }
 
   fn as_bigint_data(&self) -> Option<BigInt> {
@@ -58,12 +60,12 @@ impl ValTrait for NativeFunction {
     LoadFunctionResult::NativeFunction(self.fn_)
   }
 
-  fn sub(&self, _key: Val) -> Val {
-    std::panic!("Not implemented");
+  fn sub(&self, _key: Val) -> Result<Val, Val> {
+    format_err!("TODO: Subscript native function")
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("TODO: Exceptions");
+  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+    format_err!("TypeError: Cannot assign to subscript of native function")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

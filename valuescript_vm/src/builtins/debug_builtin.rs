@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::format_err;
 use crate::native_function::NativeFunction;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
@@ -59,16 +60,16 @@ impl ValTrait for DebugBuiltin {
     LoadFunctionResult::NotAFunction
   }
 
-  fn sub(&self, key: Val) -> Val {
-    match key.val_to_string().as_str() {
+  fn sub(&self, key: Val) -> Result<Val, Val> {
+    Ok(match key.val_to_string().as_str() {
       "log" => Val::Static(&LOG),
 
       _ => Val::Undefined,
-    }
+    })
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("TODO: Exceptions");
+  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+    format_err!("TypeError: Cannot assign to subscript of Debug builtin")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

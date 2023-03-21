@@ -6,6 +6,7 @@ mod bytecode_stack_frame;
 mod first_stack_frame;
 mod helpers;
 mod instruction;
+mod macros;
 mod native_frame_function;
 mod native_function;
 mod number_methods;

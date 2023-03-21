@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::format_err;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrameTrait};
 use crate::vs_array::VsArray;
@@ -47,26 +48,24 @@ impl StackFrameTrait for ReduceFrame {
 
   fn step(&mut self) -> FrameStepResult {
     let array_data = match &self.this {
-      None => std::panic!("Not implemented: exception: reduce called on non-array"),
+      None => return format_err!("TypeError: reduce called on non-array"),
       Some(ad) => ad,
     };
 
     let array_i = self.array_i;
     self.array_i += 1;
 
-    match array_data.elements.get(array_i) {
+    Ok(match array_data.elements.get(array_i) {
       Some(el) => match el {
-        Val::Void => {
-          return Ok(FrameStepOk::Continue);
-        }
+        Val::Void => FrameStepOk::Continue,
         _ => match &self.value {
           None => {
             self.value = Some(el.clone());
-            return Ok(FrameStepOk::Continue);
+            FrameStepOk::Continue
           }
           Some(value) => match self.reducer.load_function() {
             LoadFunctionResult::NotAFunction => {
-              std::panic!("Not implemented: exception: reduce fn is not a function")
+              return format_err!("TypeError: reduce fn is not a function")
             }
             LoadFunctionResult::NativeFunction(native_fn) => {
               self.value = Some(native_fn(
@@ -79,30 +78,26 @@ impl StackFrameTrait for ReduceFrame {
                 ],
               )?);
 
-              return Ok(FrameStepOk::Continue);
+              FrameStepOk::Continue
             }
             LoadFunctionResult::StackFrame(mut new_frame) => {
               new_frame.write_param(value.clone());
               new_frame.write_param(el.clone());
               new_frame.write_param(Val::Number(array_i as f64));
               new_frame.write_param(Val::Array(array_data.clone()));
-              return Ok(FrameStepOk::Push(new_frame));
+              FrameStepOk::Push(new_frame)
             }
           },
         },
       },
       None => match &self.value {
-        None => {
-          std::panic!("Not implemented: exception: reduce of empty array with no initial value");
-        }
-        Some(value) => {
-          return Ok(FrameStepOk::Pop(CallResult {
-            return_: value.clone(),
-            this: Val::Array(array_data.clone()),
-          }));
-        }
+        None => return format_err!("TypeError: reduce of empty array with no initial value"),
+        Some(value) => FrameStepOk::Pop(CallResult {
+          return_: value.clone(),
+          this: Val::Array(array_data.clone()),
+        }),
       },
-    };
+    })
   }
 
   fn apply_call_result(&mut self, call_result: CallResult) {
@@ -110,6 +105,6 @@ impl StackFrameTrait for ReduceFrame {
   }
 
   fn get_call_result(&mut self) -> CallResult {
-    std::panic!("Not appropriate for ReduceFrame")
+    panic!("Not appropriate for ReduceFrame")
   }
 }

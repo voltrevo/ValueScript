@@ -3,6 +3,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::{
+  format_err,
   native_function::NativeFunction,
   vs_array::VsArray,
   vs_class::VsClass,
@@ -60,8 +61,8 @@ impl ValTrait for NumberBuiltin {
     LoadFunctionResult::NativeFunction(to_number)
   }
 
-  fn sub(&self, key: Val) -> Val {
-    match key.val_to_string().as_str() {
+  fn sub(&self, key: Val) -> Result<Val, Val> {
+    Ok(match key.val_to_string().as_str() {
       "EPSILON" => Val::Number(core::f64::EPSILON),
       "MAX_VALUE" => Val::Number(core::f64::MAX),
       "MAX_SAFE_INTEGER" => Val::Number(2f64.powi(53) - 1f64),
@@ -77,11 +78,11 @@ impl ValTrait for NumberBuiltin {
       "parseFloat" => Val::Static(&PARSE_FLOAT),
       "parseInt" => Val::Static(&PARSE_INT),
       _ => Val::Undefined,
-    }
+    })
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("TODO: Exceptions");
+  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+    format_err!("TypeError: Cannot assign to subscript of Number builtin")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

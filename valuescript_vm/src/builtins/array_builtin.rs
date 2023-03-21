@@ -3,6 +3,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::{
+  format_err,
   native_function::NativeFunction,
   operations::op_sub,
   vs_array::VsArray,
@@ -61,17 +62,17 @@ impl ValTrait for ArrayBuiltin {
     LoadFunctionResult::NativeFunction(to_array)
   }
 
-  fn sub(&self, key: Val) -> Val {
-    match key.val_to_string().as_str() {
-      "isArray" => Val::Static(&IS_ARRAY),
-      "from" => Val::Static(&FROM),
-      "of" => Val::Static(&OF),
-      _ => Val::Undefined,
-    }
+  fn sub(&self, key: Val) -> Result<Val, Val> {
+    Ok(Val::Static(match key.val_to_string().as_str() {
+      "isArray" => &IS_ARRAY,
+      "from" => &FROM,
+      "of" => &OF,
+      _ => return Ok(Val::Undefined),
+    }))
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("TODO: Exceptions");
+  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+    format_err!("TypeError: Cannot assign to subscript of Array builtin")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -98,12 +99,12 @@ static IS_ARRAY: NativeFunction = NativeFunction {
 static FROM: NativeFunction = NativeFunction {
   fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
     let first_param = match params.get(0) {
-      None => panic!("TODO: Exceptions (TypeError: undefined is not iterable)"),
+      None => return format_err!("TypeError: undefined is not iterable"),
       Some(p) => p,
     };
 
     if params.len() > 1 {
-      panic!("TODO: Using Array.from with a map function");
+      return format_err!("TODO: Using Array.from with a map function");
     }
 
     Ok(match first_param {
@@ -114,7 +115,7 @@ static FROM: NativeFunction = NativeFunction {
           .collect(),
       ))),
       Val::Void | Val::Undefined | Val::Null => {
-        panic!("TODO: Exceptions (TypeError: items is not iterable)")
+        return format_err!("TypeError: items is not iterable")
       }
       Val::Bool(..) | Val::Number(..) | Val::BigInt(..) => Val::Array(Rc::new(VsArray::new())),
       Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Custom(..) => {
@@ -131,7 +132,7 @@ static FROM: NativeFunction = NativeFunction {
         }
 
         if len.is_infinite() {
-          panic!("TODO: Exceptions (RangeError: Invalid array length)")
+          return format_err!("RangeError: Invalid array length");
         }
 
         let len = len as usize;
@@ -168,7 +169,7 @@ fn to_array(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
   Ok(match params[0] {
     Val::Number(number) => {
       if number.is_sign_negative() || number != number.floor() {
-        panic!("TODO: Exceptions (RangeError: Invalid array length)")
+        return format_err!("RangeError: Invalid array length");
       }
 
       let len = number as usize;

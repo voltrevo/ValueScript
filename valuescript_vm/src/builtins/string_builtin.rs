@@ -3,6 +3,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::{
+  format_err,
   native_function::NativeFunction,
   vs_array::VsArray,
   vs_class::VsClass,
@@ -60,20 +61,20 @@ impl ValTrait for StringBuiltin {
     LoadFunctionResult::NativeFunction(to_string)
   }
 
-  fn sub(&self, key: Val) -> Val {
+  fn sub(&self, key: Val) -> Result<Val, Val> {
     // Not supported: fromCharCode.
     // See charAt etc in string_methods.rs.
 
-    match key.val_to_string().as_str() {
+    Ok(match key.val_to_string().as_str() {
       "fromCodePoint" => Val::Static(&FROM_CODE_POINT),
       // "fromCharCode" => Val::Static(&FROM_CHAR_CODE),
       // "raw" => Val::Static(&RAW),                     // TODO
       _ => Val::Undefined,
-    }
+    })
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("TODO: Exceptions");
+  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+    format_err!("TypeError: Cannot assign to subscript of String builtin")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -94,7 +95,7 @@ static FROM_CODE_POINT: NativeFunction = NativeFunction {
 
       let char = match std::char::from_u32(code_point) {
         Some(c) => c,
-        None => panic!("TODO: Exceptions (RangeError: Invalid code point)"),
+        None => return format_err!("RangeError: Invalid code point"),
       };
 
       result.push(char);

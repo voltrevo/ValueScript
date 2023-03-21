@@ -1,4 +1,4 @@
-use super::stack_frame::{StackFrameTrait, FrameStepResult, CallResult};
+use super::stack_frame::{CallResult, FrameStepResult, StackFrameTrait};
 use super::vs_value::Val;
 
 pub struct FirstStackFrame {
@@ -18,15 +18,15 @@ impl FirstStackFrame {
 
 impl StackFrameTrait for FirstStackFrame {
   fn write_this(&mut self, _this: Val) {
-    std::panic!("Not appropriate for FirstStackFrame");
+    panic!("Not appropriate for FirstStackFrame");
   }
 
   fn write_param(&mut self, _param: Val) {
-    std::panic!("Not appropriate for FirstStackFrame");
+    panic!("Not appropriate for FirstStackFrame");
   }
 
   fn step(&mut self) -> FrameStepResult {
-    std::panic!("Not appropriate for FirstStackFrame");
+    panic!("Not appropriate for FirstStackFrame");
   }
 
   fn apply_call_result(&mut self, call_result: CallResult) {

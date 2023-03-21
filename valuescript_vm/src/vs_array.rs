@@ -3,23 +3,18 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::array_higher_functions::{
+  array_every::EVERY, array_filter::FILTER, array_find::FIND, array_find_index::FIND_INDEX,
+  array_flat_map::FLAT_MAP, array_map::MAP, array_reduce::REDUCE, array_reduce_right::REDUCE_RIGHT,
+  array_some::SOME, array_sort::SORT,
+};
+use crate::format_err;
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
-
-use super::array_higher_functions::array_every::EVERY;
-use super::array_higher_functions::array_filter::FILTER;
-use super::array_higher_functions::array_find::FIND;
-use super::array_higher_functions::array_find_index::FIND_INDEX;
-use super::array_higher_functions::array_flat_map::FLAT_MAP;
-use super::array_higher_functions::array_map::MAP;
-use super::array_higher_functions::array_reduce::REDUCE;
-use super::array_higher_functions::array_reduce_right::REDUCE_RIGHT;
-use super::array_higher_functions::array_some::SOME;
-use super::array_higher_functions::array_sort::SORT;
-use super::native_function::NativeFunction;
-use super::operations::op_triple_eq_impl;
-use super::vs_class::VsClass;
-use super::vs_object::VsObject;
-use super::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
+use crate::native_function::NativeFunction;
+use crate::operations::op_triple_eq_impl;
+use crate::vs_class::VsClass;
+use crate::vs_object::VsObject;
+use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 #[derive(Clone)]
 pub struct VsArray {
@@ -100,47 +95,47 @@ impl ValTrait for ArrayPrototype {
     LoadFunctionResult::NotAFunction
   }
 
-  fn sub(&self, key: Val) -> Val {
-    match key.val_to_string().as_str() {
-      "at" => Val::Static(&AT),
-      "concat" => Val::Static(&CONCAT),
-      "copyWithin" => Val::Static(&COPY_WITHIN),
-      "entries" => Val::Static(&ENTRIES),
-      "every" => Val::Static(&EVERY),
-      "fill" => Val::Static(&FILL),
-      "filter" => Val::Static(&FILTER),
-      "find" => Val::Static(&FIND),
-      "findIndex" => Val::Static(&FIND_INDEX),
-      "flat" => Val::Static(&FLAT),
-      "flatMap" => Val::Static(&FLAT_MAP),
+  fn sub(&self, key: Val) -> Result<Val, Val> {
+    Ok(Val::Static(match key.val_to_string().as_str() {
+      "at" => &AT,
+      "concat" => &CONCAT,
+      "copyWithin" => &COPY_WITHIN,
+      "entries" => &ENTRIES,
+      "every" => &EVERY,
+      "fill" => &FILL,
+      "filter" => &FILTER,
+      "find" => &FIND,
+      "findIndex" => &FIND_INDEX,
+      "flat" => &FLAT,
+      "flatMap" => &FLAT_MAP,
       // forEach: Not included because it cannot work as expected in ValueScript
       // (Use a for..of loop)
-      "includes" => Val::Static(&INCLUDES),
-      "indexOf" => Val::Static(&INDEX_OF),
-      "join" => Val::Static(&JOIN),
-      "keys" => Val::Static(&KEYS),
-      "lastIndexOf" => Val::Static(&LAST_INDEX_OF),
-      "map" => Val::Static(&MAP),
-      "pop" => Val::Static(&POP),
-      "push" => Val::Static(&PUSH),
-      "reduce" => Val::Static(&REDUCE),
-      "reduceRight" => Val::Static(&REDUCE_RIGHT),
-      "reverse" => Val::Static(&REVERSE),
-      "shift" => Val::Static(&SHIFT),
-      "slice" => Val::Static(&SLICE),
-      "some" => Val::Static(&SOME),
-      "sort" => Val::Static(&SORT),
-      "splice" => Val::Static(&SPLICE),
-      "toLocaleString" => Val::Static(&TO_LOCALE_STRING),
-      "toString" => Val::Static(&TO_STRING),
-      "unshift" => Val::Static(&UNSHIFT),
-      "values" => Val::Static(&VALUES),
-      _ => Val::Undefined,
-    }
+      "includes" => &INCLUDES,
+      "indexOf" => &INDEX_OF,
+      "join" => &JOIN,
+      "keys" => &KEYS,
+      "lastIndexOf" => &LAST_INDEX_OF,
+      "map" => &MAP,
+      "pop" => &POP,
+      "push" => &PUSH,
+      "reduce" => &REDUCE,
+      "reduceRight" => &REDUCE_RIGHT,
+      "reverse" => &REVERSE,
+      "shift" => &SHIFT,
+      "slice" => &SLICE,
+      "some" => &SOME,
+      "sort" => &SORT,
+      "splice" => &SPLICE,
+      "toLocaleString" => &TO_LOCALE_STRING,
+      "toString" => &TO_STRING,
+      "unshift" => &UNSHIFT,
+      "values" => &VALUES,
+      _ => return Ok(Val::Undefined),
+    }))
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) {
-    std::panic!("TODO: Exceptions");
+  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+    format_err!("TypeError: Cannot assign to subscript of Array.prototype")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -159,7 +154,7 @@ static AT: NativeFunction = NativeFunction {
         None => Val::Undefined,
         Some(i) => array_data.elements[i].clone(),
       },
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -185,7 +180,7 @@ static CONCAT: NativeFunction = NativeFunction {
 
         Val::Array(Rc::new(new_array))
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -198,7 +193,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
         let ulen = array_data_mut.elements.len();
 
         if ulen > isize::MAX as usize {
-          std::panic!("Not implemented: array len exceeds isize");
+          return format_err!("TODO: array len exceeds isize");
         }
 
         let mut target = match params.get(0) {
@@ -257,7 +252,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 
         this.clone()
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -265,10 +260,8 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 static ENTRIES: NativeFunction = NativeFunction {
   fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
     match this {
-      Val::Array(_array_data) => {
-        std::panic!("Not implemented: ENTRIES");
-      }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      Val::Array(_array_data) => return format_err!("TODO: iterators"),
+      _ => return format_err!("array indirection"),
     };
   },
 };
@@ -298,7 +291,7 @@ static FILL: NativeFunction = NativeFunction {
 
         this.clone()
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -308,7 +301,7 @@ static FLAT: NativeFunction = NativeFunction {
     Ok(match this {
       Val::Array(array_data) => {
         if params.len() > 0 {
-          std::panic!("Not implemented: .flat depth parameter");
+          return format_err!("TODO: .flat depth parameter");
         }
 
         let mut new_elems = Vec::<Val>::new();
@@ -328,7 +321,7 @@ static FLAT: NativeFunction = NativeFunction {
 
         Val::Array(Rc::new(VsArray::from(new_elems)))
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -351,7 +344,7 @@ static INCLUDES: NativeFunction = NativeFunction {
 
         Val::Bool(false)
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -374,7 +367,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
 
         Val::Number(-1.0)
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -414,7 +407,7 @@ static JOIN: NativeFunction = NativeFunction {
 
         Val::String(Rc::new(res))
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -424,9 +417,9 @@ static KEYS: NativeFunction = NativeFunction {
     // TODO: Ok(...)
     match this {
       Val::Array(_array_data) => {
-        std::panic!("Not implemented: KEYS");
+        return format_err!("TODO: KEYS");
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     };
   },
 };
@@ -449,7 +442,7 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
 
         Val::Number(-1_f64)
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -473,7 +466,7 @@ static POP: NativeFunction = NativeFunction {
           _ => removed_el,
         }
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -490,7 +483,7 @@ static PUSH: NativeFunction = NativeFunction {
 
         Val::Number(array_data_mut.elements.len() as f64)
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -517,7 +510,7 @@ static REVERSE: NativeFunction = NativeFunction {
 
         this.clone()
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -534,7 +527,7 @@ static SHIFT: NativeFunction = NativeFunction {
 
         array_data_mut.elements.remove(0)
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -561,7 +554,7 @@ static SLICE: NativeFunction = NativeFunction {
 
         Val::Array(Rc::new(VsArray::from(new_elems)))
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -638,7 +631,7 @@ static SPLICE: NativeFunction = NativeFunction {
 
         Val::Array(Rc::new(VsArray::from(deleted_elements)))
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -648,9 +641,9 @@ static TO_LOCALE_STRING: NativeFunction = NativeFunction {
     // TODO: Ok(...)
     match this {
       Val::Array(_array_data) => {
-        std::panic!("Not implemented: TO_LOCALE_STRING");
+        return format_err!("TODO: TO_LOCALE_STRING");
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     };
   },
 };
@@ -677,7 +670,7 @@ static UNSHIFT: NativeFunction = NativeFunction {
 
         Val::Number(array_data_mut.elements.len() as f64)
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     })
   },
 };
@@ -687,9 +680,9 @@ static VALUES: NativeFunction = NativeFunction {
     // TODO: Ok(...)
     match this {
       Val::Array(_array_data) => {
-        std::panic!("Not implemented: VALUES");
+        return format_err!("TODO: VALUES");
       }
-      _ => std::panic!("TODO: Exceptions/array indirection"),
+      _ => return format_err!("array indirection"),
     };
   },
 };

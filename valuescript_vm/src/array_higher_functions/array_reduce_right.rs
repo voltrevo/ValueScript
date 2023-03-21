@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::format_err;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrameTrait};
 use crate::vs_array::VsArray;
@@ -52,16 +53,14 @@ impl StackFrameTrait for ReduceRightFrame {
 
   fn step(&mut self) -> FrameStepResult {
     let array_data = match &self.this {
-      None => std::panic!("Not implemented: exception: reduceRight called on non-array"),
+      None => return format_err!("TypeError: reduceRight called on non-array"),
       Some(ad) => ad,
     };
 
     if self.array_i == 0 {
       match &self.value {
         None => {
-          std::panic!(
-            "Not implemented: exception: reduceRight of empty array with no initial value"
-          );
+          return format_err!("TypeError: reduceRight of empty array with no initial value");
         }
         Some(value) => {
           return Ok(FrameStepOk::Pop(CallResult {
@@ -77,18 +76,16 @@ impl StackFrameTrait for ReduceRightFrame {
 
     let el = &array_data.elements[array_i];
 
-    match el {
-      Val::Void => {
-        return Ok(FrameStepOk::Continue);
-      }
+    Ok(match el {
+      Val::Void => FrameStepOk::Continue,
       _ => match &self.value {
         None => {
           self.value = Some(el.clone());
-          return Ok(FrameStepOk::Continue);
+          FrameStepOk::Continue
         }
         Some(value) => match self.reducer.load_function() {
           LoadFunctionResult::NotAFunction => {
-            std::panic!("Not implemented: exception: reduceRight fn is not a function")
+            return format_err!("TpeError: reduceRight fn is not a function")
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
             self.value = Some(native_fn(
@@ -101,18 +98,18 @@ impl StackFrameTrait for ReduceRightFrame {
               ],
             )?);
 
-            return Ok(FrameStepOk::Continue);
+            FrameStepOk::Continue
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             new_frame.write_param(value.clone());
             new_frame.write_param(el.clone());
             new_frame.write_param(Val::Number(array_i as f64));
             new_frame.write_param(Val::Array(array_data.clone()));
-            return Ok(FrameStepOk::Push(new_frame));
+            FrameStepOk::Push(new_frame)
           }
         },
       },
-    };
+    })
   }
 
   fn apply_call_result(&mut self, call_result: CallResult) {
@@ -120,6 +117,6 @@ impl StackFrameTrait for ReduceRightFrame {
   }
 
   fn get_call_result(&mut self) -> CallResult {
-    std::panic!("Not appropriate for ReduceRightFrame")
+    panic!("Not appropriate for ReduceRightFrame")
   }
 }
