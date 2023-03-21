@@ -340,7 +340,11 @@ static INCLUDES: NativeFunction = NativeFunction {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
         for elem in &array_data.elements {
-          if op_triple_eq_impl(elem.clone(), search_param.clone()) {
+          let is_eq = op_triple_eq_impl(elem.clone(), search_param.clone())
+            .map_err(|e| e.val_to_string())
+            .unwrap(); // TODO: Exception
+
+          if is_eq {
             return Val::Bool(true);
           }
         }
@@ -359,7 +363,11 @@ static INDEX_OF: NativeFunction = NativeFunction {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
         for i in 0..array_data.elements.len() {
-          if op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone()) {
+          let is_eq = op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone())
+            .map_err(|e| e.val_to_string())
+            .unwrap(); // TODO: Exception
+
+          if is_eq {
             return Val::Number(i as f64);
           }
         }
@@ -429,7 +437,11 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
         for i in (0..array_data.elements.len()).rev() {
-          if op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone()) {
+          let is_eq = op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone())
+            .map_err(|e| e.val_to_string())
+            .unwrap(); // TODO: Exception
+
+          if is_eq {
             return Val::Number(i as f64);
           }
         }

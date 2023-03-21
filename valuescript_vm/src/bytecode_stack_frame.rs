@@ -30,15 +30,20 @@ impl BytecodeStackFrame {
     }
   }
 
-  pub fn apply_binary_op(&mut self, op: fn(left: Val, right: Val) -> Val) {
+  pub fn apply_binary_op(
+    &mut self,
+    op: fn(left: Val, right: Val) -> Result<Val, Val>,
+  ) -> Result<(), Val> {
     let left = self.decoder.decode_val(&self.registers);
     let right = self.decoder.decode_val(&self.registers);
 
     let register_index = self.decoder.decode_register_index();
 
     if register_index.is_some() {
-      self.registers[register_index.unwrap()] = op(left, right);
+      self.registers[register_index.unwrap()] = op(left, right)?;
     }
+
+    Ok(())
   }
 
   pub fn transfer_parameters(&mut self, new_frame: &mut StackFrame) {
@@ -110,52 +115,52 @@ impl StackFrameTrait for BytecodeStackFrame {
       OpInc => {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut val = self.registers[register_index].clone();
-        val = operations::op_plus(val, Val::Number(1_f64));
+        val = operations::op_plus(val, Val::Number(1_f64))?; // TODO: BigInt
         self.registers[register_index] = val;
       }
 
       OpDec => {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut val = self.registers[register_index].clone();
-        val = operations::op_minus(val, Val::Number(1_f64));
+        val = operations::op_minus(val, Val::Number(1_f64))?; // TODO: BigInt
         self.registers[register_index] = val;
       }
 
-      OpPlus => self.apply_binary_op(operations::op_plus),
-      OpMinus => self.apply_binary_op(operations::op_minus),
-      OpMul => self.apply_binary_op(operations::op_mul),
-      OpDiv => self.apply_binary_op(operations::op_div),
-      OpMod => self.apply_binary_op(operations::op_mod),
-      OpExp => self.apply_binary_op(operations::op_exp),
-      OpEq => self.apply_binary_op(operations::op_eq),
-      OpNe => self.apply_binary_op(operations::op_ne),
-      OpTripleEq => self.apply_binary_op(operations::op_triple_eq),
-      OpTripleNe => self.apply_binary_op(operations::op_triple_ne),
-      OpAnd => self.apply_binary_op(operations::op_and),
-      OpOr => self.apply_binary_op(operations::op_or),
+      OpPlus => self.apply_binary_op(operations::op_plus)?,
+      OpMinus => self.apply_binary_op(operations::op_minus)?,
+      OpMul => self.apply_binary_op(operations::op_mul)?,
+      OpDiv => self.apply_binary_op(operations::op_div)?,
+      OpMod => self.apply_binary_op(operations::op_mod)?,
+      OpExp => self.apply_binary_op(operations::op_exp)?,
+      OpEq => self.apply_binary_op(operations::op_eq)?,
+      OpNe => self.apply_binary_op(operations::op_ne)?,
+      OpTripleEq => self.apply_binary_op(operations::op_triple_eq)?,
+      OpTripleNe => self.apply_binary_op(operations::op_triple_ne)?,
+      OpAnd => self.apply_binary_op(operations::op_and)?,
+      OpOr => self.apply_binary_op(operations::op_or)?,
 
       OpNot => self.apply_unary_op(operations::op_not),
 
-      OpLess => self.apply_binary_op(operations::op_less),
-      OpLessEq => self.apply_binary_op(operations::op_less_eq),
-      OpGreater => self.apply_binary_op(operations::op_greater),
-      OpGreaterEq => self.apply_binary_op(operations::op_greater_eq),
-      OpNullishCoalesce => self.apply_binary_op(operations::op_nullish_coalesce),
-      OpOptionalChain => self.apply_binary_op(operations::op_optional_chain),
-      OpBitAnd => self.apply_binary_op(operations::op_bit_and),
-      OpBitOr => self.apply_binary_op(operations::op_bit_or),
+      OpLess => self.apply_binary_op(operations::op_less)?,
+      OpLessEq => self.apply_binary_op(operations::op_less_eq)?,
+      OpGreater => self.apply_binary_op(operations::op_greater)?,
+      OpGreaterEq => self.apply_binary_op(operations::op_greater_eq)?,
+      OpNullishCoalesce => self.apply_binary_op(operations::op_nullish_coalesce)?,
+      OpOptionalChain => self.apply_binary_op(operations::op_optional_chain)?,
+      OpBitAnd => self.apply_binary_op(operations::op_bit_and)?,
+      OpBitOr => self.apply_binary_op(operations::op_bit_or)?,
 
       OpBitNot => self.apply_unary_op(operations::op_bit_not),
 
-      OpBitXor => self.apply_binary_op(operations::op_bit_xor),
-      OpLeftShift => self.apply_binary_op(operations::op_left_shift),
-      OpRightShift => self.apply_binary_op(operations::op_right_shift),
-      OpRightShiftUnsigned => self.apply_binary_op(operations::op_right_shift_unsigned),
+      OpBitXor => self.apply_binary_op(operations::op_bit_xor)?,
+      OpLeftShift => self.apply_binary_op(operations::op_left_shift)?,
+      OpRightShift => self.apply_binary_op(operations::op_right_shift)?,
+      OpRightShiftUnsigned => self.apply_binary_op(operations::op_right_shift_unsigned)?,
 
       TypeOf => self.apply_unary_op(operations::op_typeof),
 
-      InstanceOf => self.apply_binary_op(operations::op_instance_of),
-      In => self.apply_binary_op(operations::op_in),
+      InstanceOf => self.apply_binary_op(operations::op_instance_of)?,
+      In => self.apply_binary_op(operations::op_in)?,
 
       Call => {
         let fn_ = self.decoder.decode_val(&self.registers);
@@ -244,7 +249,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         }
       }
 
-      Sub => self.apply_binary_op(operations::op_sub),
+      Sub => self.apply_binary_op(operations::op_sub)?,
 
       SubMov => {
         let subscript = self.decoder.decode_val(&self.registers);
@@ -253,7 +258,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut target = self.registers[register_index].clone(); // TODO: Lift
 
-        operations::op_submov(&mut target, subscript, value);
+        operations::op_submov(&mut target, subscript, value)?;
         self.registers[register_index] = target;
       }
 
@@ -275,7 +280,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             ThisArg::Val(val) => val.clone(),
           },
           subscript,
-        );
+        )?;
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {

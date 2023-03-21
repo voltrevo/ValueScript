@@ -333,11 +333,15 @@ impl ValTrait for Val {
 
   fn sub(&self, key: Val) -> Val {
     // TODO: Avoid cloning?
-    return op_sub(self.clone(), key);
+    op_sub(self.clone(), key)
+      .map_err(|e| e.val_to_string())
+      .unwrap() // TODO: Exception
   }
 
   fn submov(&mut self, key: Val, value: Val) {
-    op_submov(self, key, value);
+    op_submov(self, key, value)
+      .map_err(|e| e.val_to_string())
+      .unwrap() // TODO: Exception
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -122,6 +122,8 @@ static FROM: NativeFunction = NativeFunction {
           first_param.clone(),
           Val::String(Rc::new("length".to_string())),
         )
+        .map_err(|e| e.val_to_string())
+        .unwrap() // TODO: Exception
         .to_number();
 
         if len.is_sign_negative() || len.is_nan() {
@@ -139,7 +141,11 @@ static FROM: NativeFunction = NativeFunction {
         // TODO: We should probably use a frame and step through this
         // Also using op_sub is slow. Should write specialized stuff instead.
         for i in 0..len {
-          arr.push(op_sub(first_param.clone(), Val::Number(i as f64)));
+          arr.push(
+            op_sub(first_param.clone(), Val::Number(i as f64))
+              .map_err(|e| e.val_to_string())
+              .unwrap(), // TODO: Exception
+          );
         }
 
         Val::Array(Rc::new(VsArray::from(arr)))
