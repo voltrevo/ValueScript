@@ -1,6 +1,7 @@
 mod array_builtin;
 mod boolean_builtin;
 mod debug_builtin;
+mod error_builtin;
 mod math_builtin;
 mod number_builtin;
 mod string_builtin;
@@ -20,4 +21,5 @@ pub static BUILTIN_VALS: [&'static (dyn ValTrait + Sync); BUILTIN_COUNT] = [
   &number_builtin::IS_NAN,
   &number_builtin::PARSE_FLOAT,
   &number_builtin::PARSE_INT,
+  &error_builtin::ERROR_BUILTIN,
 ];

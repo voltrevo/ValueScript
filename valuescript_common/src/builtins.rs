@@ -21,6 +21,8 @@ pub enum BuiltinName {
 
   #[allow(non_camel_case_types)]
   parseInt,
+
+  Error,
 }
 
 pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
@@ -34,6 +36,7 @@ pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
   "isNaN",
   "parseFloat",
   "parseInt",
+  "Error",
 ];
 
 pub const BUILTIN_COUNT: usize = BuiltinName::COUNT;

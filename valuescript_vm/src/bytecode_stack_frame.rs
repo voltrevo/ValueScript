@@ -4,6 +4,7 @@ use valuescript_common::InstructionByte;
 
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
+use crate::format_val;
 use crate::operations;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
@@ -348,7 +349,7 @@ impl StackFrameTrait for BytecodeStackFrame {
           .decoder
           .decode_val(&self.registers)
           .as_class_data()
-          .expect("Not implemented: throw exception (not constructible)");
+          .ok_or(format_val!("TypeError: value is not a constructor"))?;
 
         let mut instance = Val::Object(Rc::new(VsObject {
           string_map: Default::default(),

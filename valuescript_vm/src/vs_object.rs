@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use super::operations::op_sub;
 use super::vs_value::{Val, ValTrait};
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct VsObject {
   pub string_map: BTreeMap<String, Val>,
   pub prototype: Option<Val>,

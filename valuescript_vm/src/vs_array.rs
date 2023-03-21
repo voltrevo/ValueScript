@@ -16,7 +16,7 @@ use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VsArray {
   pub elements: Vec<Val>,
   pub object: VsObject,

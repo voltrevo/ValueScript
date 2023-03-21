@@ -1,3 +1,4 @@
+use core::fmt;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -5,14 +6,15 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
-use super::operations::{op_sub, op_submov};
-use super::stack_frame::StackFrame;
-use super::vs_array::VsArray;
-use super::vs_class::VsClass;
-use super::vs_function::VsFunction;
-use super::vs_object::VsObject;
+use crate::format_val;
+use crate::operations::{op_sub, op_submov};
+use crate::stack_frame::StackFrame;
+use crate::vs_array::VsArray;
+use crate::vs_class::VsClass;
+use crate::vs_function::VsFunction;
+use crate::vs_object::VsObject;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Val {
   Void,
   Undefined,
@@ -73,6 +75,14 @@ pub trait ValTrait {
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
   fn codify(&self) -> String;
+}
+
+impl fmt::Debug for dyn ValTrait {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "(dyn ValTrait)(")?;
+    self.fmt(f)?;
+    write!(f, ")")
+  }
 }
 
 impl ValTrait for Val {
@@ -313,6 +323,7 @@ impl ValTrait for Val {
 
     return match self {
       Class(class) => Some(class.clone()),
+      Static(s) => s.as_class_data(),
       Custom(val) => val.as_class_data(),
 
       _ => None,
@@ -374,11 +385,26 @@ impl ValTrait for Val {
         }
       }
       Val::Object(object) => {
-        if object.string_map.len() == 0 {
-          return "{}".into();
+        let mut res = String::new();
+
+        if let Some(proto) = &object.prototype {
+          match op_sub(proto.clone(), format_val!("name")) {
+            Ok(name) => {
+              if name.typeof_() == VsType::String {
+                res += format!("{} ", name.val_to_string()).as_str();
+              }
+            }
+            Err(_) => {}
+          }
         }
 
-        let mut res = "{".into();
+        if object.string_map.len() == 0 {
+          res += "{}";
+          return res;
+        }
+
+        res += "{";
+
         let mut first = true;
 
         for (k, v) in &object.string_map {
@@ -437,6 +463,17 @@ impl std::fmt::Display for Val {
         write!(f, " ]")
       }
       Val::Object(object) => {
+        if let Some(proto) = &object.prototype {
+          match op_sub(proto.clone(), format_val!("name")) {
+            Ok(name) => {
+              if name.typeof_() == VsType::String {
+                write!(f, "{} ", name.val_to_string())?;
+              }
+            }
+            Err(_) => {}
+          }
+        }
+
         if object.string_map.len() == 0 {
           return f.write_str("{}");
         }
