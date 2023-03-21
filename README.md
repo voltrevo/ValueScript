@@ -467,7 +467,6 @@ not the subset of ValueScript that has actually been implemented.
   - JS: `-> false`
   - This is a value semantics thing - objects don't have identity
 - Catching exceptions
-- Error (and TypeError, RangeError, etc)
 - Enforcing `const`
 - Temporal dead zones
 - Iterators
