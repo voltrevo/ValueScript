@@ -9,10 +9,11 @@ use crate::format_val;
 use crate::native_function::NativeFunction;
 use crate::number_methods::op_sub_number;
 use crate::string_methods::op_sub_string;
-
-use super::vs_value::Val;
-use super::vs_value::ValTrait;
-use super::vs_value::VsType;
+use crate::vs_value::Val;
+use crate::vs_value::ValTrait;
+use crate::vs_value::VsType;
+use crate::{builtins::range_error_builtin::to_range_error, range_error};
+use crate::{builtins::type_error_builtin::to_type_error, type_error};
 
 pub fn op_plus(left: Val, right: Val) -> Result<Val, Val> {
   let left_prim = left.to_primitive();
@@ -73,7 +74,7 @@ pub fn op_mul(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint * right_bigint)),
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => Ok(Val::Number(left.to_number() * right.to_number())),
   }
@@ -83,7 +84,7 @@ pub fn op_div(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint / right_bigint)),
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => Ok(Val::Number(left.to_number() / right.to_number())),
   }
@@ -93,7 +94,7 @@ pub fn op_mod(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint % right_bigint)),
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => Ok(Val::Number(left.to_number() % right.to_number())),
   }
@@ -103,18 +104,18 @@ pub fn op_exp(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => {
       if right_bigint.sign() == Sign::Minus {
-        return format_err!("RangeError: Exponent must be non-negative");
+        return range_error!("Exponent must be non-negative");
       }
 
       let exp = match right_bigint.to_u32() {
         Some(exp) => exp,
-        None => return format_err!("RangeError: Exponent must be less than 2^32"),
+        None => return range_error!("Exponent must be less than 2^32"),
       };
 
       Ok(Val::BigInt(left_bigint.pow(exp)))
     }
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => Ok(Val::Number(left.to_number().powf(right.to_number()))),
   }
@@ -274,7 +275,7 @@ pub fn op_bit_and(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint & right_bigint)),
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => {
       let res_i32 = to_i32(left.to_number()) & to_i32(right.to_number());
@@ -287,7 +288,7 @@ pub fn op_bit_or(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint | right_bigint)),
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => {
       let res_i32 = to_i32(left.to_number()) | to_i32(right.to_number());
@@ -310,7 +311,7 @@ pub fn op_bit_xor(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint ^ right_bigint)),
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => {
       let res_i32 = to_i32(left.to_number()) ^ to_i32(right.to_number());
@@ -325,7 +326,7 @@ pub fn op_left_shift(left: Val, right: Val) -> Result<Val, Val> {
       left_bigint << right_bigint.to_i64().expect("TODO"),
     )),
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => {
       let res_i32 = to_i32(left.to_number()) << (to_u32(right.to_number()) & 0x1f);
@@ -341,7 +342,7 @@ pub fn op_right_shift(left: Val, right: Val) -> Result<Val, Val> {
       Ok(Val::BigInt(left_bigint >> right_i64))
     }
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => {
       let res_i32 = to_i32(left.to_number()) >> (to_u32(right.to_number()) & 0x1f);
@@ -353,10 +354,10 @@ pub fn op_right_shift(left: Val, right: Val) -> Result<Val, Val> {
 pub fn op_right_shift_unsigned(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(_), Some(_)) => {
-      format_err!("TypeError: BigInts don't support unsigned right shift")
+      type_error!("BigInts don't support unsigned right shift")
     }
     (Some(_), None) | (None, Some(_)) => {
-      format_err!("TypeError: Cannot mix BigInt with other types")
+      type_error!("Cannot mix BigInt with other types")
     }
     _ => {
       let res_u32 = to_u32(left.to_number()) >> (to_u32(right.to_number()) & 0x1f);
@@ -393,8 +394,8 @@ pub fn op_in(_left: Val, _right: Val) -> Result<Val, Val> {
 pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
   return match left {
     Val::Void => format_err!("Internal: Shouldn't happen"), // TODO: Internal errors
-    Val::Undefined => format_err!("TypeError: Cannot subscript undefined"),
-    Val::Null => format_err!("TypeError: Cannot subscript null"),
+    Val::Undefined => type_error!("Cannot subscript undefined"),
+    Val::Null => type_error!("Cannot subscript null"),
     Val::Bool(_) => Ok(match right.val_to_string().as_str() {
       "toString" => Val::Static(&BOOL_TO_STRING),
       "valueOf" => Val::Static(&BOOL_VALUE_OF),

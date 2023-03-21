@@ -2,13 +2,14 @@ use std::rc::Rc;
 
 use valuescript_common::InstructionByte;
 
+use crate::builtins::type_error_builtin::to_type_error;
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
-use crate::format_val;
 use crate::operations;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, StackFrame, StackFrameTrait};
+use crate::type_error;
 use crate::vs_object::VsObject;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
@@ -345,11 +346,12 @@ impl StackFrameTrait for BytecodeStackFrame {
       New => {
         // TODO: new Array
 
-        let class = self
-          .decoder
-          .decode_val(&self.registers)
-          .as_class_data()
-          .ok_or(format_val!("TypeError: value is not a constructor"))?;
+        let class = match self.decoder.decode_val(&self.registers).as_class_data() {
+          Some(class) => class,
+          None => {
+            return type_error!("value is not a constructor");
+          }
+        };
 
         let mut instance = Val::Object(Rc::new(VsObject {
           string_map: Default::default(),

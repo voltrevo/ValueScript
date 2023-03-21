@@ -15,6 +15,7 @@ use crate::operations::op_triple_eq_impl;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
+use crate::{builtins::type_error_builtin::to_type_error, type_error};
 
 #[derive(Clone, Debug)]
 pub struct VsArray {
@@ -135,7 +136,7 @@ impl ValTrait for ArrayPrototype {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    format_err!("TypeError: Cannot assign to subscript of Array.prototype")
+    type_error!("Cannot assign to subscript of Array.prototype")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

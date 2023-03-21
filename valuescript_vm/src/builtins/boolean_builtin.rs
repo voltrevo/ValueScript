@@ -3,7 +3,8 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::{
-  format_err,
+  builtins::type_error_builtin::to_type_error,
+  type_error,
   vs_array::VsArray,
   vs_class::VsClass,
   vs_object::VsObject,
@@ -65,7 +66,7 @@ impl ValTrait for BooleanBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    format_err!("TypeError: Cannot assign to subscript of Boolean builtin")
+    type_error!("Cannot assign to subscript of Boolean builtin")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

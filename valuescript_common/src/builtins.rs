@@ -23,6 +23,8 @@ pub enum BuiltinName {
   parseInt,
 
   Error,
+  TypeError,
+  RangeError,
 }
 
 pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
@@ -37,6 +39,8 @@ pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
   "parseFloat",
   "parseInt",
   "Error",
+  "TypeError",
+  "RangeError",
 ];
 
 pub const BUILTIN_COUNT: usize = BuiltinName::COUNT;

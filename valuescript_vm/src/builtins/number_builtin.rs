@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::{builtins::type_error_builtin::to_type_error, type_error};
 use crate::{
-  format_err,
   native_function::NativeFunction,
   vs_array::VsArray,
   vs_class::VsClass,
@@ -82,7 +82,7 @@ impl ValTrait for NumberBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    format_err!("TypeError: Cannot assign to subscript of Number builtin")
+    type_error!("Cannot assign to subscript of Number builtin")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

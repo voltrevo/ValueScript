@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::format_err;
 use crate::native_function::NativeFunction;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
+use crate::{builtins::type_error_builtin::to_type_error, type_error};
 
 pub struct DebugBuiltin {}
 
@@ -69,7 +69,7 @@ impl ValTrait for DebugBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    format_err!("TypeError: Cannot assign to subscript of Debug builtin")
+    type_error!("Cannot assign to subscript of Debug builtin")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

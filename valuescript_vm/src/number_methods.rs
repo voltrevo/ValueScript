@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
   format_err, format_val,
   native_function::NativeFunction,
@@ -39,7 +40,7 @@ static TO_FIXED: NativeFunction = NativeFunction {
         precision = f64::floor(precision);
 
         if precision < 1.0 || precision > 100.0 {
-          return format_err!("RangeError: precision must be between 1 and 100");
+          return range_error!("precision must be between 1 and 100");
         }
 
         format_val!("{:.*}", precision as usize, number)
@@ -58,7 +59,7 @@ static TO_EXPONENTIAL: NativeFunction = NativeFunction {
           precision = f64::floor(precision);
 
           if precision < 0.0 || precision > 100.0 {
-            return format_err!("RangeError: precision must be between 0 and 100");
+            return range_error!("precision must be between 0 and 100");
           }
 
           format_exponential(*number, Some(precision as usize))

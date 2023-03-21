@@ -2,8 +2,9 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::{builtins::range_error_builtin::to_range_error, range_error};
+use crate::{builtins::type_error_builtin::to_type_error, type_error};
 use crate::{
-  format_err,
   native_function::NativeFunction,
   vs_array::VsArray,
   vs_class::VsClass,
@@ -74,7 +75,7 @@ impl ValTrait for StringBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    format_err!("TypeError: Cannot assign to subscript of String builtin")
+    type_error!("Cannot assign to subscript of String builtin")
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -95,7 +96,7 @@ static FROM_CODE_POINT: NativeFunction = NativeFunction {
 
       let char = match std::char::from_u32(code_point) {
         Some(c) => c,
-        None => return format_err!("RangeError: Invalid code point"),
+        None => return range_error!("Invalid code point"),
       };
 
       result.push(char);

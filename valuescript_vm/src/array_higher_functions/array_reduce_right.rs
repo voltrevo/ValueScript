@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
-use crate::format_err;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrameTrait};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
+use crate::{builtins::type_error_builtin::to_type_error, format_err, type_error};
 
 pub static REDUCE_RIGHT: NativeFrameFunction = NativeFrameFunction {
   make_frame: || {
@@ -53,14 +53,14 @@ impl StackFrameTrait for ReduceRightFrame {
 
   fn step(&mut self) -> FrameStepResult {
     let array_data = match &self.this {
-      None => return format_err!("TypeError: reduceRight called on non-array"),
+      None => return type_error!("reduceRight called on non-array"),
       Some(ad) => ad,
     };
 
     if self.array_i == 0 {
       match &self.value {
         None => {
-          return format_err!("TypeError: reduceRight of empty array with no initial value");
+          return type_error!("reduceRight of empty array with no initial value");
         }
         Some(value) => {
           return Ok(FrameStepOk::Pop(CallResult {

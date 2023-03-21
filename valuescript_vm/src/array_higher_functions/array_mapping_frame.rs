@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
-use crate::format_err;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
+use crate::{builtins::type_error_builtin::to_type_error, type_error};
 
 pub trait ArrayMappingState {
   fn process(&mut self, i: usize, element: &Val, mapped: Val) -> Option<Val>;
@@ -58,7 +58,7 @@ impl StackFrameTrait for ArrayMappingFrame {
 
   fn step(&mut self) -> FrameStepResult {
     let array_data = match &self.this {
-      None => return format_err!("TypeError: Array fn called on non-array"),
+      None => return type_error!("Array fn called on non-array"),
       Some(ad) => ad,
     };
 
@@ -79,7 +79,7 @@ impl StackFrameTrait for ArrayMappingFrame {
         Val::Void => Ok(FrameStepOk::Continue),
         _ => match self.mapper.load_function() {
           LoadFunctionResult::NotAFunction => {
-            format_err!("TypeError: map fn is not a function")
+            type_error!("map fn is not a function")
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
             match self.state.process(
@@ -122,7 +122,7 @@ impl StackFrameTrait for ArrayMappingFrame {
 
     let element = match &self.this {
       None => {
-        self.early_exit = Some(format_err!("TypeError: Array fn called on non-array"));
+        self.early_exit = Some(type_error!("Array fn called on non-array"));
         return;
       }
       Some(ad) => &ad.elements[array_i],

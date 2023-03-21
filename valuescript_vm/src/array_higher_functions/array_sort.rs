@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use crate::format_err;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
+use crate::{builtins::type_error_builtin::to_type_error, type_error};
 
 pub static SORT: NativeFrameFunction = NativeFrameFunction {
   make_frame: || {
@@ -223,7 +223,7 @@ impl StackFrameTrait for SortFrame {
   fn step(&mut self) -> FrameStepResult {
     if !self.started {
       let array_data = match &mut self.this {
-        None => return format_err!("TypeError: array fn called on non-array"),
+        None => return type_error!("array fn called on non-array"),
         Some(ad) => ad,
       };
 
@@ -268,7 +268,7 @@ impl StackFrameTrait for SortFrame {
       },
       Some((left, right)) => match self.comparator.load_function() {
         LoadFunctionResult::NotAFunction => {
-          return format_err!("TypeError: comparator is not a function");
+          return type_error!("comparator is not a function");
         }
         LoadFunctionResult::NativeFunction(native_fn) => {
           let res = native_fn(&mut Val::Undefined, vec![left, right])?.to_number();

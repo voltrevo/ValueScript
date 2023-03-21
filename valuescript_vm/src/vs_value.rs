@@ -391,7 +391,7 @@ impl ValTrait for Val {
           match op_sub(proto.clone(), format_val!("name")) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
-                res += format!("{} ", name.val_to_string()).as_str();
+                res += format!("{}", name.val_to_string()).as_str();
               }
             }
             Err(_) => {}
