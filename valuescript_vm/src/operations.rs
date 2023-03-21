@@ -30,9 +30,7 @@ pub fn op_plus(left: Val, right: Val) -> Result<Val, Val> {
 
   if left_type == VsType::BigInt || right_type == VsType::BigInt {
     if left_type != right_type {
-      return Err(Val::String(Rc::new(
-        "TypeError: Cannot mix BigInt and other types".to_string(),
-      )));
+      return type_error!("Cannot mix BigInt and other types");
     }
 
     match (left_prim.as_bigint_data(), right_prim.as_bigint_data()) {
@@ -56,9 +54,7 @@ pub fn op_unary_plus(input: Val) -> Val {
 pub fn op_minus(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint - right_bigint)),
-    (Some(_), None) | (None, Some(_)) => Err(Val::String(Rc::new(
-      "TypeError: Cannot mix BigInt with other types".to_string(),
-    ))),
+    (Some(_), None) | (None, Some(_)) => return type_error!("Cannot mix BigInt with other types"),
     _ => Ok(Val::Number(left.to_number() - right.to_number())),
   }
 }
