@@ -104,7 +104,7 @@ impl Assembler {
       }
     }
 
-    self.output.push(Instruction::End.byte());
+    self.output.push(Instruction::End.byte() as u8);
 
     // TODO: Handle >255 registers
     // +3: return, this, ignore
@@ -131,7 +131,7 @@ impl Assembler {
       }
     }
 
-    self.output.push(Instruction::End.byte());
+    self.output.push(Instruction::End.byte() as u8);
 
     // TODO: Handle >255 registers
     // +3: return, this, ignore
@@ -157,7 +157,7 @@ impl Assembler {
   fn instruction(&mut self, instruction: &Instruction) {
     use Instruction::*;
 
-    self.output.push(instruction.byte());
+    self.output.push(instruction.byte() as u8);
 
     match instruction {
       End => {}
@@ -222,6 +222,9 @@ impl Assembler {
       JmpIf(value, label_ref) => {
         self.value(value);
         self.label_ref(label_ref);
+      }
+      Throw(value) => {
+        self.value(value);
       }
     }
   }

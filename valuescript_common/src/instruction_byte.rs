@@ -44,6 +44,9 @@ pub enum InstructionByte {
   UnaryPlus = 0x29,
   UnaryMinus = 0x2a,
   New = 0x2b,
+  Throw = 0x2c,
+  Import = 0x2d,
+  ImportStar = 0x2e,
 }
 
 impl InstructionByte {
@@ -95,6 +98,9 @@ impl InstructionByte {
       0x29 => UnaryPlus,
       0x2a => UnaryMinus,
       0x2b => New,
+      0x2c => Throw,
+      0x2d => Import,
+      0x2e => ImportStar,
 
       _ => panic!("Unrecognized instruction: {}", byte),
     };

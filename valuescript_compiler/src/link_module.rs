@@ -243,7 +243,8 @@ where
       | UnaryPlus(arg, _)
       | UnaryMinus(arg, _)
       | Import(arg, _)
-      | ImportStar(arg, _) => {
+      | ImportStar(arg, _)
+      | Throw(arg) => {
         self.value(Some(owner), arg);
       }
       OpPlus(arg1, arg2, _)

@@ -219,6 +219,9 @@ impl<'a> AssemblyParser<'a> {
       ("unary+", InstructionByte::UnaryPlus),
       ("unary-", InstructionByte::UnaryMinus),
       ("new", InstructionByte::New),
+      ("throw", InstructionByte::Throw),
+      ("import", InstructionByte::Import),
+      ("import*", InstructionByte::ImportStar),
     ]);
 
     for (word, instruction) in instruction_word_map {
@@ -645,6 +648,9 @@ impl<'a> AssemblyParser<'a> {
         self.assemble_value(),
         self.assemble_register(),
       ),
+      Throw => Instruction::Throw(self.assemble_value()),
+      Import => Instruction::Import(self.assemble_value(), self.assemble_register()),
+      ImportStar => Instruction::ImportStar(self.assemble_value(), self.assemble_register()),
     }
   }
 

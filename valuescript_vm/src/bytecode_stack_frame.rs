@@ -392,9 +392,18 @@ impl StackFrameTrait for BytecodeStackFrame {
           },
         };
       }
+
+      Throw => {
+        let error = self.decoder.decode_val(&self.registers);
+        return Err(error);
+      }
+
+      Import | ImportStar => {
+        panic!("TODO: Dynamic imports")
+      }
     };
 
-    return Ok(FrameStepOk::Continue);
+    Ok(FrameStepOk::Continue)
   }
 
   fn apply_call_result(&mut self, call_result: CallResult) {

@@ -1,4 +1,5 @@
 use num_bigint::BigInt;
+use valuescript_common::InstructionByte;
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -281,6 +282,7 @@ pub enum Instruction {
   UnaryPlus(Value, Register),
   UnaryMinus(Value, Register),
   New(Value, Value, Register),
+  Throw(Value),
   Import(Value, Register),
   ImportStar(Value, Register),
 }
@@ -412,6 +414,7 @@ impl std::fmt::Display for Instruction {
       Instruction::New(value, args, register) => {
         write!(f, "new {} {} {}", value, args, register)
       }
+      Instruction::Throw(value) => write!(f, "throw {}", value),
       Instruction::Import(value, register) => {
         write!(f, "import {} {}", value, register)
       }
@@ -423,57 +426,58 @@ impl std::fmt::Display for Instruction {
 }
 
 impl Instruction {
-  pub fn byte(&self) -> u8 {
+  pub fn byte(&self) -> InstructionByte {
     use Instruction::*;
 
     // TODO: Define this in one place only
     match self {
-      End => 0x00,
-      Mov(..) => 0x01,
-      OpInc(..) => 0x02,
-      OpDec(..) => 0x03,
-      OpPlus(..) => 0x04,
-      OpMinus(..) => 0x05,
-      OpMul(..) => 0x06,
-      OpDiv(..) => 0x07,
-      OpMod(..) => 0x08,
-      OpExp(..) => 0x09,
-      OpEq(..) => 0x0a,
-      OpNe(..) => 0x0b,
-      OpTripleEq(..) => 0x0c,
-      OpTripleNe(..) => 0x0d,
-      OpAnd(..) => 0x0e,
-      OpOr(..) => 0x0f,
-      OpNot(..) => 0x10,
-      OpLess(..) => 0x11,
-      OpLessEq(..) => 0x12,
-      OpGreater(..) => 0x13,
-      OpGreaterEq(..) => 0x14,
-      OpNullishCoalesce(..) => 0x15,
-      OpOptionalChain(..) => 0x16,
-      OpBitAnd(..) => 0x17,
-      OpBitOr(..) => 0x18,
-      OpBitNot(..) => 0x19,
-      OpBitXor(..) => 0x1a,
-      OpLeftShift(..) => 0x1b,
-      OpRightShift(..) => 0x1c,
-      OpRightShiftUnsigned(..) => 0x1d,
-      TypeOf(..) => 0x1e,
-      InstanceOf(..) => 0x1f,
-      In(..) => 0x20,
-      Call(..) => 0x21,
-      Apply(..) => 0x22,
-      Bind(..) => 0x23,
-      Sub(..) => 0x24,
-      SubMov(..) => 0x25,
-      SubCall(..) => 0x26,
-      Jmp(..) => 0x27,
-      JmpIf(..) => 0x28,
-      UnaryPlus(..) => 0x29,
-      UnaryMinus(..) => 0x2a,
-      New(..) => 0x2b,
-      Import(..) => 0x2c,
-      ImportStar(..) => 0x2d,
+      End => InstructionByte::End,
+      Mov(..) => InstructionByte::Mov,
+      OpInc(..) => InstructionByte::OpInc,
+      OpDec(..) => InstructionByte::OpDec,
+      OpPlus(..) => InstructionByte::OpPlus,
+      OpMinus(..) => InstructionByte::OpMinus,
+      OpMul(..) => InstructionByte::OpMul,
+      OpDiv(..) => InstructionByte::OpDiv,
+      OpMod(..) => InstructionByte::OpMod,
+      OpExp(..) => InstructionByte::OpExp,
+      OpEq(..) => InstructionByte::OpEq,
+      OpNe(..) => InstructionByte::OpNe,
+      OpTripleEq(..) => InstructionByte::OpTripleEq,
+      OpTripleNe(..) => InstructionByte::OpTripleNe,
+      OpAnd(..) => InstructionByte::OpAnd,
+      OpOr(..) => InstructionByte::OpOr,
+      OpNot(..) => InstructionByte::OpNot,
+      OpLess(..) => InstructionByte::OpLess,
+      OpLessEq(..) => InstructionByte::OpLessEq,
+      OpGreater(..) => InstructionByte::OpGreater,
+      OpGreaterEq(..) => InstructionByte::OpGreaterEq,
+      OpNullishCoalesce(..) => InstructionByte::OpNullishCoalesce,
+      OpOptionalChain(..) => InstructionByte::OpOptionalChain,
+      OpBitAnd(..) => InstructionByte::OpBitAnd,
+      OpBitOr(..) => InstructionByte::OpBitOr,
+      OpBitNot(..) => InstructionByte::OpBitNot,
+      OpBitXor(..) => InstructionByte::OpBitXor,
+      OpLeftShift(..) => InstructionByte::OpLeftShift,
+      OpRightShift(..) => InstructionByte::OpRightShift,
+      OpRightShiftUnsigned(..) => InstructionByte::OpRightShiftUnsigned,
+      TypeOf(..) => InstructionByte::TypeOf,
+      InstanceOf(..) => InstructionByte::InstanceOf,
+      In(..) => InstructionByte::In,
+      Call(..) => InstructionByte::Call,
+      Apply(..) => InstructionByte::Apply,
+      Bind(..) => InstructionByte::Bind,
+      Sub(..) => InstructionByte::Sub,
+      SubMov(..) => InstructionByte::SubMov,
+      SubCall(..) => InstructionByte::SubCall,
+      Jmp(..) => InstructionByte::Jmp,
+      JmpIf(..) => InstructionByte::JmpIf,
+      UnaryPlus(..) => InstructionByte::UnaryPlus,
+      UnaryMinus(..) => InstructionByte::UnaryMinus,
+      New(..) => InstructionByte::New,
+      Throw(..) => InstructionByte::Throw,
+      Import(..) => InstructionByte::Import,
+      ImportStar(..) => InstructionByte::ImportStar,
     }
   }
 }
