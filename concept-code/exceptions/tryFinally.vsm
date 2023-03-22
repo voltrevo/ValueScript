@@ -5,7 +5,7 @@ export @_anon0 {}
   new $Error ["Something went wrong"] %_tmp1
   throw %_tmp1
   unset_catch
-:finally0
+finally0:
   op+ 1 1 %ignore
   throw %_tmp0 // doesn't throw if register contains void
 }

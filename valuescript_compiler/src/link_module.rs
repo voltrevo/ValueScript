@@ -234,8 +234,7 @@ where
     use Instruction::*;
 
     match instruction {
-      End => {}
-      OpInc(_) | OpDec(_) => {}
+      End | UnsetCatch | OpInc(..) | OpDec(..) | Jmp(..) | SetCatch(..) => {}
       Mov(arg, _)
       | OpNot(arg, _)
       | OpBitNot(arg, _)
@@ -286,7 +285,6 @@ where
         self.value(Some(owner), arg2);
         self.value(Some(owner), arg3);
       }
-      Jmp(_) => {}
       JmpIf(arg, _) => {
         self.value(Some(owner), arg);
       }

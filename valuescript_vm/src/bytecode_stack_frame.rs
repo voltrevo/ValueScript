@@ -20,6 +20,12 @@ pub struct BytecodeStackFrame {
   pub param_end: usize,
   pub this_target: Option<usize>,
   pub return_target: Option<usize>,
+  pub catch_setting: Option<CatchSetting>,
+}
+
+pub struct CatchSetting {
+  pub pos: usize,
+  pub register: Option<usize>,
 }
 
 impl BytecodeStackFrame {
@@ -403,6 +409,17 @@ impl StackFrameTrait for BytecodeStackFrame {
 
       Import | ImportStar => {
         panic!("TODO: Dynamic imports")
+      }
+
+      SetCatch => {
+        self.catch_setting = Some(CatchSetting {
+          pos: self.decoder.decode_pos(),
+          register: self.decoder.decode_register_index(),
+        });
+      }
+
+      UnsetCatch => {
+        self.catch_setting = None;
       }
     };
 

@@ -160,7 +160,7 @@ impl Assembler {
     self.output.push(instruction.byte() as u8);
 
     match instruction {
-      End => {}
+      End | UnsetCatch => {}
       OpInc(dst) | OpDec(dst) => {
         self.register(dst);
       }
@@ -225,6 +225,10 @@ impl Assembler {
       }
       Throw(value) => {
         self.value(value);
+      }
+      SetCatch(label_ref, register) => {
+        self.label_ref(label_ref);
+        self.register(register);
       }
     }
   }

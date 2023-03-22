@@ -47,6 +47,8 @@ pub enum InstructionByte {
   Throw = 0x2c,
   Import = 0x2d,
   ImportStar = 0x2e,
+  SetCatch = 0x2f,
+  UnsetCatch = 0x30,
 }
 
 impl InstructionByte {
@@ -101,6 +103,8 @@ impl InstructionByte {
       0x2c => Throw,
       0x2d => Import,
       0x2e => ImportStar,
+      0x2f => SetCatch,
+      0x30 => UnsetCatch,
 
       _ => panic!("Unrecognized instruction: {}", byte),
     };

@@ -14,11 +14,11 @@ export @_anon0 {}
         set_catch :catch0 %error
         jmp :catch_end1
       // } catch (error) {
-      :catch1
+      catch1:
         set_catch :catch0 %error
         sub %error_0 "message" %_tmp0
         subcall %logs "push" [%_tmp0] %ignore
-      :catch_end1
+      catch_end1:
       // }
 
     new $Error ["boom"] %_tmp0
@@ -27,10 +27,10 @@ export @_anon0 {}
     unset_catch
     jmp :catch_end0
   // } catch (error) {
-  :catch0
+  catch0:
     sub %error "message" %_tmp0
     subcall %logs "push" [%_tmp0] %ignore
-  :catch_end0
+  catch_end0:
   // }
 
   mov %logs %return

@@ -50,11 +50,12 @@ impl VsFunction {
         data: self.bytecode.clone(),
         pos: self.start,
       },
-      registers: registers,
+      registers,
       param_start: self.binds.len() + 2,
       param_end: self.parameter_count + 2,
       this_target: None,
       return_target: None,
+      catch_setting: None,
     });
   }
 }

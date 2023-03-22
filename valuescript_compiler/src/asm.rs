@@ -285,6 +285,8 @@ pub enum Instruction {
   Throw(Value),
   Import(Value, Register),
   ImportStar(Value, Register),
+  SetCatch(LabelRef, Register),
+  UnsetCatch,
 }
 
 impl std::fmt::Display for Instruction {
@@ -421,6 +423,10 @@ impl std::fmt::Display for Instruction {
       Instruction::ImportStar(value, register) => {
         write!(f, "import* {} {}", value, register)
       }
+      Instruction::SetCatch(label, register) => {
+        write!(f, "set_catch {} {}", label, register)
+      }
+      Instruction::UnsetCatch => write!(f, "unset_catch"),
     }
   }
 }
@@ -478,6 +484,8 @@ impl Instruction {
       Throw(..) => InstructionByte::Throw,
       Import(..) => InstructionByte::Import,
       ImportStar(..) => InstructionByte::ImportStar,
+      SetCatch(..) => InstructionByte::SetCatch,
+      UnsetCatch => InstructionByte::UnsetCatch,
     }
   }
 }

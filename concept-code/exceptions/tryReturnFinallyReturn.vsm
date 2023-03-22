@@ -7,10 +7,10 @@ export @_anon0 {}
   unset_catch
   jmp :finally0
   unset_catch
-:finally0
+finally0:
   mov 42 %return
   end
   throw %_tmp0
   jmpif %_is_returning :end
-:end
+end:
 }
