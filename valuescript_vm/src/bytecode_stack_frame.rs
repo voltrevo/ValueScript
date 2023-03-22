@@ -446,8 +446,19 @@ impl StackFrameTrait for BytecodeStackFrame {
     panic!("Not appropriate for BytecodeStackFrame")
   }
 
-  fn catch_exception(&mut self, _exception: Val) -> bool {
-    return false; // TODO
+  fn catch_exception(&mut self, exception: Val) -> bool {
+    if let Some(catch_setting) = &self.catch_setting {
+      if let Some(r) = catch_setting.register {
+        self.registers[r] = exception;
+      }
+
+      self.decoder.pos = catch_setting.pos;
+      self.catch_setting = None;
+
+      true
+    } else {
+      false
+    }
   }
 }
 
