@@ -445,6 +445,10 @@ impl StackFrameTrait for BytecodeStackFrame {
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for BytecodeStackFrame")
   }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    return false; // TODO
+  }
 }
 
 enum ThisArg {

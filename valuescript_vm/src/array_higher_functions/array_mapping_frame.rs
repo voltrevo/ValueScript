@@ -137,4 +137,8 @@ impl StackFrameTrait for ArrayMappingFrame {
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for MapFrame")
   }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    return false;
+  }
 }

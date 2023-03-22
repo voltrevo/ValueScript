@@ -36,4 +36,8 @@ impl StackFrameTrait for FirstStackFrame {
   fn get_call_result(&mut self) -> CallResult {
     return self.call_result.clone();
   }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    panic!("Not appropriate for FirstStackFrame");
+  }
 }

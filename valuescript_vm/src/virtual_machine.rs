@@ -50,7 +50,12 @@ impl VirtualMachine {
   }
 
   pub fn step(&mut self) -> Result<(), Val> {
-    match self.frame.step()? {
+    let step_ok = match self.frame.step() {
+      Ok(step_ok) => step_ok,
+      Err(e) => return self.handle_exception(e),
+    };
+
+    match step_ok {
       FrameStepOk::Continue => {}
       FrameStepOk::Pop(call_result) => {
         self.pop();
@@ -73,5 +78,23 @@ impl VirtualMachine {
     // This name is accurate after the swap
     let mut old_frame = self.stack.pop().unwrap();
     std::mem::swap(&mut self.frame, &mut old_frame);
+  }
+
+  pub fn handle_exception(&mut self, exception: Val) -> Result<(), Val> {
+    while !self.stack.is_empty() {
+      let handled = self.frame.catch_exception(exception.clone());
+
+      if handled {
+        return Ok(());
+      }
+
+      if self.stack.is_empty() {
+        return Err(exception);
+      }
+
+      self.pop();
+    }
+
+    Err(exception)
   }
 }

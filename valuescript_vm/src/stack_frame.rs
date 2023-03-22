@@ -22,4 +22,5 @@ pub trait StackFrameTrait {
   fn step(&mut self) -> FrameStepResult;
   fn apply_call_result(&mut self, call_result: CallResult);
   fn get_call_result(&mut self) -> CallResult;
+  fn catch_exception(&mut self, exception: Val) -> bool;
 }

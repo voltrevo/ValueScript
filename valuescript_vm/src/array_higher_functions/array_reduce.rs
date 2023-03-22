@@ -105,4 +105,8 @@ impl StackFrameTrait for ReduceFrame {
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for ReduceFrame")
   }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    return false;
+  }
 }

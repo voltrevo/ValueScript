@@ -304,4 +304,8 @@ impl StackFrameTrait for SortFrame {
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for SortFrame")
   }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    return false;
+  }
 }

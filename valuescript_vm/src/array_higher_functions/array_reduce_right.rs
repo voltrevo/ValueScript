@@ -119,4 +119,8 @@ impl StackFrameTrait for ReduceRightFrame {
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for ReduceRightFrame")
   }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    return false;
+  }
 }
