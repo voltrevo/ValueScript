@@ -9,14 +9,13 @@ use crate::asm::{
   Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Label, Pointer,
   Register, Value,
 };
+use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::expression_compiler::CompiledExpression;
+use crate::expression_compiler::ExpressionCompiler;
+use crate::name_allocator::NameAllocator;
 use crate::scope::scope_reg;
-
-use super::capture_finder::CaptureFinder;
-use super::diagnostic::{Diagnostic, DiagnosticLevel};
-use super::expression_compiler::CompiledExpression;
-use super::expression_compiler::ExpressionCompiler;
-use super::name_allocator::NameAllocator;
-use super::scope::{init_std_scope, MappedName, Scope};
+use crate::scope::{MappedName, Scope};
+use crate::scope_analysis::{OwnerId, ScopeAnalysis};
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
@@ -41,6 +40,7 @@ pub struct LoopLabels {
 pub struct FunctionCompiler {
   pub current: Function,
   pub definitions: Vec<Definition>,
+  pub scope_analysis: Rc<ScopeAnalysis>,
   pub definition_allocator: Rc<RefCell<NameAllocator>>,
   pub reg_allocator: NameAllocator,
   pub label_allocator: NameAllocator,
@@ -50,7 +50,10 @@ pub struct FunctionCompiler {
 }
 
 impl FunctionCompiler {
-  pub fn new(definition_allocator: Rc<RefCell<NameAllocator>>) -> FunctionCompiler {
+  pub fn new(
+    scope_analysis: &Rc<ScopeAnalysis>,
+    definition_allocator: Rc<RefCell<NameAllocator>>,
+  ) -> FunctionCompiler {
     let mut reg_allocator = NameAllocator::default();
     reg_allocator.allocate(&"return".to_string());
     reg_allocator.allocate(&"this".to_string());
@@ -59,6 +62,7 @@ impl FunctionCompiler {
     return FunctionCompiler {
       current: Function::default(),
       definitions: vec![],
+      scope_analysis: scope_analysis.clone(),
       definition_allocator,
       reg_allocator,
       label_allocator: NameAllocator::default(),
@@ -140,10 +144,11 @@ impl FunctionCompiler {
     definition_pointer: Pointer,
     fn_name: Option<String>,
     functionish: Functionish,
+    scope_analysis: &Rc<ScopeAnalysis>,
     definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) -> (Vec<Definition>, Vec<Diagnostic>) {
-    let mut self_ = FunctionCompiler::new(definition_allocator);
+    let mut self_ = FunctionCompiler::new(scope_analysis, definition_allocator);
 
     self_
       .queue
@@ -619,10 +624,20 @@ impl FunctionCompiler {
     let mut direct_captures_map = HashMap::<String, Vec<String>>::new();
 
     for fn_ in &function_decls {
-      let mut cf = CaptureFinder::new(synth_scope.clone());
-      cf.fn_decl(&init_std_scope(), fn_);
+      let owner_id = OwnerId::Span(fn_.function.span);
 
-      direct_captures_map.insert(fn_.ident.sym.to_string(), cf.ordered_names);
+      if let Some(captures) = self.scope_analysis.captures.get(&owner_id) {
+        for name_id in captures {
+          let name = self.scope_analysis.names.get(name_id).unwrap_or_else(|| {
+            panic!("Failed to find name for name_id: {:?}", name_id);
+          });
+
+          direct_captures_map
+            .entry(fn_.ident.sym.to_string())
+            .or_insert_with(Vec::new)
+            .push(name.sym.to_string());
+        }
+      }
     }
 
     for fn_ in &function_decls {

@@ -1,7 +1,6 @@
 mod asm;
 mod assembler;
 mod assembly_parser;
-mod capture_finder;
 mod compile;
 mod constants;
 mod diagnostic;

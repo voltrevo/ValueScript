@@ -71,8 +71,7 @@ pub struct CompilerOutput {
 }
 
 pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
-  let mut compiler = ModuleCompiler::default();
-  compiler.compile_program(&program);
+  let compiler = ModuleCompiler::compile_program(&program);
 
   return CompilerOutput {
     diagnostics: compiler.diagnostics,
@@ -98,6 +97,7 @@ pub fn compile_module(source: &str) -> CompilerOutput {
 struct ModuleCompiler {
   diagnostics: Vec<Diagnostic>,
   definition_allocator: Rc<RefCell<NameAllocator>>,
+  scope_analysis: Rc<ScopeAnalysis>,
   module: Module,
 }
 
@@ -140,19 +140,34 @@ impl ModuleCompiler {
     }
   }
 
-  fn compile_program(&mut self, program: &swc_ecma_ast::Program) {
+  fn compile_program(program: &swc_ecma_ast::Program) -> Self {
     use swc_ecma_ast::Program::*;
 
-    match program {
-      Module(module) => self.compile_module(module),
+    let module = match program {
+      Module(module) => module,
       Script(script) => {
-        self.diagnostics.push(Diagnostic {
+        let mut self_ = Self::default();
+
+        self_.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Scripts are not supported".to_string(),
           span: script.span,
         });
+
+        return self_;
       }
-    }
+    };
+
+    let scope_analysis = ScopeAnalysis::run(module);
+
+    let mut self_ = Self {
+      scope_analysis: Rc::new(scope_analysis),
+      ..Default::default()
+    };
+
+    self_.compile_module(module);
+
+    self_
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
@@ -724,6 +739,7 @@ impl ModuleCompiler {
       defn_pointer,
       fn_name,
       functionish,
+      &self.scope_analysis,
       self.definition_allocator.clone(),
       parent_scope,
     );
@@ -771,7 +787,8 @@ impl ModuleCompiler {
       ));
     }
 
-    let mut member_initializers_fnc = FunctionCompiler::new(self.definition_allocator.clone());
+    let mut member_initializers_fnc =
+      FunctionCompiler::new(&self.scope_analysis, self.definition_allocator.clone());
 
     for class_member in &class.body {
       match class_member {

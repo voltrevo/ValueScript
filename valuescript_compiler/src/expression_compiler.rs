@@ -3,11 +3,10 @@ use queues::*;
 use swc_common::Spanned;
 
 use crate::asm::{Array, Instruction, Label, Object, Pointer, Register, Value};
-
-use super::capture_finder::CaptureFinder;
-use super::diagnostic::{Diagnostic, DiagnosticLevel};
-use super::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
-use super::scope::{init_std_scope, MappedName, Scope};
+use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
+use crate::scope::{MappedName, Scope};
+use crate::scope_analysis::OwnerId;
 
 pub struct CompiledExpression {
   /** It is usually better to access this via functionCompiler.use_ */
@@ -1026,8 +1025,32 @@ impl<'a> ExpressionCompiler<'a> {
       None => self.fnc.allocate_defn_numbered(&"_anon".to_string()),
     };
 
-    let mut cf = CaptureFinder::new(self.scope.clone());
-    cf.fn_expr(&init_std_scope(), fn_);
+    let capture_params: Vec<String> = {
+      let captures = self
+        .fnc
+        .scope_analysis
+        .captures
+        .get(&OwnerId::Span(fn_.function.span));
+
+      match captures {
+        Some(captures) => captures
+          .iter()
+          .map(|capture| {
+            self
+              .fnc
+              .scope_analysis
+              .names
+              .get(capture)
+              .unwrap_or_else(|| {
+                panic!("Failed to find name for name_id: {:?}", capture);
+              })
+              .sym
+              .to_string()
+          })
+          .collect(),
+        None => Vec::new(),
+      }
+    };
 
     self
       .fnc
@@ -1035,12 +1058,12 @@ impl<'a> ExpressionCompiler<'a> {
       .add(QueuedFunction {
         definition_pointer: definition_pointer.clone(),
         fn_name: fn_name.clone(),
-        capture_params: cf.ordered_names.clone(),
+        capture_params: capture_params.clone(),
         functionish: Functionish::Fn(fn_.function.clone()),
       })
       .expect("Failed to queue function");
 
-    if cf.ordered_names.len() == 0 {
+    if capture_params.len() == 0 {
       return self.inline(Value::Pointer(definition_pointer), target_register);
     }
 
@@ -1048,7 +1071,7 @@ impl<'a> ExpressionCompiler<'a> {
       fn_name,
       fn_.ident.span(),
       &definition_pointer,
-      &cf.ordered_names,
+      &capture_params,
       target_register,
     );
   }
@@ -1060,8 +1083,32 @@ impl<'a> ExpressionCompiler<'a> {
   ) -> CompiledExpression {
     let definition_pointer = self.fnc.allocate_defn_numbered(&"_anon".to_string());
 
-    let mut cf = CaptureFinder::new(self.scope.clone());
-    cf.arrow_expr(&init_std_scope(), arrow_expr);
+    let capture_params = {
+      let captures = self
+        .fnc
+        .scope_analysis
+        .captures
+        .get(&OwnerId::Span(arrow_expr.span));
+
+      match captures {
+        Some(captures) => captures
+          .iter()
+          .map(|capture| {
+            self
+              .fnc
+              .scope_analysis
+              .names
+              .get(capture)
+              .unwrap_or_else(|| {
+                panic!("Failed to find name for name_id: {:?}", capture);
+              })
+              .sym
+              .to_string()
+          })
+          .collect(),
+        None => Vec::new(),
+      }
+    };
 
     self
       .fnc
@@ -1069,12 +1116,12 @@ impl<'a> ExpressionCompiler<'a> {
       .add(QueuedFunction {
         definition_pointer: definition_pointer.clone(),
         fn_name: None,
-        capture_params: cf.ordered_names.clone(),
+        capture_params: capture_params.clone(),
         functionish: Functionish::Arrow(arrow_expr.clone()),
       })
       .expect("Failed to queue function");
 
-    if cf.ordered_names.len() == 0 {
+    if capture_params.len() == 0 {
       return self.inline(Value::Pointer(definition_pointer), target_register);
     }
 
@@ -1082,7 +1129,7 @@ impl<'a> ExpressionCompiler<'a> {
       None,
       arrow_expr.span(),
       &definition_pointer,
-      &cf.ordered_names,
+      &capture_params,
       target_register,
     );
   }

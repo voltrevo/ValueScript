@@ -25,8 +25,8 @@ pub struct Capture {
   captor_id: OwnerId,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum NameType {
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NameType {
   Var,
   Let,
   Const,
@@ -40,18 +40,19 @@ enum NameType {
 
 #[derive(Clone)]
 pub struct Name {
-  id: NameId,
-  owner_id: OwnerId,
-  sym: swc_atoms::JsWord,
-  type_: NameType,
-  mutations: Vec<swc_common::Span>,
-  captures: Vec<Capture>,
+  pub id: NameId,
+  pub owner_id: OwnerId,
+  pub sym: swc_atoms::JsWord,
+  pub type_: NameType,
+  pub mutations: Vec<swc_common::Span>,
+  pub captures: Vec<Capture>,
 }
 
 #[derive(Default)]
 pub struct ScopeAnalysis {
   pub names: HashMap<NameId, Name>,
-  pub captures: HashMap<OwnerId, HashSet<swc_common::Span>>,
+  pub owners: HashMap<OwnerId, HashSet<swc_common::Span>>,
+  pub captures: HashMap<OwnerId, HashSet<NameId>>,
   pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -148,6 +149,12 @@ impl ScopeAnalysis {
 
     self.names.insert(name.id.clone(), name.clone());
 
+    self
+      .owners
+      .entry(name.owner_id.clone())
+      .or_insert_with(HashSet::new)
+      .insert(origin_ident.span);
+
     scope.set(
       &origin_ident.sym,
       name.id.clone(),
@@ -173,7 +180,7 @@ impl ScopeAnalysis {
       .captures
       .entry(captor_id.clone())
       .or_insert_with(HashSet::new)
-      .insert(ref_);
+      .insert(name_id.clone());
 
     name.captures.push(Capture {
       ref_,
