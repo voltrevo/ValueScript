@@ -1,4 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
+use std::{
+  cell::RefCell,
+  collections::HashMap,
+  collections::{BTreeMap, HashSet},
+  rc::Rc,
+};
 
 use swc_common::Spanned;
 use valuescript_common::BUILTIN_NAMES;
@@ -53,6 +58,7 @@ pub struct ScopeAnalysis {
   pub names: HashMap<NameId, Name>,
   pub owners: HashMap<OwnerId, HashSet<swc_common::Span>>,
   pub captures: HashMap<OwnerId, HashSet<NameId>>,
+  pub mutations: BTreeMap<swc_common::Span, NameId>,
   pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -1259,6 +1265,7 @@ impl ScopeAnalysis {
     };
 
     name.mutations.push(ident.span);
+    self.mutations.insert(ident.span, name_id);
   }
 
   fn ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
