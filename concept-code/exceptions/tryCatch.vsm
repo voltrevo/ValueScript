@@ -1,0 +1,13 @@
+export @_anon0 {}
+
+@_anon0 = function() {
+  set_catch :catch0 %error
+  new $Error ["Something went wrong"] %_tmp0
+  throw %_tmp0
+  unset_catch
+  jmp :catch_end0
+:catch0
+  mov %error %return
+  end
+:catch_end0
+}
