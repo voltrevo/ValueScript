@@ -427,6 +427,20 @@ impl<'a> AssemblyParser<'a> {
         break;
       }
 
+      if c == '/' {
+        self.parse_exact("//");
+
+        loop {
+          let c = self.pos.next();
+
+          if c == None || c == Some('\n') {
+            break;
+          }
+        }
+
+        continue;
+      }
+
       let optional_label = self.test_label();
 
       if optional_label.is_some() {
