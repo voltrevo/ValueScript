@@ -42,7 +42,7 @@ impl VsFunction {
     }
 
     while registers.len() < registers.capacity() {
-      registers.push(Val::Undefined);
+      registers.push(Val::Void);
     }
 
     return Box::new(BytecodeStackFrame {

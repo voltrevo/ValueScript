@@ -403,8 +403,20 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Throw => {
-        let error = self.decoder.decode_val(&self.registers);
-        return Err(error);
+        return match self.decoder.peek_type() {
+          BytecodeType::Register => {
+            self.decoder.decode_type();
+
+            // Avoid the void->undefined conversion here
+            let error = self.registers[self.decoder.decode_register_index().unwrap()].clone();
+
+            match error {
+              Val::Void => Ok(FrameStepOk::Continue),
+              _ => Err(error),
+            }
+          }
+          _ => Err(self.decoder.decode_val(&self.registers)),
+        };
       }
 
       Import | ImportStar => {

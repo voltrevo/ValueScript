@@ -132,7 +132,10 @@ impl BytecodeDecoder {
       }
       BytecodeType::Function => self.decode_function_header(),
       BytecodeType::Pointer => self.decode_pointer(),
-      BytecodeType::Register => registers[self.decode_register_index().unwrap()].clone(),
+      BytecodeType::Register => match registers[self.decode_register_index().unwrap()].clone() {
+        Val::Void => Val::Undefined,
+        val => val,
+      },
       BytecodeType::Builtin => Val::Static(BUILTIN_VALS[self.decode_varsize_uint()]),
       BytecodeType::Class => Val::Class(Rc::new(VsClass {
         constructor: self.decode_val(registers),
