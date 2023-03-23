@@ -8,9 +8,9 @@
 
 export default function main() {
   const x = {} as any;
-  let key = 'left';
+  let key = "left";
 
-  x[key] = (key = 'right');
+  x[key] = key = "right";
 
   return x;
 }

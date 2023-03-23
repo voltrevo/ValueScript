@@ -320,7 +320,14 @@ impl<'a> ExpressionCompiler<'a> {
   fn get_register_for_ident_mutation(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
     let (reg, err_msg) = match self.fnc.lookup(ident) {
       Some(Value::Register(reg)) => (Some(reg), None),
-      _ => (None, Some("Invalid: non-register mutation")),
+      lookup_result => (
+        None,
+        Some(format!(
+          "Invalid: Can't mutate {} because its lookup result is {:?}",
+          ident.sym.to_string(),
+          lookup_result,
+        )),
+      ),
     };
 
     if let Some(err_msg) = err_msg {
