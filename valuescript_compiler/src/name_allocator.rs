@@ -37,6 +37,10 @@ impl NameAllocator {
       None => {}
     };
 
+    return self.allocate_numbered_fresh(prefix);
+  }
+
+  pub fn allocate_numbered_fresh(&mut self, prefix: &String) -> String {
     let mut i = 0_u64;
 
     loop {

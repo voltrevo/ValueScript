@@ -37,6 +37,11 @@ pub struct LoopLabels {
   pub break_: Label,
 }
 
+pub struct CatchSetting {
+  pub label: Label,
+  pub reg: Register,
+}
+
 pub struct FunctionCompiler {
   pub current: Function,
   pub definitions: Vec<Definition>,
@@ -46,6 +51,11 @@ pub struct FunctionCompiler {
   pub label_allocator: NameAllocator,
   pub queue: Queue<QueuedFunction>,
   pub loop_labels: Vec<LoopLabels>,
+  pub catch_settings: Vec<CatchSetting>,
+  pub end_label: Option<Label>,
+  pub is_returning_register: Option<Register>,
+  pub finally_labels: Vec<Label>,
+
   pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -68,6 +78,10 @@ impl FunctionCompiler {
       label_allocator: NameAllocator::default(),
       queue: Queue::new(),
       loop_labels: vec![],
+      catch_settings: vec![],
+      end_label: None,
+      is_returning_register: None,
+      finally_labels: vec![],
       diagnostics: vec![],
     };
   }
@@ -123,6 +137,14 @@ impl FunctionCompiler {
 
   pub fn allocate_numbered_reg(&mut self, prefix: &str) -> Register {
     return Register::Named(self.reg_allocator.allocate_numbered(&prefix.to_string()));
+  }
+
+  pub fn allocate_numbered_reg_fresh(&mut self, prefix: &str) -> Register {
+    return Register::Named(
+      self
+        .reg_allocator
+        .allocate_numbered_fresh(&prefix.to_string()),
+    );
   }
 
   pub fn release_reg(&mut self, reg: &Register) {
@@ -255,6 +277,16 @@ impl FunctionCompiler {
         };
       }
     };
+
+    if let Some(end_label) = self.end_label.as_ref() {
+      self
+        .current
+        .body
+        .push(InstructionOrLabel::Label(end_label.clone()));
+
+      self.end_label = None;
+      self.is_returning_register = None;
+    }
 
     self.definitions.push(Definition {
       pointer: definition_pointer,
@@ -452,7 +484,7 @@ impl FunctionCompiler {
       }
       Switch(switch) => self.todo(switch.span, "Switch statement"),
       Throw(_) => {}
-      Try(try_) => self.todo(try_.span, "Try statement"),
+      Try(_) => {}
       While(while_) => {
         self.populate_fn_scope_statement(&while_.body, scope);
       }
@@ -717,26 +749,7 @@ impl FunctionCompiler {
     use swc_ecma_ast::Stmt::*;
 
     match statement {
-      Block(block) => {
-        let block_scope = scope.nest();
-        self.populate_block_scope(block, &block_scope);
-
-        for stmt in &block.stmts {
-          self.statement(stmt, false, &block_scope);
-        }
-
-        for mapping in block_scope.rc.borrow().name_map.values() {
-          match mapping {
-            MappedName::Register(reg) => {
-              self.release_reg(reg);
-            }
-            MappedName::Definition(_)
-            | MappedName::QueuedFunction(_)
-            | MappedName::Builtin(_)
-            | MappedName::Constant(_) => {}
-          }
-        }
-      }
+      Block(block) => self.block_statement(block, scope),
       Empty(_) => {}
       Debugger(debugger) => self.todo(debugger.span, "Debugger statement"),
       With(with) => {
@@ -747,21 +760,34 @@ impl FunctionCompiler {
         });
       }
 
-      Return(ret_stmt) => match &ret_stmt.arg {
-        None => {
-          // TODO: Skip if fn_last
-          self.push(Instruction::End);
+      Return(ret_stmt) => {
+        match &ret_stmt.arg {
+          None => {}
+          Some(expr) => {
+            let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
+
+            expression_compiler.compile(expr, Some(Register::Return));
+          }
         }
-        Some(expr) => {
-          let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
 
-          expression_compiler.compile(expr, Some(Register::Return));
+        if !fn_last {
+          if let Some(finally_label) = self.finally_labels.last().cloned() {
+            let is_returning = match self.is_returning_register.clone() {
+              Some(is_returning) => is_returning.clone(),
+              None => {
+                let is_returning = self.allocate_reg(&"_is_returning".to_string());
+                self.is_returning_register = Some(is_returning.clone());
+                is_returning
+              }
+            };
 
-          if !fn_last {
+            self.push(Instruction::Mov(Value::Bool(true), is_returning.clone()));
+            self.push(Instruction::Jmp(finally_label.ref_()));
+          } else {
             self.push(Instruction::End);
           }
         }
-      },
+      }
 
       Labeled(labeled) => self.todo(labeled.span, "Labeled statement"),
 
@@ -819,7 +845,9 @@ impl FunctionCompiler {
 
         self.push(instr);
       }
-      Try(try_) => self.todo(try_.span, "Try statement"),
+      Try(try_) => {
+        self.try_(try_, scope);
+      }
       While(while_) => {
         self.while_(while_, scope);
       }
@@ -838,6 +866,27 @@ impl FunctionCompiler {
       }
       Expr(expr) => {
         self.expression(&expr.expr, scope);
+      }
+    }
+  }
+
+  fn block_statement(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
+    let block_scope = scope.nest();
+    self.populate_block_scope(block, &block_scope);
+
+    for stmt in &block.stmts {
+      self.statement(stmt, false, &block_scope);
+    }
+
+    for mapping in block_scope.rc.borrow().name_map.values() {
+      match mapping {
+        MappedName::Register(reg) => {
+          self.release_reg(reg);
+        }
+        MappedName::Definition(_)
+        | MappedName::QueuedFunction(_)
+        | MappedName::Builtin(_)
+        | MappedName::Constant(_) => {}
       }
     }
   }
@@ -888,6 +937,157 @@ impl FunctionCompiler {
         self.label(after_else_label);
       }
     }
+  }
+
+  fn try_(&mut self, try_: &swc_ecma_ast::TryStmt, scope: &Scope) {
+    let (catch_label, after_catch_label) = match try_.handler {
+      Some(_) => (
+        Some(Label {
+          name: self.label_allocator.allocate_numbered(&"catch".to_string()),
+        }),
+        Some(Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"after_catch".to_string()),
+        }),
+      ),
+      None => (None, None),
+    };
+
+    let finally_label = match &try_.finalizer {
+      Some(_) => Some(Label {
+        name: self
+          .label_allocator
+          .allocate_numbered(&"finally".to_string()),
+      }),
+      None => None,
+    };
+
+    let mut finally_error_reg: Option<Register> = None;
+
+    if let Some(label) = &finally_label {
+      // We use a fresh register here because if we don't put anything in it, it's meaningful. It
+      // tells finally not to re-throw.
+      let reg = self.allocate_numbered_reg_fresh("_finally_error");
+      self.finally_labels.push(label.clone());
+
+      finally_error_reg = Some(reg.clone());
+
+      self.catch_settings.push(CatchSetting {
+        label: label.clone(),
+        reg,
+      });
+    }
+
+    let mut catch_error_reg: Option<Register> = None;
+
+    if let Some(label) = &catch_label {
+      let reg = match try_
+        .handler
+        .as_ref()
+        .expect("catch label without handler")
+        .param
+      {
+        Some(_) => self.allocate_numbered_reg("_error"),
+        None => Register::Ignore,
+      };
+
+      catch_error_reg = Some(reg.clone());
+
+      self.catch_settings.push(CatchSetting {
+        label: label.clone(),
+        reg,
+      });
+    }
+
+    self.apply_catch_setting();
+    self.block_statement(&try_.block, scope);
+    self.pop_catch_setting(); // TODO: Avoid redundant set_catch to our own finally
+
+    if let Some(label) = &after_catch_label {
+      self.push(Instruction::Jmp(label.ref_()));
+    }
+
+    if let Some(catch_clause) = &try_.handler {
+      self.label(catch_label.unwrap());
+      self.apply_catch_setting(); // TODO: Avoid redundant unset_catch
+      let catch_scope = scope.nest();
+
+      if let Some(param) = &catch_clause.param {
+        self.populate_scope_pat(param, &catch_scope);
+
+        let mut ec = ExpressionCompiler {
+          fnc: self,
+          scope: &catch_scope,
+        };
+
+        let pattern_reg = ec.fnc.get_pattern_register(&param, &catch_scope);
+
+        // TODO: Set up this register through set_catch instead of copying into it
+        ec.fnc.push(Instruction::Mov(
+          Value::Register(catch_error_reg.unwrap()),
+          pattern_reg.clone(),
+        ));
+
+        ec.pat(&param, &pattern_reg, false, &catch_scope);
+      }
+
+      self.block_statement(&catch_clause.body, &catch_scope);
+
+      if let Some(_) = finally_label {
+        self.pop_catch_setting();
+      }
+
+      self.label(after_catch_label.unwrap());
+
+      // TODO: Shouldn't we be releasing registers from the scope when we don't need it anymore?
+    }
+
+    if let Some(finally_clause) = &try_.finalizer {
+      self.label(finally_label.unwrap());
+      self.finally_labels.pop();
+      self.apply_catch_setting();
+      self.block_statement(&finally_clause, scope);
+
+      if let Some(is_returning) = &self.is_returning_register {
+        let end_label = match &self.end_label {
+          Some(end_label) => end_label.clone(),
+          None => {
+            let end_label = Label {
+              name: self.label_allocator.allocate(&"end".to_string()),
+            };
+
+            self.end_label = Some(end_label.clone());
+            end_label
+          }
+        };
+
+        self.push(Instruction::JmpIf(
+          Value::Register(is_returning.clone()),
+          end_label.ref_(),
+        ));
+      }
+
+      self.push(Instruction::Throw(Value::Register(
+        finally_error_reg.unwrap(),
+      )));
+    }
+  }
+
+  fn apply_catch_setting(&mut self) {
+    if let Some(catch_setting) = self.catch_settings.last() {
+      self.push(Instruction::SetCatch(
+        catch_setting.label.ref_(),
+        catch_setting.reg.clone(),
+      ));
+    } else {
+      self.push(Instruction::UnsetCatch);
+    }
+  }
+
+  fn pop_catch_setting(&mut self) {
+    self.catch_settings.pop().expect("no catch setting to pop");
+    self.apply_catch_setting();
   }
 
   fn while_(self: &mut Self, while_: &swc_ecma_ast::WhileStmt, scope: &Scope) {
