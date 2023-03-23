@@ -255,7 +255,7 @@ impl ModuleCompiler {
     let fn_name = fn_.ident.sym.to_string();
 
     let pointer = match self.scope_analysis.lookup(&OwnerId::Module, &fn_.ident) {
-      Value::Pointer(p) => p,
+      Some(Value::Pointer(p)) => p,
       _ => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
@@ -297,7 +297,7 @@ impl ModuleCompiler {
             let fn_name = ident.sym.to_string();
 
             let defn = match self.scope_analysis.lookup(&OwnerId::Module, ident) {
-              Value::Pointer(p) => p,
+              Some(Value::Pointer(p)) => p,
               _ => {
                 self.diagnostics.push(Diagnostic {
                   level: DiagnosticLevel::InternalError,
@@ -409,7 +409,7 @@ impl ModuleCompiler {
               Some(defn)
             }
             None => match self.scope_analysis.lookup(&OwnerId::Module, &orig_name) {
-              Value::Pointer(p) => Some(p),
+              Some(Value::Pointer(p)) => Some(p),
               _ => {
                 self.diagnostics.push(Diagnostic {
                   level: DiagnosticLevel::InternalError,
@@ -518,7 +518,7 @@ impl ModuleCompiler {
           };
 
           let pointer = match self.scope_analysis.lookup(&OwnerId::Module, &named.local) {
-            Value::Pointer(pointer) => pointer,
+            Some(Value::Pointer(p)) => p,
             _ => {
               self.diagnostics.push(Diagnostic {
                 level: DiagnosticLevel::InternalError,
@@ -551,7 +551,7 @@ impl ModuleCompiler {
           let local_name = default.local.sym.to_string();
 
           let pointer = match self.scope_analysis.lookup(&OwnerId::Module, &default.local) {
-            Value::Pointer(pointer) => pointer,
+            Some(Value::Pointer(p)) => p,
             _ => {
               self.diagnostics.push(Diagnostic {
                 level: DiagnosticLevel::InternalError,
@@ -580,7 +580,7 @@ impl ModuleCompiler {
             .scope_analysis
             .lookup(&OwnerId::Module, &namespace.local)
           {
-            Value::Pointer(pointer) => pointer,
+            Some(Value::Pointer(p)) => p,
             _ => {
               self.diagnostics.push(Diagnostic {
                 level: DiagnosticLevel::InternalError,
@@ -637,7 +637,7 @@ impl ModuleCompiler {
 
     let defn_name = match ident {
       Some(ident) => match self.scope_analysis.lookup(&OwnerId::Module, ident) {
-        Value::Pointer(p) => p,
+        Some(Value::Pointer(p)) => p,
         _ => {
           self.diagnostics.push(Diagnostic {
             level: DiagnosticLevel::InternalError,

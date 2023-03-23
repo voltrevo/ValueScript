@@ -1,5 +1,6 @@
 use queues::*;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use swc_common::Spanned;
@@ -82,11 +83,10 @@ impl FunctionCompiler {
     owner_id: OwnerId,
     definition_allocator: Rc<RefCell<NameAllocator>>,
   ) -> FunctionCompiler {
-    let reg_allocator = scope_analysis
-      .reg_allocators
-      .get(&owner_id)
-      .expect("Missing reg allocator")
-      .clone();
+    let reg_allocator = match scope_analysis.reg_allocators.get(&owner_id) {
+      Some(reg_allocator) => reg_allocator.clone(),
+      None => RegAllocator::default(),
+    };
 
     return FunctionCompiler {
       current: Function::default(),
@@ -117,12 +117,12 @@ impl FunctionCompiler {
     self.current.body.push(InstructionOrLabel::Label(label));
   }
 
-  pub fn lookup(&self, ident: &swc_ecma_ast::Ident) -> Value {
-    return self.scope_analysis.lookup(&self.owner_id, ident);
+  pub fn lookup(&self, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+    self.scope_analysis.lookup(&self.owner_id, ident)
   }
 
-  pub fn lookup_name_id(&self, name_id: &NameId) -> Value {
-    return self.scope_analysis.lookup_name_id(&self.owner_id, name_id);
+  pub fn lookup_name_id(&self, name_id: &NameId) -> Option<Value> {
+    self.scope_analysis.lookup_name_id(&self.owner_id, name_id)
   }
 
   pub fn todo(&mut self, span: swc_common::Span, message: &str) {
@@ -218,26 +218,24 @@ impl FunctionCompiler {
 
   fn compile_functionish(&mut self, definition_pointer: Pointer, functionish: &Functionish) {
     // TODO: Use a new FunctionCompiler per function instead of this hack
-    self.reg_allocator = self
+    self.reg_allocator = match self
       .scope_analysis
       .reg_allocators
       .get(&functionish.owner_id())
-      .expect("Missing reg allocator for fn")
-      .clone();
+    {
+      Some(reg_allocator) => reg_allocator.clone(),
+      None => RegAllocator::default(),
+    };
 
     // TODO: Transitive captures
-    let capture_params = self
-      .scope_analysis
-      .captures
-      .get(&functionish.owner_id())
-      .expect("Missing captures for fn");
+    let capture_params = self.scope_analysis.captures.get(&functionish.owner_id());
 
-    for cap_param in capture_params {
+    for cap_param in capture_params.unwrap_or(&HashSet::new()) {
       let reg = match self
         .scope_analysis
         .lookup_capture(&self.owner_id, cap_param)
       {
-        Value::Register(reg) => reg,
+        Some(Value::Register(reg)) => reg,
         _ => {
           self.diagnostics.push(Diagnostic {
             level: DiagnosticLevel::InternalError,
@@ -365,7 +363,7 @@ impl FunctionCompiler {
 
   pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
     match self.scope_analysis.lookup(&self.owner_id, ident) {
-      Value::Register(reg) => reg,
+      Some(Value::Register(reg)) => reg,
       _ => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,

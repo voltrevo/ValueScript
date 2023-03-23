@@ -319,7 +319,7 @@ impl<'a> ExpressionCompiler<'a> {
 
   fn get_register_for_ident_mutation(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
     let (reg, err_msg) = match self.fnc.lookup(ident) {
-      Value::Register(reg) => (Some(reg), None),
+      Some(Value::Register(reg)) => (Some(reg), None),
       _ => (None, Some("Invalid: non-register mutation")),
     };
 
@@ -1106,7 +1106,18 @@ impl<'a> ExpressionCompiler<'a> {
     let mut bind_values = Array::default();
 
     for cap in captures {
-      bind_values.values.push(self.fnc.lookup_name_id(cap));
+      bind_values.values.push(match self.fnc.lookup_name_id(cap) {
+        Some(v) => v,
+        None => {
+          self.fnc.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: format!("Failed to find capture {:?}", cap),
+            span: cap.span(),
+          });
+
+          Value::Void
+        }
+      });
     }
 
     self.fnc.push(Instruction::Bind(
@@ -1216,10 +1227,19 @@ impl<'a> ExpressionCompiler<'a> {
       return self.inline(Value::Undefined, target_register);
     }
 
-    self.inline(
-      self.fnc.lookup(ident), // TODO: Capturing functions
-      target_register,
-    )
+    let value = match self.fnc.lookup(ident) {
+      Some(v) => v, // TODO: Capturing functions
+      None => {
+        self.fnc.todo(
+          ident.span,
+          format!("Failed to find identifier {:?}", ident.sym).as_str(),
+        );
+
+        Value::Register(self.fnc.allocate_numbered_reg("_todo_identifier"))
+      }
+    };
+
+    self.inline(value, target_register)
   }
 
   pub fn compile_literal(&mut self, lit: &swc_ecma_ast::Lit) -> Value {
@@ -1498,7 +1518,7 @@ impl TargetAccessor {
 
     return match expr {
       Ident(ident) => match ec.fnc.lookup(ident) {
-        Value::Register(_) => true,
+        Some(Value::Register(_)) => true,
         _ => false,
       },
       This(_) => true,

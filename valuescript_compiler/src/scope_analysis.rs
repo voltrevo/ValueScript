@@ -23,9 +23,19 @@ pub enum NameId {
   Constant(&'static str),
 }
 
+impl Spanned for NameId {
+  fn span(&self) -> swc_common::Span {
+    match self {
+      NameId::Span(span) => *span,
+      NameId::Builtin(_) => swc_common::DUMMY_SP,
+      NameId::Constant(_) => swc_common::DUMMY_SP,
+    }
+  }
+}
+
 // TODO: Make use of these in the next phase of the compiler, remove the
 // allow(dead_code) attributes
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Capture {
   #[allow(dead_code)]
   ref_: swc_common::Span,
@@ -47,7 +57,7 @@ pub enum NameType {
   Constant,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Name {
   pub id: NameId,
   pub owner_id: OwnerId,
@@ -154,30 +164,29 @@ impl ScopeAnalysis {
     return sa;
   }
 
-  pub fn lookup(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Value {
-    self.lookup_name_id(
-      scope,
-      self.refs.get(&ident.span).expect("Couldn't find ident"),
-    )
+  pub fn lookup(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+    let name_id = self.refs.get(&ident.span)?;
+    self.lookup_name_id(scope, name_id)
   }
 
-  pub fn lookup_name_id(&self, scope: &OwnerId, name_id: &NameId) -> Value {
-    let name = self.names.get(name_id).expect("name_id didn't map to name");
+  pub fn lookup_name_id(&self, scope: &OwnerId, name_id: &NameId) -> Option<Value> {
+    let name = self.names.get(name_id)?;
 
-    if &name.owner_id == scope {
-      name.value.clone()
-    } else {
-      self.lookup_capture(scope, name_id)
+    match &name.value {
+      Value::Register(_) => {
+        if &name.owner_id == scope {
+          Some(name.value.clone())
+        } else {
+          self.lookup_capture(scope, name_id)
+        }
+      }
+      _ => Some(name.value.clone()),
     }
   }
 
-  pub fn lookup_capture(&self, scope: &OwnerId, name_id: &NameId) -> Value {
-    let value = self
-      .capture_values
-      .get(&(scope.clone(), name_id.clone()))
-      .expect("Captured ident not in capture_values");
-
-    value.clone()
+  pub fn lookup_capture(&self, scope: &OwnerId, name_id: &NameId) -> Option<Value> {
+    let value = self.capture_values.get(&(scope.clone(), name_id.clone()))?;
+    Some(value.clone())
   }
 
   fn allocate_reg(&mut self, scope: &OwnerId, based_on_name: &str) -> Register {
@@ -206,6 +215,7 @@ impl ScopeAnalysis {
     };
 
     self.names.insert(name.id.clone(), name.clone());
+    self.refs.insert(origin_ident.span, name.id.clone());
 
     self
       .owners
@@ -1675,7 +1685,7 @@ struct XScopeData {
 
 type XScope = Rc<RefCell<XScopeData>>;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum OwnerId {
   Span(swc_common::Span),
   Module,
