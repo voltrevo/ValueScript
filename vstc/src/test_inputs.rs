@@ -32,11 +32,11 @@ mod tests {
       let file_contents = fs::read_to_string(&file_path).expect("Failed to read file contents");
 
       if let Some(first_line) = file_contents.lines().next() {
-        if first_line.starts_with("! test_output ") {
+        if first_line.starts_with("//! test_output ") {
           println!("\nTesting {} ...", file_path.to_str().unwrap());
 
           let output_str = first_line
-            .split_once("! test_output ")
+            .split_once("//! test_output ")
             .map(|x| x.1)
             .unwrap_or("");
 
