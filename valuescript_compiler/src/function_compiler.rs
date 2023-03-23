@@ -135,6 +135,10 @@ impl FunctionCompiler {
     return Register::Named(self.reg_allocator.allocate(based_on));
   }
 
+  pub fn allocate_reg_fresh(&mut self, based_on: &String) -> Register {
+    return Register::Named(self.reg_allocator.allocate_fresh(based_on));
+  }
+
   pub fn allocate_numbered_reg(&mut self, prefix: &str) -> Register {
     return Register::Named(self.reg_allocator.allocate_numbered(&prefix.to_string()));
   }
@@ -775,7 +779,7 @@ impl FunctionCompiler {
             let is_returning = match self.is_returning_register.clone() {
               Some(is_returning) => is_returning.clone(),
               None => {
-                let is_returning = self.allocate_reg(&"_is_returning".to_string());
+                let is_returning = self.allocate_reg_fresh(&"_is_returning".to_string());
                 self.is_returning_register = Some(is_returning.clone());
                 is_returning
               }
@@ -1047,30 +1051,74 @@ impl FunctionCompiler {
       self.label(finally_label.unwrap());
       self.finally_labels.pop();
       self.apply_catch_setting();
+
+      let local_is_returning = match self.is_returning_register.clone() {
+        Some(is_returning) => {
+          let local_is_returning = self.allocate_numbered_reg_fresh("_local_is_returning");
+
+          self.push(Instruction::Mov(
+            Value::Register(is_returning.clone()),
+            local_is_returning.clone(),
+          ));
+
+          self.push(Instruction::Mov(Value::Bool(false), is_returning));
+
+          Some(local_is_returning)
+        }
+        None => None,
+      };
+
       self.block_statement(&finally_clause, scope);
-
-      if let Some(is_returning) = &self.is_returning_register {
-        let end_label = match &self.end_label {
-          Some(end_label) => end_label.clone(),
-          None => {
-            let end_label = Label {
-              name: self.label_allocator.allocate(&"end".to_string()),
-            };
-
-            self.end_label = Some(end_label.clone());
-            end_label
-          }
-        };
-
-        self.push(Instruction::JmpIf(
-          Value::Register(is_returning.clone()),
-          end_label.ref_(),
-        ));
-      }
 
       self.push(Instruction::Throw(Value::Register(
         finally_error_reg.unwrap(),
       )));
+
+      if let Some(local_is_returning) = local_is_returning {
+        if self.finally_labels.is_empty() {
+          let end_label = match &self.end_label {
+            Some(end_label) => end_label.clone(),
+            None => {
+              let end_label = Label {
+                name: self.label_allocator.allocate(&"end".to_string()),
+              };
+
+              self.end_label = Some(end_label.clone());
+              end_label
+            }
+          };
+
+          self.push(Instruction::JmpIf(
+            Value::Register(local_is_returning.clone()),
+            end_label.ref_(),
+          ));
+        } else {
+          self.push(Instruction::OpNot(
+            Value::Register(local_is_returning.clone()),
+            local_is_returning.clone(),
+          ));
+
+          let after_finally_label = Label {
+            name: self
+              .label_allocator
+              .allocate_numbered(&"after_finally".to_string()),
+          };
+
+          self.push(Instruction::JmpIf(
+            Value::Register(local_is_returning.clone()),
+            after_finally_label.ref_(),
+          ));
+
+          self.push(Instruction::Mov(
+            Value::Bool(true),
+            self.is_returning_register.clone().unwrap(),
+          ));
+
+          self.push(Instruction::Jmp(self.finally_labels.last().unwrap().ref_()));
+
+          self.label(after_finally_label);
+        }
+      }
     }
   }
 

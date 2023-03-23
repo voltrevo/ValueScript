@@ -18,6 +18,10 @@ impl NameAllocator {
       None => {}
     };
 
+    return self.allocate_fresh(based_on_name);
+  }
+
+  pub fn allocate_fresh(&mut self, based_on_name: &String) -> String {
     if !self.used_names.contains(based_on_name) {
       self.used_names.insert(based_on_name.clone());
       return based_on_name.clone();
