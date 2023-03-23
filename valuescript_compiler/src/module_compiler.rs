@@ -11,14 +11,12 @@ use crate::asm::{
   Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Lazy, Module,
   Object, Pointer, Register, Value,
 };
+use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
+use crate::function_compiler::{FunctionCompiler, Functionish};
+use crate::name_allocator::NameAllocator;
 use crate::scope_analysis::OwnerId;
-
-use super::diagnostic::{Diagnostic, DiagnosticLevel};
-use super::expression_compiler::{CompiledExpression, ExpressionCompiler};
-use super::function_compiler::{FunctionCompiler, Functionish};
-use super::name_allocator::NameAllocator;
-use super::scope::{init_std_scope, MappedName, Scope};
-use super::scope_analysis::ScopeAnalysis;
+use crate::scope_analysis::ScopeAnalysis;
 
 struct DiagnosticCollector {
   diagnostics: Arc<Mutex<Vec<Diagnostic>>>,
@@ -174,7 +172,6 @@ impl ModuleCompiler {
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
     let mut scope_analysis = ScopeAnalysis::run(module);
     self.diagnostics.append(&mut scope_analysis.diagnostics);
-    let scope = init_std_scope();
 
     for module_item in &module.body {
       self.compile_module_item(module_item);
@@ -239,7 +236,7 @@ impl ModuleCompiler {
 
     match decl {
       Class(class) => {
-        self.compile_class(None, Some(class.ident.sym.to_string()), &class.class);
+        self.compile_class(None, Some(&class.ident), &class.class);
       }
       Fn(fn_) => self.compile_fn_decl(false, fn_),
       Var(var_decl) => {
@@ -291,12 +288,7 @@ impl ModuleCompiler {
 
     match &edd.decl {
       DefaultDecl::Class(class) => {
-        let class_name = match &class.ident {
-          Some(ident) => Some(ident.sym.to_string()),
-          None => None,
-        };
-
-        let pointer = self.compile_class(None, class_name, &class.class);
+        let pointer = self.compile_class(None, class.ident.as_ref(), &class.class);
         self.module.export_default = Value::Pointer(pointer);
       }
       DefaultDecl::Fn(fn_) => {
@@ -340,7 +332,7 @@ impl ModuleCompiler {
     match &ed.decl {
       Decl::Class(class) => {
         let class_name = class.ident.sym.to_string();
-        self.compile_class(Some(class_name.clone()), Some(class_name), &class.class);
+        self.compile_class(Some(class_name.clone()), Some(&class.ident), &class.class);
       }
       Decl::Fn(fn_) => self.compile_fn_decl(true, fn_),
       Decl::Var(var_decl) => {
@@ -366,7 +358,7 @@ impl ModuleCompiler {
       match specifier {
         Named(named) => {
           let orig_name = match &named.orig {
-            ModuleExportName::Ident(ident) => ident.sym.to_string(),
+            ModuleExportName::Ident(ident) => ident,
             ModuleExportName::Str(_) => {
               self.diagnostics.push(Diagnostic {
                 level: DiagnosticLevel::InternalError,
@@ -374,7 +366,7 @@ impl ModuleCompiler {
                 span: named.span,
               });
 
-              "_todo_export_non_ident".to_string()
+              continue;
             }
           };
 
@@ -384,7 +376,7 @@ impl ModuleCompiler {
               self.todo(str_.span, "exporting a non-identifier");
               "_todo_export_non_ident".to_string()
             }
-            None => orig_name.clone(),
+            None => orig_name.sym.to_string(),
           };
 
           let defn = match &en.src {
@@ -394,7 +386,7 @@ impl ModuleCompiler {
               self.module.definitions.push(Definition {
                 pointer: defn.clone(),
                 content: DefinitionContent::Lazy(Lazy {
-                  body: match orig_name == "default" {
+                  body: match orig_name.sym.to_string() == "default" {
                     true => vec![InstructionOrLabel::Instruction(Instruction::Import(
                       Value::String(src.value.to_string()),
                       Register::Return,
@@ -406,7 +398,7 @@ impl ModuleCompiler {
                       )),
                       InstructionOrLabel::Instruction(Instruction::Sub(
                         Value::Register(Register::Return),
-                        Value::String(orig_name.clone()),
+                        Value::String(orig_name.sym.to_string()),
                         Register::Return,
                       )),
                     ],
@@ -416,9 +408,9 @@ impl ModuleCompiler {
 
               Some(defn)
             }
-            None => match scope.get_defn(&orig_name) {
-              Some(found_defn) => Some(found_defn),
-              None => {
+            None => match self.scope_analysis.lookup(&OwnerId::Module, &orig_name) {
+              Value::Pointer(p) => Some(p),
+              _ => {
                 self.diagnostics.push(Diagnostic {
                   level: DiagnosticLevel::InternalError,
                   message: format!("Definition for {} should have been in scope", orig_name),
@@ -525,9 +517,18 @@ impl ModuleCompiler {
             None => local_name.clone(),
           };
 
-          let pointer = scope
-            .get_defn(&local_name)
-            .expect("imported name should have been in scope");
+          let pointer = match self.scope_analysis.lookup(&OwnerId::Module, &named.local) {
+            Value::Pointer(pointer) => pointer,
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: format!("Imported name {} should have been a pointer", local_name),
+                span: named.span,
+              });
+
+              self.allocate_defn(local_name.as_str())
+            }
+          };
 
           self.module.definitions.push(Definition {
             pointer,
@@ -549,9 +550,18 @@ impl ModuleCompiler {
         Default(default) => {
           let local_name = default.local.sym.to_string();
 
-          let pointer = scope
-            .get_defn(&local_name)
-            .expect("imported name should have been in scope");
+          let pointer = match self.scope_analysis.lookup(&OwnerId::Module, &default.local) {
+            Value::Pointer(pointer) => pointer,
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: format!("Imported name {} should have been a pointer", local_name),
+                span: default.span,
+              });
+
+              self.allocate_defn(local_name.as_str())
+            }
+          };
 
           self.module.definitions.push(Definition {
             pointer,
@@ -566,9 +576,21 @@ impl ModuleCompiler {
         Namespace(namespace) => {
           let local_name = namespace.local.sym.to_string();
 
-          let pointer = scope
-            .get_defn(&local_name)
-            .expect("imported name should have been in scope");
+          let pointer = match self
+            .scope_analysis
+            .lookup(&OwnerId::Module, &namespace.local)
+          {
+            Value::Pointer(pointer) => pointer,
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: format!("Imported name {} should have been a pointer", local_name),
+                span: namespace.span,
+              });
+
+              self.allocate_defn(local_name.as_str())
+            }
+          };
 
           self.module.definitions.push(Definition {
             pointer,
@@ -606,31 +628,27 @@ impl ModuleCompiler {
   fn compile_class(
     &mut self,
     export_name: Option<String>,
-    class_name: Option<String>,
+    ident: Option<&swc_ecma_ast::Ident>,
     class: &swc_ecma_ast::Class,
   ) -> Pointer {
     let mut constructor: Value = Value::Void;
     let mut methods: Object = Object::default();
     let mut dependent_definitions: Vec<Definition>;
 
-    let defn_name = 'block: {
-      let class_name = match class_name {
-        Some(class_name) => class_name,
-        None => break 'block self.allocate_defn_numbered("_anon"),
-      };
-
-      match parent_scope.get(&class_name) {
-        Some(MappedName::Definition(d)) => d,
+    let defn_name = match ident {
+      Some(ident) => match self.scope_analysis.lookup(&OwnerId::Module, ident) {
+        Value::Pointer(p) => p,
         _ => {
           self.diagnostics.push(Diagnostic {
             level: DiagnosticLevel::InternalError,
-            message: format!("Definition for {} should have been in scope", class_name),
+            message: format!("Definition for {} should have been in scope", ident.sym),
             span: class.span, // FIXME: make class_name ident and use that span
           });
 
-          return self.allocate_defn_numbered("_scope_error");
+          self.allocate_defn_numbered("_scope_error")
         }
-      }
+      },
+      None => self.allocate_defn_numbered("_anon"),
     };
 
     if let Some(export_name) = export_name {
@@ -656,7 +674,6 @@ impl ModuleCompiler {
           }
 
           let mut ec = ExpressionCompiler {
-            scope: parent_scope,
             fnc: &mut member_initializers_fnc,
           };
 
@@ -684,7 +701,7 @@ impl ModuleCompiler {
     member_initializers_assembly.append(&mut member_initializers_fnc.current.body);
 
     // Include any other definitions that were created by the member initializers
-    member_initializers_fnc.process_queue(parent_scope);
+    member_initializers_fnc.process_queue();
     dependent_definitions = std::mem::take(&mut member_initializers_fnc.definitions);
 
     let mut has_constructor = false;
@@ -704,7 +721,6 @@ impl ModuleCompiler {
               class.span,
               ctor.clone(),
             ),
-            parent_scope,
           ));
 
           constructor = Value::Pointer(ctor_defn_name);
@@ -746,7 +762,6 @@ impl ModuleCompiler {
             method_defn_name.clone(),
             None,
             Functionish::Fn(method.function.clone()),
-            parent_scope,
           ));
 
           methods

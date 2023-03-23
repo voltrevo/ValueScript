@@ -208,7 +208,7 @@ impl FunctionCompiler {
   pub fn process_queue(&mut self) {
     loop {
       match self.queue.remove() {
-        Ok(qfn) => self.compile_functionish(qfn.definition_pointer, qfn.fn_name, &qfn.functionish),
+        Ok(qfn) => self.compile_functionish(qfn.definition_pointer, &qfn.functionish),
         Err(_) => {
           break;
         }
@@ -216,12 +216,7 @@ impl FunctionCompiler {
     }
   }
 
-  fn compile_functionish(
-    &mut self,
-    definition_pointer: Pointer,
-    fn_name: Option<String>,
-    functionish: &Functionish,
-  ) {
+  fn compile_functionish(&mut self, definition_pointer: Pointer, functionish: &Functionish) {
     // TODO: Use a new FunctionCompiler per function instead of this hack
     self.reg_allocator = self
       .scope_analysis

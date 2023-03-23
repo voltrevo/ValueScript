@@ -1024,7 +1024,8 @@ impl<'a> ExpressionCompiler<'a> {
       .fnc
       .scope_analysis
       .captures
-      .get(&OwnerId::Span(fn_.function.span));
+      .get(&OwnerId::Span(fn_.function.span))
+      .cloned();
 
     self
       .fnc
@@ -1040,9 +1041,8 @@ impl<'a> ExpressionCompiler<'a> {
       None => self.inline(Value::Pointer(definition_pointer), target_register),
       Some(capture_params) => self.capturing_fn_ref(
         fn_name,
-        fn_.ident.span(),
         &definition_pointer,
-        capture_params,
+        &capture_params,
         target_register,
       ),
     }
@@ -1059,7 +1059,8 @@ impl<'a> ExpressionCompiler<'a> {
       .fnc
       .scope_analysis
       .captures
-      .get(&OwnerId::Span(arrow_expr.span));
+      .get(&OwnerId::Span(arrow_expr.span))
+      .cloned();
 
     self
       .fnc
@@ -1073,26 +1074,20 @@ impl<'a> ExpressionCompiler<'a> {
 
     match capture_params {
       None => self.inline(Value::Pointer(definition_pointer), target_register),
-      Some(capture_params) => self.capturing_fn_ref(
-        None,
-        arrow_expr.span(),
-        &definition_pointer,
-        capture_params,
-        target_register,
-      ),
+      Some(capture_params) => {
+        self.capturing_fn_ref(None, &definition_pointer, &capture_params, target_register)
+      }
     }
   }
 
   pub fn capturing_fn_ref(
     &mut self,
     fn_name: Option<String>,
-    span: swc_common::Span,
     definition_pointer: &Pointer,
     captures: &HashSet<NameId>,
     target_register: Option<Register>,
   ) -> CompiledExpression {
     let mut nested_registers = Vec::<Register>::new();
-    let mut sub_nested_registers = Vec::<Register>::new();
 
     let reg = match target_register {
       None => {
@@ -1119,10 +1114,6 @@ impl<'a> ExpressionCompiler<'a> {
       Value::Array(Box::new(bind_values)),
       reg.clone(),
     ));
-
-    for reg in sub_nested_registers {
-      self.fnc.release_reg(&reg);
-    }
 
     return CompiledExpression::new(Value::Register(reg), nested_registers);
   }
