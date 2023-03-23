@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use crate::asm::{Pointer, Register};
+
 #[derive(Default)]
 pub struct NameAllocator {
   used_names: HashSet<String>,
@@ -62,5 +64,30 @@ impl NameAllocator {
   pub fn release(&mut self, name: &String) {
     self.used_names.remove(name);
     self.released_names.push(name.clone());
+  }
+}
+
+#[derive(Default)]
+pub struct PointerAllocator {
+  alloc: NameAllocator,
+}
+
+impl PointerAllocator {
+  pub fn allocate(&mut self, based_on_name: &str) -> Pointer {
+    Pointer {
+      name: self.alloc.allocate(&based_on_name.to_string()),
+    }
+  }
+}
+
+#[derive(Default)]
+pub struct RegAllocator {
+  alloc: NameAllocator,
+}
+
+impl RegAllocator {
+  pub fn allocate(&mut self, based_on_name: &str) -> Register {
+    let name = self.alloc.allocate(&based_on_name.to_string());
+    Register::Named(name)
   }
 }

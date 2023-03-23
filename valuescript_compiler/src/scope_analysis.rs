@@ -8,7 +8,11 @@ use std::{
 use swc_common::Spanned;
 use valuescript_common::BUILTIN_NAMES;
 
-use crate::{asm::Builtin, constants::CONSTANTS};
+use crate::{
+  asm::{Builtin, Register, Value},
+  constants::CONSTANTS,
+  name_allocator::{PointerAllocator, RegAllocator},
+};
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 
@@ -49,6 +53,7 @@ pub struct Name {
   pub owner_id: OwnerId,
   pub sym: swc_atoms::JsWord,
   pub type_: NameType,
+  pub value: Value,
   pub mutations: Vec<swc_common::Span>,
   pub captures: Vec<Capture>,
 }
@@ -58,8 +63,12 @@ pub struct ScopeAnalysis {
   pub names: HashMap<NameId, Name>,
   pub owners: HashMap<OwnerId, HashSet<swc_common::Span>>,
   pub captures: HashMap<OwnerId, HashSet<NameId>>,
+  pub capture_values: HashMap<(OwnerId, NameId), Value>,
   pub mutations: BTreeMap<swc_common::Span, NameId>,
+  pub refs: HashMap<swc_common::Span, NameId>,
   pub diagnostics: Vec<Diagnostic>,
+  pub pointer_allocator: PointerAllocator,
+  pub reg_allocators: HashMap<OwnerId, RegAllocator>,
 }
 
 impl ScopeAnalysis {
@@ -75,17 +84,18 @@ impl ScopeAnalysis {
       sa.names.insert(
         NameId::Builtin(builtin.clone()),
         Name {
-          id: NameId::Builtin(builtin),
+          id: NameId::Builtin(builtin.clone()),
           owner_id: OwnerId::Module,
           sym: swc_atoms::JsWord::from(builtin_name),
           type_: NameType::Builtin,
+          value: Value::Builtin(builtin),
           mutations: vec![],
           captures: vec![],
         },
       );
     }
 
-    for (name, _) in CONSTANTS {
+    for (name, value) in CONSTANTS {
       sa.names.insert(
         NameId::Constant(name),
         Name {
@@ -93,6 +103,7 @@ impl ScopeAnalysis {
           owner_id: OwnerId::Module,
           sym: swc_atoms::JsWord::from(name),
           type_: NameType::Constant,
+          value,
           mutations: vec![],
           captures: vec![],
         },
@@ -143,12 +154,43 @@ impl ScopeAnalysis {
     return sa;
   }
 
-  fn insert_name(&mut self, scope: &XScope, type_: NameType, origin_ident: &swc_ecma_ast::Ident) {
+  pub fn lookup(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Value {
+    let name_id = self.refs.get(&ident.span).expect("Couldn't find ident");
+    let name = self.names.get(name_id).expect("name_id didn't map to name");
+
+    if &name.owner_id == scope {
+      name.value.clone()
+    } else {
+      let value = self
+        .capture_values
+        .get(&(scope.clone(), name_id.clone()))
+        .expect("Captured ident not in capture_values");
+
+      value.clone()
+    }
+  }
+
+  fn allocate_reg(&mut self, scope: &OwnerId, based_on_name: &str) -> Register {
+    self
+      .reg_allocators
+      .entry(scope.clone())
+      .or_insert_with(|| RegAllocator::default())
+      .allocate(based_on_name)
+  }
+
+  fn insert_name(
+    &mut self,
+    scope: &XScope,
+    type_: NameType,
+    value: Value,
+    origin_ident: &swc_ecma_ast::Ident,
+  ) {
     let name = Name {
       id: NameId::Span(origin_ident.span),
       owner_id: scope.borrow().owner_id.clone(),
       sym: origin_ident.sym.clone(),
       type_,
+      value,
       mutations: Vec::new(),
       captures: Vec::new(),
     };
@@ -169,6 +211,26 @@ impl ScopeAnalysis {
     );
   }
 
+  fn insert_pointer_name(
+    &mut self,
+    scope: &XScope,
+    type_: NameType,
+    origin_ident: &swc_ecma_ast::Ident,
+  ) {
+    let pointer = Value::Pointer(self.pointer_allocator.allocate(&origin_ident.sym));
+    self.insert_name(scope, type_, pointer, origin_ident);
+  }
+
+  fn insert_reg_name(
+    &mut self,
+    scope: &XScope,
+    type_: NameType,
+    origin_ident: &swc_ecma_ast::Ident,
+  ) {
+    let reg = Value::Register(self.allocate_reg(&scope.borrow().owner_id, &origin_ident.sym));
+    self.insert_name(scope, type_, reg, origin_ident);
+  }
+
   fn insert_capture(&mut self, captor_id: &OwnerId, name_id: &NameId, ref_: swc_common::Span) {
     let name = match self.names.get_mut(name_id) {
       Some(name) => name,
@@ -182,11 +244,24 @@ impl ScopeAnalysis {
       }
     };
 
-    self
+    let inserted = self
       .captures
       .entry(captor_id.clone())
       .or_insert_with(HashSet::new)
       .insert(name_id.clone());
+
+    if inserted {
+      let key = (captor_id.clone(), name_id.clone());
+
+      // This is just self.allocate_reg, but we can't borrow all of self right now
+      let reg = self
+        .reg_allocators
+        .entry(captor_id.clone())
+        .or_insert_with(|| RegAllocator::default())
+        .allocate(&name.sym);
+
+      self.capture_values.insert(key, Value::Register(reg));
+    }
 
     name.captures.push(Capture {
       ref_,
@@ -255,13 +330,13 @@ impl ScopeAnalysis {
           return;
         }
 
-        self.insert_name(scope, NameType::Import, &named_specifier.local);
+        self.insert_pointer_name(scope, NameType::Import, &named_specifier.local);
       }
       Default(default_specifier) => {
-        self.insert_name(scope, NameType::Import, &default_specifier.local);
+        self.insert_pointer_name(scope, NameType::Import, &default_specifier.local);
       }
       Namespace(namespace_specifier) => {
-        self.insert_name(scope, NameType::Import, &namespace_specifier.local);
+        self.insert_pointer_name(scope, NameType::Import, &namespace_specifier.local);
       }
     }
   }
@@ -309,7 +384,7 @@ impl ScopeAnalysis {
     let child_scope = scope.nest(Some(OwnerId::Span(function.span.clone())));
 
     if let Some(name) = name {
-      self.insert_name(&child_scope, NameType::Function, name);
+      self.insert_pointer_name(&child_scope, NameType::Function, name);
     }
 
     for param in &function.params {
@@ -339,10 +414,10 @@ impl ScopeAnalysis {
         }
         ModuleDecl::ExportDecl(ed) => match &ed.decl {
           swc_ecma_ast::Decl::Class(class_decl) => {
-            self.insert_name(&scope, NameType::Class, &class_decl.ident);
+            self.insert_pointer_name(&scope, NameType::Class, &class_decl.ident);
           }
           swc_ecma_ast::Decl::Fn(fn_decl) => {
-            self.insert_name(&scope, NameType::Function, &fn_decl.ident);
+            self.insert_pointer_name(&scope, NameType::Function, &fn_decl.ident);
           }
           swc_ecma_ast::Decl::Var(var_decl) => {
             let name_type = match var_decl.kind {
@@ -353,7 +428,7 @@ impl ScopeAnalysis {
 
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(&scope, name_type, &ident);
+                self.insert_pointer_name(&scope, name_type, &ident);
               }
             }
           }
@@ -370,12 +445,12 @@ impl ScopeAnalysis {
         ModuleDecl::ExportDefaultDecl(edd) => match &edd.decl {
           swc_ecma_ast::DefaultDecl::Class(class_decl) => {
             if let Some(ident) = &class_decl.ident {
-              self.insert_name(&scope, NameType::Class, ident);
+              self.insert_pointer_name(&scope, NameType::Class, ident);
             }
           }
           swc_ecma_ast::DefaultDecl::Fn(fn_decl) => {
             if let Some(ident) = &fn_decl.ident {
-              self.insert_name(&scope, NameType::Function, ident);
+              self.insert_pointer_name(&scope, NameType::Function, ident);
             }
           }
           swc_ecma_ast::DefaultDecl::TsInterfaceDecl(_) => {}
@@ -415,7 +490,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident);
               }
             }
           }
@@ -432,7 +507,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident);
               }
             }
           }
@@ -443,7 +518,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident);
               }
             }
           }
@@ -454,7 +529,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident);
               }
             }
           }
@@ -477,10 +552,10 @@ impl ScopeAnalysis {
     match stmt {
       Stmt::Decl(decl) => match decl {
         Decl::Class(class) => {
-          self.insert_name(scope, NameType::Class, &class.ident);
+          self.insert_pointer_name(scope, NameType::Class, &class.ident);
         }
         Decl::Fn(fn_) => {
-          self.insert_name(scope, NameType::Function, &fn_.ident);
+          self.insert_pointer_name(scope, NameType::Function, &fn_.ident);
         }
         Decl::Var(var_decl) => {
           self.block_level_hoists_var_decl(scope, var_decl);
@@ -507,7 +582,7 @@ impl ScopeAnalysis {
 
     for decl in &var_decl.decls {
       for ident in self.get_pat_idents(&decl.name) {
-        self.insert_name(scope, name_type, &ident);
+        self.insert_reg_name(scope, name_type, &ident);
       }
     }
   }
@@ -687,7 +762,7 @@ impl ScopeAnalysis {
     let child_scope = scope.nest(Some(OwnerId::Span(class_.span)));
 
     if let Some(ident) = ident {
-      self.insert_name(&child_scope, NameType::Class, ident);
+      self.insert_pointer_name(&child_scope, NameType::Class, ident);
     }
 
     for member in &class_.body {
@@ -710,7 +785,7 @@ impl ScopeAnalysis {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
               match &ts_param_prop.param {
                 swc_ecma_ast::TsParamPropParam::Ident(ident) => {
-                  self.insert_name(&child_scope, NameType::Param, &ident.id);
+                  self.insert_reg_name(&child_scope, NameType::Param, &ident.id);
                 }
                 swc_ecma_ast::TsParamPropParam::Assign(assign) => {
                   self.param_pat(&child_scope, &assign.left);
@@ -1288,6 +1363,8 @@ impl ScopeAnalysis {
       }
     };
 
+    self.refs.insert(ident.span, name_id.clone());
+
     let name = match self.names.get(&name_id) {
       Some(name) => name,
       None => {
@@ -1524,7 +1601,7 @@ impl ScopeAnalysis {
 
     match param_pat {
       Pat::Ident(ident) => {
-        self.insert_name(&scope, NameType::Param, &ident.id);
+        self.insert_reg_name(&scope, NameType::Param, &ident.id);
       }
       Pat::Array(array_pat) => {
         for elem in &array_pat.elems {
@@ -1544,7 +1621,7 @@ impl ScopeAnalysis {
               self.param_pat(&scope, &key_value.value);
             }
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
-              self.insert_name(&scope, NameType::Param, &assign.key);
+              self.insert_reg_name(&scope, NameType::Param, &assign.key);
 
               if let Some(default) = &assign.value {
                 self.expr(&scope, default);
