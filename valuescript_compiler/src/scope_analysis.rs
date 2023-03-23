@@ -155,19 +155,29 @@ impl ScopeAnalysis {
   }
 
   pub fn lookup(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Value {
-    let name_id = self.refs.get(&ident.span).expect("Couldn't find ident");
+    self.lookup_name_id(
+      scope,
+      self.refs.get(&ident.span).expect("Couldn't find ident"),
+    )
+  }
+
+  pub fn lookup_name_id(&self, scope: &OwnerId, name_id: &NameId) -> Value {
     let name = self.names.get(name_id).expect("name_id didn't map to name");
 
     if &name.owner_id == scope {
       name.value.clone()
     } else {
-      let value = self
-        .capture_values
-        .get(&(scope.clone(), name_id.clone()))
-        .expect("Captured ident not in capture_values");
-
-      value.clone()
+      self.lookup_capture(scope, name_id)
     }
+  }
+
+  pub fn lookup_capture(&self, scope: &OwnerId, name_id: &NameId) -> Value {
+    let value = self
+      .capture_values
+      .get(&(scope.clone(), name_id.clone()))
+      .expect("Captured ident not in capture_values");
+
+    value.clone()
   }
 
   fn allocate_reg(&mut self, scope: &OwnerId, based_on_name: &str) -> Register {
