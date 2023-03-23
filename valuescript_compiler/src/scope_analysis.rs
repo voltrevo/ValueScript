@@ -1360,7 +1360,8 @@ impl ScopeAnalysis {
     };
 
     name.mutations.push(ident.span);
-    self.mutations.insert(ident.span, name_id);
+    self.mutations.insert(ident.span, name_id.clone());
+    self.refs.insert(ident.span, name_id);
   }
 
   fn ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
