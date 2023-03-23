@@ -1,0 +1,19 @@
+export @_anon0 {}
+
+@_anon0 = function() {
+  set_catch :catch0 %_error0
+  new $Error ["boom"] %_tmp0
+  throw %_tmp0
+  unset_catch
+  jmp :finally0
+catch0:
+  set_catch :finally0 %_error1
+  new $Error ["megaboom"] %_tmp0
+  throw %_tmp0
+  unset_catch
+finally0:
+  unset_catch
+  new $Error ["teraboom"] %_tmp0
+  throw %_tmp0
+  throw %_error1
+}
