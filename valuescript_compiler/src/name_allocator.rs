@@ -80,7 +80,6 @@ impl PointerAllocator {
   }
 }
 
-#[derive(Default)]
 pub struct RegAllocator {
   alloc: NameAllocator,
 }
@@ -89,5 +88,16 @@ impl RegAllocator {
   pub fn allocate(&mut self, based_on_name: &str) -> Register {
     let name = self.alloc.allocate(&based_on_name.to_string());
     Register::Named(name)
+  }
+}
+
+impl Default for RegAllocator {
+  fn default() -> Self {
+    let mut alloc = NameAllocator::default();
+    alloc.allocate(&"return".to_string());
+    alloc.allocate(&"this".to_string());
+    alloc.allocate(&"ignore".to_string());
+
+    RegAllocator { alloc }
   }
 }
