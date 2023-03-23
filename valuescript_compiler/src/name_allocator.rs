@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::asm::{Pointer, Register};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct NameAllocator {
   used_names: HashSet<String>,
   released_names: Vec<String>,
@@ -80,6 +80,7 @@ impl PointerAllocator {
   }
 }
 
+#[derive(Clone)]
 pub struct RegAllocator {
   alloc: NameAllocator,
 }
@@ -88,6 +89,28 @@ impl RegAllocator {
   pub fn allocate(&mut self, based_on_name: &str) -> Register {
     let name = self.alloc.allocate(&based_on_name.to_string());
     Register::Named(name)
+  }
+
+  pub fn allocate_fresh(&mut self, based_on_name: &str) -> Register {
+    let name = self.alloc.allocate_fresh(&based_on_name.to_string());
+    Register::Named(name)
+  }
+
+  pub fn allocate_numbered(&mut self, prefix: &str) -> Register {
+    let name = self.alloc.allocate_numbered(&prefix.to_string());
+    Register::Named(name)
+  }
+
+  pub fn allocate_numbered_fresh(&mut self, prefix: &str) -> Register {
+    let name = self.alloc.allocate_numbered_fresh(&prefix.to_string());
+    Register::Named(name)
+  }
+
+  pub fn release(&mut self, reg: &Register) {
+    match reg {
+      Register::Named(name) => self.alloc.release(name),
+      _ => panic!("Can't release non-named register"),
+    }
   }
 }
 

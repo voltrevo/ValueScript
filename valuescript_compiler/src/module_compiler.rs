@@ -11,6 +11,7 @@ use crate::asm::{
   Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Lazy, Module,
   Object, Pointer, Register, Value,
 };
+use crate::scope_analysis::OwnerId;
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 use super::expression_compiler::{CompiledExpression, ExpressionCompiler};
@@ -787,8 +788,11 @@ impl ModuleCompiler {
       ));
     }
 
-    let mut member_initializers_fnc =
-      FunctionCompiler::new(&self.scope_analysis, self.definition_allocator.clone());
+    let mut member_initializers_fnc = FunctionCompiler::new(
+      &self.scope_analysis,
+      &OwnerId::Span(class.span),
+      self.definition_allocator.clone(),
+    );
 
     for class_member in &class.body {
       match class_member {
@@ -843,7 +847,11 @@ impl ModuleCompiler {
           dependent_definitions.append(&mut self.compile_fn(
             ctor_defn_name.clone(),
             None,
-            Functionish::Constructor(member_initializers_assembly.clone(), ctor.clone()),
+            Functionish::Constructor(
+              member_initializers_assembly.clone(),
+              class.span,
+              ctor.clone(),
+            ),
             parent_scope,
           ));
 

@@ -12,7 +12,7 @@ use crate::asm::{
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
-use crate::name_allocator::NameAllocator;
+use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::scope_reg;
 use crate::scope::{MappedName, Scope};
 use crate::scope_analysis::{OwnerId, ScopeAnalysis};
@@ -21,7 +21,23 @@ use crate::scope_analysis::{OwnerId, ScopeAnalysis};
 pub enum Functionish {
   Fn(swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
-  Constructor(Vec<InstructionOrLabel>, swc_ecma_ast::Constructor),
+  Constructor(
+    Vec<InstructionOrLabel>,
+    swc_common::Span,
+    swc_ecma_ast::Constructor,
+  ),
+}
+
+impl Functionish {
+  pub fn owner_id(&self) -> OwnerId {
+    let span = match self {
+      Functionish::Fn(fn_) => &fn_.span,
+      Functionish::Arrow(arrow) => &arrow.span,
+      Functionish::Constructor(_, class_span, _) => class_span,
+    };
+
+    OwnerId::Span(span.clone())
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -47,7 +63,7 @@ pub struct FunctionCompiler {
   pub definitions: Vec<Definition>,
   pub scope_analysis: Rc<ScopeAnalysis>,
   pub definition_allocator: Rc<RefCell<NameAllocator>>,
-  pub reg_allocator: NameAllocator,
+  pub reg_allocator: RegAllocator,
   pub label_allocator: NameAllocator,
   pub queue: Queue<QueuedFunction>,
   pub loop_labels: Vec<LoopLabels>,
@@ -62,12 +78,14 @@ pub struct FunctionCompiler {
 impl FunctionCompiler {
   pub fn new(
     scope_analysis: &Rc<ScopeAnalysis>,
+    owner_id: &OwnerId,
     definition_allocator: Rc<RefCell<NameAllocator>>,
   ) -> FunctionCompiler {
-    let mut reg_allocator = NameAllocator::default();
-    reg_allocator.allocate(&"return".to_string());
-    reg_allocator.allocate(&"this".to_string());
-    reg_allocator.allocate(&"ignore".to_string());
+    let reg_allocator = scope_analysis
+      .reg_allocators
+      .get(owner_id)
+      .expect("Missing reg allocator")
+      .clone();
 
     return FunctionCompiler {
       current: Function::default(),
@@ -128,42 +146,29 @@ impl FunctionCompiler {
   }
 
   pub fn allocate_tmp(&mut self) -> Register {
-    return Register::Named(self.reg_allocator.allocate_numbered(&"_tmp".to_string()));
+    self.reg_allocator.allocate_numbered("_tmp")
   }
 
   pub fn allocate_reg(&mut self, based_on: &String) -> Register {
-    return Register::Named(self.reg_allocator.allocate(based_on));
+    self.reg_allocator.allocate(based_on)
   }
 
   pub fn allocate_reg_fresh(&mut self, based_on: &String) -> Register {
-    return Register::Named(self.reg_allocator.allocate_fresh(based_on));
+    self.reg_allocator.allocate_fresh(based_on)
   }
 
   pub fn allocate_numbered_reg(&mut self, prefix: &str) -> Register {
-    return Register::Named(self.reg_allocator.allocate_numbered(&prefix.to_string()));
+    self.reg_allocator.allocate_numbered(prefix)
   }
 
   pub fn allocate_numbered_reg_fresh(&mut self, prefix: &str) -> Register {
-    return Register::Named(
-      self
-        .reg_allocator
-        .allocate_numbered_fresh(&prefix.to_string()),
-    );
+    self
+      .reg_allocator
+      .allocate_numbered_fresh(&prefix.to_string())
   }
 
   pub fn release_reg(&mut self, reg: &Register) {
-    match reg {
-      Register::Named(name) => {
-        self.reg_allocator.release(name);
-      }
-      _ => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!("Tried to release non-named register {:?}", reg),
-          span: swc_common::DUMMY_SP,
-        });
-      }
-    }
+    self.reg_allocator.release(reg);
   }
 
   pub fn compile(
@@ -174,7 +179,11 @@ impl FunctionCompiler {
     definition_allocator: Rc<RefCell<NameAllocator>>,
     parent_scope: &Scope,
   ) -> (Vec<Definition>, Vec<Diagnostic>) {
-    let mut self_ = FunctionCompiler::new(scope_analysis, definition_allocator);
+    let mut self_ = FunctionCompiler::new(
+      scope_analysis,
+      &functionish.owner_id(),
+      definition_allocator,
+    );
 
     self_
       .queue
@@ -219,7 +228,12 @@ impl FunctionCompiler {
     let scope = parent_scope.nest();
 
     // TODO: Use a new FunctionCompiler per function instead of this hack
-    self.reg_allocator = NameAllocator::default();
+    self.reg_allocator = self
+      .scope_analysis
+      .reg_allocators
+      .get(&functionish.owner_id())
+      .expect("Missing reg allocator for fn")
+      .clone();
 
     match fn_name {
       // TODO: Capture propagation when using this name recursively
@@ -269,7 +283,7 @@ impl FunctionCompiler {
           expression_compiler.compile(expr, Some(Register::Return));
         }
       },
-      Functionish::Constructor(member_initializers_assembly, constructor) => {
+      Functionish::Constructor(member_initializers_assembly, _class_span, constructor) => {
         let mut mia_copy = member_initializers_assembly.clone();
         self.current.body.append(&mut mia_copy);
 
@@ -319,7 +333,7 @@ impl FunctionCompiler {
           self.populate_scope_pat(p, scope);
         }
       }
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(_, _class_span, constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
@@ -368,7 +382,7 @@ impl FunctionCompiler {
           param_registers.push(self.get_pattern_register(p, scope));
         }
       }
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(_, _class_span, constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
@@ -437,7 +451,7 @@ impl FunctionCompiler {
           ec.pat(p, &param_registers[i], false, scope);
         }
       }
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(_, _class_span, constructor) => {
         for (i, potspp) in constructor.params.iter().enumerate() {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
