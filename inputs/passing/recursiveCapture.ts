@@ -1,7 +1,9 @@
-export default function main() {
-  let one = 1;
+// test_output! 120
 
-  function factorial(n) {
+export default function main() {
+  const one = 1;
+
+  function factorial(n: number): number {
     if (n === 0) {
       return 1;
     }
