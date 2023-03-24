@@ -1039,7 +1039,31 @@ impl FunctionCompiler {
 
     match decl {
       Class(class) => self.todo(class.span(), "Class declaration"),
-      Fn(_) => {}
+      Fn(fn_decl) => {
+        self
+          .queue
+          .add(QueuedFunction {
+            definition_pointer: match self.lookup(&fn_decl.ident) {
+              Some(Value::Pointer(p)) => p,
+              _ => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: format!(
+                    "Lookup of function {} was not a pointer, lookup_result: {:?}",
+                    fn_decl.ident.sym,
+                    self.lookup(&fn_decl.ident)
+                  ),
+                  span: fn_decl.ident.span,
+                });
+
+                return;
+              }
+            },
+            fn_name: Some(fn_decl.ident.sym.to_string()),
+            functionish: Functionish::Fn(fn_decl.function.clone()),
+          })
+          .expect("Failed to add function to queue");
+      }
       Var(var_decl) => self.var_declaration(var_decl),
       TsInterface(interface_decl) => self.todo(interface_decl.span, "TsInterface declaration"),
       TsTypeAlias(_) => {}
