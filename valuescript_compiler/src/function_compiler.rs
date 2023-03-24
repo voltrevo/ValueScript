@@ -227,6 +227,8 @@ impl FunctionCompiler {
       None => RegAllocator::default(),
     };
 
+    self.owner_id = functionish.owner_id();
+
     // TODO: Transitive captures
     let capture_params = self.scope_analysis.captures.get(&functionish.owner_id());
 
@@ -236,15 +238,10 @@ impl FunctionCompiler {
         .lookup_capture(&self.owner_id, cap_param)
       {
         Some(Value::Register(reg)) => reg,
-        _ => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!("Expected capture to be a register"),
-            span: functionish.span(),
-          });
 
-          self.reg_allocator.allocate_numbered("_error_cap_register")
-        }
+        // Technically we can capture definitions, and maybe in future variables that have been
+        // reduced to constant values. We can just ignore these here.
+        _ => continue,
       };
 
       self.current.parameters.push(reg.clone());
@@ -364,12 +361,13 @@ impl FunctionCompiler {
   pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
     match self.scope_analysis.lookup(&self.owner_id, ident) {
       Some(Value::Register(reg)) => reg,
-      _ => {
+      lookup_result => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: format!(
-            "Register should have been allocated for variable {}",
-            ident.sym.to_string()
+            "Register should have been allocated for variable {}, instead: {:?}",
+            ident.sym.to_string(),
+            lookup_result,
           ),
           span: ident.span(),
         });
