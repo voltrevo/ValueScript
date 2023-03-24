@@ -126,40 +126,8 @@ impl ScopeAnalysis {
       sa.module_item(&scope, module_item);
     }
 
-    for (name_id, name) in &sa.names {
-      if name.captures.len() > 0 {
-        if name.type_ == NameType::Let {
-          match name_id {
-            NameId::Span(span) => {
-              sa.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::Lint,
-                message: format!(
-                  "`{}` should be declared using `const` because it is implicitly \
-                  const due to capture",
-                  name.sym
-                ),
-                span: *span,
-              });
-            }
-            NameId::Builtin(_) | NameId::Constant(_) => {
-              sa.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "Builtin/constant should not have type_ let".to_string(),
-                span: swc_common::DUMMY_SP,
-              });
-            }
-          }
-        }
-
-        for mutation in &name.mutations {
-          sa.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: format!("Cannot mutate captured variable `{}`", name.sym),
-            span: *mutation,
-          });
-        }
-      }
-    }
+    sa.find_capture_mutations();
+    sa.expand_captures();
 
     return sa;
   }
@@ -1811,6 +1779,143 @@ impl ScopeAnalysis {
   fn var_decl(&mut self, scope: &XScope, var_decl: &swc_ecma_ast::VarDecl) {
     for decl in &var_decl.decls {
       self.var_declarator(&scope, var_decl.kind, decl);
+    }
+  }
+
+  fn find_capture_mutations(&mut self) {
+    for (name_id, name) in &self.names {
+      if name.captures.len() > 0 {
+        if name.type_ == NameType::Let {
+          match name_id {
+            NameId::Span(span) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::Lint,
+                message: format!(
+                  "`{}` should be declared using `const` because it is implicitly \
+                  const due to capture",
+                  name.sym
+                ),
+                span: *span,
+              });
+            }
+            NameId::Builtin(_) | NameId::Constant(_) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "Builtin/constant should not have type_ let".to_string(),
+                span: swc_common::DUMMY_SP,
+              });
+            }
+          }
+        }
+
+        for mutation in &name.mutations {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: format!("Cannot mutate captured variable `{}`", name.sym),
+            span: *mutation,
+          });
+        }
+      }
+    }
+  }
+
+  pub fn name_id_to_owner_id(&mut self, name_id: &NameId) -> Option<OwnerId> {
+    let name = match self.names.get(name_id) {
+      Some(name) => name,
+      None => {
+        // TODO: Add a name lookup helper that does this diagnostic
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "NameId not found".to_string(),
+          span: swc_common::DUMMY_SP,
+        });
+
+        return None;
+      }
+    };
+
+    if name.type_ == NameType::Function {
+      match name_id {
+        NameId::Span(span) => Some(OwnerId::Span(*span)),
+        NameId::Builtin(_) | NameId::Constant(_) => None,
+      }
+    } else {
+      None
+    }
+  }
+
+  fn expand_captures(&mut self) {
+    let captors: Vec<OwnerId> = self.captures.keys().map(|k| k.clone()).collect();
+
+    for captor in captors {
+      let mut full_captures = HashSet::<NameId>::new();
+
+      let mut owners_to_process = Vec::<OwnerId>::new();
+      owners_to_process.push(captor.clone());
+      let mut owners_to_process_i = 0;
+
+      let mut owners_processed = HashSet::<OwnerId>::new();
+
+      loop {
+        let owner = match owners_to_process.get(owners_to_process_i) {
+          Some(o) => o,
+          None => break,
+        };
+
+        owners_to_process_i += 1;
+
+        let inserted = owners_processed.insert(owner.clone());
+
+        if !inserted {
+          continue;
+        }
+
+        let captures = match self.captures.get(&owner) {
+          Some(captures) => captures.clone(),
+          None => continue,
+        };
+
+        for cap in captures.iter() {
+          let name = self.names.get(cap).expect("Failed to get name");
+
+          if name.owner_id == captor {
+            continue;
+          }
+
+          full_captures.insert(cap.clone());
+
+          let owner_id = match self.name_id_to_owner_id(cap) {
+            Some(owner_id) => owner_id,
+            None => continue,
+          };
+
+          owners_to_process.push(owner_id);
+        }
+      }
+
+      for cap in &full_captures {
+        self
+          .capture_values
+          .entry((captor.clone(), cap.clone()))
+          .or_insert_with(|| {
+            let name = self.names.get(cap).expect("Failed to get name");
+
+            if let Value::Register(_) = name.value {
+              // This is just self.allocate_reg, but we can't borrow all of self right now
+              let reg = self
+                .reg_allocators
+                .entry(captor.clone())
+                .or_insert_with(|| RegAllocator::default())
+                .allocate(&name.sym);
+
+              Value::Register(reg)
+            } else {
+              name.value.clone()
+            }
+          });
+      }
+
+      self.captures.insert(captor, full_captures);
     }
   }
 }

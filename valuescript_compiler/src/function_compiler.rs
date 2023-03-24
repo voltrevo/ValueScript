@@ -234,7 +234,6 @@ impl FunctionCompiler {
 
     self.owner_id = functionish.owner_id();
 
-    // TODO: Transitive captures
     let capture_params = self.scope_analysis.captures.get(&functionish.owner_id());
 
     for cap_param in capture_params.unwrap_or(&HashSet::new()) {

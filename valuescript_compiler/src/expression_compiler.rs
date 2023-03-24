@@ -1126,7 +1126,10 @@ impl<'a> ExpressionCompiler<'a> {
           None => {
             self.fnc.diagnostics.push(Diagnostic {
               level: DiagnosticLevel::InternalError,
-              message: format!("Failed to find capture {:?}", cap),
+              message: format!(
+                "Failed to find capture {:?} for scope {:?}",
+                cap, self.fnc.owner_id
+              ),
               span: cap.span(),
             });
 
