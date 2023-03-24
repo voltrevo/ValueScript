@@ -906,14 +906,20 @@ impl ScopeAnalysis {
         self.expr(scope, &bin.left);
         self.expr(scope, &bin.right);
       }
-      Expr::Assign(assign) => match &assign.left {
-        swc_ecma_ast::PatOrExpr::Pat(pat) => {
-          self.mutate_pat(scope, pat);
+      Expr::Assign(assign) => {
+        match &assign.left {
+          swc_ecma_ast::PatOrExpr::Pat(pat) => {
+            self.pat(scope, pat);
+            self.mutate_pat(scope, pat);
+          }
+          swc_ecma_ast::PatOrExpr::Expr(expr) => {
+            self.expr(scope, expr);
+            self.mutate_expr(scope, expr);
+          }
         }
-        swc_ecma_ast::PatOrExpr::Expr(expr) => {
-          self.mutate_expr(scope, expr);
-        }
-      },
+
+        self.expr(scope, &assign.right);
+      }
       Expr::Seq(seq) => {
         for expr in &seq.exprs {
           self.expr(scope, expr);
@@ -1035,6 +1041,53 @@ impl ScopeAnalysis {
           message: "TODO".to_string(),
           span: private_name.span,
         });
+      }
+    }
+  }
+
+  fn pat(&mut self, scope: &XScope, pat: &swc_ecma_ast::Pat) {
+    use swc_ecma_ast::Pat;
+
+    match pat {
+      Pat::Ident(ident) => {
+        self.ident(scope, &ident.id);
+      }
+      Pat::Array(array) => {
+        for elem in &array.elems {
+          if let Some(elem) = elem {
+            self.pat(scope, elem);
+          }
+        }
+      }
+      Pat::Rest(rest) => {
+        self.pat(scope, &rest.arg);
+      }
+      Pat::Object(object) => {
+        for prop in &object.props {
+          match prop {
+            swc_ecma_ast::ObjectPatProp::KeyValue(key_value) => {
+              self.pat(scope, &key_value.value);
+            }
+            swc_ecma_ast::ObjectPatProp::Assign(assign) => {
+              self.ident(scope, &assign.key);
+
+              if let Some(value) = &assign.value {
+                self.expr(scope, value);
+              }
+            }
+            swc_ecma_ast::ObjectPatProp::Rest(rest) => {
+              self.pat(scope, &rest.arg);
+            }
+          }
+        }
+      }
+      Pat::Assign(assign) => {
+        self.pat(scope, &assign.left);
+        self.expr(scope, &assign.right);
+      }
+      Pat::Invalid(_) => {}
+      Pat::Expr(expr) => {
+        self.expr(scope, expr);
       }
     }
   }

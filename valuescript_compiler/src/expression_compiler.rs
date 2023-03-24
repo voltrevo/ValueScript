@@ -1239,7 +1239,7 @@ impl<'a> ExpressionCompiler<'a> {
       None => {
         self.fnc.todo(
           ident.span,
-          format!("Failed to find identifier {:?}", ident.sym).as_str(),
+          format!("Failed to find identifier {}", ident.sym).as_str(),
         );
 
         Value::Register(self.fnc.allocate_numbered_reg("_todo_identifier"))
