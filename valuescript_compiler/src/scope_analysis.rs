@@ -980,31 +980,8 @@ impl ScopeAnalysis {
           span: await_.span,
         });
       }
-      Expr::Member(member) => {
-        self.expr(scope, &member.obj);
-
-        use swc_ecma_ast::MemberProp;
-
-        match &member.prop {
-          MemberProp::Ident(_) | MemberProp::PrivateName(_) => {}
-          MemberProp::Computed(computed) => {
-            self.expr(scope, &computed.expr);
-          }
-        }
-      }
-      Expr::Call(call) => {
-        match &call.callee {
-          swc_ecma_ast::Callee::Super(_) => {}
-          swc_ecma_ast::Callee::Import(_) => {}
-          swc_ecma_ast::Callee::Expr(expr) => {
-            self.expr(scope, expr);
-          }
-        }
-
-        for arg in &call.args {
-          self.expr(scope, &arg.expr);
-        }
-      }
+      Expr::Member(member) => self.member(scope, member),
+      Expr::Call(call) => self.call(scope, call),
       Expr::New(new) => {
         self.expr(scope, &new.callee);
 
@@ -1014,9 +991,7 @@ impl ScopeAnalysis {
           }
         }
       }
-      Expr::Paren(paren) => {
-        self.expr(scope, &paren.expr);
-      }
+      Expr::Paren(paren) => self.expr(scope, &paren.expr),
       Expr::Tpl(tpl) => {
         for elem in &tpl.exprs {
           self.expr(scope, elem);
@@ -1033,12 +1008,24 @@ impl ScopeAnalysis {
       }
       Expr::MetaProp(_) => {}
       Expr::Invalid(_) => {}
-      Expr::TsTypeAssertion(_) => {}
-      Expr::TsConstAssertion(_) => {}
-      Expr::TsNonNull(_) => {}
-      Expr::TsAs(_) => {}
-      Expr::OptChain(_) => {}
+      Expr::TsTypeAssertion(tta) => self.expr(scope, &tta.expr),
+      Expr::TsConstAssertion(tca) => self.expr(scope, &tca.expr),
+      Expr::TsNonNull(tnn) => self.expr(scope, &tnn.expr),
+      Expr::TsAs(ta) => self.expr(scope, &ta.expr),
+      Expr::OptChain(opt_chain) => {
+        use swc_ecma_ast::OptChainBase;
 
+        match &opt_chain.base {
+          OptChainBase::Call(call) => {
+            self.expr(scope, &call.callee);
+
+            for arg in &call.args {
+              self.expr(scope, &arg.expr);
+            }
+          }
+          OptChainBase::Member(member) => self.member(scope, member),
+        }
+      }
       Expr::SuperProp(super_prop) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
@@ -1089,6 +1076,33 @@ impl ScopeAnalysis {
           span: private_name.span,
         });
       }
+    }
+  }
+
+  fn member(&mut self, scope: &XScope, member: &swc_ecma_ast::MemberExpr) {
+    self.expr(scope, &member.obj);
+
+    use swc_ecma_ast::MemberProp;
+
+    match &member.prop {
+      MemberProp::Ident(_) | MemberProp::PrivateName(_) => {}
+      MemberProp::Computed(computed) => {
+        self.expr(scope, &computed.expr);
+      }
+    }
+  }
+
+  fn call(&mut self, scope: &XScope, call: &swc_ecma_ast::CallExpr) {
+    match &call.callee {
+      swc_ecma_ast::Callee::Super(_) => {}
+      swc_ecma_ast::Callee::Import(_) => {}
+      swc_ecma_ast::Callee::Expr(expr) => {
+        self.expr(scope, expr);
+      }
+    }
+
+    for arg in &call.args {
+      self.expr(scope, &arg.expr);
     }
   }
 
