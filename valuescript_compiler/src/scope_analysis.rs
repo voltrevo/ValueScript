@@ -299,11 +299,14 @@ impl ScopeAnalysis {
         ModuleDecl::ExportDecl(ed) => {
           self.decl(&scope, &ed.decl);
         }
-        ModuleDecl::ExportNamed(en) => {
-          for specifier in &en.specifiers {
-            self.export_specifier(&scope, specifier);
+        ModuleDecl::ExportNamed(en) => match en.src {
+          Some(_) => {}
+          None => {
+            for specifier in &en.specifiers {
+              self.export_specifier(&scope, specifier);
+            }
           }
-        }
+        },
         ModuleDecl::ExportDefaultDecl(edd) => {
           self.default_decl(&scope, &edd.decl);
         }
