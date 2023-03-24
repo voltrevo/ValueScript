@@ -410,10 +410,15 @@ impl ModuleCompiler {
             }
             None => match self.scope_analysis.lookup(&OwnerId::Module, &orig_name) {
               Some(Value::Pointer(p)) => Some(p),
-              _ => {
+              lookup_result => {
                 self.diagnostics.push(Diagnostic {
                   level: DiagnosticLevel::InternalError,
-                  message: format!("Definition for {} should have been in scope", orig_name),
+                  message: format!(
+                    "{} should have been a pointer, but it was {:?}, ref: {:?}",
+                    orig_name,
+                    lookup_result,
+                    self.scope_analysis.refs.get(&orig_name.span)
+                  ),
                   span: named.orig.span(),
                 });
 

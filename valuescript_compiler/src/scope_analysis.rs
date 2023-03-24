@@ -299,7 +299,11 @@ impl ScopeAnalysis {
         ModuleDecl::ExportDecl(ed) => {
           self.decl(&scope, &ed.decl);
         }
-        ModuleDecl::ExportNamed(_) => {}
+        ModuleDecl::ExportNamed(en) => {
+          for specifier in &en.specifiers {
+            self.export_specifier(&scope, specifier);
+          }
+        }
         ModuleDecl::ExportDefaultDecl(edd) => {
           self.default_decl(&scope, &edd.decl);
         }
@@ -358,6 +362,37 @@ impl ScopeAnalysis {
       Namespace(namespace_specifier) => {
         self.insert_pointer_name(scope, NameType::Import, &namespace_specifier.local);
       }
+    }
+  }
+
+  fn export_specifier(&mut self, scope: &XScope, export_specifier: &swc_ecma_ast::ExportSpecifier) {
+    use swc_ecma_ast::ExportSpecifier::*;
+    use swc_ecma_ast::ModuleExportName;
+
+    match export_specifier {
+      Named(named_specifier) => {
+        if named_specifier.is_type_only {
+          return;
+        }
+
+        match &named_specifier.orig {
+          ModuleExportName::Ident(ident) => self.ident(scope, ident),
+          ModuleExportName::Str(_) => self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: ModuleExportName::Str".to_string(),
+            span: export_specifier.span(),
+          }),
+        }
+      }
+      Default(default_specifier) => self.ident(scope, &default_specifier.exported),
+      Namespace(namespace_specifier) => match &namespace_specifier.name {
+        ModuleExportName::Ident(ident) => self.ident(scope, ident),
+        ModuleExportName::Str(_) => self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: ModuleExportName::Str".to_string(),
+          span: export_specifier.span(),
+        }),
+      },
     }
   }
 
