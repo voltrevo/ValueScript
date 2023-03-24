@@ -273,14 +273,18 @@ impl ScopeAnalysis {
     if inserted {
       let key = (captor_id.clone(), name_id.clone());
 
-      // This is just self.allocate_reg, but we can't borrow all of self right now
-      let reg = self
-        .reg_allocators
-        .entry(captor_id.clone())
-        .or_insert_with(|| RegAllocator::default())
-        .allocate(&name.sym);
+      if let Value::Register(_) = name.value {
+        // This is just self.allocate_reg, but we can't borrow all of self right now
+        let reg = self
+          .reg_allocators
+          .entry(captor_id.clone())
+          .or_insert_with(|| RegAllocator::default())
+          .allocate(&name.sym);
 
-      self.capture_values.insert(key, Value::Register(reg));
+        self.capture_values.insert(key, Value::Register(reg));
+      } else {
+        self.capture_values.insert(key, name.value.clone());
+      }
     }
 
     name.captures.push(Capture {
