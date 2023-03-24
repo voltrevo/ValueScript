@@ -1,4 +1,4 @@
-// // test_output! 232792560
+// test_output! 232792560
 
 import { factorize } from "./helpers/primes.ts";
 

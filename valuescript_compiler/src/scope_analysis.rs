@@ -406,6 +406,13 @@ impl ScopeAnalysis {
   fn decl(&mut self, scope: &XScope, decl: &swc_ecma_ast::Decl) {
     use swc_ecma_ast::Decl;
 
+    if is_declare(decl) {
+      // E.g.:
+      //   declare function foo(): void;
+      // These are just type declarations, so we can ignore them
+      return;
+    }
+
     match decl {
       Decl::Class(class_decl) => {
         self.class_(scope, &Some(class_decl.ident.clone()), &class_decl.class);
@@ -611,27 +618,33 @@ impl ScopeAnalysis {
     use swc_ecma_ast::Decl;
     use swc_ecma_ast::Stmt;
 
-    match stmt {
-      Stmt::Decl(decl) => match decl {
-        Decl::Class(class) => {
-          self.insert_pointer_name(scope, NameType::Class, &class.ident);
-        }
-        Decl::Fn(fn_) => {
-          self.insert_pointer_name(scope, NameType::Function, &fn_.ident);
-        }
-        Decl::Var(var_decl) => {
-          self.block_level_hoists_var_decl(scope, var_decl);
-        }
-        Decl::TsInterface(_) => {}
-        Decl::TsTypeAlias(_) => {}
-        Decl::TsEnum(_) => {
-          // Diagnostic emitted after hoist processing
-        }
-        Decl::TsModule(_) => {
-          // Diagnostic emitted after hoist processing
-        }
-      },
-      _ => {}
+    let decl = match stmt {
+      Stmt::Decl(decl) => decl,
+      _ => return,
+    };
+
+    if is_declare(decl) {
+      return;
+    }
+
+    match decl {
+      Decl::Class(class) => {
+        self.insert_pointer_name(scope, NameType::Class, &class.ident);
+      }
+      Decl::Fn(fn_) => {
+        self.insert_pointer_name(scope, NameType::Function, &fn_.ident);
+      }
+      Decl::Var(var_decl) => {
+        self.block_level_hoists_var_decl(scope, var_decl);
+      }
+      Decl::TsInterface(_) => {}
+      Decl::TsTypeAlias(_) => {}
+      Decl::TsEnum(_) => {
+        // Diagnostic emitted after hoist processing
+      }
+      Decl::TsModule(_) => {
+        // Diagnostic emitted after hoist processing
+      }
     }
   }
 
@@ -1883,4 +1896,16 @@ fn init_std_scope() -> XScope {
     parent: None,
   }))
   .nest(None)
+}
+
+fn is_declare(decl: &swc_ecma_ast::Decl) -> bool {
+  match decl {
+    swc_ecma_ast::Decl::Class(class_decl) => class_decl.declare,
+    swc_ecma_ast::Decl::Fn(fn_decl) => fn_decl.declare,
+    swc_ecma_ast::Decl::Var(var_decl) => var_decl.declare,
+    swc_ecma_ast::Decl::TsInterface(ts_interface_decl) => ts_interface_decl.declare,
+    swc_ecma_ast::Decl::TsTypeAlias(ts_type_alias_decl) => ts_type_alias_decl.declare,
+    swc_ecma_ast::Decl::TsEnum(ts_enum_decl) => ts_enum_decl.declare,
+    swc_ecma_ast::Decl::TsModule(ts_module_decl) => ts_module_decl.declare,
+  }
 }
