@@ -1113,6 +1113,7 @@ impl ScopeAnalysis {
         for prop in &object.props {
           match prop {
             swc_ecma_ast::ObjectPatProp::KeyValue(key_value) => {
+              self.prop_key(scope, &key_value.key);
               self.pat(scope, &key_value.value);
             }
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
