@@ -254,7 +254,10 @@ impl ModuleCompiler {
   fn compile_fn_decl(&mut self, export: bool, fn_: &swc_ecma_ast::FnDecl) {
     let fn_name = fn_.ident.sym.to_string();
 
-    let pointer = match self.scope_analysis.lookup(&OwnerId::Module, &fn_.ident) {
+    let pointer = match self
+      .scope_analysis
+      .lookup_value(&OwnerId::Module, &fn_.ident)
+    {
       Some(Value::Pointer(p)) => p,
       _ => {
         self.diagnostics.push(Diagnostic {
@@ -277,7 +280,7 @@ impl ModuleCompiler {
     let mut fn_defns = self.compile_fn(
       pointer,
       Some(fn_name),
-      Functionish::Fn(fn_.function.clone()),
+      Functionish::Fn(Some(fn_.ident.clone()), fn_.function.clone()),
     );
 
     self.module.definitions.append(&mut fn_defns);
@@ -296,7 +299,7 @@ impl ModuleCompiler {
           Some(ident) => {
             let fn_name = ident.sym.to_string();
 
-            let defn = match self.scope_analysis.lookup(&OwnerId::Module, ident) {
+            let defn = match self.scope_analysis.lookup_value(&OwnerId::Module, ident) {
               Some(Value::Pointer(p)) => p,
               _ => {
                 self.diagnostics.push(Diagnostic {
@@ -316,7 +319,11 @@ impl ModuleCompiler {
 
         self.module.export_default = Value::Pointer(defn.clone());
 
-        let mut fn_defns = self.compile_fn(defn, fn_name, Functionish::Fn(fn_.function.clone()));
+        let mut fn_defns = self.compile_fn(
+          defn,
+          fn_name,
+          Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
+        );
 
         self.module.definitions.append(&mut fn_defns);
       }
@@ -408,7 +415,10 @@ impl ModuleCompiler {
 
               Some(defn)
             }
-            None => match self.scope_analysis.lookup(&OwnerId::Module, &orig_name) {
+            None => match self
+              .scope_analysis
+              .lookup_value(&OwnerId::Module, &orig_name)
+            {
               Some(Value::Pointer(p)) => Some(p),
               lookup_result => {
                 self.diagnostics.push(Diagnostic {
@@ -522,7 +532,10 @@ impl ModuleCompiler {
             None => local_name.clone(),
           };
 
-          let pointer = match self.scope_analysis.lookup(&OwnerId::Module, &named.local) {
+          let pointer = match self
+            .scope_analysis
+            .lookup_value(&OwnerId::Module, &named.local)
+          {
             Some(Value::Pointer(p)) => p,
             _ => {
               self.diagnostics.push(Diagnostic {
@@ -555,7 +568,10 @@ impl ModuleCompiler {
         Default(default) => {
           let local_name = default.local.sym.to_string();
 
-          let pointer = match self.scope_analysis.lookup(&OwnerId::Module, &default.local) {
+          let pointer = match self
+            .scope_analysis
+            .lookup_value(&OwnerId::Module, &default.local)
+          {
             Some(Value::Pointer(p)) => p,
             _ => {
               self.diagnostics.push(Diagnostic {
@@ -583,7 +599,7 @@ impl ModuleCompiler {
 
           let pointer = match self
             .scope_analysis
-            .lookup(&OwnerId::Module, &namespace.local)
+            .lookup_value(&OwnerId::Module, &namespace.local)
           {
             Some(Value::Pointer(p)) => p,
             _ => {
@@ -641,7 +657,7 @@ impl ModuleCompiler {
     let mut dependent_definitions: Vec<Definition>;
 
     let defn_name = match ident {
-      Some(ident) => match self.scope_analysis.lookup(&OwnerId::Module, ident) {
+      Some(ident) => match self.scope_analysis.lookup_value(&OwnerId::Module, ident) {
         Some(Value::Pointer(p)) => p,
         _ => {
           self.diagnostics.push(Diagnostic {
@@ -766,7 +782,7 @@ impl ModuleCompiler {
           dependent_definitions.append(&mut self.compile_fn(
             method_defn_name.clone(),
             None,
-            Functionish::Fn(method.function.clone()),
+            Functionish::Fn(None, method.function.clone()),
           ));
 
           methods

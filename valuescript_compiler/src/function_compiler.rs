@@ -13,11 +13,11 @@ use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
 use crate::name_allocator::{NameAllocator, RegAllocator};
-use crate::scope_analysis::{NameId, OwnerId, ScopeAnalysis};
+use crate::scope_analysis::{fn_to_owner_id, NameId, OwnerId, ScopeAnalysis};
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
-  Fn(swc_ecma_ast::Function),
+  Fn(Option<swc_ecma_ast::Ident>, swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
   Constructor(
     Vec<InstructionOrLabel>,
@@ -29,7 +29,7 @@ pub enum Functionish {
 impl Spanned for Functionish {
   fn span(&self) -> swc_common::Span {
     match self {
-      Functionish::Fn(fn_) => fn_.span,
+      Functionish::Fn(_, fn_) => fn_.span,
       Functionish::Arrow(arrow) => arrow.span,
       Functionish::Constructor(_, class_span, _) => *class_span,
     }
@@ -38,7 +38,10 @@ impl Spanned for Functionish {
 
 impl Functionish {
   pub fn owner_id(&self) -> OwnerId {
-    OwnerId::Span(self.span().clone())
+    match self {
+      Functionish::Fn(ident, fn_) => fn_to_owner_id(ident, fn_),
+      _ => OwnerId::Span(self.span().clone()),
+    }
   }
 }
 
@@ -117,12 +120,14 @@ impl FunctionCompiler {
     self.current.body.push(InstructionOrLabel::Label(label));
   }
 
-  pub fn lookup(&self, ident: &swc_ecma_ast::Ident) -> Option<Value> {
-    self.scope_analysis.lookup(&self.owner_id, ident)
+  pub fn lookup_value(&self, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+    self.scope_analysis.lookup_value(&self.owner_id, ident)
   }
 
-  pub fn lookup_name_id(&self, name_id: &NameId) -> Option<Value> {
-    self.scope_analysis.lookup_name_id(&self.owner_id, name_id)
+  pub fn lookup_by_name_id(&self, name_id: &NameId) -> Option<Value> {
+    self
+      .scope_analysis
+      .lookup_by_name_id(&self.owner_id, name_id)
   }
 
   pub fn todo(&mut self, span: swc_common::Span, message: &str) {
@@ -256,7 +261,7 @@ impl FunctionCompiler {
     self.add_param_code(functionish, &param_registers);
 
     match functionish {
-      Functionish::Fn(fn_) => {
+      Functionish::Fn(_, fn_) => {
         match &fn_.body {
           Some(block) => {
             self.handle_block_body(block);
@@ -316,7 +321,7 @@ impl FunctionCompiler {
     let mut param_registers = Vec::<Register>::new();
 
     match functionish {
-      Functionish::Fn(fn_) => {
+      Functionish::Fn(_, fn_) => {
         for p in &fn_.params {
           param_registers.push(self.get_pattern_register(&p.pat));
         }
@@ -359,7 +364,7 @@ impl FunctionCompiler {
   }
 
   pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
-    match self.scope_analysis.lookup(&self.owner_id, ident) {
+    match self.scope_analysis.lookup_value(&self.owner_id, ident) {
       Some(Value::Register(reg)) => reg,
       lookup_result => {
         self.diagnostics.push(Diagnostic {
@@ -379,7 +384,7 @@ impl FunctionCompiler {
 
   fn add_param_code(&mut self, functionish: &Functionish, param_registers: &Vec<Register>) {
     match functionish {
-      Functionish::Fn(fn_) => {
+      Functionish::Fn(_, fn_) => {
         for (i, p) in fn_.params.iter().enumerate() {
           let mut ec = ExpressionCompiler { fnc: self };
           ec.pat(&p.pat, &param_registers[i], false);
@@ -1043,7 +1048,7 @@ impl FunctionCompiler {
         self
           .queue
           .add(QueuedFunction {
-            definition_pointer: match self.lookup(&fn_decl.ident) {
+            definition_pointer: match self.lookup_value(&fn_decl.ident) {
               Some(Value::Pointer(p)) => p,
               _ => {
                 self.diagnostics.push(Diagnostic {
@@ -1051,7 +1056,7 @@ impl FunctionCompiler {
                   message: format!(
                     "Lookup of function {} was not a pointer, lookup_result: {:?}",
                     fn_decl.ident.sym,
-                    self.lookup(&fn_decl.ident)
+                    self.lookup_value(&fn_decl.ident)
                   ),
                   span: fn_decl.ident.span,
                 });
@@ -1060,7 +1065,7 @@ impl FunctionCompiler {
               }
             },
             fn_name: Some(fn_decl.ident.sym.to_string()),
-            functionish: Functionish::Fn(fn_decl.function.clone()),
+            functionish: Functionish::Fn(Some(fn_decl.ident.clone()), fn_decl.function.clone()),
           })
           .expect("Failed to add function to queue");
       }

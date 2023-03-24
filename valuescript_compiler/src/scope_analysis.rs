@@ -164,12 +164,17 @@ impl ScopeAnalysis {
     return sa;
   }
 
-  pub fn lookup(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+  pub fn lookup(&self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
     let name_id = self.refs.get(&ident.span)?;
-    self.lookup_name_id(scope, name_id)
+    self.names.get(name_id)
   }
 
-  pub fn lookup_name_id(&self, scope: &OwnerId, name_id: &NameId) -> Option<Value> {
+  pub fn lookup_value(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+    let name_id = self.refs.get(&ident.span)?;
+    self.lookup_by_name_id(scope, name_id)
+  }
+
+  pub fn lookup_by_name_id(&self, scope: &OwnerId, name_id: &NameId) -> Option<Value> {
     let name = self.names.get(name_id)?;
 
     match &name.value {
@@ -450,7 +455,7 @@ impl ScopeAnalysis {
     name: &Option<swc_ecma_ast::Ident>,
     function: &swc_ecma_ast::Function,
   ) {
-    let child_scope = scope.nest(Some(OwnerId::Span(function.span.clone())));
+    let child_scope = scope.nest(Some(fn_to_owner_id(name, function)));
 
     if let Some(name) = name {
       self.insert_pointer_name(&child_scope, NameType::Function, name);
@@ -1908,4 +1913,14 @@ fn is_declare(decl: &swc_ecma_ast::Decl) -> bool {
     swc_ecma_ast::Decl::TsEnum(ts_enum_decl) => ts_enum_decl.declare,
     swc_ecma_ast::Decl::TsModule(ts_module_decl) => ts_module_decl.declare,
   }
+}
+
+pub fn fn_to_owner_id(
+  name: &Option<swc_ecma_ast::Ident>,
+  function: &swc_ecma_ast::Function,
+) -> OwnerId {
+  OwnerId::Span(match name {
+    Some(name) => name.span,
+    None => function.span,
+  })
 }

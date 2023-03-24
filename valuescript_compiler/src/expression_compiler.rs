@@ -4,10 +4,10 @@ use queues::*;
 
 use swc_common::Spanned;
 
-use crate::asm::{Array, Instruction, Label, Object, Pointer, Register, Value};
+use crate::asm::{Array, Instruction, Label, Object, Register, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
-use crate::scope_analysis::{NameId, OwnerId};
+use crate::scope_analysis::{fn_to_owner_id, NameId, NameType, OwnerId};
 
 pub struct CompiledExpression {
   /** It is usually better to access this via functionCompiler.use_ */
@@ -318,7 +318,7 @@ impl<'a> ExpressionCompiler<'a> {
   }
 
   fn get_register_for_ident_mutation(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
-    let (reg, err_msg) = match self.fnc.lookup(ident) {
+    let (reg, err_msg) = match self.fnc.lookup_value(ident) {
       Some(Value::Register(reg)) => (Some(reg), None),
       lookup_result => (
         None,
@@ -1031,7 +1031,7 @@ impl<'a> ExpressionCompiler<'a> {
       .fnc
       .scope_analysis
       .captures
-      .get(&OwnerId::Span(fn_.function.span))
+      .get(&fn_to_owner_id(&fn_.ident, &fn_.function))
       .cloned();
 
     self
@@ -1040,7 +1040,7 @@ impl<'a> ExpressionCompiler<'a> {
       .add(QueuedFunction {
         definition_pointer: definition_pointer.clone(),
         fn_name: fn_name.clone(),
-        functionish: Functionish::Fn(fn_.function.clone()),
+        functionish: Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
       })
       .expect("Failed to queue function");
 
@@ -1048,7 +1048,7 @@ impl<'a> ExpressionCompiler<'a> {
       None => self.inline(Value::Pointer(definition_pointer), target_register),
       Some(capture_params) => self.capturing_fn_ref(
         fn_name,
-        &definition_pointer,
+        &Value::Pointer(definition_pointer),
         &capture_params,
         target_register,
       ),
@@ -1081,16 +1081,19 @@ impl<'a> ExpressionCompiler<'a> {
 
     match capture_params {
       None => self.inline(Value::Pointer(definition_pointer), target_register),
-      Some(capture_params) => {
-        self.capturing_fn_ref(None, &definition_pointer, &capture_params, target_register)
-      }
+      Some(capture_params) => self.capturing_fn_ref(
+        None,
+        &Value::Pointer(definition_pointer),
+        &capture_params,
+        target_register,
+      ),
     }
   }
 
   pub fn capturing_fn_ref(
     &mut self,
     fn_name: Option<String>,
-    definition_pointer: &Pointer,
+    fn_value: &Value,
     captures: &HashSet<NameId>,
     target_register: Option<Register>,
   ) -> CompiledExpression {
@@ -1113,25 +1116,27 @@ impl<'a> ExpressionCompiler<'a> {
     let mut bind_values = Array::default();
 
     for cap in captures {
-      bind_values.values.push(match self.fnc.lookup_name_id(cap) {
-        Some(v) => match v {
-          Value::Register(_) => v,
-          _ => continue,
-        },
-        None => {
-          self.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!("Failed to find capture {:?}", cap),
-            span: cap.span(),
-          });
+      bind_values
+        .values
+        .push(match self.fnc.lookup_by_name_id(cap) {
+          Some(v) => match v {
+            Value::Register(_) => v,
+            _ => continue,
+          },
+          None => {
+            self.fnc.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: format!("Failed to find capture {:?}", cap),
+              span: cap.span(),
+            });
 
-          continue;
-        }
-      });
+            continue;
+          }
+        });
     }
 
     self.fnc.push(Instruction::Bind(
-      Value::Pointer(definition_pointer.clone()),
+      fn_value.clone(),
       Value::Array(Box::new(bind_values)),
       reg.clone(),
     ));
@@ -1237,7 +1242,29 @@ impl<'a> ExpressionCompiler<'a> {
       return self.inline(Value::Undefined, target_register);
     }
 
-    let value = match self.fnc.lookup(ident) {
+    let fn_as_owner_id = match self.fnc.scope_analysis.lookup(ident) {
+      Some(name) => match name.type_ == NameType::Function {
+        true => match name.id {
+          // TODO: This is a bit of a hack, it might break...
+          // functions have an owner id, and the name id should
+          // have the same span... at least it does now
+          NameId::Span(span) => Some(OwnerId::Span(span)),
+          _ => None, // Internal error?
+        },
+        false => None,
+      },
+      _ => {
+        self.fnc.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: format!("Failed to lookup identifier `{}`", ident.sym),
+          span: ident.span,
+        });
+
+        None
+      }
+    };
+
+    let value = match self.fnc.lookup_value(ident) {
       Some(v) => v, // TODO: Capturing functions
       None => {
         self.fnc.diagnostics.push(Diagnostic {
@@ -1254,7 +1281,22 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    self.inline(value, target_register)
+    match fn_as_owner_id {
+      Some(owner_id) => {
+        let capture_params = self.fnc.scope_analysis.captures.get(&owner_id).cloned();
+
+        match capture_params {
+          Some(capture_params) => self.capturing_fn_ref(
+            Some(ident.sym.to_string()),
+            &value,
+            &capture_params,
+            target_register,
+          ),
+          None => self.inline(value, target_register),
+        }
+      }
+      None => self.inline(value, target_register),
+    }
   }
 
   pub fn compile_literal(&mut self, lit: &swc_ecma_ast::Lit) -> Value {
@@ -1532,7 +1574,7 @@ impl TargetAccessor {
     use swc_ecma_ast::Expr::*;
 
     return match expr {
-      Ident(ident) => match ec.fnc.lookup(ident) {
+      Ident(ident) => match ec.fnc.lookup_value(ident) {
         Some(Value::Register(_)) => true,
         _ => false,
       },
