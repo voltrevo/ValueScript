@@ -1239,7 +1239,11 @@ impl<'a> ExpressionCompiler<'a> {
       None => {
         self.fnc.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: format!("Failed to lookup identifier `{}`", ident.sym),
+          message: format!(
+            "Failed to lookup identifier `{}`, ref: {:?}",
+            ident.sym,
+            self.fnc.scope_analysis.refs.get(&ident.span)
+          ),
           span: ident.span,
         });
 
