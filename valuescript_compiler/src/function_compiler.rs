@@ -652,6 +652,29 @@ impl FunctionCompiler {
     }
 
     self.apply_catch_setting();
+
+    let mut snap_pairs = HashSet::<(Register, Register)>::new();
+
+    if try_.handler.is_some() {
+      let snap_registers: HashSet<Register> = self.get_mutated_registers(try_.block.span);
+
+      for reg in snap_registers {
+        let reg_name = match &reg {
+          Register::Named(name) => name,
+          _ => continue,
+        };
+
+        let snap_reg = self.allocate_reg_fresh(&format!("snap_{}", reg_name));
+
+        self.push(Instruction::Mov(
+          Value::Register(reg.clone()),
+          snap_reg.clone(),
+        ));
+
+        snap_pairs.insert((reg, snap_reg));
+      }
+    }
+
     self.block_statement(&try_.block);
     self.pop_catch_setting(); // TODO: Avoid redundant set_catch to our own finally
 
@@ -662,6 +685,10 @@ impl FunctionCompiler {
     if let Some(catch_clause) = &try_.handler {
       self.label(catch_label.unwrap());
       self.apply_catch_setting(); // TODO: Avoid redundant unset_catch
+
+      for (reg, snap_reg) in snap_pairs {
+        self.push(Instruction::Mov(Value::Register(snap_reg), reg));
+      }
 
       if let Some(param) = &catch_clause.param {
         let mut ec = ExpressionCompiler { fnc: self };
@@ -1134,5 +1161,29 @@ impl FunctionCompiler {
     compiled_expr.release_checker.has_unreleased_registers = false;
 
     return asm;
+  }
+
+  fn get_mutated_registers(&self, span: swc_common::Span) -> HashSet<Register> {
+    let start = swc_common::Span {
+      lo: span.lo,
+      hi: span.lo,
+      ctxt: span.ctxt,
+    };
+
+    let end = swc_common::Span {
+      lo: span.hi,
+      hi: span.hi,
+      ctxt: span.ctxt,
+    };
+
+    let mut mutated_registers = HashSet::<Register>::new();
+
+    for (_span, mutated_name_id) in self.scope_analysis.mutations.range(start..end) {
+      if let Some(Value::Register(reg)) = self.lookup_by_name_id(mutated_name_id) {
+        mutated_registers.insert(reg);
+      }
+    }
+
+    mutated_registers
   }
 }
