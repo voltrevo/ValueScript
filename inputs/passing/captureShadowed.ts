@@ -1,3 +1,5 @@
+// test_output! 7
+
 export default function main() {
   function foo() {
     const x = 3;
