@@ -944,6 +944,15 @@ impl ScopeAnalysis {
       }
       Expr::Member(member) => {
         self.expr(scope, &member.obj);
+
+        use swc_ecma_ast::MemberProp;
+
+        match &member.prop {
+          MemberProp::Ident(_) | MemberProp::PrivateName(_) => {}
+          MemberProp::Computed(computed) => {
+            self.expr(scope, &computed.expr);
+          }
+        }
       }
       Expr::Call(call) => {
         match &call.callee {

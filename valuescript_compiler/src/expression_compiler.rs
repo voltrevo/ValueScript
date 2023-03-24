@@ -1237,10 +1237,11 @@ impl<'a> ExpressionCompiler<'a> {
     let value = match self.fnc.lookup(ident) {
       Some(v) => v, // TODO: Capturing functions
       None => {
-        self.fnc.todo(
-          ident.span,
-          format!("Failed to find identifier {}", ident.sym).as_str(),
-        );
+        self.fnc.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: format!("Failed to lookup identifier `{}`", ident.sym),
+          span: ident.span,
+        });
 
         Value::Register(self.fnc.allocate_numbered_reg("_todo_identifier"))
       }
