@@ -1114,7 +1114,10 @@ impl<'a> ExpressionCompiler<'a> {
 
     for cap in captures {
       bind_values.values.push(match self.fnc.lookup_name_id(cap) {
-        Some(v) => v,
+        Some(v) => match v {
+          Value::Register(_) => v,
+          _ => continue,
+        },
         None => {
           self.fnc.diagnostics.push(Diagnostic {
             level: DiagnosticLevel::InternalError,
@@ -1122,7 +1125,7 @@ impl<'a> ExpressionCompiler<'a> {
             span: cap.span(),
           });
 
-          Value::Void
+          continue;
         }
       });
     }
