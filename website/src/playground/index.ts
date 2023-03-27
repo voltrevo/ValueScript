@@ -112,6 +112,16 @@ editorEl.innerHTML = '';
 
     editor.setModel(model);
     handleUpdate();
+
+    if (Object.keys(files).includes(currentFile)) {
+      renameBtn.classList.add('disabled');
+      restoreBtn.classList.remove('disabled');
+      deleteBtn.classList.add('disabled');
+    } else {
+      renameBtn.classList.remove('disabled');
+      restoreBtn.classList.add('disabled');
+      deleteBtn.classList.remove('disabled');
+    }
   }
 
   const moveFileIndex = (change: number) => () => {
