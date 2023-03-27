@@ -1,7 +1,7 @@
-import nil from "./helpers/nil.ts";
+import nil from './helpers/nil';
 
 function blockTrim(text: string) {
-  let lines = text.split("\n");
+  let lines = text.split('\n');
 
   while (lines.length > 0 && /^ *$/.test(lines[0])) {
     lines.shift();
@@ -14,7 +14,7 @@ function blockTrim(text: string) {
   let minIndent = Infinity;
 
   for (const line of lines) {
-    if (line.trim() === "") {
+    if (line.trim() === '') {
       continue;
     }
 
@@ -29,11 +29,11 @@ function blockTrim(text: string) {
 
   lines = lines.map((line) => line.slice(minIndent));
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 const files: Record<string, string | nil> = {
-  "tutorial/hello.ts": blockTrim(`
+  'tutorial/hello.ts': blockTrim(`
     // Welcome to the ValueScript playground!
     //
     // This playground also acts as a tutorial by describing a variety of
@@ -48,7 +48,7 @@ const files: Record<string, string | nil> = {
     // When you're ready, click the next arrow ('>') above to continue.
   `),
 
-  "tutorial/valueSemantics.ts": blockTrim(`
+  'tutorial/valueSemantics.ts': blockTrim(`
     export default function main() {
       const leftBowl = ['apple', 'mango'];
 
@@ -66,7 +66,7 @@ const files: Record<string, string | nil> = {
     // and therefore \`leftBowl\` doesn't change.
   `),
 
-  "tutorial/revertOnCatch.ts": blockTrim(`
+  'tutorial/revertOnCatch.ts': blockTrim(`
     export default function () {
       let x = 0;
 
@@ -87,7 +87,7 @@ const files: Record<string, string | nil> = {
     // local - nothing else can be affected.
   `),
 
-  "examples/factorial.ts": blockTrim(`
+  'examples/factorial.ts': blockTrim(`
     export default function main() {
       return factorial(5);
     }
@@ -101,7 +101,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/counter.ts": blockTrim(`
+  'examples/counter.ts': blockTrim(`
     export default function main() {
       let c = new Counter();
 
@@ -117,7 +117,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/reverse.ts": blockTrim(`
+  'examples/reverse.ts': blockTrim(`
     export default function main() {
       const values = ['a', 'b', 'c'];
     
@@ -143,7 +143,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/binaryTree.ts": blockTrim(`
+  'examples/binaryTree.ts': blockTrim(`
     export default function main() {
       let tree = new BinaryTree<number>();
 
@@ -199,7 +199,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/mergeSort.ts": blockTrim(`
+  'examples/mergeSort.ts': blockTrim(`
     export default function main() {
       const x = [7, 18, 9, 11, 16, 3, 8, 2, 5, 4, 6, 14, 15, 17, 10, 12, 1, 13];
 
@@ -253,7 +253,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/quickSort.ts": blockTrim(`
+  'examples/quickSort.ts': blockTrim(`
     export default function main() {
       const x = [7, 18, 9, 11, 16, 3, 8, 2, 5, 4, 6, 14, 15, 17, 10, 12, 1, 13];
     
@@ -325,7 +325,7 @@ const files: Record<string, string | nil> = {
     }  
   `),
 
-  "examples/idGenerationError.ts": blockTrim(`
+  'examples/idGenerationError.ts': blockTrim(`
     export default function main() {
       let nextId = 1;
           
@@ -344,7 +344,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/idGeneration.ts": blockTrim(`
+  'examples/idGeneration.ts': blockTrim(`
     export default function main() {
       let idGen = new IdGenerator();
     
@@ -371,7 +371,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/sideEffectsArticle/enablePirateError.ts": blockTrim(`
+  'examples/sideEffectsArticle/enablePirateError.ts': blockTrim(`
     export default function main() {
       let pirateEnabled = false;
 
@@ -396,7 +396,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/sideEffectsArticle/lyingAboutA.ts": blockTrim(`
+  'examples/sideEffectsArticle/lyingAboutA.ts': blockTrim(`
     export default function main() {
       let a = 5;
       a += 2;
@@ -405,7 +405,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/sideEffectsArticle/add1To50WithMutation.ts": blockTrim(`
+  'examples/sideEffectsArticle/add1To50WithMutation.ts': blockTrim(`
     export default function main() {
       let sum = 0;
 
@@ -417,7 +417,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/sideEffectsArticle/add1To50WithoutMutation.ts": blockTrim(`
+  'examples/sideEffectsArticle/add1To50WithoutMutation.ts': blockTrim(`
     export default function main() {
       return makeRange(1, 51)
         .reduce((a, b) => a + b);
@@ -434,7 +434,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/sideEffectsArticle/enablePirateWorkaround.ts": blockTrim(`
+  'examples/sideEffectsArticle/enablePirateWorkaround.ts': blockTrim(`
     export default function main() {
       let pirateEnabled = false;
 
@@ -468,7 +468,7 @@ const files: Record<string, string | nil> = {
     }
   `),
 
-  "examples/sideEffectsArticle/actorEnablePirate.ts": blockTrim(`
+  'examples/sideEffectsArticle/actorEnablePirate.ts': blockTrim(`
     export default function main() {
       let actor = new Actor();
   

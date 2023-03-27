@@ -7,23 +7,13 @@ cd "$SCRIPT_DIR"
 
 rm -rf dist
 mkdir dist
-mkdir dist/monaco
-mkdir dist/monaco/workers
-mkdir dist/monaco/pieces
-mkdir dist/playground
-
-deno run --allow-all --quiet 'https://deno.land/x/packup@v0.2.2/cli.ts' \
-  build src/playground/index.html
-
-mv dist/*.* dist/playground/.
-
-deno run --allow-all --quiet 'https://deno.land/x/packup@v0.2.2/cli.ts' \
-  build src/index.html
+mkdir -p public
 
 pushd ../valuescript_wasm
   wasm-pack build
 popd
 
-cp ../valuescript_wasm/pkg/valuescript_wasm_bg.wasm dist/value_script_bg.wasm
+cp ../valuescript_wasm/pkg/valuescript_wasm_bg.wasm public/value_script_bg.wasm
 
-tar xf monaco.tar.gz -C dist/.
+npm install
+npm run build

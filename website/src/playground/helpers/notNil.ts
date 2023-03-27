@@ -1,4 +1,4 @@
-import nil from "./nil.ts";
+import nil from './nil';
 
 export default function notNil<T>(value: T | nil): T {
   if (value === nil) {

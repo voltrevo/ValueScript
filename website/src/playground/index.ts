@@ -1,71 +1,69 @@
-import monacoPromise from "./monacoPromise.ts";
-
-import files from "./files.ts";
-import assert from "./helpers/assert.ts";
-import nil from "./helpers/nil.ts";
-import notNil from "./helpers/notNil.ts";
+import files from './files';
+import assert from './helpers/assert';
+import nil from './helpers/nil';
+import notNil from './helpers/notNil';
 import VslibPool, {
   CompilerOutput,
   Diagnostic,
   Job,
   RunResult,
-} from "./vslib/VslibPool.ts";
+} from './vslib/VslibPool';
+import monaco from './monaco';
 
 function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
 }
 
-const editorEl = domQuery("#editor");
+const editorEl = domQuery('#editor');
 
-const selectEl = domQuery<HTMLSelectElement>("#file-location select");
-const filePreviousEl = domQuery("#file-previous");
-const fileNextEl = domQuery("#file-next");
-const outcomeEl = domQuery("#outcome");
-const vsmEl = domQuery("#vsm");
-const diagnosticsEl = domQuery("#diagnostics");
+const selectEl = domQuery<HTMLSelectElement>('#file-location select');
+const filePreviousEl = domQuery('#file-previous');
+const fileNextEl = domQuery('#file-next');
+const outcomeEl = domQuery('#outcome');
+const vsmEl = domQuery('#vsm');
+const diagnosticsEl = domQuery('#diagnostics');
 
 for (const filename of Object.keys(files)) {
-  const option = document.createElement("option");
+  const option = document.createElement('option');
   option.textContent = filename;
   selectEl.appendChild(option);
 }
 
-let currentFile = "";
+let currentFile = '';
 
-editorEl.innerHTML = "";
+editorEl.innerHTML = '';
 
 (async () => {
   const vslibPool = new VslibPool();
-  const monaco = await monacoPromise;
 
   (window as any).vslibPool = vslibPool;
 
   const editor = monaco.editor.create(editorEl, {
-    theme: "vs-dark",
-    value: "",
-    language: "typescript",
+    theme: 'vs-dark',
+    value: '',
+    language: 'typescript',
   });
 
   setTimeout(() => changeFile(location.hash.slice(1)));
 
-  globalThis.addEventListener("hashchange", () => {
+  globalThis.addEventListener('hashchange', () => {
     changeFile(location.hash.slice(1));
   });
 
-  globalThis.addEventListener("resize", () => editor.layout());
+  globalThis.addEventListener('resize', () => editor.layout());
 
   const model = notNil(editor.getModel() ?? nil);
 
   model.updateOptions({ tabSize: 2, insertSpaces: true });
 
   function changeFile(newFile: string) {
-    if (currentFile === "") {
+    if (currentFile === '') {
       currentFile = Object.keys(files)[0];
     } else if (newFile === currentFile) {
       return;
     }
 
-    if (newFile === "") {
+    if (newFile === '') {
       newFile = Object.keys(files)[0];
     }
 
@@ -84,7 +82,7 @@ editorEl.innerHTML = "";
     model.setValue(content);
   }
 
-  selectEl.addEventListener("change", () => {
+  selectEl.addEventListener('change', () => {
     changeFile(selectEl.value);
   });
 
@@ -93,7 +91,7 @@ editorEl.innerHTML = "";
     let idx = filenames.indexOf(currentFile);
 
     if (idx === -1) {
-      throw new Error("This should not happen");
+      throw new Error('This should not happen');
     }
 
     idx += change;
@@ -103,8 +101,8 @@ editorEl.innerHTML = "";
     changeFile(filenames[idx]);
   };
 
-  filePreviousEl.addEventListener("click", moveFileIndex(-1));
-  fileNextEl.addEventListener("click", moveFileIndex(1));
+  filePreviousEl.addEventListener('click', moveFileIndex(-1));
+  fileNextEl.addEventListener('click', moveFileIndex(1));
 
   let timerId: undefined | number = undefined;
 
@@ -112,7 +110,7 @@ editorEl.innerHTML = "";
     files[currentFile] = model.getValue();
     clearTimeout(timerId);
 
-    timerId = setTimeout(handleUpdate, 100);
+    timerId = setTimeout(handleUpdate, 100) as unknown as number;
   });
 
   let compileJob: Job<CompilerOutput> | nil = nil;
@@ -134,7 +132,7 @@ editorEl.innerHTML = "";
       compileJob,
       vsmEl,
       (el, compilerOutput) => {
-        el.textContent = compilerOutput.assembly.join("\n");
+        el.textContent = compilerOutput.assembly.join('\n');
       },
     );
 
@@ -142,21 +140,21 @@ editorEl.innerHTML = "";
       runJob,
       outcomeEl,
       (el, runResult) => {
-        if ("Ok" in runResult.output) {
+        if ('Ok' in runResult.output) {
           el.textContent = runResult.output.Ok;
-        } else if ("Err" in runResult.output) {
+        } else if ('Err' in runResult.output) {
           el.textContent = `Uncaught exception: ${runResult.output.Err}`;
         } else {
           never(runResult.output);
         }
 
-        diagnosticsEl.innerHTML = "";
+        diagnosticsEl.innerHTML = '';
 
         for (const diagnostic of runResult.diagnostics) {
-          const diagnosticEl = document.createElement("div");
+          const diagnosticEl = document.createElement('div');
 
           diagnosticEl.classList.add(
-            "diagnostic",
+            'diagnostic',
             toKebabCase(diagnostic.level),
           );
 
@@ -168,7 +166,7 @@ editorEl.innerHTML = "";
 
         monaco.editor.setModelMarkers(
           model,
-          "valuescript",
+          'valuescript',
           runResult.diagnostics.map((diagnostic) => {
             const { line, col } = toLineCol(source, diagnostic.span.start);
             const { line: endLine, col: endCol } = toLineCol(
@@ -207,16 +205,16 @@ editorEl.innerHTML = "";
       (async () => {
         try {
           apply(el, await job.wait());
-          el.classList.remove("error");
-        } catch (err) {
+          el.classList.remove('error');
+        } catch (err: any) {
           if (!(err instanceof Error)) {
             // deno-lint-ignore no-ex-assign
             err = new Error(`Non-error exception ${err}`);
           }
 
-          if (err.message !== "Canceled") {
+          if (err.message !== 'Canceled') {
             el.textContent = err.message;
-            el.classList.add("error");
+            el.classList.add('error');
           }
         } finally {
           clearInterval(loadingInterval);
@@ -225,22 +223,23 @@ editorEl.innerHTML = "";
     }
   }
 
-  function toMonacoSeverity(level: Diagnostic["level"]): any {
+  function toMonacoSeverity(level: Diagnostic['level']) {
     switch (level) {
-      case "Error":
-        return monaco.MarkerSeverity.Error;
-      case "InternalError":
-        return monaco.MarkerSeverity.Error;
-      case "Lint":
-        return monaco.MarkerSeverity.Warning;
-      case "CompilerDebug":
-        return monaco.MarkerSeverity.Info;
+    case 'Error':
+      return monaco.MarkerSeverity.Error;
+    case 'InternalError':
+      return monaco.MarkerSeverity.Error;
+    case 'Lint':
+      return monaco.MarkerSeverity.Warning;
+    case 'CompilerDebug':
+      return monaco.MarkerSeverity.Info;
     }
   }
 })();
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function never(_: never): never {
-  throw new Error("This should not happen");
+  throw new Error('This should not happen');
 }
 
 function toKebabCase(str: string): string {
@@ -251,7 +250,7 @@ function toKebabCase(str: string): string {
 }
 
 function toLineCol(str: string, index: number): { line: number; col: number } {
-  const lines = str.slice(0, index).split("\n");
+  const lines = str.slice(0, index).split('\n');
 
   return { line: lines.length, col: lines[lines.length - 1].length + 1 };
 }

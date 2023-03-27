@@ -3,7 +3,7 @@ export async function initVslib() {
   const wasm: Record<string, any> = (await WebAssembly.instantiateStreaming(
     fetch(`${location.origin}/value_script_bg.wasm`),
     {
-      "./valuescript_wasm_bg.js": { __wbindgen_throw },
+      './valuescript_wasm_bg.js': { __wbindgen_throw },
     },
   )).instance.exports;
 
@@ -78,7 +78,7 @@ export async function initVslib() {
     return cachegetInt32Memory0;
   }
 
-  const cachedTextDecoder = new TextDecoder("utf-8", {
+  const cachedTextDecoder = new TextDecoder('utf-8', {
     ignoreBOM: true,
     fatal: true,
   });
@@ -139,4 +139,4 @@ export async function initVslib() {
     compile,
     run,
   };
-}
+};
