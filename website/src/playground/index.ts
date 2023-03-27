@@ -16,7 +16,9 @@ function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
 }
 
-const editorEl = domQuery('#editor');
+const editorLoadingEl = domQuery('#editor-loading');
+const monacoEditorEl = domQuery('#monaco-editor');
+const fileListEl = domQuery('#file-list');
 
 const fileLocationText = domQuery('#file-location-text');
 
@@ -33,8 +35,6 @@ const vsmEl = domQuery('#vsm');
 const diagnosticsEl = domQuery('#diagnostics');
 
 let currentFile = '';
-
-editorEl.innerHTML = '';
 
 (async () => {
   const vslibPool = new VslibPool();
@@ -60,7 +60,9 @@ editorEl.innerHTML = '';
     },
   ));
 
-  const editor = monaco.editor.create(editorEl, {
+  editorLoadingEl.remove();
+
+  const editor = monaco.editor.create(monacoEditorEl, {
     theme: 'vs-dark',
     language: 'typescript',
   });
@@ -342,7 +344,44 @@ editorEl.innerHTML = '';
       changeFile(fs.list[idx]);
     }
   };
+
+  listBtn.onclick = async () => {
+    monacoEditorEl.style.display = 'none';
+
+    fileListEl.textContent = '';
+
+    fileListEl.appendChild(makeFileSpacer('0.5em'));
+
+    for (const file of fs.list) {
+      const fileEl = document.createElement('div');
+      fileEl.classList.add('file');
+      fileEl.textContent = file;
+
+      if (file === currentFile) {
+        fileEl.classList.add('current');
+      }
+
+      fileEl.onclick = () => {
+        changeFile(file);
+        monacoEditorEl.style.display = '';
+        fileListEl.style.display = '';
+      };
+
+      fileListEl.appendChild(fileEl);
+    }
+
+    fileListEl.appendChild(makeFileSpacer('1.5em'));
+
+    fileListEl.style.display = 'flex';
+  };
 })();
+
+function makeFileSpacer(minHeight: string) {
+  const spacer = document.createElement('div');
+  spacer.classList.add('file-spacer');
+  spacer.style.minHeight = minHeight;
+  return spacer;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function never(_: never): never {
