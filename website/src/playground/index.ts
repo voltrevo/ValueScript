@@ -8,6 +8,7 @@ import VslibPool, {
   Job,
   RunResult,
 } from './vslib/VslibPool';
+import FileSystem from './FileSystem';
 import monaco from './monaco';
 
 function domQuery<T = HTMLElement>(query: string): T {
@@ -38,9 +39,12 @@ editorEl.innerHTML = '';
 
   (window as any).vslibPool = vslibPool;
 
-  const fileModels = Object.fromEntries(Object.entries(files).map(
-    ([filename, content]) => {
-      assert(content !== undefined);
+  const fs = new FileSystem(files);
+
+  const fileModels = Object.fromEntries(fs.list.map(
+    (filename) => {
+      const content = fs.read(filename);
+      assert(content !== nil);
 
       const model = monaco.editor.createModel(
         content,
@@ -130,7 +134,7 @@ editorEl.innerHTML = '';
   filePreviousEl.addEventListener('click', moveFileIndex(-1));
   fileNextEl.addEventListener('click', moveFileIndex(1));
 
-  let timerId: undefined | number = undefined;
+  let timerId: nil | number = nil;
 
   editor.onDidChangeModelContent(() => {
     clearTimeout(timerId);
@@ -148,6 +152,7 @@ editorEl.innerHTML = '';
     runJob?.cancel();
 
     const source = editor.getValue();
+    fs.write(currentFile, source);
 
     compileJob = vslibPool.compile(source);
     runJob = vslibPool.run(source);
