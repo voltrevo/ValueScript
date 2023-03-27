@@ -296,6 +296,27 @@ editorEl.innerHTML = '';
       editor.setValue(defaultContent);
     }
   };
+
+  renameBtn.onclick = async () => {
+    const currentParts = currentFile.split('/');
+
+    const prefill = currentParts.length === 1
+      ? ''
+      : `${currentParts.slice(0, -1).join('/')}/`;
+    
+    const popup = await Swal.fire({
+      title: 'Rename File',
+      input: 'text',
+      inputValue: prefill,
+      inputPlaceholder: currentFile,
+    });
+
+    if (typeof popup.value === 'string' && popup.value !== '') {
+      const newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
+      fs.rename(currentFile, newFile);
+      changeFile(newFile);
+    }
+  };
 })();
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

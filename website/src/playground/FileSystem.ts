@@ -52,4 +52,15 @@ export default class FileSystem {
       }
     }
   }
+
+  rename(file: string, newFile: string): void {
+    const content = this.read(file);
+
+    if (content === nil) {
+      return;
+    }
+
+    this.write(newFile, content, file);
+    this.write(file, nil);
+  }
 }
