@@ -288,6 +288,14 @@ editorEl.innerHTML = '';
       changeFile(newFile);
     }
   };
+
+  restoreBtn.onclick = async () => {
+    const defaultContent = files[currentFile];
+
+    if (defaultContent !== undefined) {
+      editor.setValue(defaultContent);
+    }
+  };
 })();
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
