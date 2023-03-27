@@ -7,6 +7,7 @@ const outDir = resolve(__dirname, 'dist');
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  publicDir: resolve(__dirname, 'public'),
   root: src,
   plugins: [react()],
   build: {
@@ -15,7 +16,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(src, 'index.html'),
-        app: resolve(src, 'app.html'),
+        playground: resolve(src, 'playground', 'index.html'),
       },
     },
   },
