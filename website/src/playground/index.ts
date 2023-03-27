@@ -38,11 +38,41 @@ editorEl.innerHTML = '';
 
   (window as any).vslibPool = vslibPool;
 
+  const fileModels = Object.fromEntries(Object.entries(files).map(
+    ([filename, content]) => {
+      assert(content !== undefined);
+
+      const model = monaco.editor.createModel(
+        content,
+        'typescript',
+        monaco.Uri.parse(filename),
+      );
+
+      model.updateOptions({ tabSize: 2, insertSpaces: true });
+
+      return [filename, model];
+    },
+  ));
+
   const editor = monaco.editor.create(editorEl, {
     theme: 'vs-dark',
-    value: '',
     language: 'typescript',
   });
+
+  {
+    const editorService = (editor as any)._codeEditorService;
+    const openEditorBase = editorService.openCodeEditor.bind(editorService);
+    editorService.openCodeEditor = async (input: any, source: any) => {
+      const result = await openEditorBase(input, source);
+
+      if (result === null) {
+        changeFile(input.resource.path.slice(1));
+        editor.setSelection(input.options.selection);
+      }
+
+      return result; // always return the base result
+    };
+  }
 
   setTimeout(() => changeFile(location.hash.slice(1)));
 
@@ -51,10 +81,6 @@ editorEl.innerHTML = '';
   });
 
   globalThis.addEventListener('resize', () => editor.layout());
-
-  const model = notNil(editor.getModel() ?? nil);
-
-  model.updateOptions({ tabSize: 2, insertSpaces: true });
 
   function changeFile(newFile: string) {
     if (currentFile === '') {
@@ -76,10 +102,10 @@ editorEl.innerHTML = '';
     location.hash = currentFile;
     selectEl.selectedIndex = fileIdx;
 
-    const content = files[currentFile];
-    assert(content !== nil);
+    const model = fileModels[currentFile];
 
-    model.setValue(content);
+    editor.setModel(model);
+    handleUpdate();
   }
 
   selectEl.addEventListener('change', () => {
@@ -106,10 +132,8 @@ editorEl.innerHTML = '';
 
   let timerId: undefined | number = undefined;
 
-  model.onDidChangeContent(() => {
-    files[currentFile] = model.getValue();
+  editor.onDidChangeModelContent(() => {
     clearTimeout(timerId);
-
     timerId = setTimeout(handleUpdate, 100) as unknown as number;
   });
 
@@ -123,7 +147,7 @@ editorEl.innerHTML = '';
     compileJob?.cancel();
     runJob?.cancel();
 
-    const source = model.getValue();
+    const source = editor.getValue();
 
     compileJob = vslibPool.compile(source);
     runJob = vslibPool.run(source);
@@ -163,6 +187,9 @@ editorEl.innerHTML = '';
 
           diagnosticsEl.appendChild(diagnosticEl);
         }
+
+        const model = editor.getModel();
+        assert(model !== null);
 
         monaco.editor.setModelMarkers(
           model,
