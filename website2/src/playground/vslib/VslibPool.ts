@@ -2,34 +2,35 @@ import * as valuescript from 'valuescript';
 import nil from '../helpers/nil';
 import { initVslib } from './index';
 
+async function main() {
+  const vslib = await initVslib();
+
+  self.postMessage('ready');
+
+  self.onmessage = (evt) => {
+    const { method, args } = evt.data;
+
+    if (method === 'compile') {
+      try {
+        self.postMessage({ ok: vslib.compile(args[0]) });
+      } catch (err) {
+        self.postMessage({ err });
+      }
+    }
+
+    if (method === 'run') {
+      try {
+        self.postMessage({ ok: vslib.run(args[0]) });
+      } catch (err) {
+        self.postMessage({ err });
+      }
+    }
+  };
+}
+
 const workerScript = [
   initVslib.toString(),
-  (async function main() {
-    const vslib = await initVslib();
-
-    self.postMessage('ready');
-
-    self.onmessage = (evt) => {
-      const { method, args } = evt.data;
-
-      if (method === 'compile') {
-        try {
-          self.postMessage({ ok: vslib.compile(args[0]) });
-        } catch (err) {
-          self.postMessage({ err });
-        }
-      }
-
-      if (method === 'run') {
-        try {
-          self.postMessage({ ok: vslib.run(args[0]) });
-        } catch (err) {
-          self.postMessage({ err });
-        }
-      }
-    };
-  }).toString(),
-  'main();',
+  `(${main.toString()})()`,
 ].join('\n\n');
 
 const workerUrl = URL.createObjectURL(

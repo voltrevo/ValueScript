@@ -139,4 +139,4 @@ export async function initVslib() {
     compile,
     run,
   };
-}
+};
