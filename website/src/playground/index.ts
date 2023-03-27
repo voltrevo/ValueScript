@@ -298,12 +298,16 @@ editorEl.innerHTML = '';
   };
 
   renameBtn.onclick = async () => {
+    if (renameBtn.classList.contains('disabled')) {
+      return;
+    }
+
     const currentParts = currentFile.split('/');
 
     const prefill = currentParts.length === 1
       ? ''
       : `${currentParts.slice(0, -1).join('/')}/`;
-    
+
     const popup = await Swal.fire({
       title: 'Rename File',
       input: 'text',
@@ -315,6 +319,27 @@ editorEl.innerHTML = '';
       const newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
       fs.rename(currentFile, newFile);
       changeFile(newFile);
+    }
+  };
+
+  deleteBtn.onclick = async () => {
+    if (deleteBtn.classList.contains('disabled')) {
+      return;
+    }
+
+    const popup = await Swal.fire({
+      title: 'Delete File',
+      text: `Are you sure you want to delete ${currentFile}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (popup.isConfirmed) {
+      const idx = Math.max(0, fs.list.indexOf(currentFile) - 1);
+      fs.write(currentFile, nil);
+      changeFile(fs.list[idx]);
     }
   };
 })();
