@@ -18,7 +18,7 @@ function domQuery<T = HTMLElement>(query: string): T {
 
 const editorEl = domQuery('#editor');
 
-const fileLocation = domQuery<HTMLSelectElement>('#file-location');
+const fileLocationText = domQuery('#file-location-text');
 
 const listBtn = domQuery('#list-btn');
 const renameBtn = domQuery('#rename-btn');
@@ -106,7 +106,7 @@ editorEl.innerHTML = '';
     }
 
     location.hash = currentFile;
-    fileLocation.textContent = currentFile;
+    fileLocationText.textContent = currentFile;
 
     const model = fileModels[currentFile];
 
