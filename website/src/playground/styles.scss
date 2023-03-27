@@ -1,3 +1,5 @@
+@import '@sweetalert2/themes/dark/dark.scss';
+
 body {
   background-color: #1e1e1e;
   color: #d4d4d4;
@@ -29,8 +31,12 @@ a, a:visited {
     padding: 0.5em 0;
   }
 
-  #list-button {
-    padding: 0 0.7em;
+  #list-btn {
+    padding: 0 0.75em;
+  }
+
+  #delete-btn {
+    padding-right: 0.75em;
   }
 
   .icon-btn {
@@ -39,6 +45,11 @@ a, a:visited {
     justify-content: center;
     align-items: center;
     cursor: pointer;
+
+    &.disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
   }
 }
 

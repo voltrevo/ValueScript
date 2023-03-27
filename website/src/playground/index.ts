@@ -10,6 +10,7 @@ import VslibPool, {
 } from './vslib/VslibPool';
 import FileSystem from './FileSystem';
 import monaco from './monaco';
+import Swal from './Swal';
 
 function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
@@ -18,6 +19,13 @@ function domQuery<T = HTMLElement>(query: string): T {
 const editorEl = domQuery('#editor');
 
 const fileLocation = domQuery<HTMLSelectElement>('#file-location');
+
+const listBtn = domQuery('#list-btn');
+const renameBtn = domQuery('#rename-btn');
+const addBtn = domQuery('#add-btn');
+const restoreBtn = domQuery('#restore-btn');
+const deleteBtn = domQuery('#delete-btn');
+
 const filePreviousEl = domQuery('#file-previous');
 const fileNextEl = domQuery('#file-next');
 const outcomeEl = domQuery('#outcome');
@@ -91,7 +99,7 @@ editorEl.innerHTML = '';
       newFile = Object.keys(files)[0];
     }
 
-    const fileIdx = Object.keys(files).indexOf(newFile);
+    const fileIdx = fs.list.indexOf(newFile);
 
     if (fileIdx !== -1) {
       currentFile = newFile;
@@ -256,6 +264,20 @@ editorEl.innerHTML = '';
       return monaco.MarkerSeverity.Info;
     }
   }
+
+  addBtn.onclick = async () => {
+    const popup = await Swal.fire({
+      title: 'New File',
+      input: 'text',
+      inputPlaceholder: 'Enter name',
+    });
+
+    if (typeof popup.value === 'string' && popup.value !== '') {
+      const newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
+      fs.write(newFile, '', currentFile);
+      changeFile(newFile);
+    }
+  };
 })();
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

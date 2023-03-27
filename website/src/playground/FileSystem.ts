@@ -25,7 +25,7 @@ export default class FileSystem {
     return this.files[file];
   }
 
-  write(file: string, content: string | nil): void {
+  write(file: string, content: string | nil, afterFile?: string): void {
     if (content === nil) {
       this.list = this.list.filter((f) => f !== file);
       localStorage.setItem('fs-list', JSON.stringify(this.list));
@@ -33,7 +33,13 @@ export default class FileSystem {
       delete this.files[file];
     } else {
       if (!this.list.includes(file)) {
-        this.list.push(file);
+        if (afterFile === nil) {
+          this.list.push(file);
+        } else {
+          const index = this.list.indexOf(afterFile);
+          this.list.splice(index + 1, 0, file);
+        }
+
         localStorage.setItem('fs-list', JSON.stringify(this.list));
       }
   
