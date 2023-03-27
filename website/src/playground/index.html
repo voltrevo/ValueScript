@@ -10,19 +10,25 @@
     <div id="editor">
       <div id="editor-loading"></div>
     </div>
-    <div id="file-selector">
-      <div id="file-previous">&lt;</div>
+    <div id="file-menu">
+      <div id="list-button" class="icon-btn ph-list"></div>
       <div id="file-location">
-        <select></select>
+        Loading...
       </div>
-      <div id="file-next">&gt;</div>
+      <div id="rename-button" class="icon-btn ph-pencil-simple"></div>
+      <div class="grow-spacer"></div>
+      <div id="add-button" class="icon-btn ph-file-plus"></div>
+      <div id="restore-button" class="icon-btn ph-clock-counter-clockwise"></div>
+      <div id="delete-button" class="icon-btn ph-trash"></div>
     </div>
 
     <div id="footer-buttons">
-      <div>New</div>
-      <div>Rename</div>
-      <div>Restore</div>
-      <div>Delete</div>
+      <div id="file-previous">
+        <i class="ph-caret-left"></i><div class="icon-spacer"></div>Previous
+      </div>
+      <div id="file-next">
+        Next<div class="icon-spacer"></div><i class="ph-caret-right"></i>
+      </div>
     </div>
 
     <div id="display">
@@ -39,5 +45,6 @@
     </div>
 
     <script src="index.ts" type="module" defer></script>
+    <script src="https://unpkg.com/phosphor-icons"></script>
   </body>
 </html>

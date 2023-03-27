@@ -17,18 +17,12 @@ function domQuery<T = HTMLElement>(query: string): T {
 
 const editorEl = domQuery('#editor');
 
-const selectEl = domQuery<HTMLSelectElement>('#file-location select');
+const fileLocation = domQuery<HTMLSelectElement>('#file-location');
 const filePreviousEl = domQuery('#file-previous');
 const fileNextEl = domQuery('#file-next');
 const outcomeEl = domQuery('#outcome');
 const vsmEl = domQuery('#vsm');
 const diagnosticsEl = domQuery('#diagnostics');
-
-for (const filename of Object.keys(files)) {
-  const option = document.createElement('option');
-  option.textContent = filename;
-  selectEl.appendChild(option);
-}
 
 let currentFile = '';
 
@@ -104,7 +98,7 @@ editorEl.innerHTML = '';
     }
 
     location.hash = currentFile;
-    selectEl.selectedIndex = fileIdx;
+    fileLocation.textContent = currentFile;
 
     const model = fileModels[currentFile];
 
@@ -112,13 +106,8 @@ editorEl.innerHTML = '';
     handleUpdate();
   }
 
-  selectEl.addEventListener('change', () => {
-    changeFile(selectEl.value);
-  });
-
   const moveFileIndex = (change: number) => () => {
-    const filenames = Object.keys(files);
-    let idx = filenames.indexOf(currentFile);
+    let idx = fs.list.indexOf(currentFile);
 
     if (idx === -1) {
       throw new Error('This should not happen');
@@ -126,9 +115,9 @@ editorEl.innerHTML = '';
 
     idx += change;
     idx = Math.max(idx, 0);
-    idx = Math.min(idx, filenames.length - 1);
+    idx = Math.min(idx, fs.list.length - 1);
 
-    changeFile(filenames[idx]);
+    changeFile(fs.list[idx]);
   };
 
   filePreviousEl.addEventListener('click', moveFileIndex(-1));

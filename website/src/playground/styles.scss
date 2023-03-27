@@ -14,7 +14,7 @@ a, a:visited {
   text-decoration: none;
 }
 
-#file-selector {
+#file-menu {
   background-color: #181818;
   position: absolute;
   left: 0;
@@ -24,15 +24,32 @@ a, a:visited {
   width: 50vw;
   border-bottom: 1px solid black;
   user-select: none;
+
+  #file-location {
+    padding: 0.5em 0;
+  }
+
+  #list-button {
+    padding: 0 0.7em;
+  }
+
+  .icon-btn {
+    padding: 0 0.5em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+  }
 }
 
-#file-selector > div {
-  width: 2em;
-  padding: 0.5em;
-}
-
-#file-location {
+.grow-spacer {
   flex-grow: 1;
+  flex-basis: 0;
+}
+
+.icon-spacer {
+  display: inline-block;
+  width: 0.5em;
 }
 
 #file-location select, #file-location option {
@@ -43,13 +60,6 @@ a, a:visited {
   font-size: 1em;
   width: 100%;
   -webkit-appearance: none;
-  cursor: pointer;
-}
-
-#file-previous, #file-next {
-  color: hsl(44, 100%, 50%);
-  font-weight: bold;
-  text-align: center;
   cursor: pointer;
 }
 
@@ -74,16 +84,13 @@ a, a:visited {
   left: 0;
   bottom: 0;
   width: 50vw;
-  height: 4em;
   background-color: #181818;
   border-top: 1px solid black;
   display: flex;
   flex-direction: row;
-  // justify-content: space-around;
   align-items: center;
 
   > div {
-    height: 4em;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -92,13 +99,16 @@ a, a:visited {
     text-align: center;
     border-left: 1px solid black;
     cursor: pointer;
+    font-size: 1.5em;
+    user-select: none;
+    padding: 0.72em;
 
     &:first-child {
       border-left: none;
     }
 
     &:hover {
-      background-color: rgba(0, 0, 255, 0.2);
+      background-color: rgba(0, 0, 255, 0.1);
     }
   }
 }

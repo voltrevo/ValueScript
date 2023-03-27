@@ -45,7 +45,7 @@ const files: Record<string, string | nil> = {
       return "Hello world!";
     }
 
-    // When you're ready, click the next arrow ('>') above to continue.
+    // When you're ready to continue, click next below.
   `),
 
   'tutorial/valueSemantics.ts': blockTrim(`
