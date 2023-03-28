@@ -363,6 +363,7 @@ let currentFile = '';
     fileListEl.textContent = '';
 
     fileListEl.appendChild(makeFileSpacer('0.5em'));
+    let currentEl: HTMLElement | undefined;
 
     for (const file of fs.list) {
       const fileEl = document.createElement('div');
@@ -371,6 +372,7 @@ let currentFile = '';
 
       if (file === currentFile) {
         fileEl.classList.add('current');
+        currentEl = fileEl;
       }
 
       fileEl.onclick = () => {
@@ -385,6 +387,10 @@ let currentFile = '';
     fileListEl.appendChild(makeFileSpacer('1.5em'));
 
     fileListEl.style.display = 'flex';
+
+    if (currentEl) {
+      currentEl.scrollIntoView();
+    }
   };
 })();
 
