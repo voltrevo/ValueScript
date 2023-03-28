@@ -15,9 +15,28 @@ export default class FileSystem {
       this.list = Object.keys(defaults);
     }
 
+    const missingFiles: string[] = [];
+
     for (const file of this.list) {
       const storedFile: string | null = localStorage.getItem(`fs-${file}`);
-      this.files[file] = storedFile ?? defaults[file];
+      const content = storedFile ?? defaults[file];
+
+      if (content === nil) {
+        missingFiles.push(file);
+        continue;
+      }
+
+      this.files[file] = content;
+    }
+
+    for (const file of missingFiles) {
+      this.write(file, nil);
+    }
+
+    for (const file of Object.keys(defaults)) {
+      if (!this.list.includes(file)) {
+        this.write(file, defaults[file]);
+      }
     }
   }
 
