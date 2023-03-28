@@ -82,7 +82,7 @@ let currentFile = '';
     };
   }
 
-  setTimeout(() => changeFile(location.hash));
+  setTimeout(() => changeFile(location.hash.slice(1)));
 
   globalThis.addEventListener('hashchange', () => {
     changeFile(location.hash);
@@ -164,7 +164,7 @@ let currentFile = '';
     fs.write(currentFile, source);
 
     compileJob = vslibPool.compile(currentFile, fs.files);
-    runJob = vslibPool.runLinked(currentFile, fs.files);
+    runJob = vslibPool.run(currentFile, fs.files);
 
     renderJob(
       compileJob,

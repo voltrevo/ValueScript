@@ -97,4 +97,13 @@ impl VirtualMachine {
 
     Err(exception)
   }
+
+  pub fn read_default_export(bytecode: &Rc<Vec<u8>>) -> Val {
+    let mut bd = BytecodeDecoder {
+      data: bytecode.clone(),
+      pos: 0,
+    };
+
+    bd.decode_val(&Vec::new())
+  }
 }

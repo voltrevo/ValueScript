@@ -117,28 +117,7 @@ export async function initVslib() {
     }
   }
 
-  function run(source: string) {
-    let r0, r1;
-
-    try {
-      const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-      const ptr0 = passStringToWasm0(
-        source,
-        wasm.__wbindgen_malloc,
-        wasm.__wbindgen_realloc,
-      );
-      const len0 = WASM_VECTOR_LEN;
-      wasm.run(retptr, ptr0, len0);
-      r0 = getInt32Memory0()[retptr / 4 + 0];
-      r1 = getInt32Memory0()[retptr / 4 + 1];
-      return getStringFromWasm0(r0, r1);
-    } finally {
-      wasm.__wbindgen_add_to_stack_pointer(16);
-      wasm.__wbindgen_free(r0, r1);
-    }
-  }
-
-  function run_linked(entry_point: string, read_file: (path: string) => string) {
+  function run(entry_point: string, read_file: (path: string) => string) {
     let r0 = undefined;
     let r1 = undefined;
 
@@ -146,7 +125,7 @@ export async function initVslib() {
       const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
       const ptr0 = passStringToWasm0(entry_point, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
       const len0 = WASM_VECTOR_LEN;
-      wasm.run_linked(retptr, ptr0, len0, addBorrowedObject(read_file));
+      wasm.run(retptr, ptr0, len0, addBorrowedObject(read_file));
       r0 = getInt32Memory0()[retptr / 4 + 0];
       r1 = getInt32Memory0()[retptr / 4 + 1];
       return getStringFromWasm0(r0, r1);
@@ -266,6 +245,5 @@ export async function initVslib() {
   return {
     compile,
     run,
-    runLinked: run_linked,
   };
 }

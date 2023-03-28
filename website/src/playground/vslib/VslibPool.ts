@@ -36,19 +36,11 @@ async function main() {
     }
 
     if (method === 'run') {
-      try {
-        self.postMessage({ ok: vslib.run(args[0]) });
-      } catch (err) {
-        self.postMessage({ err });
-      }
-    }
-
-    if (method === 'runLinked') {
       const [entryPoint, files] = args;
 
       try {
         self.postMessage({
-          ok: vslib.runLinked(entryPoint, filePath => {
+          ok: vslib.run(entryPoint, filePath => {
             let content = files[filePath];
 
             if (content === nil && !filePath.endsWith('.ts')) {
@@ -115,12 +107,8 @@ export function mapJob<U, V>(job: Job<U>, f: (x: U) => V): Job<V> {
 export default class VslibPool {
   #pool = new valuescript.WorkerPool(workerUrl);
 
-  run(source: string) {
-    return this.#Job('run', [source]) as Job<RunResult>;
-  }
-
-  runLinked(entryPoint: string, files: Record<string, string | nil>) {
-    return this.#Job('runLinked', [entryPoint, files]) as Job<RunResult>;
+  run(entryPoint: string, files: Record<string, string | nil>) {
+    return this.#Job('run', [entryPoint, files]) as Job<RunResult>;
   }
 
   compile(entryPoint: string, files: Record<string, string | nil>) {

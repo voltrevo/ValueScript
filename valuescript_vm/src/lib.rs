@@ -22,4 +22,4 @@ mod vs_pointer;
 mod vs_value;
 
 pub use virtual_machine::VirtualMachine;
-pub use vs_value::ValTrait;
+pub use vs_value::{LoadFunctionResult, ValTrait};
