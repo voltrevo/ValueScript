@@ -8,12 +8,10 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: ~/.cargo
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+        key: dot-cargo
+        restore-keys: dot-cargo
     - uses: actions/cache@v2
       with:
         path: target
-        key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-target-
+        key: target
+        restore-keys: target
