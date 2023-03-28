@@ -417,8 +417,8 @@ not the subset of ValueScript that has actually been implemented.
 - Destructuring
 - Exceptions
   - Variables changed during try block are reverted on catch
-- Local imports (not yet in the playground)
-- Tree shaking (not yet in the playground)
+- Local imports
+- Tree shaking
 - Copy-on-write optimizations
 - utf8 strings (_not_ JS's utf16 strings)
   - `"🫣".length -> 4`
