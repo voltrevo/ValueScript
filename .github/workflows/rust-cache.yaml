@@ -1,0 +1,18 @@
+name: Rust Cache
+
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/cache@v2
+      with:
+        path: ~/.cargo
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    - uses: actions/cache@v2
+      with:
+        path: target
+        key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-target-
