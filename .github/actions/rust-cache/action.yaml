@@ -1,17 +1,16 @@
 name: Rust Cache
 
-jobs:
-  cache:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/cache@v2
-      with:
-        path: ~/.cargo
-        key: dot-cargo
-        restore-keys: dot-cargo
-    - uses: actions/cache@v2
-      with:
-        path: target
-        key: target
-        restore-keys: target
+runs:
+  using: "composite"
+  steps:
+  - uses: actions/checkout@v2
+  - uses: actions/cache@v2
+    with:
+      path: ~/.cargo
+      key: dot-cargo
+      restore-keys: dot-cargo
+  - uses: actions/cache@v2
+    with:
+      path: target
+      key: target
+      restore-keys: target
