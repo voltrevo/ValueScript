@@ -60,6 +60,8 @@ let currentFile = '';
     },
   ));
 
+  (window as any).fileModels = fileModels;
+
   editorLoadingEl.remove();
 
   const editor = monaco.editor.create(monacoEditorEl, {
@@ -85,7 +87,7 @@ let currentFile = '';
   setTimeout(() => changeFile(location.hash.slice(1)));
 
   globalThis.addEventListener('hashchange', () => {
-    changeFile(location.hash);
+    changeFile(location.hash.slice(1));
   });
 
   globalThis.addEventListener('resize', () => editor.layout());
