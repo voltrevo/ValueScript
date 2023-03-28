@@ -157,10 +157,16 @@ impl ModuleCompiler {
       }
     };
 
-    let scope_analysis = ScopeAnalysis::run(module);
+    let mut scope_analysis = ScopeAnalysis::run(module);
+    let mut scope_analysis_diagnostics = Vec::<Diagnostic>::new();
+    std::mem::swap(
+      &mut scope_analysis_diagnostics,
+      &mut scope_analysis.diagnostics,
+    );
 
     let mut self_ = Self {
       scope_analysis: Rc::new(scope_analysis),
+      diagnostics: scope_analysis_diagnostics,
       ..Default::default()
     };
 
@@ -170,9 +176,6 @@ impl ModuleCompiler {
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
-    let mut scope_analysis = ScopeAnalysis::run(module);
-    self.diagnostics.append(&mut scope_analysis.diagnostics);
-
     for module_item in &module.body {
       self.compile_module_item(module_item);
     }
