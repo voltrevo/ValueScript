@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - uses: ./.github/workflows/cache.yml
+    - uses: ./.github/workflows/rust-cache.yml
 
     - name: Install Rust
       uses: actions-rs/toolchain@v1
