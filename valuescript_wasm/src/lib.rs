@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 use valuescript_compiler::{
-  assemble, compile as compile_internal, CompilerOutput, Diagnostic, DiagnosticLevel, ResolvedPath,
+  assemble, compile as compile_internal, CompileResult, Diagnostic, DiagnosticLevel, ResolvedPath,
 };
 use valuescript_vm::ValTrait;
 
@@ -70,21 +70,35 @@ struct CompilerOutputWasm {
 }
 
 impl CompilerOutputWasm {
-  fn from_compiler_output(output: CompilerOutput) -> CompilerOutputWasm {
+  fn from_compile_result(result: CompileResult) -> CompilerOutputWasm {
     CompilerOutputWasm {
-      diagnostics: vec![("(unknown)".into(), output.diagnostics)]
+      diagnostics: result
+        .diagnostics // TODO: Avoid conversion
         .into_iter()
+        .map(|(path, diagnostics)| (path.to_string(), diagnostics))
         .collect(),
-      assembly: output.module.as_lines(),
+      assembly: match result.module {
+        Some(module) => module.as_lines(),
+        None => vec![],
+      },
     }
   }
 }
 
 #[wasm_bindgen]
-pub fn compile(source: &str) -> String {
-  let output = valuescript_compiler::compile_module(source);
+pub fn compile(entry_point: &str, read_file: &js_sys::Function) -> String {
+  let compile_result = compile_internal(ResolvedPath::from(entry_point.to_string()), |path| {
+    let call_result = read_file.call1(&JsValue::UNDEFINED, &JsValue::from_str(path));
 
-  serde_json::to_string(&CompilerOutputWasm::from_compiler_output(output))
+    match call_result {
+      Ok(result) => result
+        .as_string()
+        .ok_or_else(|| "read_file from JS produced non-string".into()),
+      Err(err) => Err(js_get_error_message(&err)),
+    }
+  });
+
+  serde_json::to_string(&CompilerOutputWasm::from_compile_result(compile_result))
     .expect("Failed json serialization")
 }
 

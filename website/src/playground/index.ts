@@ -163,7 +163,7 @@ let currentFile = '';
     const source = editor.getValue();
     fs.write(currentFile, source);
 
-    compileJob = vslibPool.compile(source);
+    compileJob = vslibPool.compile(currentFile, fs.files);
     runJob = vslibPool.runLinked(currentFile, fs.files);
 
     renderJob(

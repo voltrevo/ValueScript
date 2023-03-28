@@ -99,23 +99,20 @@ export async function initVslib() {
     return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
   }
 
-  function compile(source: string) {
+  function compile(entry_point: string, read_file: (path: string) => string) {
     let r0, r1;
 
     try {
       const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-      const ptr0 = passStringToWasm0(
-        source,
-        wasm.__wbindgen_malloc,
-        wasm.__wbindgen_realloc,
-      );
+      const ptr0 = passStringToWasm0(entry_point, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
       const len0 = WASM_VECTOR_LEN;
-      wasm.compile(retptr, ptr0, len0);
+      wasm.compile(retptr, ptr0, len0, addBorrowedObject(read_file));
       r0 = getInt32Memory0()[retptr / 4 + 0];
       r1 = getInt32Memory0()[retptr / 4 + 1];
       return getStringFromWasm0(r0, r1);
     } finally {
       wasm.__wbindgen_add_to_stack_pointer(16);
+      heap[stack_pointer++] = undefined;
       wasm.__wbindgen_free(r0, r1);
     }
   }

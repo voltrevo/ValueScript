@@ -12,8 +12,24 @@ async function main() {
     const { method, args } = evt.data;
 
     if (method === 'compile') {
+      const [entryPoint, files] = args;
+
       try {
-        self.postMessage({ ok: vslib.compile(args[0]) });
+        self.postMessage({
+          ok: vslib.compile(entryPoint, filePath => {
+            let content = files[filePath];
+
+            if (content === nil && !filePath.endsWith('.ts')) {
+              content = files[`${filePath}.ts`];
+            }
+
+            if (content === nil) {
+              throw new Error('Not found');
+            }
+
+            return content;
+          }),
+        });
       } catch (err) {
         self.postMessage({ err });
       }
@@ -107,8 +123,8 @@ export default class VslibPool {
     return this.#Job('runLinked', [entryPoint, files]) as Job<RunResult>;
   }
 
-  compile(source: string) {
-    return this.#Job('compile', [source]) as Job<CompilerOutput>;
+  compile(entryPoint: string, files: Record<string, string | nil>) {
+    return this.#Job('compile', [entryPoint, files]) as Job<CompilerOutput>;
   }
 
   #Job(method: string, args: unknown[]) {
