@@ -210,8 +210,22 @@ impl ScopeAnalysis {
     type_: NameType,
     origin_ident: &swc_ecma_ast::Ident,
   ) {
-    let pointer = Value::Pointer(self.pointer_allocator.allocate(&origin_ident.sym));
-    self.insert_name(scope, type_, pointer, origin_ident);
+    match scope.get(&origin_ident.sym) {
+      None => {
+        let pointer = Value::Pointer(self.pointer_allocator.allocate(&origin_ident.sym));
+        self.insert_name(scope, type_, pointer, origin_ident);
+      }
+      Some(name_id) => {
+        let name = self.names.get(&name_id).expect("Name not found");
+
+        match &name.value {
+          Value::Pointer(_) => {}
+          _ => {
+            panic!("Expected pointer value for name: {:?}", name);
+          }
+        }
+      }
+    }
   }
 
   fn insert_reg_name(
