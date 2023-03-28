@@ -16,7 +16,7 @@ enum DependencyReason {
   ImportedBy(ResolvedPath),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Dependency {
   path: ResolvedPath,
   reason: DependencyReason,
@@ -94,7 +94,9 @@ where
       module: compiler_output.module,
     };
 
-    for imported_path in get_imported_paths(&path_and_module) {
+    let imported_paths = get_imported_paths(&path_and_module);
+
+    for imported_path in imported_paths {
       if gm.modules.contains_key(&imported_path) {
         continue;
       }

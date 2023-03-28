@@ -4,6 +4,7 @@ import { initVslib } from './index';
 
 async function main() {
   const vslib = await initVslib();
+  const nil = undefined;
 
   self.postMessage('ready');
 
@@ -21,6 +22,30 @@ async function main() {
     if (method === 'run') {
       try {
         self.postMessage({ ok: vslib.run(args[0]) });
+      } catch (err) {
+        self.postMessage({ err });
+      }
+    }
+
+    if (method === 'runLinked') {
+      const [entryPoint, files] = args;
+
+      try {
+        self.postMessage({
+          ok: vslib.runLinked(entryPoint, filePath => {
+            let content = files[filePath];
+
+            if (content === nil && !filePath.endsWith('.ts')) {
+              content = files[`${filePath}.ts`];
+            }
+
+            if (content === nil) {
+              throw new Error('Not found');
+            }
+
+            return content;
+          }),
+        });
       } catch (err) {
         self.postMessage({ err });
       }
@@ -48,12 +73,12 @@ export type Diagnostic = {
 };
 
 export type CompilerOutput = {
-  diagnostics: Diagnostic[];
+  diagnostics: Record<string, Diagnostic[]>;
   assembly: string[];
 };
 
 export type RunResult = {
-  diagnostics: Diagnostic[];
+  diagnostics: Record<string, Diagnostic[]>;
   output:
     | { Ok: string }
     | { Err: string };
@@ -76,6 +101,10 @@ export default class VslibPool {
 
   run(source: string) {
     return this.#Job('run', [source]) as Job<RunResult>;
+  }
+
+  runLinked(entryPoint: string, files: Record<string, string | nil>) {
+    return this.#Job('runLinked', [entryPoint, files]) as Job<RunResult>;
   }
 
   compile(source: string) {

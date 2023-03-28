@@ -74,7 +74,7 @@ let currentFile = '';
       const result = await openEditorBase(input, source);
 
       if (result === null) {
-        changeFile(input.resource.path.slice(1));
+        changeFile(input.resource.path);
         editor.setSelection(input.options.selection);
       }
 
@@ -82,10 +82,10 @@ let currentFile = '';
     };
   }
 
-  setTimeout(() => changeFile(location.hash.slice(1)));
+  setTimeout(() => changeFile(location.hash));
 
   globalThis.addEventListener('hashchange', () => {
-    changeFile(location.hash.slice(1));
+    changeFile(location.hash);
   });
 
   globalThis.addEventListener('resize', () => editor.layout());
@@ -164,7 +164,7 @@ let currentFile = '';
     fs.write(currentFile, source);
 
     compileJob = vslibPool.compile(source);
-    runJob = vslibPool.run(source);
+    runJob = vslibPool.runLinked(currentFile, fs.files);
 
     renderJob(
       compileJob,
@@ -188,18 +188,20 @@ let currentFile = '';
 
         diagnosticsEl.innerHTML = '';
 
-        for (const diagnostic of runResult.diagnostics) {
-          const diagnosticEl = document.createElement('div');
+        for (const [file, diagnostics] of Object.entries(runResult.diagnostics)) {
+          for (const diagnostic of diagnostics) {
+            const diagnosticEl = document.createElement('div');
 
-          diagnosticEl.classList.add(
-            'diagnostic',
-            toKebabCase(diagnostic.level),
-          );
-
-          const { line, col } = toLineCol(source, diagnostic.span.start);
-          diagnosticEl.textContent = `${line}:${col}: ${diagnostic.message}`;
-
-          diagnosticsEl.appendChild(diagnosticEl);
+            diagnosticEl.classList.add(
+              'diagnostic',
+              toKebabCase(diagnostic.level),
+            );
+  
+            const { line, col } = toLineCol(source, diagnostic.span.start);
+            diagnosticEl.textContent = `${file}:${line}:${col}: ${diagnostic.message}`;
+  
+            diagnosticsEl.appendChild(diagnosticEl);
+          }
         }
 
         const model = editor.getModel();
@@ -208,22 +210,28 @@ let currentFile = '';
         monaco.editor.setModelMarkers(
           model,
           'valuescript',
-          runResult.diagnostics.map((diagnostic) => {
-            const { line, col } = toLineCol(source, diagnostic.span.start);
-            const { line: endLine, col: endCol } = toLineCol(
-              source,
-              diagnostic.span.end,
-            );
+          Object.entries(runResult.diagnostics).map(([file, diagnostics]) => {
+            if (file !== currentFile) {
+              return []; // TODO
+            }
 
-            return {
-              severity: toMonacoSeverity(diagnostic.level),
-              startLineNumber: line,
-              startColumn: col,
-              endLineNumber: endLine,
-              endColumn: endCol,
-              message: diagnostic.message,
-            };
-          }),
+            return diagnostics.map((diagnostic) => {
+              const { line, col } = toLineCol(source, diagnostic.span.start);
+              const { line: endLine, col: endCol } = toLineCol(
+                source,
+                diagnostic.span.end,
+              );
+  
+              return {
+                severity: toMonacoSeverity(diagnostic.level),
+                startLineNumber: line,
+                startColumn: col,
+                endLineNumber: endLine,
+                endColumn: endCol,
+                message: diagnostic.message,
+              };
+            });
+          }).flat(),
         );
       },
     );
@@ -285,7 +293,8 @@ let currentFile = '';
     });
 
     if (typeof popup.value === 'string' && popup.value !== '') {
-      const newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
+      let newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
+      newFile = newFile.startsWith('/') ? newFile : `/${newFile}`;
       fs.write(newFile, '', currentFile);
       changeFile(newFile);
     }
@@ -318,7 +327,8 @@ let currentFile = '';
     });
 
     if (typeof popup.value === 'string' && popup.value !== '') {
-      const newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
+      let newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
+      newFile = newFile.startsWith('/') ? newFile : `/${newFile}`;
       fs.rename(currentFile, newFile);
       changeFile(newFile);
     }
