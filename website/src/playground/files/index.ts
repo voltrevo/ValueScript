@@ -9,6 +9,7 @@ export const orderedFiles = [
   '/tutorial/revertOnCatch.ts',
   '/tutorial/strings.ts',
   '/tutorial/binaryTree.ts',
+  '/tutorial/specialFunctions.ts',
 ];
 
 export const defaultFiles: Record<string, string | nil> = {
