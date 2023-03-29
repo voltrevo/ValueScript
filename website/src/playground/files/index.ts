@@ -3,6 +3,7 @@ import raw from './raw';
 
 export const orderedFiles = [
   '/tutorial/hello.ts',
+  '/tutorial/alsoJavaScript.js',
   '/tutorial/valueSemantics.ts',
   '/tutorial/cantMutateCaptures.ts',
   '/tutorial/classBehavior.ts',
@@ -18,6 +19,8 @@ export const defaultFiles: Record<string, string | nil> = {
   ...pick(raw, orderedFiles),
   ...raw,
 };
+
+console.log(Object.entries(defaultFiles));
 
 function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -10,4 +10,4 @@ export default function main() {
 // You can freely edit these examples and their outputs will update in
 // real-time.
 //
-// When you're ready, click next below to see a bit more complexity.
+// When you're ready, continue by clicking next below.

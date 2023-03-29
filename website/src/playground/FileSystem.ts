@@ -24,6 +24,8 @@ export default class FileSystem {
       ...Object.keys(defaultFiles).filter(f => !this.list.includes(f)),
     ];
 
+    localStorage.setItem('fs-list', JSON.stringify(this.list));
+
     for (const file of [...this.list]) {
       const storedFile: string | null = localStorage.getItem(`fs-${file}`);
       const content = storedFile ?? defaultFiles[file];
