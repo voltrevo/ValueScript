@@ -5,7 +5,6 @@
 export default function () {
   //                | JavaScript | ValueScript |
   //                ----------------------------
-
   return [
     "🚀".length, // |          2 |           4 |
     "🚀"[0],     // |   "\ud83d" |         "🚀" |
