@@ -19,5 +19,6 @@ export default defineConfig({
         playground: resolve(src, 'playground', 'index.html'),
       },
     },
+    target: 'esnext',
   },
 });
