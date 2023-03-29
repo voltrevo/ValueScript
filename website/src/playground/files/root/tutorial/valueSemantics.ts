@@ -1,5 +1,5 @@
 // ValueScript is like TypeScript without side effects. We achieve this by
-// deviating from JavaScript in three key ways.
+// deviating from JavaScript in three key ways:
 //
 // 1. Value semantics
 

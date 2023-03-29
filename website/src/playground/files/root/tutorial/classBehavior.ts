@@ -1,5 +1,5 @@
 // ValueScript is like TypeScript without side effects. We achieve this by
-// deviating from JavaScript in three key ways.
+// deviating from JavaScript in three key ways:
 //
 // 3. When `this` changes inside `counter.next()`, the updated `this` value is
 //    used to mutate `counter` when the method returns.

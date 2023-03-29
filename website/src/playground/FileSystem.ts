@@ -1,42 +1,33 @@
+import { defaultFiles, orderedFiles } from './files';
 import nil from './helpers/nil';
 
 export default class FileSystem {
   list: string[];
   files: Record<string, string | nil> = {};
 
-  constructor(public defaults: Record<string, string | nil> = {}) {
-    const storedList: string[] | null = JSON.parse(
-      localStorage.getItem('fs-list') ?? 'null',
+  constructor() {
+    const storedList: string[] = JSON.parse(
+      localStorage.getItem('fs-list') ?? '[]',
     );
 
-    if (storedList !== null) {
-      this.list = storedList;
+    if (orderedFiles.find(f => !storedList.includes(f)) !== undefined) {
+      this.list = [
+        ...orderedFiles,
+        ...storedList.filter(f => !orderedFiles.includes(f)),
+      ];
     } else {
-      this.list = Object.keys(defaults);
+      this.list = [...storedList];
     }
 
-    const missingFiles: string[] = [];
+    this.list = [
+      ...this.list,
+      ...Object.keys(defaultFiles).filter(f => !this.list.includes(f)),
+    ];
 
-    for (const file of this.list) {
+    for (const file of [...this.list]) {
       const storedFile: string | null = localStorage.getItem(`fs-${file}`);
-      const content = storedFile ?? defaults[file];
-
-      if (content === nil) {
-        missingFiles.push(file);
-        continue;
-      }
-
-      this.files[file] = content;
-    }
-
-    for (const file of missingFiles) {
-      this.write(file, nil);
-    }
-
-    for (const file of Object.keys(defaults)) {
-      if (!this.list.includes(file)) {
-        this.write(file, defaults[file]);
-      }
+      const content = storedFile ?? defaultFiles[file];
+      this.write(file, content);
     }
   }
 
@@ -64,7 +55,7 @@ export default class FileSystem {
   
       this.files[file] = content;
 
-      if (this.defaults[file] === content) {
+      if (defaultFiles[file] === content) {
         localStorage.removeItem(`fs-${file}`);
       } else {
         localStorage.setItem(`fs-${file}`, content);

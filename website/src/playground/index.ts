@@ -1,4 +1,3 @@
-import files from './files';
 import assert from './helpers/assert';
 import nil from './helpers/nil';
 import notNil from './helpers/notNil';
@@ -11,6 +10,7 @@ import VslibPool, {
 import FileSystem from './FileSystem';
 import monaco from './monaco';
 import Swal from './Swal';
+import { defaultFiles } from './files';
 
 function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
@@ -38,10 +38,7 @@ let currentFile = '';
 
 (async () => {
   const vslibPool = new VslibPool();
-
-  (window as any).vslibPool = vslibPool;
-
-  const fs = new FileSystem(files);
+  const fs = new FileSystem();
 
   const fileModels = Object.fromEntries(fs.list.map(
     (filename) => {
@@ -59,8 +56,6 @@ let currentFile = '';
       return [filename, model];
     },
   ));
-
-  (window as any).fileModels = fileModels;
 
   editorLoadingEl.remove();
 
@@ -94,13 +89,13 @@ let currentFile = '';
 
   function changeFile(newFile: string) {
     if (currentFile === '') {
-      currentFile = Object.keys(files)[0];
+      currentFile = fs.list[0];
     } else if (newFile === currentFile) {
       return;
     }
 
     if (newFile === '') {
-      newFile = Object.keys(files)[0];
+      newFile = fs.list[0];
     }
 
     const fileIdx = fs.list.indexOf(newFile);
@@ -117,7 +112,7 @@ let currentFile = '';
     editor.setModel(model);
     handleUpdate();
 
-    if (Object.keys(files).includes(currentFile)) {
+    if (Object.keys(defaultFiles).includes(currentFile)) {
       renameBtn.classList.add('disabled');
       restoreBtn.classList.remove('disabled');
       deleteBtn.classList.add('disabled');
@@ -303,7 +298,7 @@ let currentFile = '';
   };
 
   restoreBtn.onclick = async () => {
-    const defaultContent = files[currentFile];
+    const defaultContent = defaultFiles[currentFile];
 
     if (defaultContent !== undefined) {
       editor.setValue(defaultContent);
