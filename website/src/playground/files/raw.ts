@@ -11,6 +11,6 @@ export default Object.fromEntries(await Promise.all(
   entries.map(async ([path, module]) => {
     const prefix = './root';
     assert(path.startsWith(prefix));
-    return [path.slice('./root'.length), await module()];
+    return [path.slice('./root'.length), (await module()).trim()];
   }),
 ));

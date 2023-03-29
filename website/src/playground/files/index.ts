@@ -5,6 +5,8 @@ const files: Record<string, string | nil> = {
   ...pick(raw, [
     '/tutorial/hello.ts',
     '/tutorial/valueSemantics.ts',
+    '/tutorial/cantMutateCaptures.ts',
+    '/tutorial/classBehavior.ts',
     '/tutorial/revertOnCatch.ts',
     '/tutorial/binaryTree.ts',
   ]),

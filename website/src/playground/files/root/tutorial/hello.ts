@@ -1,12 +1,13 @@
 // Welcome to the ValueScript playground!
 //
-// This playground also acts as a tutorial by describing a variety of
-// examples. All examples are editable with live updates to their outputs.
-//
-// Keeping with tradition, here is the hello world program.
+// ValueScript is a dialect of TypeScript. We use the same syntax and many
+// simple programs work exactly the same way:
 
 export default function main() {
   return "Hello world!";
 }
 
-// When you're ready to continue, click next below.
+// You can freely edit these examples and their outputs will update in
+// real-time.
+//
+// When you're ready, click next below to see a bit more complexity.
