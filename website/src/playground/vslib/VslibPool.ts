@@ -1,5 +1,4 @@
 import * as valuescript from 'valuescript';
-import hasExtension from '../helpers/hasExtension';
 import nil from '../helpers/nil';
 import { initVslib } from './index';
 
@@ -35,13 +34,30 @@ async function main() {
       }
     }
   };
+
+  function makeLookupFile(files: Record<string, string | nil>) {
+    return (filePath: string) => {
+      let content = files[filePath];
+  
+      if (content === undefined && !hasExtension(filePath)) {
+        content = files[`${filePath}.ts`] ?? files[`${filePath}.js`];
+      }
+  
+      if (content === undefined) {
+        throw new Error('Not found');
+      }
+  
+      return content;
+    };
+  }
+
+  function hasExtension(path: string) {
+    return path.split('/').at(-1)?.includes('.') ?? false;
+  }
 }
 
 const workerScript = [
   initVslib.toString(),
-  makeLookupFile.toString(),
-  hasExtension.toString(),
-  'const nil = undefined;',
   `(${main.toString()})()`,
 ].join('\n\n');
 
@@ -139,20 +155,4 @@ export default class VslibPool {
       },
     };
   }
-}
-
-function makeLookupFile(files: Record<string, string | nil>) {
-  return (filePath: string) => {
-    let content = files[filePath];
-
-    if (content === nil && !hasExtension(filePath)) {
-      content = files[`${filePath}.ts`] ?? files[`${filePath}.js`];
-    }
-
-    if (content === nil) {
-      throw new Error('Not found');
-    }
-
-    return content;
-  };
 }
