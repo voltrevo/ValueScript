@@ -42,5 +42,5 @@ export default function () {
 // Also, `.charCodeAt` is about fixed units and not characters, so we don't
 // support it. Use `.codePointAt` instead (probably a good habit for JS too).
 //
-// In future, we might add JS-style strings using js`use utf-16 here` if you
-// need them.
+// If you need JS-style strings, let us know - we might add js`uses utf-16` to
+// support this.
