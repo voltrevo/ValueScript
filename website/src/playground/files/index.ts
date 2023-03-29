@@ -6,6 +6,7 @@ export const orderedFiles = [
   '/tutorial/valueSemantics.ts',
   '/tutorial/cantMutateCaptures.ts',
   '/tutorial/classBehavior.ts',
+  '/tutorial/consistency.js',
   '/tutorial/revertOnCatch.ts',
   '/tutorial/strings.ts',
   '/tutorial/binaryTree.ts',

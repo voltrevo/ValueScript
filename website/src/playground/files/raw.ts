@@ -2,7 +2,7 @@ import assert from '../helpers/assert';
 
 const entries = Object.entries(
   import.meta.glob(
-    './root/**/*.ts',
+    './root/**/*.*',
     { as: 'raw' },
   ),
 );
