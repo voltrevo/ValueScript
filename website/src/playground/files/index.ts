@@ -10,6 +10,7 @@ export const orderedFiles = [
   '/tutorial/strings.ts',
   '/tutorial/binaryTree.ts',
   '/tutorial/specialFunctions.ts',
+  '/tutorial/treeShaking.ts',
 ];
 
 export const defaultFiles: Record<string, string | nil> = {
