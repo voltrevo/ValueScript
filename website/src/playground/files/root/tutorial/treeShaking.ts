@@ -26,7 +26,7 @@ export default function main() {
   return factorize(18); // [2, 3, 3], because 2 * 3 * 3 = 18
 }
 
-// These function are also not in the assembly, because none of our exports use
+// These functions are also not in the assembly, because none of our exports use
 // them.
 function foo() { return bar(); }
 function bar() {}

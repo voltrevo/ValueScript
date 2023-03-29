@@ -11,6 +11,7 @@ import FileSystem from './FileSystem';
 import monaco from './monaco';
 import Swal from './Swal';
 import { defaultFiles } from './files';
+import hasExtension from './helpers/hasExtension';
 
 function domQuery<T = HTMLElement>(query: string): T {
   return <T> <unknown> notNil(document.querySelector(query) ?? nil);
@@ -290,10 +291,21 @@ let currentFile = '';
     });
 
     if (typeof popup.value === 'string' && popup.value !== '') {
-      let newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
-      newFile = newFile.startsWith('/') ? newFile : `/${newFile}`;
-      fs.write(newFile, '', currentFile);
-      changeFile(newFile);
+      const newFile = sanitizeNewPath(popup.value);
+
+      if (fs.list.includes(newFile)) {
+        changeFile(newFile);
+      } else {
+        fs.write(newFile, '', currentFile);
+
+        fileModels[newFile] = monaco.editor.createModel(
+          '',
+          'typescript',
+          monaco.Uri.parse(newFile),
+        );
+
+        changeFile(newFile);
+      }
     }
   };
 
@@ -324,9 +336,11 @@ let currentFile = '';
     });
 
     if (typeof popup.value === 'string' && popup.value !== '') {
-      let newFile = popup.value.endsWith('.ts') ? popup.value : `${popup.value}.ts`;
-      newFile = newFile.startsWith('/') ? newFile : `/${newFile}`;
+      const newFile = sanitizeNewPath(popup.value);
       fs.rename(currentFile, newFile);
+      const model = fileModels[currentFile];
+      delete fileModels[currentFile];
+      fileModels[newFile] = model;
       changeFile(newFile);
     }
   };
@@ -348,6 +362,8 @@ let currentFile = '';
     if (popup.isConfirmed) {
       const idx = Math.max(0, fs.list.indexOf(currentFile) - 1);
       fs.write(currentFile, nil);
+      fileModels[currentFile].dispose();
+      delete fileModels[currentFile];
       changeFile(fs.list[idx]);
     }
   };
@@ -412,4 +428,16 @@ function toLineCol(str: string, index: number): { line: number; col: number } {
   const lines = str.slice(0, index).split('\n');
 
   return { line: lines.length, col: lines[lines.length - 1].length + 1 };
+}
+
+function sanitizeNewPath(path: string) {
+  if (!hasExtension(path)) {
+    path = `${path}.ts`;
+  }
+
+  if (!path.startsWith('/')) {
+    path = `/${path}`;
+  }
+
+  return path;
 }

@@ -1,10 +1,10 @@
 import * as valuescript from 'valuescript';
+import hasExtension from '../helpers/hasExtension';
 import nil from '../helpers/nil';
 import { initVslib } from './index';
 
 async function main() {
   const vslib = await initVslib();
-  const nil = undefined;
 
   self.postMessage('ready');
 
@@ -16,19 +16,7 @@ async function main() {
 
       try {
         self.postMessage({
-          ok: vslib.compile(entryPoint, filePath => {
-            let content = files[filePath];
-
-            if (content === nil && !filePath.endsWith('.ts')) {
-              content = files[`${filePath}.ts`];
-            }
-
-            if (content === nil) {
-              throw new Error('Not found');
-            }
-
-            return content;
-          }),
+          ok: vslib.compile(entryPoint, makeLookupFile(files)),
         });
       } catch (err) {
         self.postMessage({ err });
@@ -40,19 +28,7 @@ async function main() {
 
       try {
         self.postMessage({
-          ok: vslib.run(entryPoint, filePath => {
-            let content = files[filePath];
-
-            if (content === nil && !filePath.endsWith('.ts')) {
-              content = files[`${filePath}.ts`];
-            }
-
-            if (content === nil) {
-              throw new Error('Not found');
-            }
-
-            return content;
-          }),
+          ok: vslib.run(entryPoint, makeLookupFile(files)),
         });
       } catch (err) {
         self.postMessage({ err });
@@ -63,6 +39,9 @@ async function main() {
 
 const workerScript = [
   initVslib.toString(),
+  makeLookupFile.toString(),
+  hasExtension.toString(),
+  'const nil = undefined;',
   `(${main.toString()})()`,
 ].join('\n\n');
 
@@ -160,4 +139,20 @@ export default class VslibPool {
       },
     };
   }
+}
+
+function makeLookupFile(files: Record<string, string | nil>) {
+  return (filePath: string) => {
+    let content = files[filePath];
+
+    if (content === nil && !hasExtension(filePath)) {
+      content = files[`${filePath}.ts`] ?? files[`${filePath}.js`];
+    }
+
+    if (content === nil) {
+      throw new Error('Not found');
+    }
+
+    return content;
+  };
 }
