@@ -12,6 +12,7 @@ mod link_module;
 mod module_compiler;
 mod name_allocator;
 mod resolve_path;
+mod scope;
 mod scope_analysis;
 
 pub use assembler::assemble;

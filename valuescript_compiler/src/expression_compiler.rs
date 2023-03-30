@@ -7,7 +7,8 @@ use swc_common::Spanned;
 use crate::asm::{Array, Instruction, Label, Object, Register, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
-use crate::scope_analysis::{fn_to_owner_id, NameId, NameType, OwnerId};
+use crate::scope::{NameId, OwnerId};
+use crate::scope_analysis::{fn_to_owner_id, NameType};
 
 pub struct CompiledExpression {
   /** It is usually better to access this via functionCompiler.use_ */

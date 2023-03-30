@@ -13,7 +13,8 @@ use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
 use crate::name_allocator::{NameAllocator, RegAllocator};
-use crate::scope_analysis::{fn_to_owner_id, NameId, OwnerId, ScopeAnalysis};
+use crate::scope::{NameId, OwnerId};
+use crate::scope_analysis::{fn_to_owner_id, ScopeAnalysis};
 
 #[derive(Clone, Debug)]
 pub enum Functionish {

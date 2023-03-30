@@ -15,7 +15,7 @@ use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
 use crate::function_compiler::{FunctionCompiler, Functionish};
 use crate::name_allocator::NameAllocator;
-use crate::scope_analysis::OwnerId;
+use crate::scope::OwnerId;
 use crate::scope_analysis::ScopeAnalysis;
 
 struct DiagnosticCollector {
