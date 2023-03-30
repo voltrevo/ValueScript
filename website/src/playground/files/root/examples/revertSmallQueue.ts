@@ -46,5 +46,3 @@ class SmallQueue<T extends {}> {
     this.items.push(item);
   }
 }
-
-console.log(main());
