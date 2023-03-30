@@ -893,11 +893,9 @@ impl<'a> ExpressionCompiler<'a> {
         let mut compiled_arg = self.compile(&*arg.expr, None);
         sub_nested_registers.append(&mut compiled_arg.nested_registers);
 
-        args.values.push(compiled_arg.value);
+        args.values.push(self.fnc.use_(compiled_arg));
       }
     }
-
-    // instr += &format!("{} ", args);
 
     let tmp_dest: Register;
 
