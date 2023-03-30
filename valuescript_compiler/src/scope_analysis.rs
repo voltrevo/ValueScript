@@ -63,6 +63,7 @@ pub struct Name {
   pub owner_id: OwnerId,
   pub sym: swc_atoms::JsWord,
   pub type_: NameType,
+  pub effectively_const: bool,
   pub value: Value,
   pub mutations: Vec<swc_common::Span>,
   pub captures: Vec<Capture>,
@@ -75,6 +76,7 @@ pub struct ScopeAnalysis {
   pub captures: HashMap<OwnerId, HashSet<NameId>>,
   pub capture_values: HashMap<(OwnerId, NameId), Value>,
   pub mutations: BTreeMap<swc_common::Span, NameId>,
+  pub optional_mutations: BTreeMap<swc_common::Span, NameId>,
   pub refs: HashMap<swc_common::Span, NameId>,
   pub diagnostics: Vec<Diagnostic>,
   pub pointer_allocator: PointerAllocator,
@@ -98,6 +100,7 @@ impl ScopeAnalysis {
           owner_id: OwnerId::Module,
           sym: swc_atoms::JsWord::from(builtin_name),
           type_: NameType::Builtin,
+          effectively_const: true,
           value: Value::Builtin(builtin),
           mutations: vec![],
           captures: vec![],
@@ -113,6 +116,7 @@ impl ScopeAnalysis {
           owner_id: OwnerId::Module,
           sym: swc_atoms::JsWord::from(name),
           type_: NameType::Constant,
+          effectively_const: true,
           value,
           mutations: vec![],
           captures: vec![],
@@ -128,6 +132,10 @@ impl ScopeAnalysis {
 
     sa.find_capture_mutations();
     sa.expand_captures();
+
+    sa.expand_effectively_const();
+    sa.diagnose_const_mutations();
+    sa.process_optional_mutations();
 
     return sa;
   }
@@ -182,6 +190,15 @@ impl ScopeAnalysis {
       owner_id: scope.borrow().owner_id.clone(),
       sym: origin_ident.sym.clone(),
       type_,
+      effectively_const: match type_ {
+        NameType::Var | NameType::Let | NameType::Param => false,
+        NameType::Const
+        | NameType::Function
+        | NameType::Class
+        | NameType::Import
+        | NameType::Builtin
+        | NameType::Constant => true,
+      },
       value,
       mutations: Vec::new(),
       captures: Vec::new(),
@@ -932,7 +949,7 @@ impl ScopeAnalysis {
           swc_ecma_ast::UnaryOp::TypeOf => {}
           swc_ecma_ast::UnaryOp::Void => {}
           swc_ecma_ast::UnaryOp::Delete => {
-            self.mutate_expr(scope, &unary.arg);
+            self.mutate_expr(scope, &unary.arg, false);
           }
           swc_ecma_ast::UnaryOp::Plus => {}
           swc_ecma_ast::UnaryOp::Minus => {}
@@ -942,7 +959,7 @@ impl ScopeAnalysis {
       }
       Expr::Update(update) => {
         self.expr(scope, &update.arg);
-        self.mutate_expr(scope, &update.arg);
+        self.mutate_expr(scope, &update.arg, false);
       }
       Expr::Bin(bin) => {
         self.expr(scope, &bin.left);
@@ -956,7 +973,7 @@ impl ScopeAnalysis {
           }
           swc_ecma_ast::PatOrExpr::Expr(expr) => {
             self.expr(scope, expr);
-            self.mutate_expr(scope, expr);
+            self.mutate_expr(scope, expr, false);
           }
         }
 
@@ -1102,6 +1119,13 @@ impl ScopeAnalysis {
       swc_ecma_ast::Callee::Import(_) => {}
       swc_ecma_ast::Callee::Expr(expr) => {
         self.expr(scope, expr);
+
+        match &**expr {
+          swc_ecma_ast::Expr::Member(member) => {
+            self.mutate_expr(scope, &member.obj, true);
+          }
+          _ => {}
+        };
       }
     }
 
@@ -1158,63 +1182,65 @@ impl ScopeAnalysis {
     }
   }
 
-  fn mutate_expr(&mut self, scope: &XScope, expr: &swc_ecma_ast::Expr) {
+  fn mutate_expr(&mut self, scope: &XScope, expr: &swc_ecma_ast::Expr, optional: bool) {
     use swc_ecma_ast::Expr;
+
+    let mut diagnostic: Option<Diagnostic> = None;
 
     match expr {
       Expr::Ident(ident) => {
-        self.mutate_ident(scope, ident);
+        self.mutate_ident(scope, ident, optional);
       }
       Expr::Member(member) => {
-        self.mutate_expr(scope, &member.obj);
+        self.mutate_expr(scope, &member.obj, optional);
       }
       Expr::Call(call) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Call expressions cannot be mutated".to_string(),
           span: call.span,
         });
       }
       Expr::New(new) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "New expressions cannot be mutated".to_string(),
           span: new.span,
         });
       }
       Expr::Paren(paren) => {
-        self.mutate_expr(scope, &paren.expr);
+        self.mutate_expr(scope, &paren.expr, optional);
       }
       Expr::Tpl(tpl) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Template literals cannot be mutated".to_string(),
           span: tpl.span,
         });
       }
       Expr::TaggedTpl(tagged_tpl) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Tagged template literals cannot be mutated".to_string(),
           span: tagged_tpl.span,
         });
       }
       Expr::Arrow(arrow) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Arrow functions cannot be mutated".to_string(),
           span: arrow.span,
         });
       }
       Expr::Class(class) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Class expressions cannot be mutated".to_string(),
           span: class.class.span,
         });
       }
       Expr::MetaProp(meta_prop) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Meta properties cannot be mutated".to_string(),
           span: meta_prop.span,
@@ -1228,19 +1254,19 @@ impl ScopeAnalysis {
         });
       }
       Expr::TsTypeAssertion(ts_type_assertion) => {
-        self.mutate_expr(scope, &ts_type_assertion.expr);
+        self.mutate_expr(scope, &ts_type_assertion.expr, optional);
       }
       Expr::TsConstAssertion(ts_const_assertion) => {
-        self.mutate_expr(scope, &ts_const_assertion.expr);
+        self.mutate_expr(scope, &ts_const_assertion.expr, optional);
       }
       Expr::TsNonNull(ts_non_null) => {
-        self.mutate_expr(scope, &ts_non_null.expr);
+        self.mutate_expr(scope, &ts_non_null.expr, optional);
       }
       Expr::TsAs(as_expr) => {
-        self.mutate_expr(scope, &as_expr.expr);
+        self.mutate_expr(scope, &as_expr.expr, optional);
       }
       Expr::OptChain(opt_chain) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Optional property accesses (a?.b) cannot be mutated".to_string(),
           span: opt_chain.span,
@@ -1251,7 +1277,7 @@ impl ScopeAnalysis {
         // TODO: Add capture+mutation analysis for `this`.
       }
       Expr::Array(array) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Mutating a (non-pattern) array expression is not valid. \
             This is an unusual case that can occur with things like [a,b]+=c."
@@ -1260,7 +1286,7 @@ impl ScopeAnalysis {
         });
       }
       Expr::Object(object) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Mutating a (non-pattern) object expression is not valid. \
             This is an unusual case - it's not clear whether SWC ever emit it. \
@@ -1271,70 +1297,70 @@ impl ScopeAnalysis {
         });
       }
       Expr::Fn(fn_) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: fn_.function.span,
         });
       }
       Expr::Unary(unary) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: unary.span,
         });
       }
       Expr::Update(update) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: update.span,
         });
       }
       Expr::Bin(bin) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: bin.span,
         });
       }
       Expr::Assign(assign) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: assign.span,
         });
       }
       Expr::SuperProp(super_prop) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: super_prop.span,
         });
       }
       Expr::Cond(cond) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: cond.span,
         });
       }
       Expr::Seq(seq) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: seq.span,
         });
       }
       Expr::Lit(_) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: expr.span(),
         });
       }
       Expr::Yield(yield_) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: yield_.span,
@@ -1343,7 +1369,7 @@ impl ScopeAnalysis {
       Expr::Await(await_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
-          message: "await is not supported".to_string(),
+          message: "TODO".to_string(),
           span: await_.span,
         });
       }
@@ -1391,6 +1417,12 @@ impl ScopeAnalysis {
         });
       }
     }
+
+    if !optional {
+      if let Some(diagnostic) = diagnostic {
+        self.diagnostics.push(diagnostic);
+      }
+    }
   }
 
   fn mutate_pat(&mut self, scope: &XScope, pat: &swc_ecma_ast::Pat) {
@@ -1398,7 +1430,7 @@ impl ScopeAnalysis {
 
     match pat {
       Pat::Ident(ident) => {
-        self.mutate_ident(scope, &ident.id);
+        self.mutate_ident(scope, &ident.id, false);
       }
       Pat::Array(array_pat) => {
         for elem in &array_pat.elems {
@@ -1419,7 +1451,7 @@ impl ScopeAnalysis {
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
               // TODO: How is `({ y: x = 3 } = { y: 4 })` handled?
 
-              self.mutate_ident(scope, &assign.key);
+              self.mutate_ident(scope, &assign.key, false);
 
               if let Some(value) = &assign.value {
                 // Note: Generally mutate_* only processes the mutation aspect
@@ -1448,12 +1480,12 @@ impl ScopeAnalysis {
         });
       }
       Pat::Expr(expr) => {
-        self.mutate_expr(&scope, expr);
+        self.mutate_expr(&scope, expr, false);
       }
     }
   }
 
-  fn mutate_ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
+  fn mutate_ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident, optional: bool) {
     let name_id = match scope.get(&ident.sym) {
       Some(name_id) => name_id,
       None => {
@@ -1478,8 +1510,13 @@ impl ScopeAnalysis {
       }
     };
 
-    name.mutations.push(ident.span);
-    self.mutations.insert(ident.span, name_id.clone());
+    if optional {
+      self.optional_mutations.insert(ident.span, name_id.clone());
+    } else {
+      name.mutations.push(ident.span);
+      self.mutations.insert(ident.span, name_id.clone());
+    }
+
     self.refs.insert(ident.span, name_id);
   }
 
@@ -1930,6 +1967,54 @@ impl ScopeAnalysis {
       }
 
       self.captures.insert(captor, full_captures);
+    }
+  }
+
+  fn expand_effectively_const(&mut self) {
+    for (_, name) in &mut self.names {
+      if !name.captures.is_empty() {
+        name.effectively_const = true;
+      }
+    }
+  }
+
+  fn diagnose_const_mutations(&mut self) {
+    let mut diagnostics = Vec::<Diagnostic>::new();
+
+    for (_, name) in &self.names {
+      if !name.captures.is_empty() {
+        // More specific diagnostics are emitted for these mutations elsewhere
+        continue;
+      }
+
+      if name.effectively_const {
+        for mutation in &name.mutations {
+          diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: format!("Cannot mutate const {}", name.sym),
+            span: *mutation,
+          });
+        }
+      }
+    }
+  }
+
+  fn process_optional_mutations(&mut self) {
+    let mut new_mutations = Vec::<(swc_common::Span, NameId)>::new();
+
+    for (span, name_id) in &self.optional_mutations {
+      let name = self.names.get(&name_id).expect("Name not found");
+
+      if !name.effectively_const {
+        new_mutations.push((*span, name_id.clone()));
+      }
+    }
+
+    for (span, name_id) in new_mutations {
+      let name = self.names.get_mut(&name_id).expect("Name not found");
+      name.mutations.push(span);
+
+      self.mutations.insert(span, name_id);
     }
   }
 }

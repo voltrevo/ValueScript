@@ -1184,6 +1184,15 @@ impl FunctionCompiler {
       }
     }
 
+    // TODO: Avoid doing this. This is a workaround to include mutations of variables that are
+    // supposed to be const, because we don't yet protect these variables from mutation that occurs
+    // via method calls. Once that is implemented, this shouldn't be needed.
+    for (_span, mutated_name_id) in self.scope_analysis.optional_mutations.range(start..end) {
+      if let Some(Value::Register(reg)) = self.lookup_by_name_id(mutated_name_id) {
+        mutated_registers.insert(reg);
+      }
+    }
+
     mutated_registers
   }
 }

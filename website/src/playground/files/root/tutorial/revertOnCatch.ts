@@ -1,5 +1,5 @@
 // We also deviate from JavaScript in a few other ways:
-// 
+//
 // - Try blocks are transactional
 
 export default function () {
@@ -21,6 +21,3 @@ export default function () {
 // virtual machine. In ValueScript, we just take a snapshot of each variable
 // that is mutated inside the `try` block and restore it on `catch`. You can see
 // this in the assembly as `%snap_x`.
-//
-// Note: Method calls don't yet generate snapshots. This should be fixed soon.
-// In the meantime you can workaround it by adding `myClass = myClass;`.
