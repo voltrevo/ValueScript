@@ -1,5 +1,5 @@
 export default function main() {
   const foo = 0;
-  foo++; // Should throw
+  foo++; // Compile-time error (unlike JS at runtime)
   return foo;
 }

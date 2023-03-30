@@ -2,9 +2,9 @@
 
 export default function main() {
   let log = [];
-  const x = {} as any;
+  let x = {} as any;
 
-  x[log.push('a')] = log.push('b');
+  x[log.push("a")] = log.push("b");
 
   return log;
 }

@@ -1997,6 +1997,8 @@ impl ScopeAnalysis {
         }
       }
     }
+
+    self.diagnostics.append(&mut diagnostics);
   }
 
   fn process_optional_mutations(&mut self) {

@@ -7,7 +7,7 @@
 // For reference, assignmentEvalOrder2.ts tests the actual order of evaluation.
 
 export default function main() {
-  const x = {} as any;
+  let x = {} as any;
   let key = "left";
 
   x[key] = key = "right";
