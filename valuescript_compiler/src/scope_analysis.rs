@@ -180,7 +180,7 @@ impl ScopeAnalysis {
 
   fn insert_name(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     type_: NameType,
     value: Value,
     origin_ident: &swc_ecma_ast::Ident,
@@ -223,7 +223,7 @@ impl ScopeAnalysis {
 
   fn insert_pointer_name(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     type_: NameType,
     origin_ident: &swc_ecma_ast::Ident,
   ) {
@@ -247,7 +247,7 @@ impl ScopeAnalysis {
 
   fn insert_reg_name(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     type_: NameType,
     origin_ident: &swc_ecma_ast::Ident,
   ) {
@@ -297,7 +297,7 @@ impl ScopeAnalysis {
     });
   }
 
-  fn module_item(&mut self, scope: &XScope, module_item: &swc_ecma_ast::ModuleItem) {
+  fn module_item(&mut self, scope: &Scope, module_item: &swc_ecma_ast::ModuleItem) {
     use swc_ecma_ast::ModuleDecl;
     use swc_ecma_ast::ModuleItem;
 
@@ -350,13 +350,13 @@ impl ScopeAnalysis {
     };
   }
 
-  fn import_decl(&mut self, scope: &XScope, import_decl: &swc_ecma_ast::ImportDecl) {
+  fn import_decl(&mut self, scope: &Scope, import_decl: &swc_ecma_ast::ImportDecl) {
     for specifier in &import_decl.specifiers {
       self.import_specifier(&scope, specifier);
     }
   }
 
-  fn import_specifier(&mut self, scope: &XScope, import_specifier: &swc_ecma_ast::ImportSpecifier) {
+  fn import_specifier(&mut self, scope: &Scope, import_specifier: &swc_ecma_ast::ImportSpecifier) {
     use swc_ecma_ast::ImportSpecifier::*;
 
     match import_specifier {
@@ -376,7 +376,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn export_specifier(&mut self, scope: &XScope, export_specifier: &swc_ecma_ast::ExportSpecifier) {
+  fn export_specifier(&mut self, scope: &Scope, export_specifier: &swc_ecma_ast::ExportSpecifier) {
     use swc_ecma_ast::ExportSpecifier::*;
     use swc_ecma_ast::ModuleExportName;
 
@@ -407,7 +407,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn decl(&mut self, scope: &XScope, decl: &swc_ecma_ast::Decl) {
+  fn decl(&mut self, scope: &Scope, decl: &swc_ecma_ast::Decl) {
     use swc_ecma_ast::Decl;
 
     if is_declare(decl) {
@@ -450,7 +450,7 @@ impl ScopeAnalysis {
 
   fn function(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     name: &Option<swc_ecma_ast::Ident>,
     function: &swc_ecma_ast::Function,
   ) {
@@ -470,13 +470,13 @@ impl ScopeAnalysis {
     }
   }
 
-  fn module_level_hoists(&mut self, scope: &XScope, module: &swc_ecma_ast::Module) {
+  fn module_level_hoists(&mut self, scope: &Scope, module: &swc_ecma_ast::Module) {
     for item in &module.body {
       self.module_level_hoists_item(scope, item);
     }
   }
 
-  fn module_level_hoists_item(&mut self, scope: &XScope, module_item: &swc_ecma_ast::ModuleItem) {
+  fn module_level_hoists_item(&mut self, scope: &Scope, module_item: &swc_ecma_ast::ModuleItem) {
     use swc_ecma_ast::ModuleDecl;
     use swc_ecma_ast::ModuleItem;
 
@@ -547,13 +547,13 @@ impl ScopeAnalysis {
     };
   }
 
-  fn function_level_hoists(&mut self, scope: &XScope, block: &swc_ecma_ast::BlockStmt) {
+  fn function_level_hoists(&mut self, scope: &Scope, block: &swc_ecma_ast::BlockStmt) {
     for stmt in &block.stmts {
       self.function_level_hoists_stmt(scope, stmt);
     }
   }
 
-  fn function_level_hoists_stmt(&mut self, scope: &XScope, stmt: &swc_ecma_ast::Stmt) {
+  fn function_level_hoists_stmt(&mut self, scope: &Scope, stmt: &swc_ecma_ast::Stmt) {
     use swc_ecma_ast::Decl;
     use swc_ecma_ast::Stmt;
 
@@ -612,13 +612,13 @@ impl ScopeAnalysis {
     }
   }
 
-  fn block_level_hoists(&mut self, scope: &XScope, block: &swc_ecma_ast::BlockStmt) {
+  fn block_level_hoists(&mut self, scope: &Scope, block: &swc_ecma_ast::BlockStmt) {
     for stmt in &block.stmts {
       self.block_level_hoists_stmt(scope, stmt);
     }
   }
 
-  fn block_level_hoists_stmt(&mut self, scope: &XScope, stmt: &swc_ecma_ast::Stmt) {
+  fn block_level_hoists_stmt(&mut self, scope: &Scope, stmt: &swc_ecma_ast::Stmt) {
     use swc_ecma_ast::Decl;
     use swc_ecma_ast::Stmt;
 
@@ -652,7 +652,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn block_level_hoists_var_decl(&mut self, scope: &XScope, var_decl: &swc_ecma_ast::VarDecl) {
+  fn block_level_hoists_var_decl(&mut self, scope: &Scope, var_decl: &swc_ecma_ast::VarDecl) {
     let name_type = match var_decl.kind {
       swc_ecma_ast::VarDeclKind::Var => return,
       swc_ecma_ast::VarDeclKind::Let => NameType::Let,
@@ -728,7 +728,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn arrow(&mut self, scope: &XScope, arrow: &swc_ecma_ast::ArrowExpr) {
+  fn arrow(&mut self, scope: &Scope, arrow: &swc_ecma_ast::ArrowExpr) {
     let child_scope = scope.nest(Some(OwnerId::Span(arrow.span.clone())));
 
     for param in &arrow.params {
@@ -745,7 +745,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn var_declarator_pat(&mut self, scope: &XScope, type_: NameType, pat: &swc_ecma_ast::Pat) {
+  fn var_declarator_pat(&mut self, scope: &Scope, type_: NameType, pat: &swc_ecma_ast::Pat) {
     use swc_ecma_ast::Pat;
 
     match pat {
@@ -801,7 +801,7 @@ impl ScopeAnalysis {
 
   fn var_declarator(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     kind: swc_ecma_ast::VarDeclKind,
     var_declarator: &swc_ecma_ast::VarDeclarator,
   ) {
@@ -818,7 +818,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn default_decl(&mut self, scope: &XScope, default_decl: &swc_ecma_ast::DefaultDecl) {
+  fn default_decl(&mut self, scope: &Scope, default_decl: &swc_ecma_ast::DefaultDecl) {
     use swc_ecma_ast::DefaultDecl;
 
     match &default_decl {
@@ -834,7 +834,7 @@ impl ScopeAnalysis {
 
   fn class_(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     ident: &Option<swc_ecma_ast::Ident>,
     class_: &swc_ecma_ast::Class,
   ) {
@@ -849,7 +849,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn class_member(&mut self, scope: &XScope, class_member: &swc_ecma_ast::ClassMember) {
+  fn class_member(&mut self, scope: &Scope, class_member: &swc_ecma_ast::ClassMember) {
     use swc_ecma_ast::ClassMember::*;
 
     match class_member {
@@ -914,11 +914,11 @@ impl ScopeAnalysis {
     }
   }
 
-  fn fn_expr(&mut self, scope: &XScope, fn_expr: &swc_ecma_ast::FnExpr) {
+  fn fn_expr(&mut self, scope: &Scope, fn_expr: &swc_ecma_ast::FnExpr) {
     self.function(scope, &fn_expr.ident, &fn_expr.function);
   }
 
-  fn expr(&mut self, scope: &XScope, expr: &swc_ecma_ast::Expr) {
+  fn expr(&mut self, scope: &Scope, expr: &swc_ecma_ast::Expr) {
     use swc_ecma_ast::Expr;
 
     match expr {
@@ -1100,7 +1100,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn member(&mut self, scope: &XScope, member: &swc_ecma_ast::MemberExpr) {
+  fn member(&mut self, scope: &Scope, member: &swc_ecma_ast::MemberExpr) {
     self.expr(scope, &member.obj);
 
     use swc_ecma_ast::MemberProp;
@@ -1113,7 +1113,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn call(&mut self, scope: &XScope, call: &swc_ecma_ast::CallExpr) {
+  fn call(&mut self, scope: &Scope, call: &swc_ecma_ast::CallExpr) {
     match &call.callee {
       swc_ecma_ast::Callee::Super(_) => {}
       swc_ecma_ast::Callee::Import(_) => {}
@@ -1134,7 +1134,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn pat(&mut self, scope: &XScope, pat: &swc_ecma_ast::Pat) {
+  fn pat(&mut self, scope: &Scope, pat: &swc_ecma_ast::Pat) {
     use swc_ecma_ast::Pat;
 
     match pat {
@@ -1182,7 +1182,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn mutate_expr(&mut self, scope: &XScope, expr: &swc_ecma_ast::Expr, optional: bool) {
+  fn mutate_expr(&mut self, scope: &Scope, expr: &swc_ecma_ast::Expr, optional: bool) {
     use swc_ecma_ast::Expr;
 
     let mut diagnostic: Option<Diagnostic> = None;
@@ -1425,7 +1425,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn mutate_pat(&mut self, scope: &XScope, pat: &swc_ecma_ast::Pat) {
+  fn mutate_pat(&mut self, scope: &Scope, pat: &swc_ecma_ast::Pat) {
     use swc_ecma_ast::Pat;
 
     match pat {
@@ -1485,7 +1485,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn mutate_ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident, optional: bool) {
+  fn mutate_ident(&mut self, scope: &Scope, ident: &swc_ecma_ast::Ident, optional: bool) {
     let name_id = match scope.get(&ident.sym) {
       Some(name_id) => name_id,
       None => {
@@ -1520,7 +1520,7 @@ impl ScopeAnalysis {
     self.refs.insert(ident.span, name_id);
   }
 
-  fn ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
+  fn ident(&mut self, scope: &Scope, ident: &swc_ecma_ast::Ident) {
     if ident.sym.to_string() == "undefined" {
       // The way that `undefined` is considered to be an identifier is an artifact of history. It's
       // not an identifier (unless used in an identifier context like an object key), instead it's a
@@ -1559,7 +1559,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn prop_key(&mut self, scope: &XScope, prop_name: &swc_ecma_ast::PropName) {
+  fn prop_key(&mut self, scope: &Scope, prop_name: &swc_ecma_ast::PropName) {
     use swc_ecma_ast::PropName;
 
     match prop_name {
@@ -1573,7 +1573,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn prop_or_spread(&mut self, scope: &XScope, prop_or_spread: &swc_ecma_ast::PropOrSpread) {
+  fn prop_or_spread(&mut self, scope: &Scope, prop_or_spread: &swc_ecma_ast::PropOrSpread) {
     use swc_ecma_ast::PropOrSpread;
 
     match prop_or_spread {
@@ -1618,7 +1618,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn stmt(&mut self, scope: &XScope, stmt: &swc_ecma_ast::Stmt) {
+  fn stmt(&mut self, scope: &Scope, stmt: &swc_ecma_ast::Stmt) {
     use swc_ecma_ast::Stmt;
 
     match stmt {
@@ -1764,7 +1764,7 @@ impl ScopeAnalysis {
     };
   }
 
-  fn block_stmt(&mut self, scope: &XScope, block_stmt: &swc_ecma_ast::BlockStmt) {
+  fn block_stmt(&mut self, scope: &Scope, block_stmt: &swc_ecma_ast::BlockStmt) {
     let child_scope = scope.nest(None);
     self.block_level_hoists(&child_scope, block_stmt);
 
@@ -1773,7 +1773,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn param_pat(&mut self, scope: &XScope, param_pat: &swc_ecma_ast::Pat) {
+  fn param_pat(&mut self, scope: &Scope, param_pat: &swc_ecma_ast::Pat) {
     use swc_ecma_ast::Pat;
 
     match param_pat {
@@ -1827,7 +1827,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn var_decl(&mut self, scope: &XScope, var_decl: &swc_ecma_ast::VarDecl) {
+  fn var_decl(&mut self, scope: &Scope, var_decl: &swc_ecma_ast::VarDecl) {
     for decl in &var_decl.decls {
       self.var_declarator(&scope, var_decl.kind, decl);
     }
@@ -2021,13 +2021,13 @@ impl ScopeAnalysis {
   }
 }
 
-struct XScopeData {
+struct ScopeData {
   pub owner_id: OwnerId,
   pub name_map: HashMap<swc_atoms::JsWord, NameId>,
-  pub parent: Option<Rc<RefCell<XScopeData>>>,
+  pub parent: Option<Rc<RefCell<ScopeData>>>,
 }
 
-type XScope = Rc<RefCell<XScopeData>>;
+type Scope = Rc<RefCell<ScopeData>>;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum OwnerId {
@@ -2035,7 +2035,7 @@ pub enum OwnerId {
   Module,
 }
 
-trait XScopeTrait {
+trait ScopeTrait {
   fn get(&self, name: &swc_atoms::JsWord) -> Option<NameId>;
   fn set(
     &self,
@@ -2044,10 +2044,10 @@ trait XScopeTrait {
     span: swc_common::Span,
     diagnostics: &mut Vec<Diagnostic>,
   );
-  fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<XScopeData>>;
+  fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<ScopeData>>;
 }
 
-impl XScopeTrait for XScope {
+impl ScopeTrait for Scope {
   fn get(&self, name: &swc_atoms::JsWord) -> Option<NameId> {
     match self.borrow().name_map.get(name) {
       Some(mapped_name) => Some(mapped_name.clone()),
@@ -2076,8 +2076,8 @@ impl XScopeTrait for XScope {
     }
   }
 
-  fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<XScopeData>> {
-    return Rc::new(RefCell::new(XScopeData {
+  fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<ScopeData>> {
+    return Rc::new(RefCell::new(ScopeData {
       owner_id: name_owner_location.unwrap_or(self.borrow().owner_id.clone()),
       name_map: Default::default(),
       parent: Some(self.clone()),
@@ -2085,7 +2085,7 @@ impl XScopeTrait for XScope {
   }
 }
 
-fn init_std_scope() -> XScope {
+fn init_std_scope() -> Scope {
   let mut name_map = HashMap::new();
 
   for name in BUILTIN_NAMES {
@@ -2101,7 +2101,7 @@ fn init_std_scope() -> XScope {
     name_map.insert(swc_atoms::JsWord::from(name), NameId::Constant(name));
   }
 
-  Rc::new(RefCell::new(XScopeData {
+  Rc::new(RefCell::new(ScopeData {
     owner_id: OwnerId::Module,
     name_map,
     parent: None,
