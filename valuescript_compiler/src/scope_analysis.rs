@@ -65,6 +65,7 @@ pub struct Name {
   pub type_: NameType,
   pub effectively_const: bool,
   pub value: Value,
+  pub tdz_end: Option<swc_common::BytePos>,
   pub mutations: Vec<swc_common::Span>,
   pub captures: Vec<Capture>,
 }
@@ -102,6 +103,7 @@ impl ScopeAnalysis {
           type_: NameType::Builtin,
           effectively_const: true,
           value: Value::Builtin(builtin),
+          tdz_end: None,
           mutations: vec![],
           captures: vec![],
         },
@@ -118,6 +120,7 @@ impl ScopeAnalysis {
           type_: NameType::Constant,
           effectively_const: true,
           value,
+          tdz_end: None,
           mutations: vec![],
           captures: vec![],
         },
@@ -136,6 +139,8 @@ impl ScopeAnalysis {
     sa.expand_effectively_const();
     sa.diagnose_const_mutations();
     sa.process_optional_mutations();
+
+    sa.diagnose_tdz_violations();
 
     return sa;
   }
@@ -184,6 +189,7 @@ impl ScopeAnalysis {
     type_: NameType,
     value: Value,
     origin_ident: &swc_ecma_ast::Ident,
+    tdz_end: Option<swc_common::BytePos>,
   ) {
     let name = Name {
       id: NameId::Span(origin_ident.span),
@@ -200,6 +206,7 @@ impl ScopeAnalysis {
         | NameType::Constant => true,
       },
       value,
+      tdz_end,
       mutations: Vec::new(),
       captures: Vec::new(),
     };
@@ -230,7 +237,7 @@ impl ScopeAnalysis {
     match scope.get(&origin_ident.sym) {
       None => {
         let pointer = Value::Pointer(self.pointer_allocator.allocate(&origin_ident.sym));
-        self.insert_name(scope, type_, pointer, origin_ident);
+        self.insert_name(scope, type_, pointer, origin_ident, None);
       }
       Some(name_id) => {
         let name = self.names.get(&name_id).expect("Name not found");
@@ -250,9 +257,10 @@ impl ScopeAnalysis {
     scope: &Scope,
     type_: NameType,
     origin_ident: &swc_ecma_ast::Ident,
+    tdz_end: Option<swc_common::BytePos>,
   ) {
     let reg = Value::Register(self.allocate_reg(&scope.borrow().owner_id, &origin_ident.sym));
-    self.insert_name(scope, type_, reg, origin_ident);
+    self.insert_name(scope, type_, reg, origin_ident, tdz_end);
   }
 
   fn insert_capture(&mut self, captor_id: &OwnerId, name_id: &NameId, ref_: swc_common::Span) {
@@ -563,7 +571,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_reg_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident, None);
               }
             }
           }
@@ -580,7 +588,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_reg_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident, None);
               }
             }
           }
@@ -591,7 +599,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_reg_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident, None);
               }
             }
           }
@@ -602,7 +610,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_reg_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident, None);
               }
             }
           }
@@ -661,7 +669,7 @@ impl ScopeAnalysis {
 
     for decl in &var_decl.decls {
       for ident in self.get_pat_idents(&decl.name) {
-        self.insert_reg_name(scope, name_type, &ident);
+        self.insert_reg_name(scope, name_type, &ident, Some(decl.span.hi));
       }
     }
   }
@@ -864,7 +872,7 @@ impl ScopeAnalysis {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
               match &ts_param_prop.param {
                 swc_ecma_ast::TsParamPropParam::Ident(ident) => {
-                  self.insert_reg_name(&child_scope, NameType::Param, &ident.id);
+                  self.insert_reg_name(&child_scope, NameType::Param, &ident.id, None);
                 }
                 swc_ecma_ast::TsParamPropParam::Assign(assign) => {
                   self.param_pat(&child_scope, &assign.left);
@@ -1774,11 +1782,14 @@ impl ScopeAnalysis {
   }
 
   fn param_pat(&mut self, scope: &Scope, param_pat: &swc_ecma_ast::Pat) {
+    // Note this version of pattern processing is strictly for parameter patterns, since we use None
+    // for tdz_end.
+
     use swc_ecma_ast::Pat;
 
     match param_pat {
       Pat::Ident(ident) => {
-        self.insert_reg_name(&scope, NameType::Param, &ident.id);
+        self.insert_reg_name(&scope, NameType::Param, &ident.id, None);
       }
       Pat::Array(array_pat) => {
         for elem in &array_pat.elems {
@@ -1798,7 +1809,7 @@ impl ScopeAnalysis {
               self.param_pat(&scope, &key_value.value);
             }
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
-              self.insert_reg_name(&scope, NameType::Param, &assign.key);
+              self.insert_reg_name(&scope, NameType::Param, &assign.key, None);
 
               if let Some(default) = &assign.value {
                 self.expr(&scope, default);
@@ -2018,6 +2029,47 @@ impl ScopeAnalysis {
 
       self.mutations.insert(span, name_id);
     }
+  }
+
+  fn diagnose_tdz_violations(&mut self) {
+    let mut diagnostics = Vec::<Diagnostic>::new();
+
+    for (span, name_id) in &self.refs {
+      let name = self.names.get(&name_id).expect("Name not found");
+
+      let name_span = match name_id {
+        NameId::Span(span) => *span,
+        NameId::Builtin(_) | NameId::Constant(_) => continue,
+      };
+
+      if span.lo == name_span.lo {
+        // The origin of a name is allowed, eg
+        // const x = 42;
+        //       ^ Not a tdz violation
+
+        continue;
+      }
+
+      let tdz_end = match name.tdz_end {
+        Some(tdz_end) => tdz_end,
+        None => continue,
+      };
+
+      if span.lo() > tdz_end {
+        continue;
+      }
+
+      diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::Error,
+        message: format!(
+          "Referencing {} is invalid before its declaration (temporal dead zone)",
+          name.sym,
+        ),
+        span: *span,
+      });
+    }
+
+    self.diagnostics.append(&mut diagnostics);
   }
 }
 

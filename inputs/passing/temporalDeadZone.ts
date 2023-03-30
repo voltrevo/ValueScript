@@ -1,5 +1,5 @@
 export default function main() {
-  let result = foo;
+  let result = foo; // Error: TDZ
   let foo = "oops";
-  return result; // should throw
+  return result;
 }
