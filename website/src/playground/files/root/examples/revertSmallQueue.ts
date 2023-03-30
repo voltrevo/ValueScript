@@ -11,8 +11,8 @@ export default function main() {
   }
 
   return {
-    a,
-    b,
+    a: a.items,
+    b: b.items,
     errors,
   };
 }
