@@ -1,6 +1,5 @@
 // // test_output! 7
-// Regression: TDZ rules incorreectly applied, see
-// captureButNotRefBeforeInit.ts
+// Regression: TDZ rules incorrectly applied
 
 export default function main() {
   function foo() {

@@ -1,7 +1,8 @@
+// test_output! 3
+
 export default function main() {
   function foo() {
     return x; // During tdz, but this is ok. Functions are hoisted anyway.
-    //        // (Currently emits error incorrectly.)
   }
 
   const x = 3;

@@ -1046,6 +1046,10 @@ impl<'a> ExpressionCompiler<'a> {
     match capture_params {
       None => self.inline(Value::Pointer(definition_pointer), target_register),
       Some(capture_params) => self.capturing_fn_ref(
+        match fn_.ident {
+          Some(ref ident) => ident.span,
+          None => fn_.function.span,
+        },
         fn_name,
         &Value::Pointer(definition_pointer),
         &capture_params,
@@ -1081,6 +1085,7 @@ impl<'a> ExpressionCompiler<'a> {
     match capture_params {
       None => self.inline(Value::Pointer(definition_pointer), target_register),
       Some(capture_params) => self.capturing_fn_ref(
+        arrow_expr.span,
         None,
         &Value::Pointer(definition_pointer),
         &capture_params,
@@ -1091,6 +1096,7 @@ impl<'a> ExpressionCompiler<'a> {
 
   pub fn capturing_fn_ref(
     &mut self,
+    span: swc_common::Span,
     fn_name: Option<String>,
     fn_value: &Value,
     captures: &HashSet<NameId>,
@@ -1115,6 +1121,34 @@ impl<'a> ExpressionCompiler<'a> {
     let mut bind_values = Array::default();
 
     for cap in captures {
+      let cap_name = self
+        .fnc
+        .scope_analysis
+        .names
+        .get(cap)
+        .expect("Failed to find name");
+
+      if let Some(tdz_end) = cap_name.tdz_end {
+        if span.lo() <= tdz_end {
+          self.fnc.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: match &fn_name {
+              Some(name) => format!(
+                "Referencing {} is invalid because it binds {} before its declaration (temporal \
+                  dead zone)",
+                name, cap_name.sym,
+              ),
+              None => format!(
+                "Expression is invalid because capturing {} binds its value before its declaration \
+                  (temporal dead zone)",
+                cap_name.sym,
+              ),
+            },
+            span,
+          });
+        }
+      }
+
       bind_values
         .values
         .push(match self.fnc.lookup_by_name_id(cap) {
@@ -1289,6 +1323,7 @@ impl<'a> ExpressionCompiler<'a> {
 
         match capture_params {
           Some(capture_params) => self.capturing_fn_ref(
+            ident.span,
             Some(ident.sym.to_string()),
             &value,
             &capture_params,

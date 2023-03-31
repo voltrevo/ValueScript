@@ -51,6 +51,13 @@ pub struct Name {
   pub captures: Vec<Capture>,
 }
 
+#[derive(Debug)]
+pub struct Ref {
+  pub name_id: NameId,
+  pub owner_id: OwnerId,
+  pub span: swc_common::Span,
+}
+
 #[derive(Default)]
 pub struct ScopeAnalysis {
   pub names: HashMap<NameId, Name>,
@@ -59,7 +66,7 @@ pub struct ScopeAnalysis {
   pub capture_values: HashMap<(OwnerId, NameId), Value>,
   pub mutations: BTreeMap<swc_common::Span, NameId>,
   pub optional_mutations: BTreeMap<swc_common::Span, NameId>,
-  pub refs: HashMap<swc_common::Span, NameId>,
+  pub refs: HashMap<swc_common::Span, Ref>,
   pub diagnostics: Vec<Diagnostic>,
   pub pointer_allocator: PointerAllocator,
   pub reg_allocators: HashMap<OwnerId, RegAllocator>,
@@ -121,19 +128,18 @@ impl ScopeAnalysis {
     sa.diagnose_const_mutations();
     sa.process_optional_mutations();
 
-    // Relies on expand_captures
     sa.diagnose_tdz_violations();
 
     return sa;
   }
 
   pub fn lookup(&self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
-    let name_id = self.refs.get(&ident.span)?;
+    let name_id = &self.refs.get(&ident.span)?.name_id;
     self.names.get(name_id)
   }
 
   pub fn lookup_value(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Option<Value> {
-    let name_id = self.refs.get(&ident.span)?;
+    let name_id = &self.refs.get(&ident.span)?.name_id;
     self.lookup_by_name_id(scope, name_id)
   }
 
@@ -194,7 +200,14 @@ impl ScopeAnalysis {
     };
 
     self.names.insert(name.id.clone(), name.clone());
-    self.refs.insert(origin_ident.span, name.id.clone());
+    self.refs.insert(
+      origin_ident.span,
+      Ref {
+        name_id: name.id.clone(),
+        owner_id: scope.borrow().owner_id.clone(),
+        span: origin_ident.span,
+      },
+    );
 
     self
       .owners
@@ -1507,7 +1520,14 @@ impl ScopeAnalysis {
       self.mutations.insert(ident.span, name_id.clone());
     }
 
-    self.refs.insert(ident.span, name_id);
+    self.refs.insert(
+      ident.span,
+      Ref {
+        name_id,
+        owner_id: scope.borrow().owner_id.clone(),
+        span: ident.span,
+      },
+    );
   }
 
   fn ident(&mut self, scope: &Scope, ident: &swc_ecma_ast::Ident) {
@@ -1530,7 +1550,14 @@ impl ScopeAnalysis {
       }
     };
 
-    self.refs.insert(ident.span, name_id.clone());
+    self.refs.insert(
+      ident.span,
+      Ref {
+        name_id: name_id.clone(),
+        owner_id: scope.borrow().owner_id.clone(),
+        span: ident.span,
+      },
+    );
 
     let name = match self.names.get(&name_id) {
       Some(name) => name,
@@ -2016,15 +2043,21 @@ impl ScopeAnalysis {
   fn diagnose_tdz_violations(&mut self) {
     let mut diagnostics = Vec::<Diagnostic>::new();
 
-    for (span, name_id) in &self.refs {
-      let name = self.names.get(&name_id).expect("Name not found");
+    for (_, ref_) in &self.refs {
+      let name = self.names.get(&ref_.name_id).expect("Name not found");
 
-      let name_span = match name_id {
+      if ref_.owner_id != name.owner_id {
+        // Captures are processed when the value is bound instead. Being syntactically in the TDZ is
+        // actually ok sometimes, see captureButNotRefBeforeInit.ts.
+        continue;
+      }
+
+      let name_span = match &ref_.name_id {
         NameId::Span(span) => *span,
         NameId::Builtin(_) | NameId::Constant(_) => continue,
       };
 
-      if span.lo == name_span.lo {
+      if ref_.span.lo == name_span.lo {
         // The origin of a name is allowed, eg
         // const x = 42;
         //       ^ Not a tdz violation
@@ -2032,14 +2065,12 @@ impl ScopeAnalysis {
         continue;
       }
 
-      self.diagnose_capture_tdz_violations(&mut diagnostics, name, span);
-
       let tdz_end = match name.tdz_end {
         Some(tdz_end) => tdz_end,
         None => continue,
       };
 
-      if span.lo() > tdz_end {
+      if ref_.span.lo() > tdz_end {
         continue;
       }
 
@@ -2049,51 +2080,11 @@ impl ScopeAnalysis {
           "Referencing {} is invalid before its declaration (temporal dead zone)",
           name.sym,
         ),
-        span: *span,
+        span: ref_.span,
       });
     }
 
     self.diagnostics.append(&mut diagnostics);
-  }
-
-  fn diagnose_capture_tdz_violations(
-    &self,
-    diagnostics: &mut Vec<Diagnostic>,
-    name: &Name,
-    span: &swc_common::Span,
-  ) {
-    let owner_id = match name_id_to_owner_id(&name.id) {
-      Some(owner_id) => owner_id,
-      None => return,
-    };
-
-    let captures = match self.captures.get(&owner_id) {
-      Some(captures) => captures,
-      None => return,
-    };
-
-    for capture in captures {
-      let capture_name = self.names.get(capture).expect("Name not found");
-
-      let tdz_end = match capture_name.tdz_end {
-        Some(tdz_end) => tdz_end,
-        None => continue,
-      };
-
-      if span.lo() > tdz_end {
-        continue;
-      }
-
-      diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::Error,
-        message: format!(
-          "Referencing {} is invalid because it binds {} before its declaration (temporal dead \
-            zone)",
-          name.sym, capture_name.sym,
-        ),
-        span: *span,
-      });
-    }
   }
 }
 
@@ -2117,12 +2108,4 @@ pub fn fn_to_owner_id(
     Some(name) => name.span,
     None => function.span,
   })
-}
-
-// TODO: Fix duplication
-pub fn name_id_to_owner_id(name_id: &NameId) -> Option<OwnerId> {
-  match name_id {
-    NameId::Span(span) => Some(OwnerId::Span(*span)),
-    NameId::Builtin(_) | NameId::Constant(_) => None,
-  }
 }
