@@ -8,4 +8,5 @@ members = [
   "valuescript_wasm",
   "vstc",
   "swc_demo",
+  "measure_bytecode_size",
 ]
