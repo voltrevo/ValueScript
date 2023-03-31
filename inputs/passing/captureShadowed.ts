@@ -1,5 +1,4 @@
-// // test_output! 7
-// Regression: TDZ rules incorrectly applied
+// test_output! 7
 
 export default function main() {
   function foo() {

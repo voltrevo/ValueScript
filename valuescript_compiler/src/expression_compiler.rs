@@ -1121,31 +1121,64 @@ impl<'a> ExpressionCompiler<'a> {
     let mut bind_values = Array::default();
 
     for cap in captures {
-      let cap_name = self
-        .fnc
-        .scope_analysis
-        .names
-        .get(cap)
-        .expect("Failed to find name");
-
-      if let Some(tdz_end) = cap_name.tdz_end {
-        if span.lo() <= tdz_end {
+      let cap_reg = match self.fnc.lookup_by_name_id(cap) {
+        Some(v) => match v {
+          Value::Register(r) => r,
+          _ => continue,
+        },
+        None => {
           self.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: match &fn_name {
-              Some(name) => format!(
-                "Referencing {} is invalid because it binds {} before its declaration (temporal \
-                  dead zone)",
-                name, cap_name.sym,
-              ),
-              None => format!(
-                "Expression is invalid because capturing {} binds its value before its declaration \
-                  (temporal dead zone)",
-                cap_name.sym,
-              ),
-            },
-            span,
+            level: DiagnosticLevel::InternalError,
+            message: format!(
+              "Failed to find capture {:?} for scope {:?}",
+              cap, self.fnc.owner_id
+            ),
+            span: cap.span(),
           });
+
+          continue;
+        }
+      };
+
+      // If the capture is a parameter, it's excluded from TDZ checking. This is because TDZ applies
+      // to let/const, and finding a parameter match means that the capture was already bound
+      // elsewhere, so it's already been TDZ checked (checking here isn't just duplication, it's can
+      // produce incorrect results, see captureShadowed.ts).
+      let mut is_param = false;
+
+      for p in &self.fnc.current.parameters {
+        if p == &cap_reg {
+          is_param = true;
+        }
+      }
+
+      if !is_param {
+        let cap_name = self
+          .fnc
+          .scope_analysis
+          .names
+          .get(cap)
+          .expect("Failed to find name");
+
+        if let Some(tdz_end) = cap_name.tdz_end {
+          if span.lo() <= tdz_end {
+            self.fnc.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::Error,
+              message: match &fn_name {
+                Some(name) => format!(
+                  "Referencing {} is invalid because it binds {} before its declaration (temporal \
+                    dead zone)",
+                  name, cap_name.sym,
+                ),
+                None => format!(
+                  "Expression is invalid because capturing {} binds its value before its \
+                    declaration (temporal dead zone)",
+                  cap_name.sym,
+                ),
+              },
+              span,
+            });
+          }
         }
       }
 
