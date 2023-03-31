@@ -14,7 +14,7 @@ use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
 use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::{NameId, OwnerId};
-use crate::scope_analysis::{fn_to_owner_id, ScopeAnalysis};
+use crate::scope_analysis::{fn_to_owner_id, Name, ScopeAnalysis};
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
@@ -119,6 +119,20 @@ impl FunctionCompiler {
 
   pub fn label(&mut self, label: Label) {
     self.current.body.push(InstructionOrLabel::Label(label));
+  }
+
+  pub fn lookup(&mut self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
+    let name = self.scope_analysis.lookup(ident);
+
+    if name.is_none() {
+      self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: format!("Could not find name for ident {:?}", ident),
+        span: ident.span,
+      });
+    }
+
+    name
   }
 
   pub fn lookup_value(&self, ident: &swc_ecma_ast::Ident) -> Option<Value> {

@@ -1333,22 +1333,14 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let value = match self.fnc.lookup_value(ident) {
-      Some(v) => v, // TODO: Capturing functions
+    let name = match self.fnc.lookup(ident) {
+      Some(v) => v,
       None => {
-        self.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!(
-            "Failed to lookup identifier `{}`, ref: {:?}",
-            ident.sym,
-            self.fnc.scope_analysis.refs.get(&ident.span)
-          ),
-          span: ident.span,
-        });
-
-        Value::Register(self.fnc.allocate_numbered_reg("_todo_identifier"))
+        return self.inline(Value::Undefined, target_register);
       }
     };
+
+    let value = name.value.clone();
 
     match fn_as_owner_id {
       Some(owner_id) => {
@@ -1367,7 +1359,15 @@ impl<'a> ExpressionCompiler<'a> {
       }
       None => match value {
         Value::Register(reg) => {
+          if name.mutations.is_empty() {
+            // Just use the register for the variable if it's not mutated
+            return self.inline(Value::Register(reg), target_register);
+          }
+
+          // Otherwise, we need to capture the current value for the result of the expression
+          // TODO: This case can be limited further by checking *where* the mutations are
           let new_reg = self.fnc.allocate_tmp();
+
           self.fnc.push(Instruction::Mov(
             Value::Register(reg.clone()),
             new_reg.clone(),
