@@ -447,7 +447,8 @@ impl FunctionCompiler {
           Some(expr) => {
             let mut expression_compiler = ExpressionCompiler { fnc: self };
 
-            expression_compiler.compile(expr, Some(Register::Return));
+            let compiled = expression_compiler.compile(expr, Some(Register::Return));
+            self.use_(compiled);
           }
         }
 

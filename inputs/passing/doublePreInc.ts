@@ -1,5 +1,4 @@
-// test_output! 4
-// (This is wrong.)
+// test_output! 3
 
 export default function main() {
   let x = 0;

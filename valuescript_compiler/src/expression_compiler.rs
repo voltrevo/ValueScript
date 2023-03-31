@@ -741,7 +741,19 @@ impl<'a> ExpressionCompiler<'a> {
               }
             }
 
-            reg.clone()
+            let res = self.fnc.allocate_tmp();
+            nested_registers.push(res.clone());
+
+            // Always copy pre-increment value into a new register.
+            // This is a bit heavy-handed (FIXME), but it's consistent with the current policy of
+            // doing this whenever the variable is mutated, which it clearly is. Really though, the
+            // issue is when *other* mutations to this variable occur between now and when it's
+            // inserted.
+            self
+              .fnc
+              .push(Instruction::Mov(Value::Register(reg.clone()), res.clone()));
+
+            res
           }
           TargetAccessor::Nested(nta) => match target_register {
             Some(tr) => {
