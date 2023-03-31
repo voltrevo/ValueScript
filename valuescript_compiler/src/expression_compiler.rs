@@ -1365,7 +1365,20 @@ impl<'a> ExpressionCompiler<'a> {
           None => self.inline(value, target_register),
         }
       }
-      None => self.inline(value, target_register),
+      None => match value {
+        Value::Register(reg) => {
+          let new_reg = self.fnc.allocate_tmp();
+          self.fnc.push(Instruction::Mov(
+            Value::Register(reg.clone()),
+            new_reg.clone(),
+          ));
+
+          self.inline(Value::Register(new_reg.clone()), target_register);
+
+          CompiledExpression::new(Value::Register(new_reg), vec![])
+        }
+        _ => self.inline(value, target_register),
+      },
     }
   }
 
