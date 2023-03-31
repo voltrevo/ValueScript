@@ -1,5 +1,5 @@
 export default function main() {
-  const res = foo(); // Should fail compilation: Binds uninitialized variable
+  const res = foo(); // Error: binds x before its declaration
   const x = 3;
 
   function foo() {

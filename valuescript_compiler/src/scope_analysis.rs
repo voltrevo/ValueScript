@@ -121,6 +121,7 @@ impl ScopeAnalysis {
     sa.diagnose_const_mutations();
     sa.process_optional_mutations();
 
+    // Relies on expand_captures
     sa.diagnose_tdz_violations();
 
     return sa;
@@ -2031,6 +2032,8 @@ impl ScopeAnalysis {
         continue;
       }
 
+      self.diagnose_capture_tdz_violations(&mut diagnostics, name, span);
+
       let tdz_end = match name.tdz_end {
         Some(tdz_end) => tdz_end,
         None => continue,
@@ -2051,6 +2054,46 @@ impl ScopeAnalysis {
     }
 
     self.diagnostics.append(&mut diagnostics);
+  }
+
+  fn diagnose_capture_tdz_violations(
+    &self,
+    diagnostics: &mut Vec<Diagnostic>,
+    name: &Name,
+    span: &swc_common::Span,
+  ) {
+    let owner_id = match name_id_to_owner_id(&name.id) {
+      Some(owner_id) => owner_id,
+      None => return,
+    };
+
+    let captures = match self.captures.get(&owner_id) {
+      Some(captures) => captures,
+      None => return,
+    };
+
+    for capture in captures {
+      let capture_name = self.names.get(capture).expect("Name not found");
+
+      let tdz_end = match capture_name.tdz_end {
+        Some(tdz_end) => tdz_end,
+        None => continue,
+      };
+
+      if span.lo() > tdz_end {
+        continue;
+      }
+
+      diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::Error,
+        message: format!(
+          "Referencing {} is invalid because it binds {} before its declaration (temporal dead \
+            zone)",
+          name.sym, capture_name.sym,
+        ),
+        span: *span,
+      });
+    }
   }
 }
 
@@ -2074,4 +2117,12 @@ pub fn fn_to_owner_id(
     Some(name) => name.span,
     None => function.span,
   })
+}
+
+// TODO: Fix duplication
+pub fn name_id_to_owner_id(name_id: &NameId) -> Option<OwnerId> {
+  match name_id {
+    NameId::Span(span) => Some(OwnerId::Span(*span)),
+    NameId::Builtin(_) | NameId::Constant(_) => None,
+  }
 }

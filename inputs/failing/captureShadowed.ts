@@ -1,4 +1,6 @@
-// test_output! 7
+// // test_output! 7
+// Regression: TDZ rules incorreectly applied, see
+// captureButNotRefBeforeInit.ts
 
 export default function main() {
   function foo() {
