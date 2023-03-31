@@ -1,7 +1,6 @@
 export default function main() {
-  let res = foo(); // Should fail compilation: Binds uninitialized variable
-
-  let x = 3;
+  const res = foo(); // Should fail compilation: Binds uninitialized variable
+  const x = 3;
 
   function foo() {
     return x;

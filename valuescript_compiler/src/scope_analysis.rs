@@ -15,8 +15,7 @@ use crate::{
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 
-// TODO: Make use of these in the next phase of the compiler, remove the
-// allow(dead_code) attributes
+// TODO: Find a use for these or remove them
 #[derive(Clone, Debug)]
 pub struct Capture {
   #[allow(dead_code)]
