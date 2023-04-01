@@ -39,7 +39,7 @@ onto `rightBowl` is interpreted as a change to the `rightBowl` variable itself,
 not the data it points to.
 
 You can
-[see this in the playground](https://valuescript.org/playground/#tutorial/valueSemantics.ts),
+[see this in the playground](https://valuescript.org/playground/#/tutorial/valueSemantics.ts),
 or run it locally:
 
 ```sh
