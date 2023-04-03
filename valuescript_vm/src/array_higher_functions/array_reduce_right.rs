@@ -29,13 +29,15 @@ struct ReduceRightFrame {
 }
 
 impl StackFrameTrait for ReduceRightFrame {
-  fn write_this(&mut self, this: Val) {
+  fn write_this(&mut self, _const: bool, this: Val) -> Result<(), Val> {
     self.this = this.as_array_data();
 
     match &self.this {
       None => {}
       Some(ad) => self.array_i = ad.elements.len(),
     };
+
+    Ok(())
   }
 
   fn write_param(&mut self, param: Val) {

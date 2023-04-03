@@ -29,8 +29,9 @@ struct ReduceFrame {
 }
 
 impl StackFrameTrait for ReduceFrame {
-  fn write_this(&mut self, this: Val) {
+  fn write_this(&mut self, _const: bool, this: Val) -> Result<(), Val> {
     self.this = this.as_array_data();
+    Ok(())
   }
 
   fn write_param(&mut self, param: Val) {

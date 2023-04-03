@@ -17,6 +17,7 @@ use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 pub struct BytecodeStackFrame {
   pub decoder: BytecodeDecoder,
   pub registers: Vec<Val>,
+  pub const_this: bool,
   pub param_start: usize,
   pub param_end: usize,
   pub this_target: Option<usize>,
@@ -91,8 +92,10 @@ impl BytecodeStackFrame {
 }
 
 impl StackFrameTrait for BytecodeStackFrame {
-  fn write_this(&mut self, this: Val) {
+  fn write_this(&mut self, _const: bool, this: Val) -> Result<(), Val> {
     self.registers[1] = this;
+    self.const_this = _const;
+    Ok(())
   }
 
   fn write_param(&mut self, param: Val) {
@@ -217,11 +220,11 @@ impl StackFrameTrait for BytecodeStackFrame {
               self.this_target = this_target;
 
               if this_target.is_some() {
-                new_frame.write_this(self.registers[this_target.unwrap()].clone());
+                new_frame.write_this(false, self.registers[this_target.unwrap()].clone())?;
               }
             } else {
               self.this_target = None;
-              new_frame.write_this(self.decoder.decode_val(&self.registers));
+              new_frame.write_this(false, self.decoder.decode_val(&self.registers))?;
             }
 
             self.transfer_parameters(&mut new_frame);
@@ -302,10 +305,13 @@ impl StackFrameTrait for BytecodeStackFrame {
           LoadFunctionResult::StackFrame(mut new_frame) => {
             self.transfer_parameters(&mut new_frame);
 
-            new_frame.write_this(match &obj {
-              ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
-              ThisArg::Val(val) => val.clone(),
-            });
+            new_frame.write_this(
+              false,
+              match &obj {
+                ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
+                ThisArg::Val(val) => val.clone(),
+              },
+            )?;
 
             self.return_target = self.decoder.decode_register_index();
 
@@ -386,7 +392,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             }
             LoadFunctionResult::StackFrame(mut new_frame) => {
               self.transfer_parameters(&mut new_frame);
-              new_frame.write_this(instance);
+              new_frame.write_this(false, instance)?;
 
               self.return_target = None;
               self.this_target = self.decoder.decode_register_index();

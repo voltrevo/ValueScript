@@ -17,7 +17,7 @@ pub enum FrameStepOk {
 pub type FrameStepResult = Result<FrameStepOk, Val>;
 
 pub trait StackFrameTrait {
-  fn write_this(&mut self, this: Val);
+  fn write_this(&mut self, const_: bool, this: Val) -> Result<(), Val>;
   fn write_param(&mut self, param: Val);
   fn step(&mut self) -> FrameStepResult;
   fn apply_call_result(&mut self, call_result: CallResult);

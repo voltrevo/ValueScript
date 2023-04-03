@@ -17,7 +17,7 @@ impl FirstStackFrame {
 }
 
 impl StackFrameTrait for FirstStackFrame {
-  fn write_this(&mut self, _this: Val) {
+  fn write_this(&mut self, _const: bool, _this: Val) -> Result<(), Val> {
     panic!("Not appropriate for FirstStackFrame");
   }
 

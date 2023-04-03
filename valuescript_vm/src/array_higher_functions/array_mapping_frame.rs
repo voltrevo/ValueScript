@@ -39,8 +39,9 @@ impl ArrayMappingFrame {
 }
 
 impl StackFrameTrait for ArrayMappingFrame {
-  fn write_this(&mut self, this: Val) {
+  fn write_this(&mut self, _const: bool, this: Val) -> Result<(), Val> {
     self.this = this.as_array_data();
+    Ok(())
   }
 
   fn write_param(&mut self, param: Val) {
@@ -103,7 +104,7 @@ impl StackFrameTrait for ArrayMappingFrame {
             }
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
-            new_frame.write_this(self.this_arg.clone());
+            new_frame.write_this(true, self.this_arg.clone())?;
             new_frame.write_param(el.clone());
             new_frame.write_param(Val::Number(array_i as f64));
             new_frame.write_param(Val::Array(array_data.clone()));

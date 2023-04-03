@@ -206,8 +206,13 @@ enum SortTreeNodeData {
 }
 
 impl StackFrameTrait for SortFrame {
-  fn write_this(&mut self, this: Val) {
+  fn write_this(&mut self, const_: bool, this: Val) -> Result<(), Val> {
+    if const_ {
+      return type_error!("Cannot sort const array");
+    }
+
     self.this = this.as_array_data();
+    Ok(())
   }
 
   fn write_param(&mut self, param: Val) {
