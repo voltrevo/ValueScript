@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::native_function::ThisWrapper;
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{builtins::type_error_builtin::to_type_error, type_error};
 use crate::{
@@ -88,7 +89,7 @@ impl ValTrait for StringBuiltin {
 }
 
 static FROM_CODE_POINT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let mut result = String::new();
 
     for param in params {
@@ -106,7 +107,7 @@ static FROM_CODE_POINT: NativeFunction = NativeFunction {
   },
 };
 
-fn to_string(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
+fn to_string(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(if let Some(value) = params.get(0) {
     Val::String(Rc::new(value.val_to_string()))
   } else {

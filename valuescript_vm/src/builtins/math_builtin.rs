@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::native_function::NativeFunction;
+use crate::native_function::{NativeFunction, ThisWrapper};
 use crate::operations::to_u32;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
@@ -134,49 +134,49 @@ fn param_to_number(param: Option<&Val>) -> f64 {
 }
 
 static ABS: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.abs()))
   },
 };
 
 static ACOS: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.acos()))
   },
 };
 
 static ACOSH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.acosh()))
   },
 };
 
 static ASIN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.asin()))
   },
 };
 
 static ASINH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.sinh()))
   },
 };
 
 static ATAN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.atan()))
   },
 };
 
 static ATAN2: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     let y = param_to_number(params.get(1));
 
@@ -185,77 +185,77 @@ static ATAN2: NativeFunction = NativeFunction {
 };
 
 static ATANH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.atanh()))
   },
 };
 
 static CBRT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.cbrt()))
   },
 };
 
 static CEIL: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.ceil()))
   },
 };
 
 static CLZ32: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(to_u32(x).leading_zeros() as f64))
   },
 };
 
 static COS: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.cos()))
   },
 };
 
 static COSH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.cosh()))
   },
 };
 
 static EXP: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.exp()))
   },
 };
 
 static EXPM1: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.exp_m1()))
   },
 };
 
 static FLOOR: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.floor()))
   },
 };
 
 static FROUND: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x as f32 as f64))
   },
 };
 
 static HYPOT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     let y = param_to_number(params.get(1));
     Ok(Val::Number(x.hypot(y)))
@@ -263,7 +263,7 @@ static HYPOT: NativeFunction = NativeFunction {
 };
 
 static IMUL: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     let y = param_to_number(params.get(1));
     Ok(Val::Number((to_u32(x) * to_u32(y)) as i32 as f64))
@@ -271,35 +271,35 @@ static IMUL: NativeFunction = NativeFunction {
 };
 
 static LOG: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.ln()))
   },
 };
 
 static LOG10: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.log10()))
   },
 };
 
 static LOG1P: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.ln_1p()))
   },
 };
 
 static LOG2: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.log2()))
   },
 };
 
 static MAX: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     let y = param_to_number(params.get(1));
     Ok(Val::Number(x.max(y)))
@@ -307,7 +307,7 @@ static MAX: NativeFunction = NativeFunction {
 };
 
 static MIN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     let y = param_to_number(params.get(1));
     Ok(Val::Number(x.min(y)))
@@ -315,7 +315,7 @@ static MIN: NativeFunction = NativeFunction {
 };
 
 static POW: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     let y = param_to_number(params.get(1));
     Ok(Val::Number(x.powf(y)))
@@ -323,56 +323,56 @@ static POW: NativeFunction = NativeFunction {
 };
 
 static ROUND: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.round()))
   },
 };
 
 static SIGN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.signum()))
   },
 };
 
 static SIN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.sin()))
   },
 };
 
 static SINH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.sinh()))
   },
 };
 
 static SQRT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.sqrt()))
   },
 };
 
 static TAN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.tan()))
   },
 };
 
 static TANH: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.tanh()))
   },
 };
 
 static TRUNC: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let x = param_to_number(params.get(0));
     Ok(Val::Number(x.trunc()))
   },

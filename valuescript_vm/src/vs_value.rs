@@ -7,6 +7,7 @@ use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
 use crate::format_val;
+use crate::native_function::ThisWrapper;
 use crate::operations::{op_sub, op_submov};
 use crate::stack_frame::StackFrame;
 use crate::vs_array::VsArray;
@@ -48,7 +49,7 @@ pub enum VsType {
 pub enum LoadFunctionResult {
   NotAFunction,
   StackFrame(StackFrame),
-  NativeFunction(fn(this: &mut Val, params: Vec<Val>) -> Result<Val, Val>),
+  NativeFunction(fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val>),
 }
 
 pub trait ValTrait {

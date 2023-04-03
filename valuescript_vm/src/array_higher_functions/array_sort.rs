@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use crate::native_frame_function::NativeFrameFunction;
+use crate::native_function::ThisWrapper;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
 use crate::vs_array::VsArray;
@@ -271,7 +272,11 @@ impl StackFrameTrait for SortFrame {
           return type_error!("comparator is not a function");
         }
         LoadFunctionResult::NativeFunction(native_fn) => {
-          let res = native_fn(&mut Val::Undefined, vec![left, right])?.to_number();
+          let res = native_fn(
+            ThisWrapper::new(true, &mut Val::Undefined),
+            vec![left, right],
+          )?
+          .to_number();
 
           let should_swap = match res.is_nan() {
             true => false,

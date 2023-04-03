@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
+use crate::native_function::ThisWrapper;
 use crate::{builtins::type_error_builtin::to_type_error, type_error};
 use crate::{
   native_function::NativeFunction,
@@ -95,7 +96,7 @@ impl ValTrait for NumberBuiltin {
 }
 
 pub static IS_FINITE: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(if let Some(value) = params.get(0) {
       let number = value.to_number();
       Val::Bool(number.is_finite())
@@ -106,7 +107,7 @@ pub static IS_FINITE: NativeFunction = NativeFunction {
 };
 
 static IS_INTEGER: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let num = match params.get(0) {
       Some(n) => n.to_number(),
       None => return Ok(Val::Bool(false)),
@@ -120,7 +121,7 @@ static IS_INTEGER: NativeFunction = NativeFunction {
 };
 
 pub static IS_NAN: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(if let Some(value) = params.get(0) {
       let number = value.to_number();
       Val::Bool(number.is_nan())
@@ -131,7 +132,7 @@ pub static IS_NAN: NativeFunction = NativeFunction {
 };
 
 static IS_SAFE_INTEGER: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let num = match params.get(0) {
       Some(n) => n.to_number(),
       None => return Ok(Val::Bool(false)),
@@ -148,7 +149,7 @@ static IS_SAFE_INTEGER: NativeFunction = NativeFunction {
 };
 
 pub static PARSE_FLOAT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(if let Some(value) = params.get(0) {
       let string_value = value.val_to_string().trim().to_string();
 
@@ -163,7 +164,7 @@ pub static PARSE_FLOAT: NativeFunction = NativeFunction {
 };
 
 pub static PARSE_INT: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(if let Some(value) = params.get(0) {
       let string_value = value.val_to_string().trim_start().to_string();
       let radix = params.get(1).and_then(|v| v.to_index()).unwrap_or(10);
@@ -196,7 +197,7 @@ pub static PARSE_INT: NativeFunction = NativeFunction {
   },
 };
 
-fn to_number(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
+fn to_number(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(if let Some(value) = params.get(0) {
     Val::Number(value.to_number())
   } else {

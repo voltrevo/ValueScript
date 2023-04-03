@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, rc::Rc};
 
 use num_bigint::BigInt;
 
+use crate::native_function::ThisWrapper;
 use crate::{builtins::type_error_builtin::to_type_error, type_error};
 use crate::{
   format_val,
@@ -83,7 +84,7 @@ impl ValTrait for ErrorBuiltin {
   }
 }
 
-fn to_error(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
+fn to_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(Val::Object(Rc::new(VsObject {
     string_map: BTreeMap::from([(
       "message".to_string(),
@@ -111,21 +112,25 @@ fn make_error_prototype() -> Val {
 }
 
 static SET_MESSAGE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let message = match params.get(0) {
       Some(param) => param.val_to_string(),
       None => "".to_string(),
     };
 
-    op_submov(this, format_val!("message"), format_val!("{}", message))?;
+    op_submov(
+      this.get_mut()?,
+      format_val!("message"),
+      format_val!("{}", message),
+    )?;
 
     Ok(Val::Undefined)
   },
 };
 
 static ERROR_TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    let message = op_sub(this.clone(), format_val!("message"))?;
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    let message = op_sub(this.get().clone(), format_val!("message"))?;
     Ok(format_val!("Error({})", message)) // TODO: Fixes needed here (and other errors)
   },
 };

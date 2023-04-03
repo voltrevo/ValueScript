@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::native_function::ThisWrapper;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
 use crate::vs_array::VsArray;
@@ -86,7 +87,7 @@ impl StackFrameTrait for ArrayMappingFrame {
               array_i,
               el,
               native_fn(
-                &mut self.this_arg.clone(),
+                ThisWrapper::new(false, &mut self.this_arg.clone()),
                 vec![
                   el.clone(),
                   Val::Number(array_i as f64),

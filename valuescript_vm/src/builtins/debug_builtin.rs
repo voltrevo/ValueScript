@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::native_function::NativeFunction;
+use crate::native_function::{NativeFunction, ThisWrapper};
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
@@ -82,7 +82,7 @@ impl ValTrait for DebugBuiltin {
 }
 
 static LOG: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     for p in params {
       println!("Debug.log: {}", p);
     }

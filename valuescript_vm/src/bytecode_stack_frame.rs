@@ -5,6 +5,7 @@ use valuescript_common::InstructionByte;
 use crate::builtins::type_error_builtin::to_type_error;
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
+use crate::native_function::ThisWrapper;
 use crate::operations;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
@@ -187,7 +188,10 @@ impl StackFrameTrait for BytecodeStackFrame {
             return Ok(FrameStepOk::Push(new_frame));
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
-            let res = native_fn(&mut Val::Undefined, self.decode_parameters())?;
+            let res = native_fn(
+              ThisWrapper::new(true, &mut Val::Undefined),
+              self.decode_parameters(),
+            )?;
 
             match self.decoder.decode_register_index() {
               Some(return_target) => {
@@ -316,10 +320,11 @@ impl StackFrameTrait for BytecodeStackFrame {
             let params = self.decode_parameters();
 
             let res = match &mut obj {
-              ThisArg::Register(reg_i) => {
-                native_fn(self.registers.get_mut(reg_i.clone()).unwrap(), params)?
-              }
-              ThisArg::Val(val) => native_fn(val, params)?,
+              ThisArg::Register(reg_i) => native_fn(
+                ThisWrapper::new(false, self.registers.get_mut(reg_i.clone()).unwrap()),
+                params,
+              )?,
+              ThisArg::Val(val) => native_fn(ThisWrapper::new(true, val), params)?,
             };
 
             match self.decoder.decode_register_index() {
@@ -389,7 +394,10 @@ impl StackFrameTrait for BytecodeStackFrame {
               return Ok(FrameStepOk::Push(new_frame));
             }
             LoadFunctionResult::NativeFunction(native_fn) => {
-              native_fn(&mut instance, self.decode_parameters())?;
+              native_fn(
+                ThisWrapper::new(false, &mut instance),
+                self.decode_parameters(),
+              )?;
 
               match self.decoder.decode_register_index() {
                 Some(target) => {

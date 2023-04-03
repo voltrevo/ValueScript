@@ -3,7 +3,7 @@ use std::{rc::Rc, str::Chars};
 use crate::{
   format_err,
   helpers::{to_wrapping_index, to_wrapping_index_clamped},
-  native_function::NativeFunction,
+  native_function::{NativeFunction, ThisWrapper},
   vs_array::VsArray,
   vs_value::Val,
   ValTrait,
@@ -85,8 +85,8 @@ pub fn get_string_method(method: &str) -> Val {
 }
 
 static AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -106,8 +106,8 @@ static AT: NativeFunction = NativeFunction {
 };
 
 static CODE_POINT_AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -130,8 +130,8 @@ static CODE_POINT_AT: NativeFunction = NativeFunction {
 };
 
 static CONCAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let mut result = string_data.as_str().to_string();
 
@@ -147,8 +147,8 @@ static CONCAT: NativeFunction = NativeFunction {
 };
 
 static ENDS_WITH: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -190,8 +190,8 @@ static ENDS_WITH: NativeFunction = NativeFunction {
 };
 
 static INCLUDES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -222,8 +222,8 @@ static INCLUDES: NativeFunction = NativeFunction {
 };
 
 static INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -254,8 +254,8 @@ static INDEX_OF: NativeFunction = NativeFunction {
 };
 
 static LAST_INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -286,9 +286,9 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
 };
 
 static TODO_LOCALE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     // TODO: Ok(...)
-    match this {
+    match this.get() {
       Val::String(_string_data) => {
         return format_err!("TODO: locale");
       }
@@ -298,9 +298,9 @@ static TODO_LOCALE: NativeFunction = NativeFunction {
 };
 
 static TODO_REGEXES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     // TODO: Ok(...)
-    match this {
+    match this.get() {
       Val::String(_string_data) => {
         return format_err!("TODO: regexes");
       }
@@ -310,9 +310,9 @@ static TODO_REGEXES: NativeFunction = NativeFunction {
 };
 
 static NORMALIZE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     // TODO: Ok(...)
-    match this {
+    match this.get() {
       Val::String(_string_data) => {
         // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
         return format_err!("TODO: normalize");
@@ -324,8 +324,8 @@ static NORMALIZE: NativeFunction = NativeFunction {
 
 // TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
 static PAD_END: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let target_length = match params.get(0) {
           Some(p) => match p.to_index() {
@@ -378,8 +378,8 @@ static PAD_END: NativeFunction = NativeFunction {
 
 // TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
 static PAD_START: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let target_length = match params.get(0) {
           Some(p) => match p.to_index() {
@@ -433,8 +433,8 @@ static PAD_START: NativeFunction = NativeFunction {
 };
 
 static REPEAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let count = match params.get(0) {
           Some(p) => match p.to_index() {
@@ -458,8 +458,8 @@ static REPEAT: NativeFunction = NativeFunction {
 };
 
 static SLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -492,8 +492,8 @@ static SLICE: NativeFunction = NativeFunction {
 };
 
 static SPLIT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let separator = match params.get(0) {
           Some(s) => s.val_to_string(), // TODO: Regexes
@@ -558,8 +558,8 @@ static SPLIT: NativeFunction = NativeFunction {
 };
 
 static STARTS_WITH: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -599,8 +599,8 @@ static STARTS_WITH: NativeFunction = NativeFunction {
 };
 
 static SUBSTRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let string_bytes = string_data.as_bytes();
 
@@ -642,8 +642,8 @@ static SUBSTRING: NativeFunction = NativeFunction {
 };
 
 static TO_LOWER_CASE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let lowercased_string = string_data.to_lowercase();
         Val::String(Rc::new(lowercased_string))
@@ -654,8 +654,8 @@ static TO_LOWER_CASE: NativeFunction = NativeFunction {
 };
 
 static TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => Val::String(string_data.clone()),
       _ => return format_err!("string indirection"),
     })
@@ -663,8 +663,8 @@ static TO_STRING: NativeFunction = NativeFunction {
 };
 
 static TO_UPPER_CASE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let uppercased_string = string_data.to_uppercase();
         Val::String(Rc::new(uppercased_string))
@@ -675,8 +675,8 @@ static TO_UPPER_CASE: NativeFunction = NativeFunction {
 };
 
 static TRIM: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let trimmed_string = string_data.trim();
         Val::String(Rc::new(trimmed_string.to_owned()))
@@ -687,8 +687,8 @@ static TRIM: NativeFunction = NativeFunction {
 };
 
 static TRIM_END: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let trimmed_string = string_data.trim_end();
         Val::String(Rc::new(trimmed_string.to_owned()))
@@ -699,8 +699,8 @@ static TRIM_END: NativeFunction = NativeFunction {
 };
 
 static TRIM_START: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => {
         let trimmed_string = string_data.trim_start();
         Val::String(Rc::new(trimmed_string.to_owned()))
@@ -711,8 +711,8 @@ static TRIM_START: NativeFunction = NativeFunction {
 };
 
 static VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::String(string_data) => Val::String(string_data.clone()),
       _ => return format_err!("string indirection"),
     })

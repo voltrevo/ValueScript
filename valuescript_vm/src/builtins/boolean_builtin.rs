@@ -4,6 +4,7 @@ use num_bigint::BigInt;
 
 use crate::{
   builtins::type_error_builtin::to_type_error,
+  native_function::ThisWrapper,
   type_error,
   vs_array::VsArray,
   vs_class::VsClass,
@@ -78,7 +79,7 @@ impl ValTrait for BooleanBuiltin {
   }
 }
 
-fn to_boolean(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
+fn to_boolean(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(if let Some(value) = params.get(0) {
     Val::Bool(value.is_truthy())
   } else {

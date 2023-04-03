@@ -6,7 +6,7 @@ use crate::{
   builtins::range_error_builtin::to_range_error,
   builtins::type_error_builtin::to_type_error,
   format_err,
-  native_function::NativeFunction,
+  native_function::{NativeFunction, ThisWrapper},
   operations::op_sub,
   range_error, type_error,
   vs_array::VsArray,
@@ -88,7 +88,7 @@ impl ValTrait for ArrayBuiltin {
 }
 
 static IS_ARRAY: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(match params.get(0) {
       None => Val::Bool(false),
       Some(p) => match p.as_array_data() {
@@ -100,7 +100,7 @@ static IS_ARRAY: NativeFunction = NativeFunction {
 };
 
 static FROM: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let first_param = match params.get(0) {
       None => return type_error!("undefined is not iterable"),
       Some(p) => p,
@@ -157,12 +157,12 @@ static FROM: NativeFunction = NativeFunction {
 };
 
 static OF: NativeFunction = NativeFunction {
-  fn_: |_this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(Val::Array(Rc::new(VsArray::from(params))))
   },
 };
 
-fn to_array(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
+fn to_array(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   if params.len() != 1 {
     return Ok(Val::Array(Rc::new(VsArray::from(params))));
   }

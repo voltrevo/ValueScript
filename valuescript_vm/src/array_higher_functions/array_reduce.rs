@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use crate::native_frame_function::NativeFrameFunction;
+use crate::native_function::ThisWrapper;
 use crate::stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrameTrait};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
@@ -67,7 +68,7 @@ impl StackFrameTrait for ReduceFrame {
             LoadFunctionResult::NotAFunction => return type_error!("reduce fn is not a function"),
             LoadFunctionResult::NativeFunction(native_fn) => {
               self.value = Some(native_fn(
-                &mut Val::Undefined,
+                ThisWrapper::new(true, &mut Val::Undefined),
                 vec![
                   value.clone(),
                   el.clone(),

@@ -7,6 +7,7 @@ use crate::bigint_methods::op_sub_bigint;
 use crate::format_err;
 use crate::format_val;
 use crate::native_function::NativeFunction;
+use crate::native_function::ThisWrapper;
 use crate::number_methods::op_sub_number;
 use crate::string_methods::op_sub_string;
 use crate::vs_value::Val;
@@ -480,8 +481,8 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val
 }
 
 static BOOL_TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match &this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Bool(b) => Val::String(Rc::new(b.to_string())),
       _ => return format_err!("bool indirection"),
     })
@@ -489,8 +490,8 @@ static BOOL_TO_STRING: NativeFunction = NativeFunction {
 };
 
 static BOOL_VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match &this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Bool(b) => Val::Bool(*b),
       _ => return format_err!("bool indirection"),
     })

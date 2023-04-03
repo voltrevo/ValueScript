@@ -9,8 +9,31 @@ use crate::vs_object::VsObject;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 use crate::{builtins::type_error_builtin::to_type_error, type_error};
 
+pub struct ThisWrapper<'a> {
+  const_: bool,
+  this: &'a mut Val,
+}
+
+impl<'a> ThisWrapper<'a> {
+  pub fn new(const_: bool, this: &'a mut Val) -> ThisWrapper<'a> {
+    ThisWrapper { const_, this }
+  }
+
+  pub fn get(&self) -> &Val {
+    self.this
+  }
+
+  pub fn get_mut(&mut self) -> Result<&mut Val, Val> {
+    if self.const_ {
+      return type_error!("Cannot mutate this because it is const");
+    }
+
+    Ok(self.this)
+  }
+}
+
 pub struct NativeFunction {
-  pub fn_: fn(this: &mut Val, params: Vec<Val>) -> Result<Val, Val>,
+  pub fn_: fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val>,
 }
 
 impl ValTrait for NativeFunction {

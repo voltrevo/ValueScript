@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::native_function::ThisWrapper;
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
   format_err, format_val,
@@ -21,8 +22,8 @@ pub fn op_sub_number(_number: f64, subscript: &Val) -> Val {
 }
 
 static TO_FIXED: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Number(number) => {
         if number.is_infinite() {
           return Ok(if number.is_sign_positive() {
@@ -34,7 +35,7 @@ static TO_FIXED: NativeFunction = NativeFunction {
 
         let mut precision = match params.get(0) {
           Some(p) => p.to_number(),
-          _ => return Ok(Val::String(Rc::new(this.val_to_string()))),
+          _ => return Ok(Val::String(Rc::new(this.get().val_to_string()))),
         };
 
         precision = f64::floor(precision);
@@ -51,8 +52,8 @@ static TO_FIXED: NativeFunction = NativeFunction {
 };
 
 static TO_EXPONENTIAL: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Number(number) => match params.get(0) {
         Some(p) => {
           let mut precision = p.to_number();
@@ -72,8 +73,8 @@ static TO_EXPONENTIAL: NativeFunction = NativeFunction {
 };
 
 static TODO_LOCALE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    match this.get() {
       Val::Number(_number) => return format_err!("TODO: locale"),
       _ => return format_err!("number indirection"),
     }
@@ -81,14 +82,14 @@ static TODO_LOCALE: NativeFunction = NativeFunction {
 };
 
 static TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Number(_) => match params.get(0) {
         Some(_) => {
           return format_err!("TODO: toString with radix");
         }
 
-        None => Val::String(Rc::new(this.val_to_string())),
+        None => Val::String(Rc::new(this.get().val_to_string())),
       },
       _ => return format_err!("number indirection"),
     })
@@ -96,8 +97,8 @@ static TO_STRING: NativeFunction = NativeFunction {
 };
 
 static VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Number(number) => Val::Number(*number),
       _ => return format_err!("number indirection"),
     })

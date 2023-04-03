@@ -3,6 +3,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::format_err;
+use crate::native_function::ThisWrapper;
 use crate::stack_frame::StackFrame;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;

@@ -10,7 +10,7 @@ use crate::array_higher_functions::{
 };
 use crate::format_err;
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
-use crate::native_function::NativeFunction;
+use crate::native_function::{NativeFunction, ThisWrapper};
 use crate::operations::op_triple_eq_impl;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
@@ -149,8 +149,8 @@ impl ValTrait for ArrayPrototype {
 }
 
 static AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Array(array_data) => match to_wrapping_index(params.get(0), array_data.elements.len()) {
         None => Val::Undefined,
         Some(i) => array_data.elements[i].clone(),
@@ -161,8 +161,8 @@ static AT: NativeFunction = NativeFunction {
 };
 
 static CONCAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Array(array_data) => {
         let mut new_array = array_data.as_ref().clone();
 
@@ -187,7 +187,9 @@ static CONCAT: NativeFunction = NativeFunction {
 };
 
 static COPY_WITHIN: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    let this = this.get_mut()?;
+
     Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
@@ -259,8 +261,8 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 };
 
 static ENTRIES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    match this {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    match this.get() {
       Val::Array(_array_data) => return format_err!("TODO: iterators"),
       _ => return format_err!("array indirection"),
     };
@@ -268,7 +270,9 @@ static ENTRIES: NativeFunction = NativeFunction {
 };
 
 static FILL: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    let this = this.get_mut()?;
+
     Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
@@ -298,8 +302,8 @@ static FILL: NativeFunction = NativeFunction {
 };
 
 static FLAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Array(array_data) => {
         if params.len() > 0 {
           return format_err!("TODO: .flat depth parameter");
@@ -328,8 +332,8 @@ static FLAT: NativeFunction = NativeFunction {
 };
 
 static INCLUDES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Array(array_data) => {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
@@ -351,8 +355,8 @@ static INCLUDES: NativeFunction = NativeFunction {
 };
 
 static INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Array(array_data) => {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
@@ -374,8 +378,8 @@ static INDEX_OF: NativeFunction = NativeFunction {
 };
 
 static JOIN: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Array(vals) => {
         if vals.elements.len() == 0 {
           return Ok(Val::String(Rc::new("".to_string())));
@@ -414,9 +418,9 @@ static JOIN: NativeFunction = NativeFunction {
 };
 
 static KEYS: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     // TODO: Ok(...)
-    match this {
+    match this.get() {
       Val::Array(_array_data) => {
         return format_err!("TODO: KEYS");
       }
@@ -426,8 +430,8 @@ static KEYS: NativeFunction = NativeFunction {
 };
 
 static LAST_INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Array(array_data) => {
         let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
 
@@ -449,7 +453,9 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
 };
 
 static POP: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    let this = this.get_mut()?;
+
     Ok(match this {
       Val::Array(array_data) => {
         if array_data.elements.len() == 0 {
@@ -473,7 +479,9 @@ static POP: NativeFunction = NativeFunction {
 };
 
 static PUSH: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    let this = this.get_mut()?;
+
     Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
@@ -490,7 +498,9 @@ static PUSH: NativeFunction = NativeFunction {
 };
 
 static REVERSE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    let this = this.get_mut()?;
+
     Ok(match this {
       Val::Array(array_data) => {
         if array_data.elements.len() == 0 {
@@ -517,7 +527,9 @@ static REVERSE: NativeFunction = NativeFunction {
 };
 
 static SHIFT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    let this = this.get_mut()?;
+
     Ok(match this {
       Val::Array(array_data) => {
         if array_data.elements.len() == 0 {
@@ -534,8 +546,8 @@ static SHIFT: NativeFunction = NativeFunction {
 };
 
 static SLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
+  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    Ok(match this.get() {
       Val::Array(array_data) => {
         let mut new_elems = Vec::<Val>::new();
 
@@ -561,7 +573,9 @@ static SLICE: NativeFunction = NativeFunction {
 };
 
 static SPLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    let this = this.get_mut()?;
+
     Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
@@ -638,9 +652,9 @@ static SPLICE: NativeFunction = NativeFunction {
 };
 
 static TO_LOCALE_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     // TODO: Ok(...)
-    match this {
+    match this.get() {
       Val::Array(_array_data) => {
         return format_err!("TODO: TO_LOCALE_STRING");
       }
@@ -651,13 +665,15 @@ static TO_LOCALE_STRING: NativeFunction = NativeFunction {
 
 // TODO: Share this? (JS doesn't?)
 static TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(Val::String(Rc::new(this.val_to_string())))
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
+    Ok(Val::String(Rc::new(this.get().val_to_string())))
   },
 };
 
 static UNSHIFT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+    let this = this.get_mut()?;
+
     Ok(match this {
       Val::Array(array_data) => {
         let array_data_mut = Rc::make_mut(array_data);
@@ -677,9 +693,9 @@ static UNSHIFT: NativeFunction = NativeFunction {
 };
 
 static VALUES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
+  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     // TODO: Ok(...)
-    match this {
+    match this.get() {
       Val::Array(_array_data) => {
         return format_err!("TODO: VALUES");
       }
