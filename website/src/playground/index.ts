@@ -105,7 +105,7 @@ let currentFile = '';
       currentFile = newFile;
     }
 
-    location.hash = currentFile;
+    history.replaceState(null, '', `#${currentFile}`);
     fileLocationText.textContent = currentFile;
 
     const model = fileModels[currentFile];
