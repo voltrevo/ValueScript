@@ -1,6 +1,6 @@
-name: Cargo Test
+name: Test
 
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
   test:
@@ -10,7 +10,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
         
-      - uses: ./.github/actions/rust-cache
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cargo
+          restore-keys: pr-dot-cargo
+      - uses: actions/cache@v2
+        with:
+          path: target
+          key: pr-target
+          restore-keys: pr-target
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
