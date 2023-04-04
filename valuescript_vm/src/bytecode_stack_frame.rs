@@ -108,7 +108,9 @@ impl StackFrameTrait for BytecodeStackFrame {
   fn step(&mut self) -> FrameStepResult {
     use InstructionByte::*;
 
-    match self.decoder.decode_instruction() {
+    let instruction_byte = self.decoder.decode_instruction();
+
+    match instruction_byte {
       End => {
         return Ok(FrameStepOk::Pop(CallResult {
           return_: self.registers[0].clone(),
@@ -278,7 +280,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         self.registers[register_index] = target;
       }
 
-      SubCall => {
+      SubCall | ConstSubCall => {
         let mut obj = match self.decoder.peek_type() {
           BytecodeType::Register => {
             self.decoder.decode_type();
@@ -306,7 +308,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             self.transfer_parameters(&mut new_frame);
 
             new_frame.write_this(
-              false,
+              instruction_byte == ConstSubCall,
               match &obj {
                 ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
                 ThisArg::Val(val) => val.clone(),
@@ -327,7 +329,10 @@ impl StackFrameTrait for BytecodeStackFrame {
 
             let res = match &mut obj {
               ThisArg::Register(reg_i) => native_fn(
-                ThisWrapper::new(false, self.registers.get_mut(reg_i.clone()).unwrap()),
+                ThisWrapper::new(
+                  instruction_byte == ConstSubCall,
+                  self.registers.get_mut(reg_i.clone()).unwrap(),
+                ),
                 params,
               )?,
               ThisArg::Val(val) => native_fn(ThisWrapper::new(true, val), params)?,

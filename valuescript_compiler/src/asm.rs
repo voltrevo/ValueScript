@@ -287,6 +287,7 @@ pub enum Instruction {
   ImportStar(Value, Register),
   SetCatch(LabelRef, Register),
   UnsetCatch,
+  ConstSubCall(Value, Value, Value, Register),
 }
 
 impl std::fmt::Display for Instruction {
@@ -427,6 +428,13 @@ impl std::fmt::Display for Instruction {
         write!(f, "set_catch {} {}", label, register)
       }
       Instruction::UnsetCatch => write!(f, "unset_catch"),
+      Instruction::ConstSubCall(obj, subscript, args, register) => {
+        write!(
+          f,
+          "const_subcall {} {} {} {}",
+          obj, subscript, args, register
+        )
+      }
     }
   }
 }
@@ -486,6 +494,7 @@ impl Instruction {
       ImportStar(..) => InstructionByte::ImportStar,
       SetCatch(..) => InstructionByte::SetCatch,
       UnsetCatch => InstructionByte::UnsetCatch,
+      ConstSubCall(..) => InstructionByte::ConstSubCall,
     }
   }
 }

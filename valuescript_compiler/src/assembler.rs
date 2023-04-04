@@ -210,7 +210,9 @@ impl Assembler {
         self.value(arg2);
         self.register(dst);
       }
-      Apply(arg1, arg2, arg3, dst) | SubCall(arg1, arg2, arg3, dst) => {
+      Apply(arg1, arg2, arg3, dst)
+      | SubCall(arg1, arg2, arg3, dst)
+      | ConstSubCall(arg1, arg2, arg3, dst) => {
         self.value(arg1);
         self.value(arg2);
         self.value(arg3);
