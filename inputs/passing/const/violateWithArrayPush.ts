@@ -1,5 +1,4 @@
-// test_output! [1,2,3]
-// (This is wrong.)
+// test_output! E: TypeError{"message":"Cannot mutate this because it is const"}
 
 export default function () {
   const arr = [1, 2];

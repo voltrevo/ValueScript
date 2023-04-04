@@ -998,20 +998,27 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let instr = Instruction::SubCall(
-      obj_value.clone(),
-      prop.value,
-      Value::Array(Box::new(asm_args)),
-      dest.clone(),
-    );
-
-    self.fnc.push(instr);
-
     match obj {
       TargetAccessorOrCompiledExpression::TargetAccessor(mut ta) => {
+        let instr = Instruction::SubCall(
+          obj_value.clone(),
+          prop.value,
+          Value::Array(Box::new(asm_args)),
+          dest.clone(),
+        );
+
+        self.fnc.push(instr);
         ta.assign_and_packup(self, &obj_value);
       }
       TargetAccessorOrCompiledExpression::CompiledExpression(ce) => {
+        let instr = Instruction::ConstSubCall(
+          obj_value.clone(),
+          prop.value,
+          Value::Array(Box::new(asm_args)),
+          dest.clone(),
+        );
+
+        self.fnc.push(instr);
         self.fnc.use_(ce);
       }
     }
@@ -1669,9 +1676,9 @@ impl TargetAccessor {
     use swc_ecma_ast::Expr::*;
 
     return match expr {
-      Ident(ident) => match ec.fnc.lookup_value(ident) {
-        Some(Value::Register(_)) => true,
-        _ => false,
+      Ident(ident) => match ec.fnc.lookup(ident) {
+        Some(name) => !name.effectively_const,
+        _ => false, // TODO: InternalError?
       },
       This(_) => true,
       Member(member) => TargetAccessor::is_eligible_expr(ec, &member.obj),
