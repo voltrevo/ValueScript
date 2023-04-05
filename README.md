@@ -216,10 +216,10 @@ instances (and the methods on those class instances). In ValueScript, everything
 is plain data.
 
 In fact, because ValueScript doesn't require garbage collection, it's also
-possible to build up large structures that wouldn't fit into memory. Garbage
-collection is a limiting factor on traditional languages on this point, because
-you need to periodically fully traverse the memory to find things that can be
-cleaned up.
+possible to build up large structures that wouldn't fit into memory. In garbage
+collected languages, the garbage collector needs to be able to fully traverse
+all the data (as a last resort) to find cycles to clean up, so growing beyond
+memory limits isn't very practical. ValueScript doesn't have this limitation.
 
 </details>
 
@@ -347,7 +347,7 @@ const fValue = f(z).wait();
 Suppose instead that `f`, `widget.calculate`, and `expensiveCalculation` are all
 sync functions. Suppose that `f` is part of an important API - it has users and
 you can't require them to make changes. Allowing `.wait` means those users can
-still benefit this multithreaded version of `f`:
+still benefit from this multi-threaded version of `f`:
 
 ```ts
 const f = (z: number): number => {
