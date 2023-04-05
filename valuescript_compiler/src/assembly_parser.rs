@@ -226,6 +226,7 @@ impl<'a> AssemblyParser<'a> {
       ("unset_catch", InstructionByte::UnsetCatch),
       ("const_subcall", InstructionByte::ConstSubCall),
       ("require_mutable_this", InstructionByte::RequireMutableThis),
+      ("this_subcall", InstructionByte::ThisSubCall),
     ]);
 
     for (word, instruction) in instruction_word_map {
@@ -678,6 +679,12 @@ impl<'a> AssemblyParser<'a> {
         self.assemble_register(),
       ),
       RequireMutableThis => Instruction::RequireMutableThis,
+      ThisSubCall => Instruction::ThisSubCall(
+        self.assemble_value(),
+        self.assemble_value(),
+        self.assemble_value(),
+        self.assemble_register(),
+      ),
     }
   }
 

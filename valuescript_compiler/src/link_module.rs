@@ -282,7 +282,8 @@ where
       }
       Apply(arg1, arg2, arg3, _)
       | SubCall(arg1, arg2, arg3, _)
-      | ConstSubCall(arg1, arg2, arg3, _) => {
+      | ConstSubCall(arg1, arg2, arg3, _)
+      | ThisSubCall(arg1, arg2, arg3, _) => {
         self.value(Some(owner), arg1);
         self.value(Some(owner), arg2);
         self.value(Some(owner), arg3);

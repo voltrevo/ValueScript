@@ -280,7 +280,10 @@ impl StackFrameTrait for BytecodeStackFrame {
         self.registers[register_index] = target;
       }
 
-      SubCall | ConstSubCall => {
+      SubCall | ConstSubCall | ThisSubCall => {
+        let const_call = instruction_byte == InstructionByte::ConstSubCall
+          || (instruction_byte == InstructionByte::ThisSubCall && self.const_this);
+
         let mut obj = match self.decoder.peek_type() {
           BytecodeType::Register => {
             self.decoder.decode_type();
@@ -308,7 +311,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             self.transfer_parameters(&mut new_frame);
 
             new_frame.write_this(
-              instruction_byte == ConstSubCall,
+              const_call,
               match &obj {
                 ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
                 ThisArg::Val(val) => val.clone(),
@@ -329,10 +332,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
             let res = match &mut obj {
               ThisArg::Register(reg_i) => native_fn(
-                ThisWrapper::new(
-                  instruction_byte == ConstSubCall,
-                  self.registers.get_mut(reg_i.clone()).unwrap(),
-                ),
+                ThisWrapper::new(const_call, self.registers.get_mut(reg_i.clone()).unwrap()),
                 params,
               )?,
               ThisArg::Val(val) => native_fn(ThisWrapper::new(true, val), params)?,
