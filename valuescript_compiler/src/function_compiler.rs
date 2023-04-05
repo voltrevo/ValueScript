@@ -113,11 +113,13 @@ impl FunctionCompiler {
 
   pub fn push(&mut self, instruction: Instruction) {
     if instruction_mutates_this(&instruction) {
-      self.current.body.push(InstructionOrLabel::Instruction(
-        Instruction::RequireMutableThis,
-      ));
+      self.push_raw(Instruction::RequireMutableThis);
     }
 
+    self.push_raw(instruction);
+  }
+
+  pub fn push_raw(&mut self, instruction: Instruction) {
     self
       .current
       .body

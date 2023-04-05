@@ -397,7 +397,7 @@ impl<'a> ExpressionCompiler<'a> {
       // at is already assigned by compiling directly into at.direct_register()
       // and also doesn't need to be packed up, since it's just a register
     } else {
-      at.assign_and_packup(self, &rhs.value);
+      at.assign_and_packup(self, &rhs.value, false);
     }
 
     rhs
@@ -517,7 +517,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    target.assign_and_packup(self, &Value::Register(target_read));
+    target.assign_and_packup(self, &Value::Register(target_read), false);
 
     CompiledExpression::new(Value::Register(result_reg), nested_registers)
   }
@@ -806,7 +806,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    target.assign_and_packup(self, &Value::Register(target_read));
+    target.assign_and_packup(self, &Value::Register(target_read), false);
 
     return res;
   }
@@ -1000,15 +1000,25 @@ impl<'a> ExpressionCompiler<'a> {
 
     match obj {
       TargetAccessorOrCompiledExpression::TargetAccessor(mut ta) => {
-        let instr = Instruction::SubCall(
-          obj_value.clone(),
-          prop.value,
-          Value::Array(Box::new(asm_args)),
-          dest.clone(),
-        );
+        let targets_this = ta.targets_this();
+
+        let instr = match targets_this {
+          false => Instruction::SubCall(
+            obj_value.clone(),
+            prop.value,
+            Value::Array(Box::new(asm_args)),
+            dest.clone(),
+          ),
+          true => Instruction::ThisSubCall(
+            obj_value.clone(),
+            prop.value,
+            Value::Array(Box::new(asm_args)),
+            dest.clone(),
+          ),
+        };
 
         self.fnc.push(instr);
-        ta.assign_and_packup(self, &obj_value);
+        ta.assign_and_packup(self, &obj_value, targets_this);
       }
       TargetAccessorOrCompiledExpression::CompiledExpression(ce) => {
         let instr = Instruction::ConstSubCall(
@@ -1451,7 +1461,7 @@ impl<'a> ExpressionCompiler<'a> {
         if let Pat::Expr(expr) = &*assign.left {
           let mut at = TargetAccessor::compile(self, expr, true);
           self.default_expr(&assign.right, register);
-          at.assign_and_packup(self, &Value::Register(register.clone()));
+          at.assign_and_packup(self, &Value::Register(register.clone()), false);
         } else {
           self.default_expr(&assign.right, register);
           self.pat(&assign.left, register, false);
@@ -1532,7 +1542,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
       Pat::Expr(expr) => {
         let mut at = TargetAccessor::compile(self, expr, true);
-        at.assign_and_packup(self, &Value::Register(register.clone()));
+        at.assign_and_packup(self, &Value::Register(register.clone()), false);
       }
     }
   }
@@ -1744,7 +1754,12 @@ impl TargetAccessor {
     return TargetAccessor::Register(ec.fnc.allocate_numbered_reg(&"_todo_lvalue".to_string()));
   }
 
-  fn assign_and_packup(&mut self, ec: &mut ExpressionCompiler, value: &Value) {
+  fn assign_and_packup(
+    &mut self,
+    ec: &mut ExpressionCompiler,
+    value: &Value,
+    uses_this_subcall: bool,
+  ) {
     use TargetAccessor::*;
 
     match self {
@@ -1761,11 +1776,18 @@ impl TargetAccessor {
           nta.obj.register(),
         );
 
-        ec.fnc.push(submov_instr);
+        if uses_this_subcall {
+          // This avoids require_mutable_this when packing up a this_subcall. Technically it will
+          // still assign to %this, but we've protected against the actual mutation because if %this
+          // is const, then this_subcall won't allow its mutation.
+          ec.fnc.push_raw(submov_instr);
+        } else {
+          ec.fnc.push(submov_instr);
+        }
 
         ec.fnc.release_reg(&nta.register);
 
-        nta.obj.packup(ec);
+        nta.obj.packup(ec, uses_this_subcall);
       }
     }
   }
@@ -1805,7 +1827,7 @@ impl TargetAccessor {
     };
   }
 
-  fn packup(&mut self, ec: &mut ExpressionCompiler) {
+  fn packup(&mut self, ec: &mut ExpressionCompiler, uses_this_subcall: bool) {
     use TargetAccessor::*;
 
     match self {
@@ -1817,13 +1839,24 @@ impl TargetAccessor {
           nta.obj.register(),
         );
 
-        ec.fnc.push(submov_instr);
+        if uses_this_subcall {
+          ec.fnc.push_raw(submov_instr);
+        } else {
+          ec.fnc.push(submov_instr);
+        }
 
         ec.fnc.release_reg(&nta.register);
 
-        nta.obj.packup(ec);
+        nta.obj.packup(ec, uses_this_subcall);
       }
     }
+  }
+
+  fn targets_this(&self) -> bool {
+    return match self {
+      TargetAccessor::Register(reg) => reg == &Register::This,
+      TargetAccessor::Nested(nta) => nta.obj.targets_this(),
+    };
   }
 }
 

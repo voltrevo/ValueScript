@@ -1,5 +1,4 @@
-// test_output! E: TypeError{"message":"Cannot mutate this because it is const"}
-// (This is wrong.)
+// test_output! 37
 
 export default function () {
   const foo = new Foo();
