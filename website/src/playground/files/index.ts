@@ -10,6 +10,7 @@ export const orderedFiles = [
   '/tutorial/consistency.js',
   '/tutorial/revertOnCatch.ts',
   '/tutorial/strings.ts',
+  '/tutorial/const.ts',
   '/tutorial/binaryTree.ts',
   '/tutorial/specialFunctions.ts',
   '/tutorial/treeShaking.ts',
