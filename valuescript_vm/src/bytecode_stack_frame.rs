@@ -92,9 +92,9 @@ impl BytecodeStackFrame {
 }
 
 impl StackFrameTrait for BytecodeStackFrame {
-  fn write_this(&mut self, _const: bool, this: Val) -> Result<(), Val> {
+  fn write_this(&mut self, const_: bool, this: Val) -> Result<(), Val> {
     self.registers[1] = this;
-    self.const_this = _const;
+    self.const_this = const_;
     Ok(())
   }
 
@@ -226,7 +226,7 @@ impl StackFrameTrait for BytecodeStackFrame {
               }
             } else {
               self.this_target = None;
-              new_frame.write_this(false, self.decoder.decode_val(&self.registers))?;
+              new_frame.write_this(true, self.decoder.decode_val(&self.registers))?;
             }
 
             self.transfer_parameters(&mut new_frame);
@@ -451,6 +451,12 @@ impl StackFrameTrait for BytecodeStackFrame {
 
       UnsetCatch => {
         self.catch_setting = None;
+      }
+
+      RequireMutableThis => {
+        if self.const_this {
+          return type_error!("Cannot mutate this because it is const");
+        }
       }
     };
 

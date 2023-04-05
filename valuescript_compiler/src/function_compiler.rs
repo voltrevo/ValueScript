@@ -12,6 +12,7 @@ use crate::asm::{
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
+use crate::instruction_mutates_this::instruction_mutates_this;
 use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, Name, ScopeAnalysis};
@@ -111,6 +112,12 @@ impl FunctionCompiler {
   }
 
   pub fn push(&mut self, instruction: Instruction) {
+    if instruction_mutates_this(&instruction) {
+      self.current.body.push(InstructionOrLabel::Instruction(
+        Instruction::RequireMutableThis,
+      ));
+    }
+
     self
       .current
       .body

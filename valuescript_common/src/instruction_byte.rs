@@ -50,6 +50,7 @@ pub enum InstructionByte {
   SetCatch = 0x2f,
   UnsetCatch = 0x30,
   ConstSubCall = 0x31,
+  RequireMutableThis = 0x32,
 }
 
 impl InstructionByte {
@@ -107,6 +108,7 @@ impl InstructionByte {
       0x2f => SetCatch,
       0x30 => UnsetCatch,
       0x31 => ConstSubCall,
+      0x32 => RequireMutableThis,
 
       _ => panic!("Unrecognized instruction: {}", byte),
     };

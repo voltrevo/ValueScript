@@ -160,7 +160,7 @@ impl Assembler {
     self.output.push(instruction.byte() as u8);
 
     match instruction {
-      End | UnsetCatch => {}
+      End | UnsetCatch | RequireMutableThis => {}
       OpInc(dst) | OpDec(dst) => {
         self.register(dst);
       }

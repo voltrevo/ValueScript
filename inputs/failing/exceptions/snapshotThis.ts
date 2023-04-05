@@ -2,7 +2,7 @@
 // (Should be 0.)
 
 export default function main() {
-  const foo = new Foo();
+  let foo = new Foo();
   foo.inc();
 
   return foo.x;

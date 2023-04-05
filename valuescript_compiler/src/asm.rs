@@ -288,6 +288,7 @@ pub enum Instruction {
   SetCatch(LabelRef, Register),
   UnsetCatch,
   ConstSubCall(Value, Value, Value, Register),
+  RequireMutableThis,
 }
 
 impl std::fmt::Display for Instruction {
@@ -435,6 +436,7 @@ impl std::fmt::Display for Instruction {
           obj, subscript, args, register
         )
       }
+      Instruction::RequireMutableThis => write!(f, "require_mutable_this"),
     }
   }
 }
@@ -495,6 +497,7 @@ impl Instruction {
       SetCatch(..) => InstructionByte::SetCatch,
       UnsetCatch => InstructionByte::UnsetCatch,
       ConstSubCall(..) => InstructionByte::ConstSubCall,
+      RequireMutableThis => InstructionByte::RequireMutableThis,
     }
   }
 }

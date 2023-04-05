@@ -234,7 +234,7 @@ where
     use Instruction::*;
 
     match instruction {
-      End | UnsetCatch | OpInc(..) | OpDec(..) | Jmp(..) | SetCatch(..) => {}
+      End | UnsetCatch | RequireMutableThis | OpInc(..) | OpDec(..) | Jmp(..) | SetCatch(..) => {}
       Mov(arg, _)
       | OpNot(arg, _)
       | OpBitNot(arg, _)

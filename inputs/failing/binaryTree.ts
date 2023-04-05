@@ -1,4 +1,5 @@
-// test_output! [[1,2,5],[1,2,3,4,5]]
+// test_output! E: TypeError{"message":"Cannot mutate this because it is const"}
+// (This is wrong.)
 
 export default function main() {
   let tree = BinaryTree();
@@ -18,17 +19,17 @@ export default function main() {
 function BinaryTree() {
   type BinaryTree = {
     data: {
-      value?: number,
-      left?: BinaryTree,
-      right?: BinaryTree,
-    },
-    insert(this: BinaryTree, newValue: number): void,
-    toArray(this: BinaryTree): number[],
+      value?: number;
+      left?: BinaryTree;
+      right?: BinaryTree;
+    };
+    insert(this: BinaryTree, newValue: number): void;
+    toArray(this: BinaryTree): number[];
   };
 
   let tree: BinaryTree = {
     data: {},
-    insert: function(newValue) {
+    insert: function (newValue) {
       if (this.data.value === undefined) {
         this.data.value = newValue;
         return;
@@ -42,7 +43,7 @@ function BinaryTree() {
         this.data.right.insert(newValue);
       }
     },
-    toArray: function() {
+    toArray: function () {
       let res: number[] = [];
 
       if (this.data.left) {

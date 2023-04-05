@@ -1,4 +1,4 @@
-export default class BinaryTree<T> {
+export default class BinaryTree<T extends {}> {
   left?: BinaryTree<T>;
   value?: T;
   right?: BinaryTree<T>;
