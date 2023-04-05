@@ -417,6 +417,8 @@ not the subset of ValueScript that has actually been implemented.
 - Destructuring
 - Exceptions
   - Variables changed during try block are reverted on catch
+- Enforcing `const`
+- Temporal dead zones
 - Local imports
 - Tree shaking
 - Copy-on-write optimizations
@@ -467,8 +469,6 @@ not the subset of ValueScript that has actually been implemented.
   - `{} === {} -> true`
   - JS: `-> false`
   - This is a value semantics thing - objects don't have identity
-- Enforcing `const`
-- Temporal dead zones
 - Iterators
 - Rest and spread
 - Generators
