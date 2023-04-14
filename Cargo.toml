@@ -6,6 +6,7 @@ members = [
   "valuescript_common",
   "valuescript_program_embed",
   "valuescript_wasm",
+  "valuescript_wasm_minimal",
   "vstc",
   "swc_demo",
   "measure_bytecode_size",

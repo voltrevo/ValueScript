@@ -2262,6 +2262,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "valuescript_wasm_minimal"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "serde",
+ "serde_json",
+ "valuescript_compiler",
+ "valuescript_vm",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+ "wee_alloc",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
