@@ -1,7 +1,7 @@
 mod array_builtin;
 mod boolean_builtin;
 mod debug_builtin;
-mod error_builtin;
+pub mod error_builtin;
 mod math_builtin;
 mod number_builtin;
 pub mod range_error_builtin;

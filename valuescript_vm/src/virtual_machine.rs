@@ -1,7 +1,10 @@
 use std::rc::Rc;
 
+use crate::builtins::error_builtin::to_error;
 use crate::bytecode_decoder::BytecodeDecoder;
+use crate::error;
 use crate::first_stack_frame::FirstStackFrame;
+use crate::native_function::ThisWrapper;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::StackFrame;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
@@ -36,6 +39,44 @@ impl VirtualMachine {
     }
 
     return Ok(self.frame.get_call_result().return_);
+  }
+
+  pub fn run_with_limit(
+    &mut self,
+    bytecode: &Rc<Vec<u8>>,
+    params: &[String],
+    step_limit: usize,
+  ) -> Result<Val, Val> {
+    let mut bd = BytecodeDecoder {
+      data: bytecode.clone(),
+      pos: 0,
+    };
+
+    let main_fn = bd.decode_val(&Vec::new());
+
+    let mut frame = match main_fn.load_function() {
+      LoadFunctionResult::StackFrame(f) => f,
+      _ => panic!("bytecode does start with function"),
+    };
+
+    for p in params {
+      frame.write_param(Val::String(Rc::new(p.clone())));
+    }
+
+    self.push(frame);
+
+    let mut step_count = 0;
+
+    while step_count < step_limit {
+      self.step()?;
+      step_count += 1;
+
+      if self.stack.len() == 0 {
+        return Ok(self.frame.get_call_result().return_);
+      }
+    }
+
+    error!("step limit reached")
   }
 
   pub fn new() -> VirtualMachine {

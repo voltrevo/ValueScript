@@ -84,7 +84,18 @@ impl ValTrait for ErrorBuiltin {
   }
 }
 
-fn to_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
+#[macro_export]
+macro_rules! error {
+  ($fmt:expr $(, $($arg:expr),*)?) => {{
+    let formatted_string = format!($fmt $(, $($arg),*)?);
+    Err(to_error(
+      ThisWrapper::new(true, &mut Val::Undefined),
+      vec![Val::String(Rc::new(formatted_string))],
+    ).unwrap())
+  }};
+}
+
+pub fn to_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(Val::Object(Rc::new(VsObject {
     string_map: BTreeMap::from([(
       "message".to_string(),
