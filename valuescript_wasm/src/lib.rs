@@ -76,7 +76,7 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function) -> RunResult {
 
   let mut vm = VirtualMachine::new();
 
-  let vm_result = vm.run(&bytecode, &[]);
+  let vm_result = vm.run_with_limit(&bytecode, &[], 1000000);
 
   RunResult {
     diagnostics: HashMap::default(),
