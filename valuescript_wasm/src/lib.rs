@@ -1,9 +1,18 @@
-use std::collections::HashMap;
+use std::{
+  collections::{BTreeMap, HashMap},
+  rc::Rc,
+};
 
 use wasm_bindgen::prelude::*;
 
-use valuescript_compiler::{assemble, compile as compile_internal, Diagnostic, ResolvedPath};
-use valuescript_vm::{LoadFunctionResult, ValTrait, VirtualMachine};
+use valuescript_compiler::{
+  asm::Value, assemble, assembly_parser::AssemblyParser, compile as compile_internal, Diagnostic,
+  ResolvedPath,
+};
+use valuescript_vm::{
+  vs_array::VsArray, vs_object::VsObject, vs_value::Val, LoadFunctionResult, ValTrait,
+  VirtualMachine,
+};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -23,7 +32,7 @@ struct RunResult {
   output: Result<String, String>,
 }
 
-fn run_to_result(entry_point: &str, read_file: &js_sys::Function) -> RunResult {
+fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) -> RunResult {
   let compile_result = compile_internal(ResolvedPath::from(entry_point.to_string()), |path| {
     let call_result = read_file.call1(&JsValue::UNDEFINED, &JsValue::from_str(path));
 
@@ -76,7 +85,17 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function) -> RunResult {
 
   let mut vm = VirtualMachine::new();
 
-  let vm_result = vm.run_with_limit(&bytecode, &[], 1000000);
+  let val_args: Vec<Val> = match parse_args(args) {
+    Ok(args) => args,
+    Err(err) => {
+      return RunResult {
+        diagnostics: HashMap::default(),
+        output: Err(err.codify()),
+      }
+    }
+  };
+
+  let vm_result = vm.run_with_limit(&bytecode, &val_args, 1000000);
 
   RunResult {
     diagnostics: HashMap::default(),
@@ -88,7 +107,65 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function) -> RunResult {
 }
 
 #[wasm_bindgen]
-pub fn run(entry_point: &str, read_file: &js_sys::Function) -> String {
-  let result = run_to_result(entry_point, read_file);
+pub fn run(entry_point: &str, read_file: &js_sys::Function, args: &str) -> String {
+  let result = run_to_result(entry_point, read_file, args);
   serde_json::to_string(&result).expect("Failed json serialization")
+}
+
+fn parse_args(args: &str) -> Result<Vec<Val>, Val> {
+  let mut assembler = AssemblyParser {
+    content: args,
+    pos: args.chars().peekable(),
+  };
+
+  let value = assembler.assemble_value();
+
+  let arr = match value {
+    Value::Array(arr) => arr,
+    _ => return Err(Val::String(Rc::new("Expected array".into()))),
+  };
+
+  let mut result = Vec::<Val>::new();
+
+  for arg in arr.values {
+    result.push(value_to_val(arg)?);
+  }
+
+  Ok(result)
+}
+
+fn value_to_val(value: Value) -> Result<Val, Val> {
+  Ok(match value {
+    Value::Undefined => Val::Undefined,
+    Value::Null => Val::Null,
+    Value::Bool(b) => Val::Bool(b),
+    Value::Number(n) => Val::Number(n),
+    Value::BigInt(n) => Val::BigInt(n),
+    Value::String(s) => Val::String(Rc::new(s)),
+    Value::Array(arr) => {
+      let mut result = Vec::<Val>::new();
+
+      for value in arr.values {
+        result.push(value_to_val(value)?);
+      }
+
+      Val::Array(Rc::new(VsArray::from(result)))
+    }
+    Value::Object(obj) => {
+      let mut string_map = BTreeMap::<String, Val>::new();
+
+      for (key, value) in obj.properties {
+        string_map.insert(value_to_val(key)?.val_to_string(), value_to_val(value)?);
+      }
+
+      Val::Object(Rc::new(VsObject {
+        string_map,
+        prototype: None,
+      }))
+    }
+
+    Value::Void | Value::Register(..) | Value::Pointer(..) | Value::Builtin(..) => {
+      return Err(Val::String(Rc::new("Invalid argument".into())));
+    }
+  })
 }

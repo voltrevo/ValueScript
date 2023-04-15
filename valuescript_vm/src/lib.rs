@@ -14,12 +14,12 @@ mod stack_frame;
 mod string_methods;
 mod todo_fn;
 mod virtual_machine;
-mod vs_array;
+pub mod vs_array;
 mod vs_class;
 mod vs_function;
-mod vs_object;
+pub mod vs_object;
 mod vs_pointer;
-mod vs_value;
+pub mod vs_value;
 
 pub use virtual_machine::VirtualMachine;
 pub use vs_value::{LoadFunctionResult, ValTrait};

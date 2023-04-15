@@ -9,9 +9,9 @@ use crate::asm::{
   Label, LabelRef, Module, Object, Pointer, Register, Value,
 };
 
-struct AssemblyParser<'a> {
-  content: &'a str,
-  pos: std::iter::Peekable<std::str::Chars<'a>>,
+pub struct AssemblyParser<'a> {
+  pub content: &'a str,
+  pub pos: std::iter::Peekable<std::str::Chars<'a>>,
 }
 
 impl<'a> AssemblyParser<'a> {
@@ -688,7 +688,7 @@ impl<'a> AssemblyParser<'a> {
     }
   }
 
-  fn assemble_value(&mut self) -> Value {
+  pub fn assemble_value(&mut self) -> Value {
     self.parse_optional_whitespace();
 
     match self.pos.peek() {

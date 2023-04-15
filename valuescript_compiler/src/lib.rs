@@ -1,6 +1,6 @@
-mod asm;
+pub mod asm;
 mod assembler;
-mod assembly_parser;
+pub mod assembly_parser;
 mod compile;
 mod constants;
 mod diagnostic;

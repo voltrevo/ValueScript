@@ -44,7 +44,7 @@ impl VirtualMachine {
   pub fn run_with_limit(
     &mut self,
     bytecode: &Rc<Vec<u8>>,
-    params: &[String],
+    params: &[Val],
     step_limit: usize,
   ) -> Result<Val, Val> {
     let mut bd = BytecodeDecoder {
@@ -60,7 +60,7 @@ impl VirtualMachine {
     };
 
     for p in params {
-      frame.write_param(Val::String(Rc::new(p.clone())));
+      frame.write_param(p.clone());
     }
 
     self.push(frame);
