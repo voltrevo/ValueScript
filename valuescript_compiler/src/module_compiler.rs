@@ -512,6 +512,10 @@ impl ModuleCompiler {
   }
 
   fn compile_import(&mut self, import: &swc_ecma_ast::ImportDecl) {
+    if import.type_only {
+      return;
+    }
+
     let import_path = import.src.value.to_string();
 
     for specifier in &import.specifiers {
@@ -520,6 +524,10 @@ impl ModuleCompiler {
 
       match specifier {
         Named(named) => {
+          if named.is_type_only {
+            continue;
+          }
+
           let local_name = named.local.sym.to_string();
 
           let external_name = match &named.imported {
