@@ -774,7 +774,7 @@ impl<'a> AssemblyParser<'a> {
       let next = self.parse_one_of(&[",", "]"]);
 
       if next == "," {
-        self.pos.next(); // TODO: Assert whitespace
+        self.parse_optional_whitespace();
         continue;
       }
 
