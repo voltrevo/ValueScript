@@ -28,5 +28,12 @@ export default function main() {
 
 // These functions are also not in the assembly, because none of our exports use
 // them.
-function foo() { return bar(); }
-function bar() {}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function foo() {
+  return bar();
+}
+
+function bar() {
+  return 0;
+}

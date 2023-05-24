@@ -1,11 +1,7 @@
 export default function main() {
   let actor = new Actor();
 
-  return [
-    actor.greet(),
-    actor.enablePirate(),
-    actor.greet(),
-  ];
+  return [actor.greet(), actor.enablePirate(), actor.greet()];
 }
 
 class Actor {

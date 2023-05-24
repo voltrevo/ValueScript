@@ -1,13 +1,13 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react-swc';
-import { resolve } from 'path';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react-swc";
+import { resolve } from "path";
 
-const src = resolve(__dirname, 'src');
-const outDir = resolve(__dirname, 'dist');
+const src = resolve(__dirname, "src");
+const outDir = resolve(__dirname, "dist");
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  publicDir: resolve(__dirname, 'public'),
+  publicDir: resolve(__dirname, "public"),
   root: src,
   plugins: [react()],
   build: {
@@ -15,10 +15,10 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(src, 'index.html'),
-        playground: resolve(src, 'playground', 'index.html'),
+        main: resolve(src, "index.html"),
+        playground: resolve(src, "playground", "index.html"),
       },
     },
-    target: 'esnext',
+    target: "esnext",
   },
 });

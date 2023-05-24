@@ -6,7 +6,7 @@ export default function () {
   let n = 37;
 
   // TypeScript would complain here, since `n` is inferred as `number`.
-  n = 'Hello';
+  n = "Hello";
 
   return n;
 }

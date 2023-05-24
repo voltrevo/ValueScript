@@ -1,5 +1,5 @@
 // We also deviate from JavaScript in a few other ways:
-// 
+//
 // - Strings are utf-8 and partial code points are not allowed
 
 export default function () {
@@ -7,11 +7,11 @@ export default function () {
   //                ----------------------------
   return [
     "🚀".length, // |          2 |           4 |
-    "🚀"[0],     // |   "\ud83d" |         "🚀" |
-    "🚀"[1],     // |   "\ude80" |          "" |
-    "🚀"[2],     // |  undefined |          "" |
-    "🚀"[3],     // |  undefined |          "" |
-    "🚀"[4],     // |  undefined |   undefined |
+    "🚀"[0], //     |   "\ud83d" |         "🚀" |
+    "🚀"[1], //     |   "\ude80" |          "" |
+    "🚀"[2], //     |  undefined |          "" |
+    "🚀"[3], //     |  undefined |          "" |
+    "🚀"[4], //     |  undefined |   undefined |
   ];
 }
 

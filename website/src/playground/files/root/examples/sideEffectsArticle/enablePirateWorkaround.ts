@@ -9,9 +9,7 @@ export default function main() {
     return "Ahoy";
   }
 
-  function enablePirate(
-    pirateEnabled: boolean,
-  ): [boolean, string] {
+  function enablePirate(pirateEnabled: boolean): [boolean, string] {
     pirateEnabled = true;
     return [pirateEnabled, "Done"];
   }
@@ -23,9 +21,5 @@ export default function main() {
 
   const greetResponse2 = greet(pirateEnabled);
 
-  return [
-    greetResponse1,
-    enablePirateResponse,
-    greetResponse2,
-  ];
+  return [greetResponse1, enablePirateResponse, greetResponse2];
 }

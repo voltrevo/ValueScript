@@ -7,8 +7,7 @@
 // the sum using `.reduce`.
 
 export default function main() {
-  return Array
-    .from(`${2n ** 1000n}`)
+  return Array.from(`${2n ** 1000n}`)
     .map(Number)
     .reduce((a, b) => a + b);
 
@@ -27,7 +26,7 @@ export default function main() {
 // Platform access is extremely important, but getting the language itself right
 // is more foundational and is still being actively developed.
 
-function alternateSolution() {
+export function alternateSolution() {
   const digits = `${2n ** 1000n}`;
   let sum = 0;
 

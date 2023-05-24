@@ -15,7 +15,7 @@ function quickSort<T>(vals: T[], cmp: (a: T, b: T) => number) {
   // to mutate in-place when the ref count is one is already there. This
   // will be optimized/fixed in the future.)
   //
-  // More on quickSort: 
+  // More on quickSort:
   // https://www.youtube.com/watch?v=Hoixgm4-P4M
 
   const len = vals.length;
@@ -57,7 +57,7 @@ function quickSort<T>(vals: T[], cmp: (a: T, b: T) => number) {
         j--;
         continue;
       }
-      
+
       [vals[i], vals[end]] = [vals[end], vals[i]];
 
       ranges.push([start, i - 1]);
@@ -66,4 +66,4 @@ function quickSort<T>(vals: T[], cmp: (a: T, b: T) => number) {
       break;
     }
   }
-}  
+}

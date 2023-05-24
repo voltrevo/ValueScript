@@ -23,7 +23,6 @@ module.exports = {
     },
   },
   rules: {
-    "indent": ["error", 2],
     "linebreak-style": ["error", "unix"],
     "quotes": ["error", "double"],
     "semi": ["error", "always"],
@@ -32,5 +31,7 @@ module.exports = {
     "quote-props": ["error", "consistent-as-needed"],
     "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     "prettier/prettier": "error",
+    "no-constant-condition": "off",
+    "no-empty": ["error", { allowEmptyCatch: true }],
   },
 };

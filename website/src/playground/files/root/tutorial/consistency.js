@@ -11,8 +11,8 @@ export default function () {
   let nums = [10, 1, 3];
 
   return [
-    [] + [],                // ""
-    nums.sort(),            // [1, 10, 3]
+    [] + [], // ""
+    nums.sort(), // [1, 10, 3]
     "b" + "a" + +"a" + "a", // "baNaNa"
   ];
   //                           JavaScript and ValueScript agree on these.

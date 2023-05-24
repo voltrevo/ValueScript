@@ -14,9 +14,5 @@ export default function main() {
     return "Done";
   }
 
-  return [
-    greet(),
-    enablePirate(),
-    greet(),
-  ];
+  return [greet(), enablePirate(), greet()];
 }

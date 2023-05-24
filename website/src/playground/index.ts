@@ -1,74 +1,78 @@
-import assert from './helpers/assert';
-import nil from './helpers/nil';
-import notNil from './helpers/notNil';
+import assert from "./helpers/assert";
+import nil from "./helpers/nil";
+import notNil from "./helpers/notNil";
 import VslibPool, {
   CompilerOutput,
   Diagnostic,
   Job,
   RunResult,
-} from './vslib/VslibPool';
-import FileSystem from './FileSystem';
-import monaco from './monaco';
-import Swal from './Swal';
-import { defaultFiles } from './files';
-import hasExtension from './helpers/hasExtension';
+} from "./vslib/VslibPool";
+import FileSystem from "./FileSystem";
+import monaco from "./monaco";
+import Swal from "./Swal";
+import { defaultFiles } from "./files";
+import hasExtension from "./helpers/hasExtension";
+import ExplicitAny from "./helpers/ExplicitAny";
 
 function domQuery<T = HTMLElement>(query: string): T {
-  return <T> <unknown> notNil(document.querySelector(query) ?? nil);
+  return <T>(<unknown>notNil(document.querySelector(query) ?? nil));
 }
 
-const editorLoadingEl = domQuery('#editor-loading');
-const monacoEditorEl = domQuery('#monaco-editor');
-const fileListEl = domQuery('#file-list');
+const editorLoadingEl = domQuery("#editor-loading");
+const monacoEditorEl = domQuery("#monaco-editor");
+const fileListEl = domQuery("#file-list");
 
-const fileLocationText = domQuery('#file-location-text');
+const fileLocationText = domQuery("#file-location-text");
 
-const listBtn = domQuery('#list-btn');
-const renameBtn = domQuery('#rename-btn');
-const addBtn = domQuery('#add-btn');
-const restoreBtn = domQuery('#restore-btn');
-const deleteBtn = domQuery('#delete-btn');
+const listBtn = domQuery("#list-btn");
+const renameBtn = domQuery("#rename-btn");
+const addBtn = domQuery("#add-btn");
+const restoreBtn = domQuery("#restore-btn");
+const deleteBtn = domQuery("#delete-btn");
 
-const filePreviousEl = domQuery('#file-previous');
-const fileNextEl = domQuery('#file-next');
-const outcomeEl = domQuery('#outcome');
-const vsmEl = domQuery('#vsm');
-const diagnosticsEl = domQuery('#diagnostics');
+const filePreviousEl = domQuery("#file-previous");
+const fileNextEl = domQuery("#file-next");
+const outcomeEl = domQuery("#outcome");
+const vsmEl = domQuery("#vsm");
+const diagnosticsEl = domQuery("#diagnostics");
 
-let currentFile = '';
+let currentFile = "";
 
 (async () => {
   const vslibPool = new VslibPool();
   const fs = new FileSystem();
 
-  const fileModels = Object.fromEntries(fs.list.map(
-    (filename) => {
+  const fileModels = Object.fromEntries(
+    fs.list.map((filename) => {
       const content = fs.read(filename);
       assert(content !== nil);
 
       const model = monaco.editor.createModel(
         content,
-        'typescript',
+        "typescript",
         monaco.Uri.parse(filename),
       );
 
       model.updateOptions({ tabSize: 2, insertSpaces: true });
 
       return [filename, model];
-    },
-  ));
+    }),
+  );
 
   editorLoadingEl.remove();
 
   const editor = monaco.editor.create(monacoEditorEl, {
-    theme: 'vs-dark',
-    language: 'typescript',
+    theme: "vs-dark",
+    language: "typescript",
   });
 
   {
-    const editorService = (editor as any)._codeEditorService;
+    const editorService = (editor as ExplicitAny)._codeEditorService;
     const openEditorBase = editorService.openCodeEditor.bind(editorService);
-    editorService.openCodeEditor = async (input: any, source: any) => {
+    editorService.openCodeEditor = async (
+      input: ExplicitAny,
+      source: ExplicitAny,
+    ) => {
       const result = await openEditorBase(input, source);
 
       if (result === null) {
@@ -82,20 +86,20 @@ let currentFile = '';
 
   setTimeout(() => changeFile(location.hash.slice(1)));
 
-  globalThis.addEventListener('hashchange', () => {
+  globalThis.addEventListener("hashchange", () => {
     changeFile(location.hash.slice(1));
   });
 
-  globalThis.addEventListener('resize', () => editor.layout());
+  globalThis.addEventListener("resize", () => editor.layout());
 
   function changeFile(newFile: string) {
-    if (currentFile === '') {
+    if (currentFile === "") {
       currentFile = fs.list[0];
     } else if (newFile === currentFile) {
       return;
     }
 
-    if (newFile === '') {
+    if (newFile === "") {
       newFile = fs.list[0];
     }
 
@@ -105,7 +109,7 @@ let currentFile = '';
       currentFile = newFile;
     }
 
-    history.replaceState(null, '', `#${currentFile}`);
+    history.replaceState(null, "", `#${currentFile}`);
     fileLocationText.textContent = currentFile;
 
     const model = fileModels[currentFile];
@@ -114,13 +118,13 @@ let currentFile = '';
     handleUpdate();
 
     if (Object.keys(defaultFiles).includes(currentFile)) {
-      renameBtn.classList.add('disabled');
-      restoreBtn.classList.remove('disabled');
-      deleteBtn.classList.add('disabled');
+      renameBtn.classList.add("disabled");
+      restoreBtn.classList.remove("disabled");
+      deleteBtn.classList.add("disabled");
     } else {
-      renameBtn.classList.remove('disabled');
-      restoreBtn.classList.add('disabled');
-      deleteBtn.classList.remove('disabled');
+      renameBtn.classList.remove("disabled");
+      restoreBtn.classList.add("disabled");
+      deleteBtn.classList.remove("disabled");
     }
   }
 
@@ -128,7 +132,7 @@ let currentFile = '';
     let idx = fs.list.indexOf(currentFile);
 
     if (idx === -1) {
-      throw new Error('This should not happen');
+      throw new Error("This should not happen");
     }
 
     idx += change;
@@ -138,8 +142,8 @@ let currentFile = '';
     changeFile(fs.list[idx]);
   };
 
-  filePreviousEl.addEventListener('click', moveFileIndex(-1));
-  fileNextEl.addEventListener('click', moveFileIndex(1));
+  filePreviousEl.addEventListener("click", moveFileIndex(-1));
+  fileNextEl.addEventListener("click", moveFileIndex(1));
 
   let timerId: nil | number = nil;
 
@@ -164,51 +168,45 @@ let currentFile = '';
     compileJob = vslibPool.compile(currentFile, fs.files);
     runJob = vslibPool.run(currentFile, fs.files);
 
-    renderJob(
-      compileJob,
-      vsmEl,
-      (el, compilerOutput) => {
-        el.textContent = compilerOutput.assembly.join('\n');
-      },
-    );
+    renderJob(compileJob, vsmEl, (el, compilerOutput) => {
+      el.textContent = compilerOutput.assembly.join("\n");
+    });
 
-    renderJob(
-      runJob,
-      outcomeEl,
-      (el, runResult) => {
-        if ('Ok' in runResult.output) {
-          el.textContent = runResult.output.Ok;
-        } else if ('Err' in runResult.output) {
-          el.textContent = `Uncaught exception: ${runResult.output.Err}`;
-        } else {
-          never(runResult.output);
+    renderJob(runJob, outcomeEl, (el, runResult) => {
+      if ("Ok" in runResult.output) {
+        el.textContent = runResult.output.Ok;
+      } else if ("Err" in runResult.output) {
+        el.textContent = `Uncaught exception: ${runResult.output.Err}`;
+      } else {
+        never(runResult.output);
+      }
+
+      diagnosticsEl.innerHTML = "";
+
+      for (const [file, diagnostics] of Object.entries(runResult.diagnostics)) {
+        for (const diagnostic of diagnostics) {
+          const diagnosticEl = document.createElement("div");
+
+          diagnosticEl.classList.add(
+            "diagnostic",
+            toKebabCase(diagnostic.level),
+          );
+
+          const { line, col } = toLineCol(source, diagnostic.span.start);
+          diagnosticEl.textContent = `${file}:${line}:${col}: ${diagnostic.message}`;
+
+          diagnosticsEl.appendChild(diagnosticEl);
         }
+      }
 
-        diagnosticsEl.innerHTML = '';
+      const model = editor.getModel();
+      assert(model !== null);
 
-        for (const [file, diagnostics] of Object.entries(runResult.diagnostics)) {
-          for (const diagnostic of diagnostics) {
-            const diagnosticEl = document.createElement('div');
-
-            diagnosticEl.classList.add(
-              'diagnostic',
-              toKebabCase(diagnostic.level),
-            );
-  
-            const { line, col } = toLineCol(source, diagnostic.span.start);
-            diagnosticEl.textContent = `${file}:${line}:${col}: ${diagnostic.message}`;
-  
-            diagnosticsEl.appendChild(diagnosticEl);
-          }
-        }
-
-        const model = editor.getModel();
-        assert(model !== null);
-
-        monaco.editor.setModelMarkers(
-          model,
-          'valuescript',
-          Object.entries(runResult.diagnostics).map(([file, diagnostics]) => {
+      monaco.editor.setModelMarkers(
+        model,
+        "valuescript",
+        Object.entries(runResult.diagnostics)
+          .map(([file, diagnostics]) => {
             if (file !== currentFile) {
               return []; // TODO
             }
@@ -219,7 +217,7 @@ let currentFile = '';
                 source,
                 diagnostic.span.end,
               );
-  
+
               return {
                 severity: toMonacoSeverity(diagnostic.level),
                 startLineNumber: line,
@@ -229,10 +227,10 @@ let currentFile = '';
                 message: diagnostic.message,
               };
             });
-          }).flat(),
-        );
-      },
-    );
+          })
+          .flat(),
+      );
+    });
 
     function renderJob<T>(
       job: Job<T>,
@@ -243,25 +241,26 @@ let currentFile = '';
 
       const loadingInterval = setInterval(() => {
         if (currentUpdateId === updateId) {
-          el.textContent = `Loading... ${
-            ((Date.now() - startTime) / 1000).toFixed(1)
-          }s`;
+          el.textContent = `Loading... ${(
+            (Date.now() - startTime) /
+            1000
+          ).toFixed(1)}s`;
         }
       }, 100);
 
       (async () => {
         try {
           apply(el, await job.wait());
-          el.classList.remove('error');
-        } catch (err: any) {
+          el.classList.remove("error");
+        } catch (err: ExplicitAny) {
           if (!(err instanceof Error)) {
-            // deno-lint-ignore no-ex-assign
+            // eslint-disable-next-line no-ex-assign
             err = new Error(`Non-error exception ${err}`);
           }
 
-          if (err.message !== 'Canceled') {
+          if (err.message !== "Canceled") {
             el.textContent = err.message;
-            el.classList.add('error');
+            el.classList.add("error");
           }
         } finally {
           clearInterval(loadingInterval);
@@ -270,37 +269,37 @@ let currentFile = '';
     }
   }
 
-  function toMonacoSeverity(level: Diagnostic['level']) {
+  function toMonacoSeverity(level: Diagnostic["level"]) {
     switch (level) {
-    case 'Error':
-      return monaco.MarkerSeverity.Error;
-    case 'InternalError':
-      return monaco.MarkerSeverity.Error;
-    case 'Lint':
-      return monaco.MarkerSeverity.Warning;
-    case 'CompilerDebug':
-      return monaco.MarkerSeverity.Info;
+      case "Error":
+        return monaco.MarkerSeverity.Error;
+      case "InternalError":
+        return monaco.MarkerSeverity.Error;
+      case "Lint":
+        return monaco.MarkerSeverity.Warning;
+      case "CompilerDebug":
+        return monaco.MarkerSeverity.Info;
     }
   }
 
   addBtn.onclick = async () => {
     const popup = await Swal.fire({
-      title: 'New File',
-      input: 'text',
-      inputPlaceholder: 'Enter name',
+      title: "New File",
+      input: "text",
+      inputPlaceholder: "Enter name",
     });
 
-    if (typeof popup.value === 'string' && popup.value !== '') {
+    if (typeof popup.value === "string" && popup.value !== "") {
       const newFile = sanitizeNewPath(popup.value);
 
       if (fs.list.includes(newFile)) {
         changeFile(newFile);
       } else {
-        fs.write(newFile, '', currentFile);
+        fs.write(newFile, "", currentFile);
 
         fileModels[newFile] = monaco.editor.createModel(
-          '',
-          'typescript',
+          "",
+          "typescript",
           monaco.Uri.parse(newFile),
         );
 
@@ -318,24 +317,25 @@ let currentFile = '';
   };
 
   renameBtn.onclick = async () => {
-    if (renameBtn.classList.contains('disabled')) {
+    if (renameBtn.classList.contains("disabled")) {
       return;
     }
 
-    const currentParts = currentFile.split('/');
+    const currentParts = currentFile.split("/");
 
-    const prefill = currentParts.length === 1
-      ? ''
-      : `${currentParts.slice(0, -1).join('/')}/`;
+    const prefill =
+      currentParts.length === 1
+        ? ""
+        : `${currentParts.slice(0, -1).join("/")}/`;
 
     const popup = await Swal.fire({
-      title: 'Rename File',
-      input: 'text',
+      title: "Rename File",
+      input: "text",
       inputValue: prefill,
       inputPlaceholder: currentFile,
     });
 
-    if (typeof popup.value === 'string' && popup.value !== '') {
+    if (typeof popup.value === "string" && popup.value !== "") {
       const newFile = sanitizeNewPath(popup.value);
       fs.rename(currentFile, newFile);
       const model = fileModels[currentFile];
@@ -346,17 +346,17 @@ let currentFile = '';
   };
 
   deleteBtn.onclick = async () => {
-    if (deleteBtn.classList.contains('disabled')) {
+    if (deleteBtn.classList.contains("disabled")) {
       return;
     }
 
     const popup = await Swal.fire({
-      title: 'Delete File',
+      title: "Delete File",
       text: `Are you sure you want to delete ${currentFile}?`,
-      icon: 'warning',
+      icon: "warning",
       showCancelButton: true,
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: "Delete",
+      cancelButtonText: "Cancel",
     });
 
     if (popup.isConfirmed) {
@@ -369,35 +369,35 @@ let currentFile = '';
   };
 
   listBtn.onclick = async () => {
-    monacoEditorEl.style.display = 'none';
+    monacoEditorEl.style.display = "none";
 
-    fileListEl.textContent = '';
+    fileListEl.textContent = "";
 
-    fileListEl.appendChild(makeFileSpacer('0.5em'));
+    fileListEl.appendChild(makeFileSpacer("0.5em"));
     let currentEl: HTMLElement | undefined;
 
     for (const file of fs.list) {
-      const fileEl = document.createElement('div');
-      fileEl.classList.add('file');
+      const fileEl = document.createElement("div");
+      fileEl.classList.add("file");
       fileEl.textContent = file;
 
       if (file === currentFile) {
-        fileEl.classList.add('current');
+        fileEl.classList.add("current");
         currentEl = fileEl;
       }
 
       fileEl.onclick = () => {
         changeFile(file);
-        monacoEditorEl.style.display = '';
-        fileListEl.style.display = '';
+        monacoEditorEl.style.display = "";
+        fileListEl.style.display = "";
       };
 
       fileListEl.appendChild(fileEl);
     }
 
-    fileListEl.appendChild(makeFileSpacer('1.5em'));
+    fileListEl.appendChild(makeFileSpacer("1.5em"));
 
-    fileListEl.style.display = 'flex';
+    fileListEl.style.display = "flex";
 
     if (currentEl) {
       currentEl.scrollIntoView();
@@ -406,15 +406,15 @@ let currentFile = '';
 })();
 
 function makeFileSpacer(minHeight: string) {
-  const spacer = document.createElement('div');
-  spacer.classList.add('file-spacer');
+  const spacer = document.createElement("div");
+  spacer.classList.add("file-spacer");
   spacer.style.minHeight = minHeight;
   return spacer;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function never(_: never): never {
-  throw new Error('This should not happen');
+  throw new Error("This should not happen");
 }
 
 function toKebabCase(str: string): string {
@@ -425,7 +425,7 @@ function toKebabCase(str: string): string {
 }
 
 function toLineCol(str: string, index: number): { line: number; col: number } {
-  const lines = str.slice(0, index).split('\n');
+  const lines = str.slice(0, index).split("\n");
 
   return { line: lines.length, col: lines[lines.length - 1].length + 1 };
 }
@@ -435,7 +435,7 @@ function sanitizeNewPath(path: string) {
     path = `${path}.ts`;
   }
 
-  if (!path.startsWith('/')) {
+  if (!path.startsWith("/")) {
     path = `/${path}`;
   }
 

@@ -1,5 +1,5 @@
-import { defaultFiles, orderedFiles } from './files';
-import nil from './helpers/nil';
+import { defaultFiles, orderedFiles } from "./files";
+import nil from "./helpers/nil";
 
 export default class FileSystem {
   list: string[];
@@ -7,13 +7,13 @@ export default class FileSystem {
 
   constructor() {
     const storedList: string[] = JSON.parse(
-      localStorage.getItem('fs-list') ?? '[]',
+      localStorage.getItem("fs-list") ?? "[]",
     );
 
-    if (orderedFiles.find(f => !storedList.includes(f)) !== undefined) {
+    if (orderedFiles.find((f) => !storedList.includes(f)) !== undefined) {
       this.list = [
         ...orderedFiles,
-        ...storedList.filter(f => !orderedFiles.includes(f)),
+        ...storedList.filter((f) => !orderedFiles.includes(f)),
       ];
     } else {
       this.list = [...storedList];
@@ -21,10 +21,10 @@ export default class FileSystem {
 
     this.list = [
       ...this.list,
-      ...Object.keys(defaultFiles).filter(f => !this.list.includes(f)),
+      ...Object.keys(defaultFiles).filter((f) => !this.list.includes(f)),
     ];
 
-    localStorage.setItem('fs-list', JSON.stringify(this.list));
+    localStorage.setItem("fs-list", JSON.stringify(this.list));
 
     for (const file of [...this.list]) {
       const storedFile: string | null = localStorage.getItem(`fs-${file}`);
@@ -40,7 +40,7 @@ export default class FileSystem {
   write(file: string, content: string | nil, afterFile?: string): void {
     if (content === nil) {
       this.list = this.list.filter((f) => f !== file);
-      localStorage.setItem('fs-list', JSON.stringify(this.list));
+      localStorage.setItem("fs-list", JSON.stringify(this.list));
       localStorage.removeItem(`fs-${file}`);
       delete this.files[file];
     } else {
@@ -52,9 +52,9 @@ export default class FileSystem {
           this.list.splice(index + 1, 0, file);
         }
 
-        localStorage.setItem('fs-list', JSON.stringify(this.list));
+        localStorage.setItem("fs-list", JSON.stringify(this.list));
       }
-  
+
       this.files[file] = content;
 
       if (defaultFiles[file] === content) {

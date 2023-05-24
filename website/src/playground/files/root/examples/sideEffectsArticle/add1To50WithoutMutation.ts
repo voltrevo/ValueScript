@@ -1,6 +1,5 @@
 export default function main() {
-  return makeRange(1, 51)
-    .reduce((a, b) => a + b);
+  return makeRange(1, 51).reduce((a, b) => a + b);
 }
 
 function makeRange(start: number, end: number): number[] {
@@ -8,7 +7,5 @@ function makeRange(start: number, end: number): number[] {
     return [];
   }
 
-  return [start].concat(
-    makeRange(start + 1, end),
-  );
+  return [start].concat(makeRange(start + 1, end));
 }

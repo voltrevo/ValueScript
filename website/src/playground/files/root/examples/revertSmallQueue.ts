@@ -17,7 +17,7 @@ export default function main() {
   };
 }
 
-class SmallQueue<T extends {}> {
+class SmallQueue<T extends Exclude<unknown, undefined>> {
   items: T[];
 
   constructor(items: T[]) {

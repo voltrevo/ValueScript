@@ -1,5 +1,5 @@
 export default function main() {
-  const values = ['a', 'b', 'c'];
+  const values = ["a", "b", "c"];
 
   return [values, reverse(values)];
 }
