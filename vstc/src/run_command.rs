@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::{ffi::OsStr, path::Path, process::exit};
 
 use valuescript_compiler::{assemble, compile, parse_module};
+use valuescript_vm::vs_value::Val;
 use valuescript_vm::VirtualMachine;
 
 use crate::resolve_entry_path::resolve_entry_path;
@@ -38,7 +39,12 @@ pub fn run_command(args: &Vec<String>) {
 
   let mut vm = VirtualMachine::new();
 
-  match vm.run(&bytecode, &args[argpos..]) {
+  let val_args: Vec<Val> = args[argpos..]
+    .iter()
+    .map(|a| Val::String(Rc::new(a.into())))
+    .collect();
+
+  match vm.run(&bytecode, None, &val_args) {
     Ok(result) => {
       println!("{}", result);
     }

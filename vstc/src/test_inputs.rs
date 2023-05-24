@@ -83,7 +83,7 @@ mod tests {
 
           let mut vm = VirtualMachine::new();
 
-          let result = vm.run(&bytecode, &[]);
+          let result = vm.run(&bytecode, Some(2_000_000), &[]);
 
           let result_str = match result {
             Ok(val) => val.codify(),

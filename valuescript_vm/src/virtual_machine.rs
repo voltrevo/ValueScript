@@ -15,37 +15,11 @@ pub struct VirtualMachine {
 }
 
 impl VirtualMachine {
-  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>, params: &[String]) -> Result<Val, Val> {
-    let mut bd = BytecodeDecoder {
-      data: bytecode.clone(),
-      pos: 0,
-    };
-
-    let main_fn = bd.decode_val(&Vec::new());
-
-    let mut frame = match main_fn.load_function() {
-      LoadFunctionResult::StackFrame(f) => f,
-      _ => panic!("bytecode does start with function"),
-    };
-
-    for p in params {
-      frame.write_param(Val::String(Rc::new(p.clone())));
-    }
-
-    self.push(frame);
-
-    while self.stack.len() > 0 {
-      self.step()?;
-    }
-
-    return Ok(self.frame.get_call_result().return_);
-  }
-
-  pub fn run_with_limit(
+  pub fn run(
     &mut self,
     bytecode: &Rc<Vec<u8>>,
+    step_limit: Option<usize>,
     params: &[Val],
-    step_limit: usize,
   ) -> Result<Val, Val> {
     let mut bd = BytecodeDecoder {
       data: bytecode.clone(),
@@ -65,18 +39,29 @@ impl VirtualMachine {
 
     self.push(frame);
 
-    let mut step_count = 0;
+    match step_limit {
+      Some(step_limit) => {
+        let mut step_count = 0;
 
-    while step_count < step_limit {
-      self.step()?;
-      step_count += 1;
+        while step_count < step_limit {
+          self.step()?;
+          step_count += 1;
 
-      if self.stack.len() == 0 {
-        return Ok(self.frame.get_call_result().return_);
+          if self.stack.len() == 0 {
+            return Ok(self.frame.get_call_result().return_);
+          }
+        }
+
+        error!("step limit reached")
+      }
+      None => {
+        while self.stack.len() > 0 {
+          self.step()?;
+        }
+
+        Ok(self.frame.get_call_result().return_)
       }
     }
-
-    error!("step limit reached")
   }
 
   pub fn new() -> VirtualMachine {

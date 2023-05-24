@@ -95,7 +95,7 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) ->
     }
   };
 
-  let vm_result = vm.run_with_limit(&bytecode, &val_args, 1000000);
+  let vm_result = vm.run(&bytecode, Some(1000000), &val_args);
 
   RunResult {
     diagnostics: HashMap::default(),
