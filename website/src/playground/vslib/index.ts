@@ -125,7 +125,11 @@ export async function initVslib() {
     }
   }
 
-  function run(entry_point: string, read_file: (path: string) => string) {
+  function run(
+    entry_point: string,
+    read_file: (path: string) => string,
+    args: string,
+  ) {
     let r0 = undefined;
     let r1 = undefined;
 
@@ -137,7 +141,13 @@ export async function initVslib() {
         wasm.__wbindgen_realloc,
       );
       const len0 = WASM_VECTOR_LEN;
-      wasm.run(retptr, ptr0, len0, addBorrowedObject(read_file));
+      const ptr1 = passStringToWasm0(
+        args,
+        wasm.__wbindgen_malloc,
+        wasm.__wbindgen_realloc,
+      );
+      const len1 = WASM_VECTOR_LEN;
+      wasm.run(retptr, ptr0, len0, addBorrowedObject(read_file), ptr1, len1);
       r0 = getInt32Memory0()[retptr / 4 + 0];
       r1 = getInt32Memory0()[retptr / 4 + 1];
       return getStringFromWasm0(r0, r1);

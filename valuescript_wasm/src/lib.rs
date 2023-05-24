@@ -6,8 +6,8 @@ use std::{
 use wasm_bindgen::prelude::*;
 
 use valuescript_compiler::{
-  asm::Value, assemble, assembly_parser::AssemblyParser, compile as compile_internal, Diagnostic,
-  ResolvedPath,
+  asm::Value, assemble, assembly_parser::AssemblyParser, compile as compile_internal,
+  CompileResult, Diagnostic, ResolvedPath,
 };
 use valuescript_vm::{
   vs_array::VsArray, vs_object::VsObject, vs_value::Val, LoadFunctionResult, ValTrait,
@@ -30,6 +30,45 @@ extern "C" {
 struct RunResult {
   diagnostics: HashMap<String, Vec<Diagnostic>>,
   output: Result<String, String>,
+}
+
+#[derive(serde::Serialize)]
+struct CompilerOutputWasm {
+  diagnostics: HashMap<String, Vec<Diagnostic>>,
+  assembly: Vec<String>,
+}
+
+impl CompilerOutputWasm {
+  fn from_compile_result(result: CompileResult) -> CompilerOutputWasm {
+    CompilerOutputWasm {
+      diagnostics: result
+        .diagnostics // TODO: Avoid conversion
+        .into_iter()
+        .map(|(path, diagnostics)| (path.to_string(), diagnostics))
+        .collect(),
+      assembly: match result.module {
+        Some(module) => module.as_lines(),
+        None => vec![],
+      },
+    }
+  }
+}
+
+#[wasm_bindgen]
+pub fn compile(entry_point: &str, read_file: &js_sys::Function) -> String {
+  let compile_result = compile_internal(ResolvedPath::from(entry_point.to_string()), |path| {
+    let call_result = read_file.call1(&JsValue::UNDEFINED, &JsValue::from_str(path));
+
+    match call_result {
+      Ok(result) => result
+        .as_string()
+        .ok_or_else(|| "read_file from JS produced non-string".into()),
+      Err(err) => Err(js_get_error_message(&err)),
+    }
+  });
+
+  serde_json::to_string(&CompilerOutputWasm::from_compile_result(compile_result))
+    .expect("Failed json serialization")
 }
 
 fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) -> RunResult {
@@ -95,7 +134,7 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) ->
     }
   };
 
-  let vm_result = vm.run(&bytecode, Some(1000000), &val_args);
+  let vm_result = vm.run(&bytecode, None, &val_args);
 
   RunResult {
     diagnostics: HashMap::default(),

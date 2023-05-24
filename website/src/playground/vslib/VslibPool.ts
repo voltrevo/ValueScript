@@ -23,11 +23,11 @@ async function main() {
     }
 
     if (method === "run") {
-      const [entryPoint, files] = args;
+      const [entryPoint, files, argsStr] = args;
 
       try {
         self.postMessage({
-          ok: vslib.run(entryPoint, makeLookupFile(files)),
+          ok: vslib.run(entryPoint, makeLookupFile(files), argsStr),
         });
       } catch (err) {
         self.postMessage({ err });
@@ -99,8 +99,16 @@ export function mapJob<U, V>(job: Job<U>, f: (x: U) => V): Job<V> {
 export default class VslibPool {
   #pool = new valuescript.WorkerPool(workerUrl);
 
-  run(entryPoint: string, files: Record<string, string | nil>) {
-    return this.#Job("run", [entryPoint, files]) as Job<RunResult>;
+  run(
+    entryPoint: string,
+    files: Record<string, string | nil>,
+    args: unknown[],
+  ) {
+    return this.#Job("run", [
+      entryPoint,
+      files,
+      JSON.stringify(args),
+    ]) as Job<RunResult>;
   }
 
   compile(entryPoint: string, files: Record<string, string | nil>) {

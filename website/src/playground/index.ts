@@ -166,7 +166,7 @@ let currentFile = "";
     fs.write(currentFile, source);
 
     compileJob = vslibPool.compile(currentFile, fs.files);
-    runJob = vslibPool.run(currentFile, fs.files);
+    runJob = vslibPool.run(currentFile, fs.files, []);
 
     renderJob(compileJob, vsmEl, (el, compilerOutput) => {
       el.textContent = compilerOutput.assembly.join("\n");
