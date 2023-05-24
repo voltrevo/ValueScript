@@ -1,8 +1,6 @@
 module.exports = {
-  extends: [
-    "../../../.eslintrc.cjs",
-  ],
+  extends: ["../../../../.eslintrc.cjs"],
   rules: {
-    quotes: ["error", "double"],
+    "prefer-const": "off",
   },
 };
