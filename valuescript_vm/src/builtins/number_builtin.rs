@@ -86,6 +86,10 @@ impl ValTrait for NumberBuiltin {
     type_error!("Cannot assign to subscript of Number builtin")
   }
 
+  fn next(&mut self) -> LoadFunctionResult {
+    LoadFunctionResult::NotAFunction
+  }
+
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Number]\x1b[39m")
   }

@@ -79,6 +79,10 @@ impl ValTrait for StringBuiltin {
     type_error!("Cannot assign to subscript of String builtin")
   }
 
+  fn next(&mut self) -> LoadFunctionResult {
+    LoadFunctionResult::NotAFunction
+  }
+
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[String]\x1b[39m")
   }

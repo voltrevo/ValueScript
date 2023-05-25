@@ -77,6 +77,8 @@ pub trait ValTrait {
   fn sub(&self, key: Val) -> Result<Val, Val>;
   fn submov(&mut self, key: Val, value: Val) -> Result<(), Val>;
 
+  fn next(&mut self) -> LoadFunctionResult;
+
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
   fn codify(&self) -> String;
 }
@@ -360,6 +362,20 @@ impl ValTrait for Val {
 
   fn submov(&mut self, key: Val, value: Val) -> Result<(), Val> {
     op_submov(self, key, value)
+  }
+
+  fn next(&mut self) -> LoadFunctionResult {
+    match self {
+      // TODO: iterator
+      _ => {
+        let next_fn = op_sub(self.clone(), Val::String(Rc::new("next".into())));
+
+        match next_fn {
+          Ok(next_fn) => next_fn.load_function(),
+          Err(_) => LoadFunctionResult::NotAFunction,
+        }
+      }
+    }
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

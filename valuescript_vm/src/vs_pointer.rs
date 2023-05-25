@@ -21,7 +21,7 @@ impl VsPointer {
   pub fn new(bytecode: &Rc<Vec<u8>>, pos: usize) -> Val {
     return Val::Custom(Rc::new(VsPointer {
       bytecode: bytecode.clone(),
-      pos: pos,
+      pos,
       resolved: RefCell::new(None),
     }));
   }
@@ -147,6 +147,10 @@ impl ValTrait for VsPointer {
 
   fn submov(&mut self, _subscript: Val, _value: Val) -> Result<(), Val> {
     format_err!("TODO: Probably an exception, but might be possible")
+  }
+
+  fn next(&mut self) -> LoadFunctionResult {
+    self.resolve().next()
   }
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

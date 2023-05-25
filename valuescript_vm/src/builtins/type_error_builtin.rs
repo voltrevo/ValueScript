@@ -77,6 +77,10 @@ impl ValTrait for TypeErrorBuiltin {
     type_error!("Cannot assign to subscript of TypeError builtin")
   }
 
+  fn next(&mut self) -> LoadFunctionResult {
+    LoadFunctionResult::NotAFunction
+  }
+
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[TypeError]\x1b[39m")
   }

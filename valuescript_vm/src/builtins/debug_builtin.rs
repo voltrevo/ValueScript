@@ -72,6 +72,10 @@ impl ValTrait for DebugBuiltin {
     type_error!("Cannot assign to subscript of Debug builtin")
   }
 
+  fn next(&mut self) -> LoadFunctionResult {
+    LoadFunctionResult::NotAFunction
+  }
+
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Debug]\x1b[39m")
   }
