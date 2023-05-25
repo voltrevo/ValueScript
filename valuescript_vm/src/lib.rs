@@ -19,6 +19,7 @@ mod vs_class;
 mod vs_function;
 pub mod vs_object;
 mod vs_pointer;
+mod vs_symbol;
 pub mod vs_value;
 
 pub use virtual_machine::VirtualMachine;

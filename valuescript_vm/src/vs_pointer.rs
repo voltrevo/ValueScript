@@ -96,6 +96,7 @@ impl ValTrait for VsPointer {
       VsType::Bool => true,
       VsType::Number => true,
       VsType::BigInt => true,
+      VsType::Symbol => true,
       VsType::String => true,
       VsType::Array => false,
       VsType::Object => false,

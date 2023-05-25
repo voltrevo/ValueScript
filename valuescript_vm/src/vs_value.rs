@@ -14,6 +14,7 @@ use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
 use crate::vs_object::VsObject;
+use crate::vs_symbol::{symbol_to_name, VsSymbol};
 
 #[derive(Clone, Debug)]
 pub enum Val {
@@ -23,6 +24,7 @@ pub enum Val {
   Bool(bool),
   Number(f64),
   BigInt(BigInt),
+  Symbol(VsSymbol),
   String(Rc<String>),
   Array(Rc<VsArray>),
   Object(Rc<VsObject>),
@@ -39,6 +41,7 @@ pub enum VsType {
   Bool,
   Number,
   BigInt,
+  Symbol,
   String,
   Array,
   Object,
@@ -97,6 +100,7 @@ impl ValTrait for Val {
       Bool(_) => VsType::Bool,
       Number(_) => VsType::Number,
       BigInt(_) => VsType::BigInt,
+      Symbol(_) => VsType::Symbol,
       String(_) => VsType::String,
       Array(_) => VsType::Array,
       Object(_) => VsType::Object,
@@ -127,6 +131,7 @@ impl ValTrait for Val {
         }
       } // TODO: Match js's number string format
       BigInt(x) => x.to_string(),
+      Symbol(s) => format!("Symbol(Symbol.{})", symbol_to_name(s.clone())),
       String(s) => s.to_string(),
       Array(vals) => {
         if vals.elements.len() == 0 {
@@ -169,6 +174,7 @@ impl ValTrait for Val {
       Bool(b) => *b as u8 as f64,
       Number(x) => *x,
       BigInt(x) => x.to_f64().unwrap_or(f64::NAN),
+      Symbol(_) => f64::NAN, // TODO: Should be TypeError
       String(s) => f64::from_str(s).unwrap_or(f64::NAN),
       Array(vals) => match vals.elements.len() {
         0 => 0_f64,
@@ -193,6 +199,7 @@ impl ValTrait for Val {
       Bool(_) => None,
       Number(x) => number_to_index(*x),
       BigInt(b) => number_to_index(b.to_f64().unwrap_or(f64::NAN)),
+      Symbol(_) => None,
       String(s) => match f64::from_str(s) {
         Ok(x) => number_to_index(x),
         Err(_) => None,
@@ -216,6 +223,7 @@ impl ValTrait for Val {
       Bool(_) => true,
       Number(_) => true,
       BigInt(_) => true,
+      Symbol(_) => true,
       String(_) => true,
       Array(_) => false,
       Object(_) => false,
@@ -244,6 +252,7 @@ impl ValTrait for Val {
       Bool(b) => *b,
       Number(x) => *x != 0_f64 && !x.is_nan(),
       BigInt(x) => !x.is_zero(),
+      Symbol(_) => true,
       String(s) => s.len() > 0,
       Array(_) => true,
       Object(_) => true,
@@ -264,6 +273,7 @@ impl ValTrait for Val {
       Bool(_) => false,
       Number(_) => false,
       BigInt(_) => false,
+      Symbol(_) => false,
       String(_) => false,
       Array(_) => false,
       Object(_) => false,
@@ -364,6 +374,7 @@ impl ValTrait for Val {
       Val::Bool(_) => self.val_to_string(),
       Val::Number(_) => self.val_to_string(),
       Val::BigInt(_) => self.val_to_string() + "n",
+      Val::Symbol(s) => format!("Symbol.{}", symbol_to_name(s.clone())),
       Val::String(str) => stringify_string(str),
       Val::Array(vals) => {
         if vals.elements.len() == 0 {
@@ -441,6 +452,7 @@ impl std::fmt::Display for Val {
       Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
       Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
       Val::BigInt(_) => write!(f, "\x1b[33m{}n\x1b[39m", self.val_to_string()),
+      Val::Symbol(_) => write!(f, "\x1b[32m{}\x1b[39m", self.codify()),
       Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.codify()),
       Val::Array(array) => {
         if array.elements.len() == 0 {

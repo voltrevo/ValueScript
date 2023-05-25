@@ -127,6 +127,7 @@ impl BytecodeDecoder {
 
         Val::Object(Rc::new(VsObject {
           string_map: obj,
+          symbol_map: Default::default(),
           prototype: None,
         }))
       }

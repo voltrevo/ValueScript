@@ -118,7 +118,9 @@ static FROM: NativeFunction = NativeFunction {
           .collect(),
       ))),
       Val::Void | Val::Undefined | Val::Null => return type_error!("items is not iterable"),
-      Val::Bool(..) | Val::Number(..) | Val::BigInt(..) => Val::Array(Rc::new(VsArray::new())),
+      Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => {
+        Val::Array(Rc::new(VsArray::new()))
+      }
       Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Custom(..) => {
         let len = op_sub(
           first_param.clone(),

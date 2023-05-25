@@ -29,6 +29,7 @@ impl VsArray {
       elements: vals,
       object: VsObject {
         string_map: Default::default(),
+        symbol_map: Default::default(),
         prototype: Some(Val::Static(&ARRAY_PROTOTYPE)),
       },
     };
@@ -39,6 +40,7 @@ impl VsArray {
       elements: vec![],
       object: VsObject {
         string_map: Default::default(),
+        symbol_map: Default::default(),
         prototype: Some(Val::Static(&ARRAY_PROTOTYPE)),
       },
     };

@@ -95,6 +95,7 @@ pub fn to_type_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
         None => "".to_string(),
       })),
     )]),
+    symbol_map: Default::default(),
     prototype: Some(make_type_error_prototype()),
   })))
 }
@@ -109,6 +110,7 @@ fn make_type_error_prototype() -> Val {
       ),
       ("toString".to_string(), Val::Static(&TYPE_ERROR_TO_STRING)),
     ]),
+    symbol_map: Default::default(),
     prototype: None,
   }))
 }

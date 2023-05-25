@@ -372,6 +372,7 @@ pub fn op_typeof(input: Val) -> Val {
     Bool => "boolean".to_string(),
     Number => "number".to_string(),
     BigInt => "bigint".to_string(),
+    Symbol => "symbol".to_string(),
     String => "string".to_string(),
     Array => "object".to_string(),
     Object => "object".to_string(),
@@ -400,6 +401,7 @@ pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
     }),
     Val::Number(number) => Ok(op_sub_number(number, &right)),
     Val::BigInt(bigint) => Ok(op_sub_bigint(&bigint, &right)),
+    Val::Symbol(_) => Ok(Val::Undefined),
     Val::String(string_data) => Ok(op_sub_string(&string_data, &right)),
     Val::Array(array_data) => {
       let right_index = match right.to_index() {
@@ -436,14 +438,16 @@ pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
 pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val> {
   match target {
     Val::Void => format_err!("Internal: Shouldn't happen"), // TODO: Internal errors
-    Val::Undefined => format_err!("Cannot assign to subscript of undefined"),
-    Val::Null => format_err!("Cannot assign to subscript of null"),
-    Val::Bool(_) => format_err!("Cannot assign to subscript of bool"),
-    Val::Number(_) => format_err!("Cannot assign to subscript of number"),
-    Val::BigInt(_) => format_err!("Cannot assign to subscript of bigint"),
-    Val::String(_) => format_err!("Cannot assign to subscript of string"),
+    Val::Undefined => type_error!("Cannot assign to subscript of undefined"),
+    Val::Null => type_error!("Cannot assign to subscript of null"),
+    Val::Bool(_) => type_error!("Cannot assign to subscript of bool"),
+    Val::Number(_) => type_error!("Cannot assign to subscript of number"),
+    Val::BigInt(_) => type_error!("Cannot assign to subscript of bigint"),
+    Val::Symbol(_) => type_error!("Cannot assign to subscript of symbol"),
+    Val::String(_) => type_error!("Cannot assign to subscript of string"),
     Val::Array(array_data) => {
       let subscript_index = match subscript.to_index() {
+        // TODO: Internal errors
         None => return format_err!("TODO: non-uint array subscript assignment"),
         Some(i) => i,
       };
