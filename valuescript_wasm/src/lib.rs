@@ -199,6 +199,7 @@ fn value_to_val(value: Value) -> Result<Val, Val> {
 
       Val::Object(Rc::new(VsObject {
         string_map,
+        symbol_map: Default::default(),
         prototype: None,
       }))
     }
