@@ -6,6 +6,7 @@ mod math_builtin;
 mod number_builtin;
 pub mod range_error_builtin;
 mod string_builtin;
+mod symbol_builtin;
 pub mod type_error_builtin;
 
 use valuescript_common::BUILTIN_COUNT;
@@ -26,4 +27,5 @@ pub static BUILTIN_VALS: [&'static (dyn ValTrait + Sync); BUILTIN_COUNT] = [
   &error_builtin::ERROR_BUILTIN,
   &type_error_builtin::TYPE_ERROR_BUILTIN,
   &range_error_builtin::RANGE_ERROR_BUILTIN,
+  &symbol_builtin::SYMBOL_BUILTIN,
 ];

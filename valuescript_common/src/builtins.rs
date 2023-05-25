@@ -25,6 +25,8 @@ pub enum BuiltinName {
   Error,
   TypeError,
   RangeError,
+
+  Symbol,
 }
 
 pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
@@ -41,6 +43,7 @@ pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
   "Error",
   "TypeError",
   "RangeError",
+  "Symbol",
 ];
 
 pub const BUILTIN_COUNT: usize = BuiltinName::COUNT;

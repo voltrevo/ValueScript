@@ -471,9 +471,15 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val
       Ok(())
     }
     Val::Object(object_data) => {
-      Rc::make_mut(object_data)
-        .string_map
-        .insert(subscript.val_to_string(), value);
+      let object_data_mut = Rc::make_mut(object_data);
+
+      match subscript {
+        Val::String(string) => object_data_mut.string_map.insert(string.to_string(), value),
+        Val::Symbol(symbol) => object_data_mut.symbol_map.insert(symbol, value),
+        _ => object_data_mut
+          .string_map
+          .insert(subscript.val_to_string(), value),
+      };
 
       Ok(())
     }

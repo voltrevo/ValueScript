@@ -11,6 +11,7 @@ use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
 use crate::vs_object::VsObject;
 use crate::vs_pointer::VsPointer;
+use crate::vs_symbol::VsSymbol;
 use crate::vs_value::Val;
 use crate::vs_value::ValTrait;
 
@@ -114,20 +115,25 @@ impl BytecodeDecoder {
         Val::Array(Rc::new(VsArray::from(vals)))
       }
       BytecodeType::Object => {
-        let mut obj: BTreeMap<String, Val> = BTreeMap::new();
+        let mut string_map: BTreeMap<String, Val> = BTreeMap::new();
+        let mut symbol_map: BTreeMap<VsSymbol, Val> = BTreeMap::new();
 
         while self.peek_type() != BytecodeType::End {
-          obj.insert(
-            self.decode_val(registers).val_to_string(),
-            self.decode_val(registers),
-          );
+          let key = self.decode_val(registers);
+          let value = self.decode_val(registers);
+
+          match key {
+            Val::String(string) => string_map.insert(string.to_string(), value),
+            Val::Symbol(symbol) => symbol_map.insert(symbol, value),
+            key => string_map.insert(key.val_to_string(), value),
+          };
         }
 
         self.decode_type(); // End (TODO: assert)
 
         Val::Object(Rc::new(VsObject {
-          string_map: obj,
-          symbol_map: Default::default(),
+          string_map,
+          symbol_map,
           prototype: None,
         }))
       }
