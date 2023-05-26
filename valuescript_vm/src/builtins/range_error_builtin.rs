@@ -34,9 +34,6 @@ impl ValTrait for RangeErrorBuiltin {
   fn is_primitive(&self) -> bool {
     false
   }
-  fn to_primitive(&self) -> Val {
-    self.to_string().to_val()
-  }
   fn is_truthy(&self) -> bool {
     true
   }

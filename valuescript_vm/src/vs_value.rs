@@ -59,7 +59,6 @@ pub trait ValTrait: fmt::Display {
   fn to_number(&self) -> f64;
   fn to_index(&self) -> Option<usize>;
   fn is_primitive(&self) -> bool;
-  fn to_primitive(&self) -> Val;
   fn is_truthy(&self) -> bool;
   fn is_nullish(&self) -> bool;
 
@@ -90,6 +89,14 @@ impl fmt::Debug for dyn ValTrait {
 }
 
 impl Val {
+  pub fn to_primitive(&self) -> Val {
+    if self.is_primitive() {
+      self.clone()
+    } else {
+      self.clone().to_val_string()
+    }
+  }
+
   pub fn to_val_string(self) -> Val {
     match self {
       Val::String(_) => self,
@@ -188,14 +195,6 @@ impl ValTrait for Val {
       Static(val) => val.is_primitive(), // TODO: false?
       Custom(val) => val.is_primitive(),
     };
-  }
-
-  fn to_primitive(&self) -> Val {
-    if self.is_primitive() {
-      self.clone()
-    } else {
-      self.clone().to_val_string()
-    }
   }
 
   fn is_truthy(&self) -> bool {

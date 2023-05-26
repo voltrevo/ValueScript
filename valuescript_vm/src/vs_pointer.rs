@@ -103,10 +103,6 @@ impl ValTrait for VsPointer {
     };
   }
 
-  fn to_primitive(&self) -> Val {
-    return self.resolve().to_primitive();
-  }
-
   fn bind(&self, params: Vec<Val>) -> Option<Val> {
     return self.resolve().bind(params);
   }

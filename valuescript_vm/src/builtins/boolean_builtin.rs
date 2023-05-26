@@ -7,7 +7,7 @@ use crate::{
   vs_array::VsArray,
   vs_class::VsClass,
   vs_object::VsObject,
-  vs_value::{LoadFunctionResult, ToVal, Val, VsType},
+  vs_value::{LoadFunctionResult, Val, VsType},
   ValTrait,
 };
 
@@ -29,9 +29,6 @@ impl ValTrait for BooleanBuiltin {
   }
   fn is_primitive(&self) -> bool {
     false
-  }
-  fn to_primitive(&self) -> Val {
-    self.to_string().to_val()
   }
   fn is_truthy(&self) -> bool {
     true

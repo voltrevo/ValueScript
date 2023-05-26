@@ -4,7 +4,6 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::native_function::ThisWrapper;
-use crate::vs_value::ToVal;
 use crate::{
   native_function::NativeFunction,
   vs_array::VsArray,
@@ -32,9 +31,6 @@ impl ValTrait for NumberBuiltin {
   }
   fn is_primitive(&self) -> bool {
     false
-  }
-  fn to_primitive(&self) -> Val {
-    self.to_string().to_val()
   }
   fn is_truthy(&self) -> bool {
     true

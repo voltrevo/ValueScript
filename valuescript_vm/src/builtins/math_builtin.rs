@@ -8,7 +8,7 @@ use crate::operations::to_u32;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, ToVal, Val, ValTrait, VsType};
+use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 use super::type_error_builtin::ToTypeError;
 
@@ -28,9 +28,6 @@ impl ValTrait for MathBuiltin {
   }
   fn is_primitive(&self) -> bool {
     false
-  }
-  fn to_primitive(&self) -> Val {
-    self.to_string().to_val()
   }
   fn is_truthy(&self) -> bool {
     true
