@@ -122,7 +122,7 @@ impl ValTrait for MathBuiltin {
     LoadFunctionResult::NotAFunction
   }
 
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Math]\x1b[39m")
   }
 

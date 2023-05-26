@@ -52,9 +52,9 @@ pub fn main() {
   );
 
   match result {
-    Ok(result) => println!("{}", result),
+    Ok(result) => println!("{}", result.pretty()),
     Err(err) => {
-      println!("Uncaught exception: {}", err);
+      println!("Uncaught exception: {}", err.pretty());
       exit(1);
     }
   }

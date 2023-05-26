@@ -86,7 +86,7 @@ impl ValTrait for TypeErrorBuiltin {
     LoadFunctionResult::NotAFunction
   }
 
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[TypeError]\x1b[39m")
   }
 
@@ -124,7 +124,7 @@ static SET_MESSAGE: NativeFunction = NativeFunction {
 static TYPE_ERROR_TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     let message = op_sub(this.get().clone(), "message".to_val())?;
-    Ok(format!("TypeError({})", message).to_val())
+    Ok(format!("TypeError({})", message.val_to_string()).to_val())
   },
 };
 

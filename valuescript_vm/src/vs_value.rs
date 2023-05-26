@@ -109,14 +109,14 @@ pub trait ValTrait {
 
   fn next(&mut self) -> LoadFunctionResult;
 
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
   fn codify(&self) -> String;
 }
 
 impl fmt::Debug for dyn ValTrait {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "(dyn ValTrait)(")?;
-    self.fmt(f)?;
+    self.pretty_fmt(f)?;
     write!(f, ")")
   }
 }
@@ -408,8 +408,8 @@ impl ValTrait for Val {
     }
   }
 
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    std::fmt::Display::fmt(self, f)
+  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::fmt::Display::fmt(&self.pretty(), f)
   }
 
   fn codify(&self) -> String {
@@ -554,17 +554,27 @@ impl ToVal for Vec<Val> {
   }
 }
 
-impl std::fmt::Display for Val {
+pub struct PrettyVal<'a> {
+  val: &'a Val,
+}
+
+impl<'a> Val {
+  pub fn pretty(&'a self) -> PrettyVal<'a> {
+    PrettyVal { val: self }
+  }
+}
+
+impl<'a> std::fmt::Display for PrettyVal<'a> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
+    match self.val {
       Val::Void => write!(f, "void"),
       Val::Undefined => write!(f, "\x1b[90mundefined\x1b[39m"),
       Val::Null => write!(f, "\x1b[1mnull\x1b[22m"),
-      Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
-      Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
-      Val::BigInt(_) => write!(f, "\x1b[33m{}n\x1b[39m", self.val_to_string()),
-      Val::Symbol(_) => write!(f, "\x1b[32m{}\x1b[39m", self.codify()),
-      Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.codify()),
+      Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val.val_to_string()),
+      Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val.val_to_string()),
+      Val::BigInt(_) => write!(f, "\x1b[33m{}n\x1b[39m", self.val.val_to_string()),
+      Val::Symbol(_) => write!(f, "\x1b[32m{}\x1b[39m", self.val.codify()),
+      Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.val.codify()),
       Val::Array(array) => {
         if array.elements.len() == 0 {
           return write!(f, "[]");
@@ -581,7 +591,7 @@ impl std::fmt::Display for Val {
             write!(f, ", ").expect("Failed to write");
           }
 
-          write!(f, "{}", elem).expect("Failed to write");
+          write!(f, "{}", elem.pretty()).expect("Failed to write");
         }
 
         write!(f, " ]")
@@ -615,10 +625,10 @@ impl std::fmt::Display for Val {
           if first {
             first = false;
           } else {
-            write!(f, ", ").expect("Failed to write");
+            write!(f, ", ")?;
           }
 
-          write!(f, "{}: {}", k, v).expect("Failed to write");
+          write!(f, "{}: {}", k, v.pretty())?;
         }
 
         f.write_str(" }")
@@ -627,8 +637,8 @@ impl std::fmt::Display for Val {
       Val::Class(_) => write!(f, "\x1b[36m[Class]\x1b[39m"),
 
       // TODO: Improve printing these
-      Val::Static(s) => s.fmt(f),
-      Val::Custom(c) => c.fmt(f),
+      Val::Static(s) => s.pretty_fmt(f),
+      Val::Custom(c) => c.pretty_fmt(f),
     }
   }
 }

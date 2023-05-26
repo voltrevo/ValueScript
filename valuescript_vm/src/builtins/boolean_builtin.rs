@@ -74,7 +74,7 @@ impl ValTrait for BooleanBuiltin {
     LoadFunctionResult::NotAFunction
   }
 
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Boolean]\x1b[39m")
   }
 

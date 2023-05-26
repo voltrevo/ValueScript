@@ -77,7 +77,7 @@ impl ValTrait for DebugBuiltin {
     LoadFunctionResult::NotAFunction
   }
 
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Debug]\x1b[39m")
   }
 
@@ -89,7 +89,7 @@ impl ValTrait for DebugBuiltin {
 static LOG: NativeFunction = NativeFunction {
   fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     for p in params {
-      println!("Debug.log: {}", p);
+      println!("Debug.log: {}", p.pretty());
     }
 
     Ok(Val::Undefined)

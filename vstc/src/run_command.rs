@@ -46,10 +46,10 @@ pub fn run_command(args: &Vec<String>) {
 
   match vm.run(&bytecode, None, &val_args) {
     Ok(result) => {
-      println!("{}", result);
+      println!("{}", result.pretty());
     }
     Err(err) => {
-      println!("Uncaught exception: {}", err);
+      println!("Uncaught exception: {}", err.pretty());
       exit(1);
     }
   }
