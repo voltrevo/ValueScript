@@ -1,7 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 
-use crate::native_function::ThisWrapper;
+use crate::native_function::{native_fn, ThisWrapper};
 use crate::vs_value::ToVal;
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
@@ -49,24 +49,22 @@ impl fmt::Display for StringBuiltin {
   }
 }
 
-static FROM_CODE_POINT: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    let mut result = String::new();
+static FROM_CODE_POINT: NativeFunction = native_fn(|_this, params| {
+  let mut result = String::new();
 
-    for param in params {
-      let code_point = param.to_number() as u32; // TODO: Check overflow behavior
+  for param in params {
+    let code_point = param.to_number() as u32; // TODO: Check overflow behavior
 
-      let char = match std::char::from_u32(code_point) {
-        Some(c) => c,
-        None => return range_error!("Invalid code point"),
-      };
+    let char = match std::char::from_u32(code_point) {
+      Some(c) => c,
+      None => return range_error!("Invalid code point"),
+    };
 
-      result.push(char);
-    }
+    result.push(char);
+  }
 
-    Ok(result.to_val())
-  },
-};
+  Ok(result.to_val())
+});
 
 fn to_string(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(if let Some(value) = params.get(0) {

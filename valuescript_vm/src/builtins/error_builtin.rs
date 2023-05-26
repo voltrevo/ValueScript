@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::native_function::ThisWrapper;
+use crate::native_function::{native_fn, ThisWrapper};
 use crate::vs_class::VsClass;
 use crate::vs_value::ToVal;
 use crate::{
@@ -93,22 +93,18 @@ fn make_error_prototype() -> Val {
   .to_val()
 }
 
-static SET_MESSAGE: NativeFunction = NativeFunction {
-  fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    let message = match params.get(0) {
-      Some(param) => param.to_string(),
-      None => "".to_string(),
-    };
+static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
+  let message = match params.get(0) {
+    Some(param) => param.to_string(),
+    None => "".to_string(),
+  };
 
-    op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
+  op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
 
-    Ok(Val::Undefined)
-  },
-};
+  Ok(Val::Undefined)
+});
 
-static ERROR_TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    let message = op_sub(this.get().clone(), "message".to_val())?;
-    Ok(format!("Error({})", message).to_val()) // TODO: Fixes needed here (and other errors)
-  },
-};
+static ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
+  let message = op_sub(this.get().clone(), "message".to_val())?;
+  Ok(format!("Error({})", message).to_val()) // TODO: Fixes needed here (and other errors)
+});

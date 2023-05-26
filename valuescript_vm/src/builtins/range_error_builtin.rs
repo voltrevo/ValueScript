@@ -1,7 +1,7 @@
 use std::fmt;
 use std::{collections::BTreeMap, rc::Rc};
 
-use crate::native_function::ThisWrapper;
+use crate::native_function::{native_fn, ThisWrapper};
 use crate::vs_value::ToVal;
 use crate::{
   native_function::NativeFunction,
@@ -57,18 +57,16 @@ fn make_range_error_prototype() -> Val {
   .to_val()
 }
 
-static SET_MESSAGE: NativeFunction = NativeFunction {
-  fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    let message = match params.get(0) {
-      Some(param) => param.to_string(),
-      None => "".to_string(),
-    };
+static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
+  let message = match params.get(0) {
+    Some(param) => param.to_string(),
+    None => "".to_string(),
+  };
 
-    op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
+  op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
 
-    Ok(Val::Undefined)
-  },
-};
+  Ok(Val::Undefined)
+});
 
 pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(
@@ -87,12 +85,10 @@ pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   )
 }
 
-static RANGE_ERROR_TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    let message = op_sub(this.get().clone(), "message".to_val())?;
-    Ok(format!("RangeError({})", message).to_val())
-  },
-};
+static RANGE_ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
+  let message = op_sub(this.get().clone(), "message".to_val())?;
+  Ok(format!("RangeError({})", message).to_val())
+});
 
 #[macro_export]
 macro_rules! range_error {

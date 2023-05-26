@@ -37,6 +37,12 @@ pub struct NativeFunction {
   pub fn_: fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val>,
 }
 
+pub const fn native_fn(
+  fn_: fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val>,
+) -> NativeFunction {
+  NativeFunction { fn_ }
+}
+
 impl ValTrait for NativeFunction {
   fn typeof_(&self) -> VsType {
     VsType::Function

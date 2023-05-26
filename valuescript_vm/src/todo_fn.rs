@@ -1,9 +1,6 @@
 use crate::{
   builtins::error_builtin::ToError,
-  native_function::{NativeFunction, ThisWrapper},
-  vs_value::Val,
+  native_function::{native_fn, NativeFunction},
 };
 
-pub static TODO: NativeFunction = NativeFunction {
-  fn_: |_: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> { Err("TODO".to_error()) },
-};
+pub static TODO: NativeFunction = native_fn(|_, _| Err("TODO".to_error()));

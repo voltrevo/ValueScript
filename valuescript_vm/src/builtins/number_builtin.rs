@@ -1,7 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 
-use crate::native_function::ThisWrapper;
+use crate::native_function::{native_fn, ThisWrapper};
 use crate::vs_value::ToVal;
 use crate::{
   native_function::NativeFunction,
@@ -62,104 +62,92 @@ impl fmt::Display for NumberBuiltin {
   }
 }
 
-pub static IS_FINITE: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(if let Some(value) = params.get(0) {
-      let number = value.to_number();
-      Val::Bool(number.is_finite())
-    } else {
-      Val::Bool(false)
-    })
-  },
-};
+pub static IS_FINITE: NativeFunction = native_fn(|_this, params| {
+  Ok(if let Some(value) = params.get(0) {
+    let number = value.to_number();
+    Val::Bool(number.is_finite())
+  } else {
+    Val::Bool(false)
+  })
+});
 
-static IS_INTEGER: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    let num = match params.get(0) {
-      Some(n) => n.to_number(),
-      None => return Ok(Val::Bool(false)),
+static IS_INTEGER: NativeFunction = native_fn(|_this, params| {
+  let num = match params.get(0) {
+    Some(n) => n.to_number(),
+    None => return Ok(Val::Bool(false)),
+  };
+
+  let is_finite = num.is_finite();
+  let is_integer = num.floor() == num;
+
+  Ok(Val::Bool(is_finite && is_integer))
+});
+
+pub static IS_NAN: NativeFunction = native_fn(|_this, params| {
+  Ok(if let Some(value) = params.get(0) {
+    let number = value.to_number();
+    Val::Bool(number.is_nan())
+  } else {
+    Val::Bool(false)
+  })
+});
+
+static IS_SAFE_INTEGER: NativeFunction = native_fn(|_this, params| {
+  let num = match params.get(0) {
+    Some(n) => n.to_number(),
+    None => return Ok(Val::Bool(false)),
+  };
+
+  let is_finite = num.is_finite();
+  let is_integer = num.floor() == num;
+  let min_safe_integer = -(2f64.powi(53) - 1f64);
+  let max_safe_integer = 2f64.powi(53) - 1f64;
+  let in_safe_range = min_safe_integer <= num && num <= max_safe_integer;
+
+  Ok(Val::Bool(is_finite && is_integer && in_safe_range))
+});
+
+pub static PARSE_FLOAT: NativeFunction = native_fn(|_this, params| {
+  Ok(if let Some(value) = params.get(0) {
+    let string_value = value.to_string().trim().to_string();
+
+    match string_value.parse::<f64>() {
+      Ok(number) => Val::Number(number),
+      Err(_) => Val::Number(core::f64::NAN),
+    }
+  } else {
+    Val::Number(core::f64::NAN)
+  })
+});
+
+pub static PARSE_INT: NativeFunction = native_fn(|_this, params| {
+  Ok(if let Some(value) = params.get(0) {
+    let string_value = value.to_string().trim_start().to_string();
+    let radix = params.get(1).and_then(|v| v.to_index()).unwrap_or(10);
+
+    if radix < 2 || radix > 36 {
+      return Ok(Val::Number(core::f64::NAN));
+    }
+
+    let (is_negative, string_value) = if string_value.starts_with('-') {
+      (true, &string_value[1..])
+    } else {
+      (false, string_value.as_str())
     };
 
-    let is_finite = num.is_finite();
-    let is_integer = num.floor() == num;
-
-    Ok(Val::Bool(is_finite && is_integer))
-  },
-};
-
-pub static IS_NAN: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(if let Some(value) = params.get(0) {
-      let number = value.to_number();
-      Val::Bool(number.is_nan())
-    } else {
-      Val::Bool(false)
-    })
-  },
-};
-
-static IS_SAFE_INTEGER: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    let num = match params.get(0) {
-      Some(n) => n.to_number(),
-      None => return Ok(Val::Bool(false)),
+    let string_value = match string_value.find(|c: char| !c.is_digit(radix as u32)) {
+      Some(pos) => &string_value[..pos],
+      None => &string_value,
     };
 
-    let is_finite = num.is_finite();
-    let is_integer = num.floor() == num;
-    let min_safe_integer = -(2f64.powi(53) - 1f64);
-    let max_safe_integer = 2f64.powi(53) - 1f64;
-    let in_safe_range = min_safe_integer <= num && num <= max_safe_integer;
-
-    Ok(Val::Bool(is_finite && is_integer && in_safe_range))
-  },
-};
-
-pub static PARSE_FLOAT: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(if let Some(value) = params.get(0) {
-      let string_value = value.to_string().trim().to_string();
-
-      match string_value.parse::<f64>() {
-        Ok(number) => Val::Number(number),
-        Err(_) => Val::Number(core::f64::NAN),
+    match i64::from_str_radix(string_value, radix as u32) {
+      Ok(number) => {
+        let number = if is_negative { -number } else { number };
+        Val::Number(number as f64)
       }
-    } else {
-      Val::Number(core::f64::NAN)
-    })
-  },
-};
-
-pub static PARSE_INT: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(if let Some(value) = params.get(0) {
-      let string_value = value.to_string().trim_start().to_string();
-      let radix = params.get(1).and_then(|v| v.to_index()).unwrap_or(10);
-
-      if radix < 2 || radix > 36 {
-        return Ok(Val::Number(core::f64::NAN));
-      }
-
-      let (is_negative, string_value) = if string_value.starts_with('-') {
-        (true, &string_value[1..])
-      } else {
-        (false, string_value.as_str())
-      };
-
-      let string_value = match string_value.find(|c: char| !c.is_digit(radix as u32)) {
-        Some(pos) => &string_value[..pos],
-        None => &string_value,
-      };
-
-      match i64::from_str_radix(string_value, radix as u32) {
-        Ok(number) => {
-          let number = if is_negative { -number } else { number };
-          Val::Number(number as f64)
-        }
-        Err(_) => Val::Number(core::f64::NAN),
-      }
-    } else {
-      Val::Number(core::f64::NAN)
-    })
-  },
-};
+      Err(_) => Val::Number(core::f64::NAN),
+    }
+  } else {
+    Val::Number(core::f64::NAN)
+  })
+});

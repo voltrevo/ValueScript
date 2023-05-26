@@ -2,7 +2,7 @@ use std::{fmt, rc::Rc};
 
 use crate::{
   builtins::range_error_builtin::to_range_error,
-  native_function::{NativeFunction, ThisWrapper},
+  native_function::{native_fn, NativeFunction, ThisWrapper},
   operations::op_sub,
   range_error,
   vs_array::VsArray,
@@ -23,12 +23,12 @@ impl BuiltinObject for ArrayBuiltin {
   }
 
   fn bo_sub(key: &str) -> Val {
-    Val::Static(match key {
-      "isArray" => &IS_ARRAY,
-      "from" => &FROM,
-      "of" => &OF,
+    match key {
+      "isArray" => IS_ARRAY.to_val(),
+      "from" => FROM.to_val(),
+      "of" => OF.to_val(),
       _ => return Val::Undefined,
-    })
+    }
   }
 
   fn bo_load_function() -> LoadFunctionResult {
@@ -46,77 +46,65 @@ impl fmt::Display for ArrayBuiltin {
   }
 }
 
-static IS_ARRAY: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match params.get(0) {
+static IS_ARRAY: NativeFunction = native_fn(|_this, params| {
+  Ok(match params.get(0) {
+    None => Val::Bool(false),
+    Some(p) => match p.as_array_data() {
       None => Val::Bool(false),
-      Some(p) => match p.as_array_data() {
-        None => Val::Bool(false),
-        Some(_) => Val::Bool(true),
-      },
-    })
-  },
-};
+      Some(_) => Val::Bool(true),
+    },
+  })
+});
 
-static FROM: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    let first_param = match params.get(0) {
-      None => return Err("undefined is not iterable".to_type_error()),
-      Some(p) => p,
-    };
+static FROM: NativeFunction = native_fn(|_this, params| {
+  let first_param = match params.get(0) {
+    None => return Err("undefined is not iterable".to_type_error()),
+    Some(p) => p,
+  };
 
-    if params.len() > 1 {
-      return Err(format!("TODO: Using Array.from with a map function").to_val());
+  if params.len() > 1 {
+    return Err(format!("TODO: Using Array.from with a map function").to_val());
+  }
+
+  Ok(match first_param {
+    Val::Array(arr) => Val::Array(arr.clone()),
+    Val::String(s) => s.chars().map(|c| c.to_val()).collect::<Vec<Val>>().to_val(),
+    Val::Void | Val::Undefined | Val::Null => return Err("items is not iterable".to_type_error()),
+    Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => VsArray::new().to_val(),
+    Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Custom(..) => {
+      let len = op_sub(first_param.clone(), "length".to_val())
+        .map_err(|e| e.to_string())
+        .unwrap() // TODO: Exception
+        .to_number();
+
+      if len.is_sign_negative() || len.is_nan() {
+        return Ok(VsArray::new().to_val());
+      }
+
+      if len.is_infinite() {
+        return range_error!("Invalid array length");
+      }
+
+      let len = len as usize;
+
+      let mut arr = Vec::with_capacity(len);
+
+      // TODO: We should probably use a frame and step through this
+      // Also using op_sub is slow. Should write specialized stuff instead.
+      for i in 0..len {
+        arr.push(
+          op_sub(first_param.clone(), Val::Number(i as f64))
+            .map_err(|e| e.to_string())
+            .unwrap(), // TODO: Exception
+        );
+      }
+
+      VsArray::from(arr).to_val()
     }
+  })
+});
 
-    Ok(match first_param {
-      Val::Array(arr) => Val::Array(arr.clone()),
-      Val::String(s) => s.chars().map(|c| c.to_val()).collect::<Vec<Val>>().to_val(),
-      Val::Void | Val::Undefined | Val::Null => {
-        return Err("items is not iterable".to_type_error())
-      }
-      Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => {
-        VsArray::new().to_val()
-      }
-      Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Custom(..) => {
-        let len = op_sub(first_param.clone(), "length".to_val())
-          .map_err(|e| e.to_string())
-          .unwrap() // TODO: Exception
-          .to_number();
-
-        if len.is_sign_negative() || len.is_nan() {
-          return Ok(VsArray::new().to_val());
-        }
-
-        if len.is_infinite() {
-          return range_error!("Invalid array length");
-        }
-
-        let len = len as usize;
-
-        let mut arr = Vec::with_capacity(len);
-
-        // TODO: We should probably use a frame and step through this
-        // Also using op_sub is slow. Should write specialized stuff instead.
-        for i in 0..len {
-          arr.push(
-            op_sub(first_param.clone(), Val::Number(i as f64))
-              .map_err(|e| e.to_string())
-              .unwrap(), // TODO: Exception
-          );
-        }
-
-        VsArray::from(arr).to_val()
-      }
-    })
-  },
-};
-
-static OF: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(VsArray::from(params).to_val())
-  },
-};
+static OF: NativeFunction = native_fn(|_this, params| Ok(VsArray::from(params).to_val()));
 
 fn to_array(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   if params.len() != 1 {

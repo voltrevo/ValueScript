@@ -1,5 +1,5 @@
 use crate::builtins::error_builtin::ToError;
-use crate::native_function::ThisWrapper;
+use crate::native_function::{native_fn, ThisWrapper};
 use crate::vs_value::ToVal;
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
@@ -21,92 +21,80 @@ pub fn op_sub_number(_number: f64, subscript: &Val) -> Val {
   .to_val()
 }
 
-static TO_FIXED: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this.get() {
-      Val::Number(number) => {
-        if number.is_infinite() {
-          return Ok(
-            if number.is_sign_positive() {
-              "Infinity"
-            } else {
-              "-Infinity"
-            }
-            .to_val(),
-          );
-        }
+static TO_FIXED: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::Number(number) => {
+      if number.is_infinite() {
+        return Ok(
+          if number.is_sign_positive() {
+            "Infinity"
+          } else {
+            "-Infinity"
+          }
+          .to_val(),
+        );
+      }
 
-        let mut precision = match params.get(0) {
-          Some(p) => p.to_number(),
-          _ => return Ok(number.to_val().to_string().to_val()),
-        };
+      let mut precision = match params.get(0) {
+        Some(p) => p.to_number(),
+        _ => return Ok(number.to_val().to_string().to_val()),
+      };
 
+      precision = f64::floor(precision);
+
+      if precision < 1.0 || precision > 100.0 {
+        return range_error!("precision must be between 1 and 100");
+      }
+
+      format!("{:.*}", precision as usize, number).to_val()
+    }
+    _ => return Err(format!("TODO: number indirection").to_val()),
+  })
+});
+
+static TO_EXPONENTIAL: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::Number(number) => match params.get(0) {
+      Some(p) => {
+        let mut precision = p.to_number();
         precision = f64::floor(precision);
 
-        if precision < 1.0 || precision > 100.0 {
-          return range_error!("precision must be between 1 and 100");
+        if precision < 0.0 || precision > 100.0 {
+          return range_error!("precision must be between 0 and 100");
         }
 
-        format!("{:.*}", precision as usize, number).to_val()
+        format_exponential(*number, Some(precision as usize))
       }
-      _ => return Err(format!("TODO: number indirection").to_val()),
-    })
-  },
-};
+      None => format_exponential(*number, None),
+    },
+    _ => return Err("number indirection".to_error()),
+  })
+});
 
-static TO_EXPONENTIAL: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this.get() {
-      Val::Number(number) => match params.get(0) {
-        Some(p) => {
-          let mut precision = p.to_number();
-          precision = f64::floor(precision);
+static TODO_LOCALE: NativeFunction = native_fn(|this, _params| match this.get() {
+  Val::Number(_number) => return Err("TODO: locale".to_error()),
+  _ => return Err("number indirection".to_error()),
+});
 
-          if precision < 0.0 || precision > 100.0 {
-            return range_error!("precision must be between 0 and 100");
-          }
+static TO_STRING: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::Number(number) => match params.get(0) {
+      Some(_) => {
+        return Err("TODO: toString with radix".to_error());
+      }
 
-          format_exponential(*number, Some(precision as usize))
-        }
-        None => format_exponential(*number, None),
-      },
-      _ => return Err("number indirection".to_error()),
-    })
-  },
-};
+      None => number.to_val().to_string().to_val(),
+    },
+    _ => return Err("number indirection".to_error()),
+  })
+});
 
-static TODO_LOCALE: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    match this.get() {
-      Val::Number(_number) => return Err("TODO: locale".to_error()),
-      _ => return Err("number indirection".to_error()),
-    }
-  },
-};
-
-static TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this.get() {
-      Val::Number(number) => match params.get(0) {
-        Some(_) => {
-          return Err("TODO: toString with radix".to_error());
-        }
-
-        None => number.to_val().to_string().to_val(),
-      },
-      _ => return Err("number indirection".to_error()),
-    })
-  },
-};
-
-static VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this.get() {
-      Val::Number(number) => Val::Number(*number),
-      _ => return Err("number indirection".to_error()),
-    })
-  },
-};
+static VALUE_OF: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::Number(number) => Val::Number(*number),
+    _ => return Err("number indirection".to_error()),
+  })
+});
 
 fn format_exponential(number: f64, precision: Option<usize>) -> Val {
   if number.is_infinite() {

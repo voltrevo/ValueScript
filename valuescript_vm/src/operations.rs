@@ -6,6 +6,7 @@ use num_traits::ToPrimitive;
 use crate::bigint_methods::op_sub_bigint;
 use crate::builtins::error_builtin::ToError;
 use crate::builtins::type_error_builtin::ToTypeError;
+use crate::native_function::native_fn;
 use crate::native_function::NativeFunction;
 use crate::native_function::ThisWrapper;
 use crate::number_methods::op_sub_number;
@@ -469,20 +470,16 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val
   }
 }
 
-static BOOL_TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this.get() {
-      Val::Bool(b) => b.to_string().to_val(),
-      _ => return Err("bool indirection".to_type_error()),
-    })
-  },
-};
+static BOOL_TO_STRING: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::Bool(b) => b.to_string().to_val(),
+    _ => return Err("bool indirection".to_type_error()),
+  })
+});
 
-static BOOL_VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this.get() {
-      Val::Bool(b) => Val::Bool(*b),
-      _ => return Err("bool indirection".to_type_error()),
-    })
-  },
-};
+static BOOL_VALUE_OF: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::Bool(b) => Val::Bool(*b),
+    _ => return Err("bool indirection".to_type_error()),
+  })
+});

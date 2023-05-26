@@ -1,7 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 
-use crate::native_function::{NativeFunction, ThisWrapper};
+use crate::native_function::{native_fn, NativeFunction};
 use crate::vs_class::VsClass;
 use crate::vs_value::{LoadFunctionResult, Val};
 
@@ -38,12 +38,10 @@ impl fmt::Display for DebugBuiltin {
   }
 }
 
-static LOG: NativeFunction = NativeFunction {
-  fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    for p in params {
-      println!("Debug.log: {}", p.pretty());
-    }
+static LOG: NativeFunction = native_fn(|_this, params| {
+  for p in params {
+    println!("Debug.log: {}", p.pretty());
+  }
 
-    Ok(Val::Undefined)
-  },
-};
+  Ok(Val::Undefined)
+});
