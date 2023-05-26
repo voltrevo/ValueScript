@@ -92,10 +92,6 @@ impl ValTrait for NativeFunction {
     Err("Cannot assign to subscript of native function".to_type_error())
   }
 
-  fn next(&mut self) -> LoadFunctionResult {
-    LoadFunctionResult::NotAFunction
-  }
-
   fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "\x1b[36m[Function]\x1b[39m")
   }
