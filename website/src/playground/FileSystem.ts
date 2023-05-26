@@ -1,5 +1,5 @@
-import { defaultFiles, orderedFiles } from "./files";
-import nil from "./helpers/nil";
+import { defaultFiles, orderedFiles } from "./files/index.ts";
+import nil from "./helpers/nil.ts";
 
 export default class FileSystem {
   list: string[];

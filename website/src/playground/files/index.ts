@@ -1,5 +1,5 @@
-import nil from "../helpers/nil";
-import raw from "./raw";
+import nil from "../helpers/nil.ts";
+import raw from "./raw.ts";
 
 export const orderedFiles = [
   "/tutorial/hello.ts",

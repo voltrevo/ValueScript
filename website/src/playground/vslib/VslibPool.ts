@@ -1,6 +1,6 @@
 import * as valuescript from "valuescript";
-import nil from "../helpers/nil";
-import { initVslib } from "./index";
+import nil from "../helpers/nil.ts";
+import { initVslib } from "./index.ts";
 
 async function main() {
   const vslib = await initVslib();

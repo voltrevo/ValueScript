@@ -1,4 +1,4 @@
-import assert from "../helpers/assert";
+import assert from "../helpers/assert.ts";
 
 const entries = Object.entries(
   import.meta.glob("./root/**/*.*", { as: "raw" }),

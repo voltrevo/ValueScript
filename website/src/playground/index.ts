@@ -1,18 +1,18 @@
-import assert from "./helpers/assert";
-import nil from "./helpers/nil";
-import notNil from "./helpers/notNil";
+import assert from "./helpers/assert.ts";
+import nil from "./helpers/nil.ts";
+import notNil from "./helpers/notNil.ts";
 import VslibPool, {
   CompilerOutput,
   Diagnostic,
   Job,
   RunResult,
-} from "./vslib/VslibPool";
-import FileSystem from "./FileSystem";
-import monaco from "./monaco";
-import Swal from "./Swal";
-import { defaultFiles } from "./files";
-import hasExtension from "./helpers/hasExtension";
-import ExplicitAny from "./helpers/ExplicitAny";
+} from "./vslib/VslibPool.ts";
+import FileSystem from "./FileSystem.ts";
+import monaco from "./monaco.ts";
+import Swal from "./Swal.ts";
+import { defaultFiles } from "./files/index.ts";
+import hasExtension from "./helpers/hasExtension.ts";
+import ExplicitAny from "./helpers/ExplicitAny.ts";
 
 function domQuery<T = HTMLElement>(query: string): T {
   return <T>(<unknown>notNil(document.querySelector(query) ?? nil));

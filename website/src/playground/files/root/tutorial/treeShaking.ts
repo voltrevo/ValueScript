@@ -15,7 +15,7 @@
 // module do not need them. Omitting those unused definitions reduces the
 // bytecode for this module from 1,091 to 295 bytes.
 
-import { factorize } from "../lib/primes";
+import { factorize } from "../lib/primes.ts";
 
 // It's not just the default export that matters. If you uncomment this line,
 // the assembly will also include `PrimeCandidatesGenerator`, even though it's
