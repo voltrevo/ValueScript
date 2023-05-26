@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, rc::Rc};
 use num_bigint::BigInt;
 
 use crate::native_function::ThisWrapper;
-use crate::vs_value::{ToVal, ToValString};
+use crate::vs_value::ToVal;
 use crate::{
   native_function::NativeFunction,
   operations::{op_sub, op_submov},
@@ -35,7 +35,7 @@ impl ValTrait for RangeErrorBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    self.to_val_string()
+    self.to_string().to_val()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -99,7 +99,7 @@ pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
       string_map: BTreeMap::from([(
         "message".to_string(),
         match params.get(0) {
-          Some(param) => param.to_val_string(),
+          Some(param) => param.clone().to_val_string(),
           None => "".to_val(),
         },
       )]),

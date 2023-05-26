@@ -1,6 +1,6 @@
 use crate::builtins::error_builtin::ToError;
 use crate::native_function::ThisWrapper;
-use crate::vs_value::{ToVal, ToValString};
+use crate::vs_value::ToVal;
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
   native_function::NativeFunction,
@@ -37,7 +37,7 @@ static TO_FIXED: NativeFunction = NativeFunction {
 
         let mut precision = match params.get(0) {
           Some(p) => p.to_number(),
-          _ => return Ok(this.get().to_val_string()),
+          _ => return Ok(number.to_val().to_string().to_val()),
         };
 
         precision = f64::floor(precision);
@@ -86,12 +86,12 @@ static TODO_LOCALE: NativeFunction = NativeFunction {
 static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
-      Val::Number(_) => match params.get(0) {
+      Val::Number(number) => match params.get(0) {
         Some(_) => {
           return Err("TODO: toString with radix".to_error());
         }
 
-        None => this.get().to_val_string(),
+        None => number.to_val().to_string().to_val(),
       },
       _ => return Err("number indirection".to_error()),
     })

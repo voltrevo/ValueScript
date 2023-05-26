@@ -4,7 +4,7 @@ use crate::{
   builtins::error_builtin::ToError,
   native_function::{NativeFunction, ThisWrapper},
   todo_fn::TODO,
-  vs_value::{ToValString, Val},
+  vs_value::{ToVal, Val},
 };
 
 pub fn op_sub_bigint(_bigint: &BigInt, subscript: &Val) -> Val {
@@ -19,12 +19,12 @@ pub fn op_sub_bigint(_bigint: &BigInt, subscript: &Val) -> Val {
 static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
-      Val::BigInt(_) => match params.get(0) {
+      Val::BigInt(bigint) => match params.get(0) {
         Some(_) => {
           return Err("TODO: toString with radix".to_error());
         }
 
-        None => this.get().to_val_string(),
+        None => bigint.clone().to_val().to_string().to_val(),
       },
       _ => return Err("TODO: bigint indirection".to_error()),
     })

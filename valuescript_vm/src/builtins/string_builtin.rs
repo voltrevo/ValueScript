@@ -4,7 +4,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::native_function::ThisWrapper;
-use crate::vs_value::{ToVal, ToValString};
+use crate::vs_value::ToVal;
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
   native_function::NativeFunction,
@@ -35,7 +35,7 @@ impl ValTrait for StringBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    self.to_val_string()
+    self.to_string().to_val()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -119,7 +119,7 @@ static FROM_CODE_POINT: NativeFunction = NativeFunction {
 
 fn to_string(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(if let Some(value) = params.get(0) {
-    value.to_val_string()
+    value.clone().to_val_string()
   } else {
     "".to_val()
   })

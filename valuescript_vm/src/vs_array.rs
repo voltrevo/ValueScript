@@ -17,7 +17,7 @@ use crate::operations::op_triple_eq_impl;
 use crate::todo_fn::TODO;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, ToVal, ToValString, Val, ValTrait, VsType};
+use crate::vs_value::{LoadFunctionResult, ToVal, Val, ValTrait, VsType};
 
 #[derive(Clone, Debug)]
 pub struct VsArray {
@@ -73,7 +73,7 @@ impl ValTrait for ArrayPrototype {
     false
   }
   fn to_primitive(&self) -> Val {
-    self.to_val_string()
+    self.to_string().to_val()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -403,7 +403,7 @@ static JOIN: NativeFunction = NativeFunction {
         }
 
         if vals.elements.len() == 1 {
-          return Ok(vals.elements[0].to_val_string());
+          return Ok(vals.elements[0].clone().to_val_string());
         }
 
         let separator = match params.get(0) {
@@ -657,7 +657,7 @@ static SPLICE: NativeFunction = NativeFunction {
 // TODO: Share this? (JS doesn't?)
 static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(this.get().to_val_string())
+    Ok(this.get().to_string().to_val())
   },
 };
 

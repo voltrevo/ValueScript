@@ -120,6 +120,15 @@ impl fmt::Debug for dyn ValTrait {
   }
 }
 
+impl Val {
+  pub fn to_val_string(self) -> Val {
+    match self {
+      Val::String(_) => self,
+      _ => self.to_string().to_val(),
+    }
+  }
+}
+
 impl ValTrait for Val {
   fn typeof_(&self) -> VsType {
     use Val::*;
@@ -216,7 +225,7 @@ impl ValTrait for Val {
     if self.is_primitive() {
       self.clone()
     } else {
-      self.to_val_string()
+      self.clone().to_val_string()
     }
   }
 
@@ -487,16 +496,6 @@ impl fmt::Display for Val {
       Static(val) => val.fmt(f),
       Custom(val) => val.fmt(f),
     }
-  }
-}
-
-pub trait ToValString {
-  fn to_val_string(&self) -> Val;
-}
-
-impl<T: ValTrait> ToValString for T {
-  fn to_val_string(&self) -> Val {
-    Val::String(Rc::new(self.to_string()))
   }
 }
 
