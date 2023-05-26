@@ -369,13 +369,13 @@ pub fn op_in(_left: Val, _right: Val) -> Result<Val, Val> {
 }
 
 pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
-  return match left {
+  match left {
     Val::Void => Err("Internal: Shouldn't happen".to_error()), // TODO: Internal errors
     Val::Undefined => Err("Cannot subscript undefined".to_type_error()),
     Val::Null => Err("Cannot subscript null".to_type_error()),
     Val::Bool(_) => Ok(match right.to_string().as_str() {
-      "toString" => Val::Static(&BOOL_TO_STRING),
-      "valueOf" => Val::Static(&BOOL_VALUE_OF),
+      "toString" => BOOL_TO_STRING.to_val(),
+      "valueOf" => BOOL_VALUE_OF.to_val(),
       _ => Val::Undefined,
     }),
     Val::Number(number) => Ok(op_sub_number(number, &right)),
@@ -411,7 +411,7 @@ pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
     Val::Function(_) | Val::Class(_) => Ok(Val::Undefined),
     Val::Static(s) => s.sub(right),
     Val::Custom(custom_data) => custom_data.sub(right),
-  };
+  }
 }
 
 pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val> {

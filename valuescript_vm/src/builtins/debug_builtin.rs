@@ -58,7 +58,7 @@ impl ValTrait for DebugBuiltin {
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
     Ok(match key.to_string().as_str() {
-      "log" => Val::Static(&LOG),
+      "log" => LOG.to_val(),
 
       _ => Val::Undefined,
     })

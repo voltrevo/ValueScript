@@ -9,11 +9,12 @@ use crate::{
 
 pub fn op_sub_bigint(_bigint: &BigInt, subscript: &Val) -> Val {
   match subscript.to_string().as_str() {
-    "toLocaleString" => Val::Static(&TODO),
-    "toString" => Val::Static(&TO_STRING),
-    "valueOf" => Val::Static(&VALUE_OF),
-    _ => Val::Undefined,
+    "toLocaleString" => &TODO,
+    "toString" => &TO_STRING,
+    "valueOf" => &VALUE_OF,
+    _ => return Val::Undefined,
   }
+  .to_val()
 }
 
 static TO_STRING: NativeFunction = NativeFunction {

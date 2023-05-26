@@ -54,7 +54,7 @@ impl ValTrait for ErrorBuiltin {
   }
   fn as_class_data(&self) -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
-      constructor: Val::Static(&SET_MESSAGE),
+      constructor: SET_MESSAGE.to_val(),
       instance_prototype: make_error_prototype(),
     }))
   }

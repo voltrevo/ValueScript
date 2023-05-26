@@ -32,7 +32,7 @@ impl VsArray {
       object: VsObject {
         string_map: Default::default(),
         symbol_map: Default::default(),
-        prototype: Some(Val::Static(&ARRAY_PROTOTYPE)),
+        prototype: Some(ARRAY_PROTOTYPE.to_val()),
       },
     };
   }
@@ -43,7 +43,7 @@ impl VsArray {
       object: VsObject {
         string_map: Default::default(),
         symbol_map: Default::default(),
-        prototype: Some(Val::Static(&ARRAY_PROTOTYPE)),
+        prototype: Some(ARRAY_PROTOTYPE.to_val()),
       },
     };
   }

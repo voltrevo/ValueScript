@@ -522,6 +522,15 @@ impl ToVal for Vec<Val> {
   }
 }
 
+impl<T> ToVal for &'static T
+where
+  T: ValTrait,
+{
+  fn to_val(self) -> Val {
+    Val::Static(self)
+  }
+}
+
 pub struct PrettyVal<'a> {
   val: &'a Val,
 }

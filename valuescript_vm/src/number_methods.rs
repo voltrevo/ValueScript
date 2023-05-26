@@ -10,14 +10,15 @@ use crate::{
 
 pub fn op_sub_number(_number: f64, subscript: &Val) -> Val {
   match subscript.to_string().as_str() {
-    "toExponential" => Val::Static(&TO_EXPONENTIAL),
-    "toFixed" => Val::Static(&TO_FIXED),
-    "toLocaleString" => Val::Static(&TODO_LOCALE),
-    "toPrecision" => Val::Static(&TODO),
-    "toString" => Val::Static(&TO_STRING),
-    "valueOf" => Val::Static(&VALUE_OF),
-    _ => Val::Undefined,
+    "toExponential" => &TO_EXPONENTIAL,
+    "toFixed" => &TO_FIXED,
+    "toLocaleString" => &TODO_LOCALE,
+    "toPrecision" => &TODO,
+    "toString" => &TO_STRING,
+    "valueOf" => &VALUE_OF,
+    _ => return Val::Undefined,
   }
+  .to_val()
 }
 
 static TO_FIXED: NativeFunction = NativeFunction {

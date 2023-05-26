@@ -104,9 +104,3 @@ impl fmt::Display for NativeFunction {
     write!(f, "function() {{ [native code] }}")
   }
 }
-
-impl ToVal for &'static NativeFunction {
-  fn to_val(self) -> Val {
-    Val::Static(self)
-  }
-}

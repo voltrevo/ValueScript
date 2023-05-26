@@ -47,40 +47,41 @@ pub fn get_string_method(method: &str) -> Val {
   // desirable.
 
   match method {
-    "at" => Val::Static(&AT),
-    // "charAt" => Val::Static(&CHAR_AT),
-    // "charCodeAt" => Val::Static(&CHAR_CODE_AT),
-    "codePointAt" => Val::Static(&CODE_POINT_AT),
-    "concat" => Val::Static(&CONCAT),
-    "endsWith" => Val::Static(&ENDS_WITH),
-    "includes" => Val::Static(&INCLUDES),
-    "indexOf" => Val::Static(&INDEX_OF),
-    "lastIndexOf" => Val::Static(&LAST_INDEX_OF),
-    "localeCompare" => Val::Static(&TODO_LOCALE), // (TODO)
-    "match" => Val::Static(&TODO_REGEXES),        // (TODO: regex)
-    "matchAll" => Val::Static(&TODO_REGEXES),     // (TODO: regex)
-    "normalize" => Val::Static(&NORMALIZE),       // (TODO)
-    "padEnd" => Val::Static(&PAD_END),
-    "padStart" => Val::Static(&PAD_START),
-    "repeat" => Val::Static(&REPEAT),
-    "replace" => Val::Static(&TODO_REGEXES), // (TODO: regex)
-    "replaceAll" => Val::Static(&TODO_REGEXES), // (TODO: regex)
-    "search" => Val::Static(&TODO_REGEXES),  // (TODO: regex)
-    "slice" => Val::Static(&SLICE),
-    "split" => Val::Static(&SPLIT),
-    "startsWith" => Val::Static(&STARTS_WITH),
-    "substring" => Val::Static(&SUBSTRING),
-    "toLocaleLowerCase" => Val::Static(&TODO_LOCALE),
-    "toLocaleUpperCase" => Val::Static(&TODO_LOCALE),
-    "toLowerCase" => Val::Static(&TO_LOWER_CASE),
-    "toString" => Val::Static(&TO_STRING),
-    "toUpperCase" => Val::Static(&TO_UPPER_CASE),
-    "trim" => Val::Static(&TRIM),
-    "trimEnd" => Val::Static(&TRIM_END),
-    "trimStart" => Val::Static(&TRIM_START),
-    "valueOf" => Val::Static(&VALUE_OF),
-    _ => Val::Undefined,
+    "at" => &AT,
+    // "charAt" => &CHAR_AT,
+    // "charCodeAt" => &CHAR_CODE_AT,
+    "codePointAt" => &CODE_POINT_AT,
+    "concat" => &CONCAT,
+    "endsWith" => &ENDS_WITH,
+    "includes" => &INCLUDES,
+    "indexOf" => &INDEX_OF,
+    "lastIndexOf" => &LAST_INDEX_OF,
+    "localeCompare" => &TODO_LOCALE, // (TODO)
+    "match" => &TODO_REGEXES,        // (TODO: regex)
+    "matchAll" => &TODO_REGEXES,     // (TODO: regex)
+    "normalize" => &NORMALIZE,       // (TODO)
+    "padEnd" => &PAD_END,
+    "padStart" => &PAD_START,
+    "repeat" => &REPEAT,
+    "replace" => &TODO_REGEXES,    // (TODO: regex)
+    "replaceAll" => &TODO_REGEXES, // (TODO: regex)
+    "search" => &TODO_REGEXES,     // (TODO: regex)
+    "slice" => &SLICE,
+    "split" => &SPLIT,
+    "startsWith" => &STARTS_WITH,
+    "substring" => &SUBSTRING,
+    "toLocaleLowerCase" => &TODO_LOCALE,
+    "toLocaleUpperCase" => &TODO_LOCALE,
+    "toLowerCase" => &TO_LOWER_CASE,
+    "toString" => &TO_STRING,
+    "toUpperCase" => &TO_UPPER_CASE,
+    "trim" => &TRIM,
+    "trimEnd" => &TRIM_END,
+    "trimStart" => &TRIM_START,
+    "valueOf" => &VALUE_OF,
+    _ => return Val::Undefined,
   }
+  .to_val()
 }
 
 static AT: NativeFunction = NativeFunction {
