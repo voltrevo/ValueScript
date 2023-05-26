@@ -1,5 +1,6 @@
 mod array_builtin;
 mod boolean_builtin;
+mod builtin_object;
 mod debug_builtin;
 pub mod error_builtin;
 mod math_builtin;

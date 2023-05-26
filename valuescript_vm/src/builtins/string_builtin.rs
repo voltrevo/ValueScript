@@ -1,91 +1,45 @@
 use std::fmt;
 use std::rc::Rc;
 
-use num_bigint::BigInt;
-
 use crate::native_function::ThisWrapper;
 use crate::vs_value::ToVal;
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
   native_function::NativeFunction,
-  vs_array::VsArray,
   vs_class::VsClass,
-  vs_object::VsObject,
-  vs_value::{LoadFunctionResult, Val, VsType},
+  vs_value::{LoadFunctionResult, Val},
   ValTrait,
 };
 
-use super::type_error_builtin::ToTypeError;
+use super::builtin_object::BuiltinObject;
 
 pub struct StringBuiltin {}
 
 pub static STRING_BUILTIN: StringBuiltin = StringBuiltin {};
 
-impl ValTrait for StringBuiltin {
-  fn typeof_(&self) -> VsType {
-    VsType::Object
-  }
-  fn to_number(&self) -> f64 {
-    core::f64::NAN
-  }
-  fn to_index(&self) -> Option<usize> {
-    None
-  }
-  fn is_primitive(&self) -> bool {
-    false
-  }
-  fn is_truthy(&self) -> bool {
-    true
-  }
-  fn is_nullish(&self) -> bool {
-    false
-  }
-  fn bind(&self, _params: Vec<Val>) -> Option<Val> {
-    None
-  }
-  fn as_bigint_data(&self) -> Option<BigInt> {
-    None
-  }
-  fn as_array_data(&self) -> Option<Rc<VsArray>> {
-    None
-  }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    None
-  }
-  fn as_class_data(&self) -> Option<Rc<VsClass>> {
-    None
+impl BuiltinObject for StringBuiltin {
+  fn bo_name() -> &'static str {
+    "String"
   }
 
-  fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NativeFunction(to_string)
-  }
-
-  fn sub(&self, key: Val) -> Result<Val, Val> {
+  fn bo_sub(key: &str) -> Val {
     // Not supported: fromCharCode.
     // See charAt etc in string_methods.rs.
 
-    Ok(match key.to_string().as_str() {
+    match key {
       "fromCodePoint" => Val::Static(&FROM_CODE_POINT),
       // "fromCharCode" => Val::Static(&FROM_CHAR_CODE),
       // "raw" => Val::Static(&RAW),                     // TODO
       _ => Val::Undefined,
-    })
+    }
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    Err("Cannot assign to subscript of String builtin".to_type_error())
+  fn bo_load_function() -> LoadFunctionResult {
+    LoadFunctionResult::NativeFunction(to_string)
   }
 
-  fn next(&mut self) -> LoadFunctionResult {
-    LoadFunctionResult::NotAFunction
-  }
-
-  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "\x1b[36m[String]\x1b[39m")
-  }
-
-  fn codify(&self) -> String {
-    "String".into()
+  fn bo_as_class_data() -> Option<Rc<VsClass>> {
+    None
   }
 }
 

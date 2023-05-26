@@ -1,64 +1,24 @@
 use std::fmt;
 use std::rc::Rc;
 
-use num_bigint::BigInt;
-
 use crate::native_function::{NativeFunction, ThisWrapper};
 use crate::operations::to_u32;
-use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
-use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
+use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
-use super::type_error_builtin::ToTypeError;
+use super::builtin_object::BuiltinObject;
 
 pub struct MathBuiltin {}
 
 pub static MATH_BUILTIN: MathBuiltin = MathBuiltin {};
 
-impl ValTrait for MathBuiltin {
-  fn typeof_(&self) -> VsType {
-    VsType::Object
-  }
-  fn to_number(&self) -> f64 {
-    f64::NAN
-  }
-  fn to_index(&self) -> Option<usize> {
-    None
-  }
-  fn is_primitive(&self) -> bool {
-    false
-  }
-  fn is_truthy(&self) -> bool {
-    true
-  }
-  fn is_nullish(&self) -> bool {
-    false
+impl BuiltinObject for MathBuiltin {
+  fn bo_name() -> &'static str {
+    "Math"
   }
 
-  fn bind(&self, _params: Vec<Val>) -> Option<Val> {
-    None
-  }
-
-  fn as_bigint_data(&self) -> Option<BigInt> {
-    None
-  }
-  fn as_array_data(&self) -> Option<Rc<VsArray>> {
-    None
-  }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    None
-  }
-  fn as_class_data(&self) -> Option<Rc<VsClass>> {
-    None
-  }
-
-  fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NotAFunction
-  }
-
-  fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(match key.to_string().as_str() {
+  fn bo_sub(key: &str) -> Val {
+    match key {
       "E" => Val::Number(std::f64::consts::E),
       "LN10" => Val::Number(std::f64::consts::LN_10),
       "LN2" => Val::Number(std::f64::consts::LN_2),
@@ -106,23 +66,15 @@ impl ValTrait for MathBuiltin {
       "trunc" => Val::Static(&TRUNC),
 
       _ => Val::Undefined,
-    })
+    }
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    Err("Cannot assign to subscript of Math builtin".to_type_error())
-  }
-
-  fn next(&mut self) -> LoadFunctionResult {
+  fn bo_load_function() -> LoadFunctionResult {
     LoadFunctionResult::NotAFunction
   }
 
-  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "\x1b[36m[Math]\x1b[39m")
-  }
-
-  fn codify(&self) -> String {
-    "Math".into()
+  fn bo_as_class_data() -> Option<Rc<VsClass>> {
+    None
   }
 }
 

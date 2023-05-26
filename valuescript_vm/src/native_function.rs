@@ -8,7 +8,7 @@ use crate::builtins::type_error_builtin::ToTypeError;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, ToVal, Val, ValTrait, VsType};
+use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 pub struct ThisWrapper<'a> {
   const_: bool,

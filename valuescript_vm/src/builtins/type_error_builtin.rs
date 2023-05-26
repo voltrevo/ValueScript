@@ -1,63 +1,32 @@
 use std::fmt;
 use std::{collections::BTreeMap, rc::Rc};
 
-use num_bigint::BigInt;
-
 use crate::native_function::ThisWrapper;
 use crate::vs_value::ToVal;
 use crate::{
   native_function::NativeFunction,
   operations::{op_sub, op_submov},
-  vs_array::VsArray,
   vs_class::VsClass,
   vs_object::VsObject,
-  vs_value::{LoadFunctionResult, Val, VsType},
-  ValTrait,
+  vs_value::{LoadFunctionResult, Val},
 };
+
+use super::builtin_object::BuiltinObject;
 
 pub struct TypeErrorBuiltin {}
 
 pub static TYPE_ERROR_BUILTIN: TypeErrorBuiltin = TypeErrorBuiltin {};
 
-impl ValTrait for TypeErrorBuiltin {
-  fn typeof_(&self) -> VsType {
-    VsType::Object
-  }
-  fn to_number(&self) -> f64 {
-    core::f64::NAN
-  }
-  fn to_index(&self) -> Option<usize> {
-    None
-  }
-  fn is_primitive(&self) -> bool {
-    false
-  }
-  fn is_truthy(&self) -> bool {
-    true
-  }
-  fn is_nullish(&self) -> bool {
-    false
-  }
-  fn bind(&self, _params: Vec<Val>) -> Option<Val> {
-    None
-  }
-  fn as_bigint_data(&self) -> Option<BigInt> {
-    None
-  }
-  fn as_array_data(&self) -> Option<Rc<VsArray>> {
-    None
-  }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    None
-  }
-  fn as_class_data(&self) -> Option<Rc<VsClass>> {
-    Some(Rc::new(VsClass {
-      constructor: Val::Static(&SET_MESSAGE),
-      instance_prototype: make_type_error_prototype(),
-    }))
+impl BuiltinObject for TypeErrorBuiltin {
+  fn bo_name() -> &'static str {
+    "TypeError"
   }
 
-  fn load_function(&self) -> LoadFunctionResult {
+  fn bo_sub(_key: &str) -> Val {
+    Val::Undefined
+  }
+
+  fn bo_load_function() -> LoadFunctionResult {
     LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
       Ok(
         match params.get(0) {
@@ -69,24 +38,11 @@ impl ValTrait for TypeErrorBuiltin {
     })
   }
 
-  fn sub(&self, _key: Val) -> Result<Val, Val> {
-    Ok(Val::Undefined)
-  }
-
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    Err("Cannot assign to subscript of TypeError builtin".to_type_error())
-  }
-
-  fn next(&mut self) -> LoadFunctionResult {
-    LoadFunctionResult::NotAFunction
-  }
-
-  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "\x1b[36m[TypeError]\x1b[39m")
-  }
-
-  fn codify(&self) -> String {
-    "TypeError".into()
+  fn bo_as_class_data() -> Option<Rc<VsClass>> {
+    Some(Rc::new(VsClass {
+      constructor: Val::Static(&SET_MESSAGE),
+      instance_prototype: make_type_error_prototype(),
+    }))
   }
 }
 

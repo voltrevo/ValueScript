@@ -1,97 +1,58 @@
 use std::fmt;
 use std::rc::Rc;
 
-use num_bigint::BigInt;
-
 use crate::native_function::ThisWrapper;
+use crate::vs_value::ToVal;
 use crate::{
   native_function::NativeFunction,
-  vs_array::VsArray,
   vs_class::VsClass,
-  vs_object::VsObject,
-  vs_value::{LoadFunctionResult, Val, VsType},
+  vs_value::{LoadFunctionResult, Val},
   ValTrait,
 };
 
-use super::type_error_builtin::ToTypeError;
+use super::builtin_object::BuiltinObject;
 
 pub struct NumberBuiltin {}
 
 pub static NUMBER_BUILTIN: NumberBuiltin = NumberBuiltin {};
 
-impl ValTrait for NumberBuiltin {
-  fn typeof_(&self) -> VsType {
-    VsType::Object
-  }
-  fn to_number(&self) -> f64 {
-    core::f64::NAN
-  }
-  fn to_index(&self) -> Option<usize> {
-    None
-  }
-  fn is_primitive(&self) -> bool {
-    false
-  }
-  fn is_truthy(&self) -> bool {
-    true
-  }
-  fn is_nullish(&self) -> bool {
-    false
-  }
-  fn bind(&self, _params: Vec<Val>) -> Option<Val> {
-    None
-  }
-  fn as_bigint_data(&self) -> Option<BigInt> {
-    None
-  }
-  fn as_array_data(&self) -> Option<Rc<VsArray>> {
-    None
-  }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    None
-  }
-  fn as_class_data(&self) -> Option<Rc<VsClass>> {
-    None
+impl BuiltinObject for NumberBuiltin {
+  fn bo_name() -> &'static str {
+    "Number"
   }
 
-  fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NativeFunction(to_number)
-  }
-
-  fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(match key.to_string().as_str() {
-      "EPSILON" => Val::Number(core::f64::EPSILON),
-      "MAX_VALUE" => Val::Number(core::f64::MAX),
-      "MAX_SAFE_INTEGER" => Val::Number(2f64.powi(53) - 1f64),
-      "MIN_SAFE_INTEGER" => Val::Number(-(2f64.powi(53) - 1f64)),
-      "MIN_VALUE" => Val::Number(core::f64::MIN_POSITIVE),
-      "NEGATIVE_INFINITY" => Val::Number(core::f64::NEG_INFINITY),
-      "POSITIVE_INFINITY" => Val::Number(core::f64::INFINITY),
-      "NaN" => Val::Number(core::f64::NAN),
-      "isFinite" => Val::Static(&IS_FINITE),
-      "isInteger" => Val::Static(&IS_INTEGER),
-      "isNaN" => Val::Static(&IS_NAN),
-      "isSafeInteger" => Val::Static(&IS_SAFE_INTEGER),
-      "parseFloat" => Val::Static(&PARSE_FLOAT),
-      "parseInt" => Val::Static(&PARSE_INT),
+  fn bo_sub(key: &str) -> Val {
+    match key {
+      "EPSILON" => core::f64::EPSILON.to_val(),
+      "MAX_VALUE" => core::f64::MAX.to_val(),
+      "MAX_SAFE_INTEGER" => (2f64.powi(53) - 1f64).to_val(),
+      "MIN_SAFE_INTEGER" => (-(2f64.powi(53) - 1f64)).to_val(),
+      "MIN_VALUE" => core::f64::MIN_POSITIVE.to_val(),
+      "NEGATIVE_INFINITY" => core::f64::NEG_INFINITY.to_val(),
+      "POSITIVE_INFINITY" => core::f64::INFINITY.to_val(),
+      "NaN" => core::f64::NAN.to_val(),
+      "isFinite" => IS_FINITE.to_val(),
+      "isInteger" => IS_INTEGER.to_val(),
+      "isNaN" => IS_NAN.to_val(),
+      "isSafeInteger" => IS_SAFE_INTEGER.to_val(),
+      "parseFloat" => PARSE_FLOAT.to_val(),
+      "parseInt" => PARSE_INT.to_val(),
       _ => Val::Undefined,
+    }
+  }
+
+  fn bo_load_function() -> LoadFunctionResult {
+    LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+      Ok(if let Some(value) = params.get(0) {
+        Val::Number(value.to_number())
+      } else {
+        Val::Number(0.0)
+      })
     })
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    Err("Cannot assign to subscript of Number builtin".to_type_error())
-  }
-
-  fn next(&mut self) -> LoadFunctionResult {
-    LoadFunctionResult::NotAFunction
-  }
-
-  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "\x1b[36m[Number]\x1b[39m")
-  }
-
-  fn codify(&self) -> String {
-    "Number".into()
+  fn bo_as_class_data() -> Option<Rc<VsClass>> {
+    None
   }
 }
 
@@ -202,11 +163,3 @@ pub static PARSE_INT: NativeFunction = NativeFunction {
     })
   },
 };
-
-fn to_number(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
-  Ok(if let Some(value) = params.get(0) {
-    Val::Number(value.to_number())
-  } else {
-    Val::Number(0.0)
-  })
-}
