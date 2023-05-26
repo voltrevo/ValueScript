@@ -5,17 +5,16 @@ use num_traits::ToPrimitive;
 
 use crate::bigint_methods::op_sub_bigint;
 use crate::builtins::error_builtin::ToError;
+use crate::builtins::range_error_builtin::ToRangeError;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::native_function::native_fn;
 use crate::native_function::NativeFunction;
-use crate::native_function::ThisWrapper;
 use crate::number_methods::op_sub_number;
 use crate::string_methods::op_sub_string;
 use crate::vs_value::ToVal;
 use crate::vs_value::Val;
 use crate::vs_value::ValTrait;
 use crate::vs_value::VsType;
-use crate::{builtins::range_error_builtin::to_range_error, range_error};
 
 pub fn op_plus(left: Val, right: Val) -> Result<Val, Val> {
   let left_prim = left.to_primitive();
@@ -96,12 +95,12 @@ pub fn op_exp(left: Val, right: Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => {
       if right_bigint.sign() == Sign::Minus {
-        return range_error!("Exponent must be non-negative");
+        return Err("Exponent must be non-negative".to_range_error());
       }
 
       let exp = match right_bigint.to_u32() {
         Some(exp) => exp,
-        None => return range_error!("Exponent must be less than 2^32"),
+        None => return Err("Exponent must be less than 2^32".to_range_error()),
       };
 
       Ok(Val::BigInt(left_bigint.pow(exp)))

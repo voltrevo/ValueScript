@@ -1,17 +1,17 @@
 use std::{fmt, rc::Rc};
 
 use crate::{
-  builtins::range_error_builtin::to_range_error,
   native_function::{native_fn, NativeFunction, ThisWrapper},
   operations::op_sub,
-  range_error,
   vs_array::VsArray,
   vs_class::VsClass,
   vs_value::{LoadFunctionResult, ToVal, Val},
   ValTrait,
 };
 
-use super::{builtin_object::BuiltinObject, type_error_builtin::ToTypeError};
+use super::{
+  builtin_object::BuiltinObject, range_error_builtin::ToRangeError, type_error_builtin::ToTypeError,
+};
 
 pub struct ArrayBuiltin {}
 
@@ -82,7 +82,7 @@ static FROM: NativeFunction = native_fn(|_this, params| {
       }
 
       if len.is_infinite() {
-        return range_error!("Invalid array length");
+        return Err("Invalid array length".to_range_error());
       }
 
       let len = len as usize;
@@ -114,7 +114,7 @@ fn to_array(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(match params[0] {
     Val::Number(number) => {
       if number.is_sign_negative() || number != number.floor() {
-        return range_error!("Invalid array length");
+        return Err("Invalid array length".to_range_error());
       }
 
       let len = number as usize;

@@ -1,7 +1,7 @@
 use crate::builtins::error_builtin::ToError;
-use crate::native_function::{native_fn, ThisWrapper};
+use crate::builtins::range_error_builtin::ToRangeError;
+use crate::native_function::native_fn;
 use crate::vs_value::ToVal;
-use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
   native_function::NativeFunction,
   todo_fn::TODO,
@@ -43,7 +43,7 @@ static TO_FIXED: NativeFunction = native_fn(|this, params| {
       precision = f64::floor(precision);
 
       if precision < 1.0 || precision > 100.0 {
-        return range_error!("precision must be between 1 and 100");
+        return Err("precision must be between 1 and 100".to_range_error());
       }
 
       format!("{:.*}", precision as usize, number).to_val()
@@ -60,7 +60,7 @@ static TO_EXPONENTIAL: NativeFunction = native_fn(|this, params| {
         precision = f64::floor(precision);
 
         if precision < 0.0 || precision > 100.0 {
-          return range_error!("precision must be between 0 and 100");
+          return Err("precision must be between 0 and 100".to_range_error());
         }
 
         format_exponential(*number, Some(precision as usize))

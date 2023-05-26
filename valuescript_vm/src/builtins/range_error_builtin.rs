@@ -90,13 +90,29 @@ static RANGE_ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
   Ok(format!("RangeError({})", message).to_val())
 });
 
-#[macro_export]
-macro_rules! range_error {
-  ($fmt:expr $(, $($arg:expr),*)?) => {{
-    let formatted_string = format!($fmt $(, $($arg),*)?);
-    Err(to_range_error(
-      ThisWrapper::new(true, &mut Val::Undefined),
-      vec![formatted_string.to_val()],
-    ).unwrap())
-  }};
+pub trait ToRangeError {
+  fn to_range_error(self) -> Val;
+}
+
+impl ToRangeError for &str {
+  fn to_range_error(self) -> Val {
+    self.to_string().to_range_error()
+  }
+}
+
+impl ToRangeError for String {
+  fn to_range_error(self) -> Val {
+    self.to_val().to_range_error()
+  }
+}
+
+impl ToRangeError for Val {
+  fn to_range_error(self) -> Val {
+    VsObject {
+      string_map: BTreeMap::from([("message".to_string(), self)]),
+      symbol_map: Default::default(),
+      prototype: Some(make_range_error_prototype()),
+    }
+    .to_val()
+  }
 }

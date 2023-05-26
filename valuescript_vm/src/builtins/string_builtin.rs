@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use crate::native_function::{native_fn, ThisWrapper};
 use crate::vs_value::ToVal;
-use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
   native_function::NativeFunction,
   vs_class::VsClass,
@@ -12,6 +11,7 @@ use crate::{
 };
 
 use super::builtin_object::BuiltinObject;
+use super::range_error_builtin::ToRangeError;
 
 pub struct StringBuiltin {}
 
@@ -57,7 +57,7 @@ static FROM_CODE_POINT: NativeFunction = native_fn(|_this, params| {
 
     let char = match std::char::from_u32(code_point) {
       Some(c) => c,
-      None => return range_error!("Invalid code point"),
+      None => return Err("Invalid code point".to_range_error()),
     };
 
     result.push(char);
