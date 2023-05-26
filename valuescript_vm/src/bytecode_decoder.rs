@@ -13,7 +13,6 @@ use crate::vs_pointer::VsPointer;
 use crate::vs_symbol::VsSymbol;
 use crate::vs_value::ToVal;
 use crate::vs_value::Val;
-use crate::vs_value::ValTrait;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
@@ -125,7 +124,7 @@ impl BytecodeDecoder {
           match key {
             Val::String(string) => string_map.insert(string.to_string(), value),
             Val::Symbol(symbol) => symbol_map.insert(symbol, value),
-            key => string_map.insert(key.val_to_string(), value),
+            key => string_map.insert(key.to_string(), value),
           };
         }
 

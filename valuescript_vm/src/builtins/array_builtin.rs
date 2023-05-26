@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt, rc::Rc};
 
 use num_bigint::BigInt;
 
@@ -23,9 +23,6 @@ pub static ARRAY_BUILTIN: ArrayBuiltin = ArrayBuiltin {};
 impl ValTrait for ArrayBuiltin {
   fn typeof_(&self) -> VsType {
     VsType::Object
-  }
-  fn val_to_string(&self) -> String {
-    "function Array() { [native code] }".to_string()
   }
   fn to_number(&self) -> f64 {
     core::f64::NAN
@@ -66,7 +63,7 @@ impl ValTrait for ArrayBuiltin {
   }
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(Val::Static(match key.val_to_string().as_str() {
+    Ok(Val::Static(match key.to_string().as_str() {
       "isArray" => &IS_ARRAY,
       "from" => &FROM,
       "of" => &OF,
@@ -88,6 +85,12 @@ impl ValTrait for ArrayBuiltin {
 
   fn codify(&self) -> String {
     "Array".into()
+  }
+}
+
+impl fmt::Display for ArrayBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "function Array() {{ [native code] }}")
   }
 }
 
@@ -125,7 +128,7 @@ static FROM: NativeFunction = NativeFunction {
       }
       Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Custom(..) => {
         let len = op_sub(first_param.clone(), "length".to_val())
-          .map_err(|e| e.val_to_string())
+          .map_err(|e| e.to_string())
           .unwrap() // TODO: Exception
           .to_number();
 
@@ -146,7 +149,7 @@ static FROM: NativeFunction = NativeFunction {
         for i in 0..len {
           arr.push(
             op_sub(first_param.clone(), Val::Number(i as f64))
-              .map_err(|e| e.val_to_string())
+              .map_err(|e| e.to_string())
               .unwrap(), // TODO: Exception
           );
         }

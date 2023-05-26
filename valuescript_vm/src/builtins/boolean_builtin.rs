@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt, rc::Rc};
 
 use num_bigint::BigInt;
 
@@ -20,9 +20,6 @@ pub static BOOLEAN_BUILTIN: BooleanBuiltin = BooleanBuiltin {};
 impl ValTrait for BooleanBuiltin {
   fn typeof_(&self) -> VsType {
     VsType::Object
-  }
-  fn val_to_string(&self) -> String {
-    "function Boolean() { [native code] }".to_string()
   }
   fn to_number(&self) -> f64 {
     core::f64::NAN
@@ -80,6 +77,12 @@ impl ValTrait for BooleanBuiltin {
 
   fn codify(&self) -> String {
     "Boolean".into()
+  }
+}
+
+impl fmt::Display for BooleanBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "function Boolean() {{ [native code] }}")
   }
 }
 

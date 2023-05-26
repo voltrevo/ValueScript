@@ -4,11 +4,11 @@ use crate::{
   builtins::error_builtin::ToError,
   native_function::{NativeFunction, ThisWrapper},
   todo_fn::TODO,
-  vs_value::{ToValString, Val, ValTrait},
+  vs_value::{ToValString, Val},
 };
 
 pub fn op_sub_bigint(_bigint: &BigInt, subscript: &Val) -> Val {
-  match subscript.val_to_string().as_str() {
+  match subscript.to_string().as_str() {
     "toLocaleString" => Val::Static(&TODO),
     "toString" => Val::Static(&TO_STRING),
     "valueOf" => Val::Static(&VALUE_OF),

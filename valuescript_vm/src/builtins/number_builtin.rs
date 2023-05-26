@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -22,9 +23,6 @@ pub static NUMBER_BUILTIN: NumberBuiltin = NumberBuiltin {};
 impl ValTrait for NumberBuiltin {
   fn typeof_(&self) -> VsType {
     VsType::Object
-  }
-  fn val_to_string(&self) -> String {
-    "function Number() { [native code] }".to_string()
   }
   fn to_number(&self) -> f64 {
     core::f64::NAN
@@ -65,7 +63,7 @@ impl ValTrait for NumberBuiltin {
   }
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(match key.val_to_string().as_str() {
+    Ok(match key.to_string().as_str() {
       "EPSILON" => Val::Number(core::f64::EPSILON),
       "MAX_VALUE" => Val::Number(core::f64::MAX),
       "MAX_SAFE_INTEGER" => Val::Number(2f64.powi(53) - 1f64),
@@ -98,6 +96,12 @@ impl ValTrait for NumberBuiltin {
 
   fn codify(&self) -> String {
     "Number".into()
+  }
+}
+
+impl fmt::Display for NumberBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "function Number() {{ [native code] }}")
   }
 }
 
@@ -157,7 +161,7 @@ static IS_SAFE_INTEGER: NativeFunction = NativeFunction {
 pub static PARSE_FLOAT: NativeFunction = NativeFunction {
   fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(if let Some(value) = params.get(0) {
-      let string_value = value.val_to_string().trim().to_string();
+      let string_value = value.to_string().trim().to_string();
 
       match string_value.parse::<f64>() {
         Ok(number) => Val::Number(number),
@@ -172,7 +176,7 @@ pub static PARSE_FLOAT: NativeFunction = NativeFunction {
 pub static PARSE_INT: NativeFunction = NativeFunction {
   fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     Ok(if let Some(value) = params.get(0) {
-      let string_value = value.val_to_string().trim_start().to_string();
+      let string_value = value.to_string().trim_start().to_string();
       let radix = params.get(1).and_then(|v| v.to_index()).unwrap_or(10);
 
       if radix < 2 || radix > 36 {

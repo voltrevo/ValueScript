@@ -345,7 +345,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self
       .fnc
-      .allocate_numbered_reg(&format!("_couldnt_mutate_{}_", ident.sym.to_string()))
+      .allocate_numbered_reg(&format!("_couldnt_mutate_{}_", ident.sym))
   }
 
   pub fn assign_expression(

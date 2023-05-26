@@ -239,7 +239,7 @@ impl StackFrameTrait for SortFrame {
 
           array_data_mut
             .elements
-            .sort_by(|a, b| a.val_to_string().cmp(&b.val_to_string()));
+            .sort_by(|a, b| a.to_string().cmp(&b.to_string()));
 
           return Ok(FrameStepOk::Pop(CallResult {
             return_: Val::Array(array_data.clone()),

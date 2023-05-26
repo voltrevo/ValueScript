@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -39,9 +40,6 @@ pub struct NativeFunction {
 impl ValTrait for NativeFunction {
   fn typeof_(&self) -> VsType {
     VsType::Function
-  }
-  fn val_to_string(&self) -> String {
-    "function() { [native code] }".to_string()
   }
   fn to_number(&self) -> f64 {
     f64::NAN
@@ -101,6 +99,12 @@ impl ValTrait for NativeFunction {
 
   fn codify(&self) -> String {
     "function() { [native code] }".into()
+  }
+}
+
+impl fmt::Display for NativeFunction {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "function() {{ [native code] }}")
   }
 }
 

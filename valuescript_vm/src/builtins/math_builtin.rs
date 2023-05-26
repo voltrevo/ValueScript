@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -18,9 +19,6 @@ pub static MATH_BUILTIN: MathBuiltin = MathBuiltin {};
 impl ValTrait for MathBuiltin {
   fn typeof_(&self) -> VsType {
     VsType::Object
-  }
-  fn val_to_string(&self) -> String {
-    "[object Math]".to_string()
   }
   fn to_number(&self) -> f64 {
     f64::NAN
@@ -63,7 +61,7 @@ impl ValTrait for MathBuiltin {
   }
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(match key.val_to_string().as_str() {
+    Ok(match key.to_string().as_str() {
       "E" => Val::Number(std::f64::consts::E),
       "LN10" => Val::Number(std::f64::consts::LN_10),
       "LN2" => Val::Number(std::f64::consts::LN_2),
@@ -128,6 +126,12 @@ impl ValTrait for MathBuiltin {
 
   fn codify(&self) -> String {
     "Math".into()
+  }
+}
+
+impl fmt::Display for MathBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "[object Math]")
   }
 }
 

@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt, rc::Rc};
 
 use num_bigint::BigInt;
 
@@ -20,9 +20,6 @@ pub static SYMBOL_BUILTIN: SymbolBuiltin = SymbolBuiltin {};
 impl ValTrait for SymbolBuiltin {
   fn typeof_(&self) -> VsType {
     VsType::Object
-  }
-  fn val_to_string(&self) -> String {
-    "[object Symbol]".to_string()
   }
   fn to_number(&self) -> f64 {
     core::f64::NAN
@@ -63,7 +60,7 @@ impl ValTrait for SymbolBuiltin {
   }
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(match key.val_to_string().as_str() {
+    Ok(match key.to_string().as_str() {
       "iterator" => Val::Symbol(VsSymbol::ITERATOR),
       _ => Val::Undefined,
     })
@@ -83,5 +80,11 @@ impl ValTrait for SymbolBuiltin {
 
   fn codify(&self) -> String {
     "Symbol".into()
+  }
+}
+
+impl fmt::Display for SymbolBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "[object Symbol]")
   }
 }

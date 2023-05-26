@@ -5,7 +5,7 @@ use crate::vs_symbol::VsSymbol;
 use crate::vs_value::ToVal;
 
 use super::operations::op_sub;
-use super::vs_value::{Val, ValTrait};
+use super::vs_value::Val;
 
 #[derive(Clone, Default, Debug)]
 pub struct VsObject {
@@ -19,7 +19,7 @@ impl VsObject {
     let val = match &key {
       Val::String(string) => self.string_map.get(&**string),
       Val::Symbol(symbol) => self.symbol_map.get(symbol),
-      _ => self.string_map.get(&key.val_to_string()),
+      _ => self.string_map.get(&key.to_string()),
     };
 
     if let Some(val) = val {
@@ -28,7 +28,7 @@ impl VsObject {
 
     match &self.prototype {
       Some(prototype) => op_sub(prototype.clone(), key)
-        .map_err(|e| e.val_to_string())
+        .map_err(|e| e.to_string())
         .unwrap(), // TODO: Exception
       None => Val::Undefined,
     }

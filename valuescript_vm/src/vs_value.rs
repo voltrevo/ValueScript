@@ -85,9 +85,8 @@ where
   }
 }
 
-pub trait ValTrait {
+pub trait ValTrait: fmt::Display {
   fn typeof_(&self) -> VsType;
-  fn val_to_string(&self) -> String;
   fn to_number(&self) -> f64;
   fn to_index(&self) -> Option<usize>;
   fn is_primitive(&self) -> bool;
@@ -140,59 +139,6 @@ impl ValTrait for Val {
       Class(_) => VsType::Class,
       Static(val) => val.typeof_(),
       Custom(val) => val.typeof_(),
-    };
-  }
-
-  fn val_to_string(&self) -> String {
-    use Val::*;
-
-    return match self {
-      Void => "".to_string(),
-      Undefined => "undefined".to_string(),
-      Null => "null".to_string(),
-      Bool(b) => b.to_string(),
-      Number(x) => {
-        if x.is_infinite() {
-          if x.is_sign_positive() {
-            "Infinity".to_string()
-          } else {
-            "-Infinity".to_string()
-          }
-        } else {
-          x.to_string()
-        }
-      } // TODO: Match js's number string format
-      BigInt(x) => x.to_string(),
-      Symbol(s) => format!("Symbol(Symbol.{})", symbol_to_name(s.clone())),
-      String(s) => s.to_string(),
-      Array(vals) => {
-        if vals.elements.len() == 0 {
-          "".to_string()
-        } else if vals.elements.len() == 1 {
-          vals.elements[0].val_to_string()
-        } else {
-          let mut iter = vals.elements.iter();
-          let mut res = iter.next().unwrap().val_to_string();
-
-          for val in iter {
-            res += ",";
-
-            match val.typeof_() {
-              VsType::Undefined => {}
-              _ => {
-                res += &val.val_to_string();
-              }
-            };
-          }
-
-          res
-        }
-      }
-      Object(_) => "[object Object]".to_string(),
-      Function(_) => "[function]".to_string(),
-      Class(_) => "[class]".to_string(),
-      Static(val) => val.val_to_string(),
-      Custom(val) => val.val_to_string(),
     };
   }
 
@@ -417,9 +363,9 @@ impl ValTrait for Val {
       Val::Void => "".into(),
       Val::Undefined => "undefined".into(),
       Val::Null => "null".into(),
-      Val::Bool(_) => self.val_to_string(),
-      Val::Number(_) => self.val_to_string(),
-      Val::BigInt(_) => self.val_to_string() + "n",
+      Val::Bool(_) => self.to_string(),
+      Val::Number(_) => self.to_string(),
+      Val::BigInt(_) => self.to_string() + "n",
       Val::Symbol(s) => format!("Symbol.{}", symbol_to_name(s.clone())),
       Val::String(str) => stringify_string(str),
       Val::Array(vals) => {
@@ -449,7 +395,7 @@ impl ValTrait for Val {
           match op_sub(proto.clone(), "name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
-                res += format!("{}", name.val_to_string()).as_str();
+                res += &name.to_string();
               }
             }
             Err(_) => {}
@@ -489,13 +435,68 @@ impl ValTrait for Val {
   }
 }
 
+impl fmt::Display for Val {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    use Val::*;
+
+    match self {
+      Void => Ok(()),
+      Undefined => write!(f, "undefined"),
+      Null => write!(f, "null"),
+      Bool(b) => b.fmt(f),
+      Number(x) => {
+        if x.is_infinite() {
+          if x.is_sign_positive() {
+            write!(f, "Infinity")
+          } else {
+            write!(f, "-Infinity")
+          }
+        } else {
+          x.fmt(f)
+        }
+      } // TODO: Match js's number string format
+      BigInt(x) => x.fmt(f),
+      Symbol(s) => write!(f, "Symbol(Symbol.{})", symbol_to_name(s.clone())),
+      String(s) => s.fmt(f),
+      Array(vals) => {
+        if vals.elements.len() == 0 {
+          Ok(())
+        } else if vals.elements.len() == 1 {
+          vals.elements[0].fmt(f)
+        } else {
+          let mut iter = vals.elements.iter();
+          iter.next().unwrap().fmt(f)?;
+
+          for val in iter {
+            write!(f, ",")?;
+
+            match val.typeof_() {
+              VsType::Undefined => {}
+              _ => {
+                val.fmt(f)?;
+              }
+            };
+          }
+
+          Ok(())
+        }
+      }
+      Object(_) => write!(f, "[object Object]"),
+      Function(_) => write!(f, "[function]"),
+      Class(_) => write!(f, "[class]"),
+      Static(val) => val.fmt(f),
+      Custom(val) => val.fmt(f),
+    }
+  }
+}
+
 pub trait ToValString {
   fn to_val_string(&self) -> Val;
 }
 
 impl<T: ValTrait> ToValString for T {
   fn to_val_string(&self) -> Val {
-    Val::String(Rc::new(self.val_to_string()))
+    Val::String(Rc::new(self.to_string()))
   }
 }
 
@@ -570,9 +571,9 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
       Val::Void => write!(f, "void"),
       Val::Undefined => write!(f, "\x1b[90mundefined\x1b[39m"),
       Val::Null => write!(f, "\x1b[1mnull\x1b[22m"),
-      Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val.val_to_string()),
-      Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val.val_to_string()),
-      Val::BigInt(_) => write!(f, "\x1b[33m{}n\x1b[39m", self.val.val_to_string()),
+      Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val),
+      Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val),
+      Val::BigInt(_) => write!(f, "\x1b[33m{}n\x1b[39m", self.val),
       Val::Symbol(_) => write!(f, "\x1b[32m{}\x1b[39m", self.val.codify()),
       Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.val.codify()),
       Val::Array(array) => {
@@ -580,7 +581,7 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
           return write!(f, "[]");
         }
 
-        write!(f, "[ ").expect("Failed to write");
+        write!(f, "[ ")?;
 
         let mut first = true;
 
@@ -588,10 +589,10 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
           if first {
             first = false;
           } else {
-            write!(f, ", ").expect("Failed to write");
+            write!(f, ", ")?;
           }
 
-          write!(f, "{}", elem.pretty()).expect("Failed to write");
+          write!(f, "{}", elem.pretty())?;
         }
 
         write!(f, " ]")
@@ -601,7 +602,7 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
           match op_sub(proto.clone(), "name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
-                write!(f, "{} ", name.val_to_string())?;
+                write!(f, "{} ", name)?;
               }
             }
             Err(_) => {}

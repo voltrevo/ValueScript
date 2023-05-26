@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -17,9 +18,6 @@ pub static DEBUG_BUILTIN: DebugBuiltin = DebugBuiltin {};
 impl ValTrait for DebugBuiltin {
   fn typeof_(&self) -> VsType {
     VsType::Object
-  }
-  fn val_to_string(&self) -> String {
-    "[object Debug]".to_string()
   }
   fn to_number(&self) -> f64 {
     f64::NAN
@@ -62,7 +60,7 @@ impl ValTrait for DebugBuiltin {
   }
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(match key.val_to_string().as_str() {
+    Ok(match key.to_string().as_str() {
       "log" => Val::Static(&LOG),
 
       _ => Val::Undefined,
@@ -83,6 +81,12 @@ impl ValTrait for DebugBuiltin {
 
   fn codify(&self) -> String {
     "Debug".into()
+  }
+}
+
+impl fmt::Display for DebugBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "[object Debug]")
   }
 }
 

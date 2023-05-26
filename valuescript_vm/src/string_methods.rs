@@ -11,7 +11,7 @@ use crate::{
 pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
   let right_index = match subscript.to_index() {
     None => {
-      let method = subscript.val_to_string();
+      let method = subscript.to_string();
       let method_str = method.as_str();
 
       return match method_str {
@@ -135,7 +135,7 @@ static CONCAT: NativeFunction = NativeFunction {
         let mut result = string_data.as_str().to_string();
 
         for param in params {
-          result.push_str(param.val_to_string().as_str());
+          result.push_str(param.to_string().as_str());
         }
 
         result.to_val()
@@ -152,7 +152,7 @@ static ENDS_WITH: NativeFunction = NativeFunction {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
+          Some(s) => s.to_string(),
           _ => return Ok(Val::Bool(false)),
         };
 
@@ -195,7 +195,7 @@ static INCLUDES: NativeFunction = NativeFunction {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
+          Some(s) => s.to_string(),
           _ => return Ok(Val::Bool(false)),
         };
 
@@ -227,7 +227,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
+          Some(s) => s.to_string(),
           _ => return Ok(Val::Number(-1.0)),
         };
 
@@ -259,7 +259,7 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
+          Some(s) => s.to_string(),
           _ => return Ok(Val::Number(-1.0)),
         };
 
@@ -341,7 +341,7 @@ static PAD_END: NativeFunction = NativeFunction {
         let mut string = string_data.to_string();
 
         let pad_string = match params.get(1) {
-          Some(s) => s.val_to_string(),
+          Some(s) => s.to_string(),
           _ => " ".to_string(),
         };
 
@@ -393,7 +393,7 @@ static PAD_START: NativeFunction = NativeFunction {
         }
 
         let pad_string = match params.get(1) {
-          Some(s) => s.val_to_string(),
+          Some(s) => s.to_string(),
           _ => " ".to_string(),
         };
 
@@ -495,7 +495,7 @@ static SPLIT: NativeFunction = NativeFunction {
     Ok(match this.get() {
       Val::String(string_data) => {
         let separator = match params.get(0) {
-          Some(s) => s.val_to_string(), // TODO: Regexes
+          Some(s) => s.to_string(), // TODO: Regexes
           None => return Ok(Val::String(string_data.clone())),
         };
 
@@ -563,7 +563,7 @@ static STARTS_WITH: NativeFunction = NativeFunction {
         let string_bytes = string_data.as_bytes();
 
         let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
+          Some(s) => s.to_string(),
           _ => return Ok(Val::Bool(false)),
         };
 

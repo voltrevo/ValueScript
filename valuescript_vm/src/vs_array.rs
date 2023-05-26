@@ -1,4 +1,5 @@
 use std::cmp::{max, min};
+use std::fmt;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -62,9 +63,6 @@ impl ValTrait for ArrayPrototype {
   fn typeof_(&self) -> VsType {
     VsType::Object
   }
-  fn val_to_string(&self) -> String {
-    "".to_string()
-  }
   fn to_number(&self) -> f64 {
     0_f64
   }
@@ -106,7 +104,7 @@ impl ValTrait for ArrayPrototype {
   }
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(Val::Static(match key.val_to_string().as_str() {
+    Ok(Val::Static(match key.to_string().as_str() {
       "at" => &AT,
       "concat" => &CONCAT,
       "copyWithin" => &COPY_WITHIN,
@@ -158,6 +156,12 @@ impl ValTrait for ArrayPrototype {
 
   fn codify(&self) -> String {
     "Array.prototype".into()
+  }
+}
+
+impl fmt::Display for ArrayPrototype {
+  fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    Ok(())
   }
 }
 
@@ -352,7 +356,7 @@ static INCLUDES: NativeFunction = NativeFunction {
 
         for elem in &array_data.elements {
           let is_eq = op_triple_eq_impl(elem.clone(), search_param.clone())
-            .map_err(|e| e.val_to_string())
+            .map_err(|e| e.to_string())
             .unwrap(); // TODO: Exception
 
           if is_eq {
@@ -375,7 +379,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
 
         for i in 0..array_data.elements.len() {
           let is_eq = op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone())
-            .map_err(|e| e.val_to_string())
+            .map_err(|e| e.to_string())
             .unwrap(); // TODO: Exception
 
           if is_eq {
@@ -402,23 +406,21 @@ static JOIN: NativeFunction = NativeFunction {
           return Ok(vals.elements[0].to_val_string());
         }
 
-        let separator = params.get(0).unwrap_or(&Val::Undefined);
-
-        let separator_str = match separator.typeof_() {
-          VsType::Undefined => ",".to_string(),
-          _ => separator.val_to_string(),
+        let separator = match params.get(0) {
+          None => ",".to_string(),
+          Some(v) => v.to_string(),
         };
 
         let mut iter = vals.elements.iter();
-        let mut res = iter.next().unwrap().val_to_string();
+        let mut res = iter.next().unwrap().to_string();
 
         for val in iter {
-          res += &separator_str;
+          res += &separator;
 
           match val.typeof_() {
             VsType::Undefined => {}
             _ => {
-              res += &val.val_to_string();
+              res += &val.to_string();
             }
           };
         }
@@ -438,7 +440,7 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
 
         for i in (0..array_data.elements.len()).rev() {
           let is_eq = op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone())
-            .map_err(|e| e.val_to_string())
+            .map_err(|e| e.to_string())
             .unwrap(); // TODO: Exception
 
           if is_eq {

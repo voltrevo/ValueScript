@@ -197,7 +197,7 @@ impl TryToVal for Value {
         let mut string_map = BTreeMap::<String, Val>::new();
 
         for (key, value) in obj.properties {
-          string_map.insert(key.try_to_val()?.val_to_string(), value.try_to_val()?);
+          string_map.insert(key.try_to_val()?.to_string(), value.try_to_val()?);
         }
 
         VsObject {

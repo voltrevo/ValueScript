@@ -1,3 +1,4 @@
+use std::fmt;
 use std::{collections::BTreeMap, rc::Rc};
 
 use num_bigint::BigInt;
@@ -23,9 +24,6 @@ pub static RANGE_ERROR_BUILTIN: RangeErrorBuiltin = RangeErrorBuiltin {};
 impl ValTrait for RangeErrorBuiltin {
   fn typeof_(&self) -> VsType {
     VsType::Object
-  }
-  fn val_to_string(&self) -> String {
-    "function RangeError() { [native code] }".to_string()
   }
   fn to_number(&self) -> f64 {
     core::f64::NAN
@@ -89,6 +87,12 @@ impl ValTrait for RangeErrorBuiltin {
   }
 }
 
+impl fmt::Display for RangeErrorBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "function RangeError() {{ [native code] }}")
+  }
+}
+
 pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(
     VsObject {
@@ -122,7 +126,7 @@ fn make_range_error_prototype() -> Val {
 static SET_MESSAGE: NativeFunction = NativeFunction {
   fn_: |mut this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let message = match params.get(0) {
-      Some(param) => param.val_to_string(),
+      Some(param) => param.to_string(),
       None => "".to_string(),
     };
 
@@ -135,7 +139,7 @@ static SET_MESSAGE: NativeFunction = NativeFunction {
 static RANGE_ERROR_TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     let message = op_sub(this.get().clone(), "message".to_val())?;
-    Ok(format!("RangeError({})", message.val_to_string()).to_val())
+    Ok(format!("RangeError({})", message).to_val())
   },
 };
 

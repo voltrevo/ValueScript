@@ -1,3 +1,4 @@
+use std::fmt;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -23,9 +24,6 @@ pub static STRING_BUILTIN: StringBuiltin = StringBuiltin {};
 impl ValTrait for StringBuiltin {
   fn typeof_(&self) -> VsType {
     VsType::Object
-  }
-  fn val_to_string(&self) -> String {
-    "function String() { [native code] }".to_string()
   }
   fn to_number(&self) -> f64 {
     core::f64::NAN
@@ -69,7 +67,7 @@ impl ValTrait for StringBuiltin {
     // Not supported: fromCharCode.
     // See charAt etc in string_methods.rs.
 
-    Ok(match key.val_to_string().as_str() {
+    Ok(match key.to_string().as_str() {
       "fromCodePoint" => Val::Static(&FROM_CODE_POINT),
       // "fromCharCode" => Val::Static(&FROM_CHAR_CODE),
       // "raw" => Val::Static(&RAW),                     // TODO
@@ -91,6 +89,12 @@ impl ValTrait for StringBuiltin {
 
   fn codify(&self) -> String {
     "String".into()
+  }
+}
+
+impl fmt::Display for StringBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "function String() {{ [native code] }}")
   }
 }
 

@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -76,10 +77,6 @@ impl ValTrait for VsPointer {
       BytecodeType::BigInt => VsType::BigInt,
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
-  }
-
-  fn val_to_string(&self) -> String {
-    return self.resolve().val_to_string();
   }
 
   fn to_number(&self) -> f64 {
@@ -160,6 +157,12 @@ impl ValTrait for VsPointer {
 
   fn codify(&self) -> String {
     self.resolve().codify()
+  }
+}
+
+impl fmt::Display for VsPointer {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.resolve().fmt(f)
   }
 }
 

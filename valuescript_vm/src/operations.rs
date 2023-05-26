@@ -24,7 +24,7 @@ pub fn op_plus(left: Val, right: Val) -> Result<Val, Val> {
   let right_type = right_prim.typeof_();
 
   if left_type == VsType::String || right_type == VsType::String {
-    return Ok((left_prim.val_to_string() + &right_prim.val_to_string()).to_val());
+    return Ok((left_prim.to_string() + &right_prim.to_string()).to_val());
   }
 
   if left_type == VsType::BigInt || right_type == VsType::BigInt {
@@ -373,7 +373,7 @@ pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
     Val::Void => Err("Internal: Shouldn't happen".to_error()), // TODO: Internal errors
     Val::Undefined => Err("Cannot subscript undefined".to_type_error()),
     Val::Null => Err("Cannot subscript null".to_type_error()),
-    Val::Bool(_) => Ok(match right.val_to_string().as_str() {
+    Val::Bool(_) => Ok(match right.to_string().as_str() {
       "toString" => Val::Static(&BOOL_TO_STRING),
       "valueOf" => Val::Static(&BOOL_VALUE_OF),
       _ => Val::Undefined,
@@ -385,9 +385,9 @@ pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
     Val::Array(array_data) => {
       let right_index = match right.to_index() {
         None => {
-          // FIXME: Inefficient val_to_string() that gets duplicated
+          // FIXME: Inefficient to_string() that gets duplicated
           // when subscripting the object
-          if right.val_to_string() == "length" {
+          if right.to_string() == "length" {
             return Ok(Val::Number(array_data.elements.len() as f64));
           }
 
@@ -457,7 +457,7 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val
         Val::Symbol(symbol) => object_data_mut.symbol_map.insert(symbol, value),
         _ => object_data_mut
           .string_map
-          .insert(subscript.val_to_string(), value),
+          .insert(subscript.to_string(), value),
       };
 
       Ok(())
