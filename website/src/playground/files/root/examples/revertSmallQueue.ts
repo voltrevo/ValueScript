@@ -1,3 +1,5 @@
+import { NotNullish } from "../lib/util.ts";
+
 export default function main() {
   let a = new SmallQueue(["item1"]);
   let b = new SmallQueue(["item2", "item3", "item4"]);
@@ -17,7 +19,7 @@ export default function main() {
   };
 }
 
-class SmallQueue<T extends Exclude<unknown, undefined>> {
+class SmallQueue<T extends NotNullish> {
   items: T[];
 
   constructor(items: T[]) {
