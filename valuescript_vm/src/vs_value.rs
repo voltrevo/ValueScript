@@ -6,7 +6,7 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
-use crate::native_function::{NativeFunction, ThisWrapper};
+use crate::native_function::ThisWrapper;
 use crate::operations::{op_sub, op_submov};
 use crate::stack_frame::StackFrame;
 use crate::vs_array::VsArray;
@@ -52,37 +52,6 @@ pub enum LoadFunctionResult {
   NotAFunction,
   StackFrame(StackFrame),
   NativeFunction(fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val>),
-}
-
-pub trait ToLoadFunctionResult {
-  fn to_load_function_result(self) -> LoadFunctionResult;
-}
-
-impl ToLoadFunctionResult for StackFrame {
-  fn to_load_function_result(self) -> LoadFunctionResult {
-    LoadFunctionResult::StackFrame(self)
-  }
-}
-
-impl ToLoadFunctionResult for fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
-  fn to_load_function_result(self) -> LoadFunctionResult {
-    LoadFunctionResult::NativeFunction(self)
-  }
-}
-
-impl ToLoadFunctionResult for NativeFunction {
-  fn to_load_function_result(self) -> LoadFunctionResult {
-    self.fn_.to_load_function_result()
-  }
-}
-
-impl<T> From<T> for LoadFunctionResult
-where
-  T: ToLoadFunctionResult,
-{
-  fn from(value: T) -> Self {
-    value.to_load_function_result()
-  }
 }
 
 pub trait ValTrait: fmt::Display {
