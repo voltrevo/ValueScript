@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+  collections::{BTreeMap, HashMap},
+  rc::Rc,
+};
 
 use wasm_bindgen::prelude::*;
 
@@ -9,7 +12,7 @@ use valuescript_compiler::{
 use valuescript_vm::{
   vs_object::VsObject,
   vs_value::{ToVal, Val},
-  LoadFunctionResult, ValTrait, VirtualMachine,
+  Bytecode, LoadFunctionResult, ValTrait, VirtualMachine,
 };
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -108,9 +111,9 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) ->
     }
   };
 
-  let bytecode = assemble(&module);
+  let bytecode = Rc::new(Bytecode::new(assemble(&module)));
 
-  match VirtualMachine::read_default_export(&bytecode).load_function() {
+  match VirtualMachine::read_default_export(bytecode.clone()).load_function() {
     LoadFunctionResult::NotAFunction => {
       return RunResult {
         diagnostics: HashMap::default(),
@@ -132,7 +135,7 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) ->
     }
   };
 
-  let vm_result = vm.run(&bytecode, None, &val_args);
+  let vm_result = vm.run(bytecode, None, &val_args);
 
   RunResult {
     diagnostics: HashMap::default(),

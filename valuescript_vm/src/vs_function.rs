@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use crate::bytecode::Bytecode;
 use crate::vs_value::ToVal;
 
 use super::bytecode_decoder::BytecodeDecoder;
@@ -9,7 +10,7 @@ use super::vs_value::Val;
 
 #[derive(Debug)]
 pub struct VsFunction {
-  pub bytecode: Rc<Vec<u8>>,
+  pub bytecode: Rc<Bytecode>,
   pub register_count: usize,
   pub parameter_count: usize,
   pub start: usize,
@@ -49,7 +50,7 @@ impl VsFunction {
 
     return Box::new(BytecodeStackFrame {
       decoder: BytecodeDecoder {
-        data: self.bytecode.clone(),
+        bytecode: self.bytecode.clone(),
         pos: self.start,
       },
       registers,

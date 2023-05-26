@@ -1,6 +1,5 @@
 use std::{
   collections::{HashMap, HashSet},
-  rc::Rc,
   str::FromStr,
 };
 
@@ -13,7 +12,7 @@ use crate::asm::{
   Label, LabelRef, Lazy, Module, Object, Pointer, Register, Value,
 };
 
-pub fn assemble(module: &Module) -> Rc<Vec<u8>> {
+pub fn assemble(module: &Module) -> Vec<u8> {
   let mut assembler = Assembler {
     output: Vec::new(),
     fn_data: Default::default(),
@@ -25,8 +24,7 @@ pub fn assemble(module: &Module) -> Rc<Vec<u8>> {
 
   assembler.module(module);
 
-  // TODO: Don't use Rc
-  return Rc::new(assembler.output);
+  assembler.output
 }
 
 struct Assembler {

@@ -1,6 +1,7 @@
 mod array_higher_functions;
 mod bigint_methods;
 mod builtins;
+mod bytecode;
 mod bytecode_decoder;
 mod bytecode_stack_frame;
 mod first_stack_frame;
@@ -17,9 +18,9 @@ pub mod vs_array;
 mod vs_class;
 mod vs_function;
 pub mod vs_object;
-mod vs_pointer;
 mod vs_symbol;
 pub mod vs_value;
 
+pub use bytecode::Bytecode;
 pub use virtual_machine::VirtualMachine;
 pub use vs_value::{LoadFunctionResult, ValTrait};

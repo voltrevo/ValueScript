@@ -244,6 +244,7 @@ impl ValTrait for Val {
 
     return match self {
       Function(f) => Some(f.bind(params).to_val()),
+      Static(val) => val.bind(params),
       Custom(val) => val.bind(params),
 
       _ => None,

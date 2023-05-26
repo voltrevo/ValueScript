@@ -6,17 +6,17 @@ use num_bigint::Sign;
 use valuescript_common::InstructionByte;
 
 use crate::builtins::BUILTIN_VALS;
+use crate::bytecode::Bytecode;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
 use crate::vs_object::VsObject;
-use crate::vs_pointer::VsPointer;
 use crate::vs_symbol::VsSymbol;
 use crate::vs_value::ToVal;
 use crate::vs_value::Val;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
-  pub data: Rc<Vec<u8>>,
+  pub bytecode: Rc<Bytecode>,
   pub pos: usize,
 }
 
@@ -74,13 +74,13 @@ impl BytecodeType {
 
 impl BytecodeDecoder {
   pub fn decode_byte(&mut self) -> u8 {
-    let byte = self.data[self.pos];
+    let byte = self.bytecode[self.pos];
     self.pos += 1;
     return byte;
   }
 
   pub fn peek_byte(&self) -> u8 {
-    return self.data[self.pos];
+    return self.bytecode[self.pos];
   }
 
   pub fn decode_type(&mut self) -> BytecodeType {
@@ -138,7 +138,7 @@ impl BytecodeDecoder {
         .to_val()
       }
       BytecodeType::Function => self.decode_function_header(),
-      BytecodeType::Pointer => self.decode_pointer(),
+      BytecodeType::Pointer => self.decode_pointer(registers),
       BytecodeType::Register => match registers[self.decode_register_index().unwrap()].clone() {
         Val::Void => Val::Undefined,
         val => val,
@@ -155,7 +155,7 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_signed_byte(&mut self) -> i8 {
-    let res = self.data[self.pos] as i8;
+    let res = self.bytecode[self.pos] as i8;
     self.pos += 1;
     return res;
   }
@@ -163,7 +163,7 @@ impl BytecodeDecoder {
   pub fn decode_number(&mut self) -> f64 {
     let mut buf = [0u8; 8];
     let next_pos = self.pos + 8;
-    buf.clone_from_slice(&self.data[self.pos..next_pos]);
+    buf.clone_from_slice(&self.bytecode[self.pos..next_pos]);
     self.pos = next_pos;
     return f64::from_le_bytes(buf);
   }
@@ -178,7 +178,7 @@ impl BytecodeDecoder {
     };
 
     let len = self.decode_varsize_uint();
-    let bytes = &self.data[self.pos..self.pos + len];
+    let bytes = &self.bytecode[self.pos..self.pos + len];
     self.pos += len;
 
     return BigInt::from_bytes_le(sign, bytes);
@@ -188,7 +188,7 @@ impl BytecodeDecoder {
     let len = self.decode_varsize_uint();
     let start = self.pos; // Start after decoding varsize
     let end = self.pos + len;
-    let res = String::from_utf8_lossy(&self.data[start..end]).into_owned();
+    let res = String::from_utf8_lossy(&self.bytecode[start..end]).into_owned();
     self.pos = end;
 
     return res;
@@ -229,12 +229,12 @@ impl BytecodeDecoder {
 
   pub fn clone_at(&self, pos: usize) -> BytecodeDecoder {
     return BytecodeDecoder {
-      data: self.data.clone(),
-      pos: pos,
+      bytecode: self.bytecode.clone(),
+      pos,
     };
   }
 
-  pub fn decode_pointer(&mut self) -> Val {
+  pub fn decode_pointer(&mut self, registers: &Vec<Val>) -> Val {
     let from_pos = self.pos;
     let pos = self.decode_pos();
 
@@ -250,7 +250,22 @@ impl BytecodeDecoder {
       }
     }
 
-    VsPointer::new(&self.data, pos).to_val()
+    let cached_val = self
+      .bytecode
+      .cache
+      .borrow()
+      .get(&pos)
+      .map(|val| val.clone());
+
+    match cached_val {
+      Some(val) => val,
+      None => {
+        let val = self.clone_at(pos).decode_val(registers);
+        self.bytecode.cache.borrow_mut().insert(pos, val.clone());
+
+        val
+      }
+    }
   }
 
   pub fn decode_function_header(&mut self) -> Val {
@@ -259,7 +274,7 @@ impl BytecodeDecoder {
     let parameter_count = self.decode_byte() as usize;
 
     return VsFunction {
-      bytecode: self.data.clone(),
+      bytecode: self.bytecode.clone(),
       register_count,
       parameter_count,
       start: self.pos,

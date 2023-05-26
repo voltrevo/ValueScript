@@ -1,7 +1,8 @@
 use std::rc::Rc;
 
 use crate::builtins::error_builtin::ToError;
-use crate::bytecode_decoder::BytecodeDecoder;
+use crate::bytecode::Bytecode;
+use crate::bytecode::DecoderMaker;
 use crate::first_stack_frame::FirstStackFrame;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::StackFrame;
@@ -15,14 +16,11 @@ pub struct VirtualMachine {
 impl VirtualMachine {
   pub fn run(
     &mut self,
-    bytecode: &Rc<Vec<u8>>,
+    bytecode: Rc<Bytecode>,
     step_limit: Option<usize>,
     params: &[Val],
   ) -> Result<Val, Val> {
-    let mut bd = BytecodeDecoder {
-      data: bytecode.clone(),
-      pos: 0,
-    };
+    let mut bd = bytecode.decoder(0);
 
     let main_fn = bd.decode_val(&Vec::new());
 
@@ -122,12 +120,7 @@ impl VirtualMachine {
     Err(exception)
   }
 
-  pub fn read_default_export(bytecode: &Rc<Vec<u8>>) -> Val {
-    let mut bd = BytecodeDecoder {
-      data: bytecode.clone(),
-      pos: 0,
-    };
-
-    bd.decode_val(&Vec::new())
+  pub fn read_default_export(bytecode: Rc<Bytecode>) -> Val {
+    bytecode.decoder(0).decode_val(&Vec::new())
   }
 }

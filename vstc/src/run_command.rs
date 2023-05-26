@@ -1,9 +1,10 @@
+use std::fs;
 use std::rc::Rc;
 use std::{ffi::OsStr, path::Path, process::exit};
 
 use valuescript_compiler::{assemble, compile, parse_module};
 use valuescript_vm::vs_value::Val;
-use valuescript_vm::VirtualMachine;
+use valuescript_vm::{Bytecode, VirtualMachine};
 
 use crate::resolve_entry_path::resolve_entry_path;
 
@@ -35,7 +36,7 @@ pub fn run_command(args: &Vec<String>) {
   let file_path = &args[argpos];
   argpos += 1;
 
-  let bytecode = to_bytecode(format, file_path);
+  let bytecode = Rc::new(to_bytecode(format, file_path));
 
   let mut vm = VirtualMachine::new();
 
@@ -44,7 +45,7 @@ pub fn run_command(args: &Vec<String>) {
     .map(|a| Val::String(Rc::new(a.into())))
     .collect();
 
-  match vm.run(&bytecode, None, &val_args) {
+  match vm.run(bytecode, None, &val_args) {
     Ok(result) => {
       println!("{}", result.pretty());
     }
@@ -87,8 +88,8 @@ fn format_from_path(file_path: &String) -> RunFormat {
   };
 }
 
-fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
-  match format {
+fn to_bytecode(format: RunFormat, file_path: &String) -> Bytecode {
+  Bytecode::new(match format {
     RunFormat::TypeScript => {
       let resolved_entry_path = resolve_entry_path(file_path);
 
@@ -115,10 +116,10 @@ fn to_bytecode(format: RunFormat, file_path: &String) -> Rc<Vec<u8>> {
       assemble(&module)
     }
 
-    RunFormat::Bytecode => Rc::new(
-      std::fs::read(file_path).unwrap_or_else(|_| panic!("Failed to read file {}", file_path)),
-    ),
-  }
+    RunFormat::Bytecode => {
+      fs::read(file_path).unwrap_or_else(|_| panic!("Failed to read file {}", file_path))
+    }
+  })
 }
 
 fn show_help() {
