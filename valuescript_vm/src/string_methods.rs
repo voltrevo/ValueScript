@@ -1,11 +1,10 @@
 use std::{rc::Rc, str::Chars};
 
 use crate::{
-  format_err,
+  builtins::error_builtin::ToError,
   helpers::{to_wrapping_index, to_wrapping_index_clamped},
   native_function::{NativeFunction, ThisWrapper},
-  vs_array::VsArray,
-  vs_value::Val,
+  vs_value::{ToVal, Val},
   ValTrait,
 };
 
@@ -30,8 +29,8 @@ pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
   }
 
   match unicode_at(string_bytes, string_bytes.len(), right_index) {
-    Some(char) => Val::String(Rc::new(char.to_string())),
-    None => Val::String(Rc::new(String::from(""))),
+    Some(char) => char.to_string().to_val(),
+    None => "".to_val(),
   }
 }
 
@@ -96,11 +95,11 @@ static AT: NativeFunction = NativeFunction {
         };
 
         match unicode_at(string_bytes, string_bytes.len(), index) {
-          Some(char) => Val::String(Rc::new(char.to_string())),
-          None => Val::String(Rc::new(String::from(""))),
+          Some(char) => char.to_string().to_val(),
+          None => "".to_val(),
         }
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -124,7 +123,7 @@ static CODE_POINT_AT: NativeFunction = NativeFunction {
           None => Val::Undefined,
         }
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -139,9 +138,9 @@ static CONCAT: NativeFunction = NativeFunction {
           result.push_str(param.val_to_string().as_str());
         }
 
-        Val::String(Rc::new(result))
+        result.to_val()
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -184,7 +183,7 @@ static ENDS_WITH: NativeFunction = NativeFunction {
 
         Val::Bool(true)
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -216,7 +215,7 @@ static INCLUDES: NativeFunction = NativeFunction {
           None => Val::Bool(false),
         }
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -248,7 +247,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
           None => Val::Number(-1.0),
         }
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -280,7 +279,7 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
           None => Val::Number(-1.0),
         }
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -290,9 +289,9 @@ static TODO_LOCALE: NativeFunction = NativeFunction {
     // TODO: Ok(...)
     match this.get() {
       Val::String(_string_data) => {
-        return format_err!("TODO: locale");
+        return Err("TODO: locale".to_error());
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     }
   },
 };
@@ -302,9 +301,9 @@ static TODO_REGEXES: NativeFunction = NativeFunction {
     // TODO: Ok(...)
     match this.get() {
       Val::String(_string_data) => {
-        return format_err!("TODO: regexes");
+        return Err("TODO: regexes".to_error());
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     }
   },
 };
@@ -315,9 +314,9 @@ static NORMALIZE: NativeFunction = NativeFunction {
     match this.get() {
       Val::String(_string_data) => {
         // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
-        return format_err!("TODO: normalize");
+        return Err("TODO: normalize".to_error());
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     }
   },
 };
@@ -369,9 +368,9 @@ static PAD_END: NativeFunction = NativeFunction {
           }
         }
 
-        Val::String(Rc::new(string))
+        string.to_val()
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -425,9 +424,9 @@ static PAD_START: NativeFunction = NativeFunction {
 
         prefix.push_str(string_data);
 
-        Val::String(Rc::new(prefix))
+        prefix.to_val()
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -450,9 +449,9 @@ static REPEAT: NativeFunction = NativeFunction {
           result.push_str(string_data);
         }
 
-        Val::String(Rc::new(result))
+        result.to_val()
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -484,9 +483,9 @@ static SLICE: NativeFunction = NativeFunction {
           }
         }
 
-        Val::String(Rc::new(new_string))
+        new_string.to_val()
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -512,19 +511,19 @@ static SPLIT: NativeFunction = NativeFunction {
         let mut result = Vec::<Val>::new();
 
         if limit == 0 {
-          return Ok(Val::Array(Rc::new(VsArray::from(result))));
+          return Ok(result.to_val());
         }
 
         if separator.is_empty() {
           for c in string_data.chars() {
-            result.push(Val::String(Rc::new(c.to_string())));
+            result.push(c.to_val());
 
             if result.len() == limit {
               break;
             }
           }
 
-          return Ok(Val::Array(Rc::new(VsArray::from(result))));
+          return Ok(result.to_val());
         }
 
         let mut part = String::new();
@@ -534,7 +533,7 @@ static SPLIT: NativeFunction = NativeFunction {
           if match_chars(&mut str_chars, &separator) {
             let mut new_part = String::new();
             std::mem::swap(&mut new_part, &mut part);
-            result.push(Val::String(Rc::new(new_part)));
+            result.push(new_part.to_val());
 
             if result.len() == limit {
               break;
@@ -543,16 +542,16 @@ static SPLIT: NativeFunction = NativeFunction {
             match str_chars.next() {
               Some(c) => part.push(c),
               None => {
-                result.push(Val::String(Rc::new(part)));
+                result.push(part.to_val());
                 break;
               }
             }
           }
         }
 
-        Val::Array(Rc::new(VsArray::from(result)))
+        result.to_val()
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -593,7 +592,7 @@ static STARTS_WITH: NativeFunction = NativeFunction {
 
         Val::Bool(true)
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -634,9 +633,9 @@ static SUBSTRING: NativeFunction = NativeFunction {
           }
         }
 
-        Val::String(Rc::new(new_string))
+        new_string.to_val()
       }
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -644,11 +643,8 @@ static SUBSTRING: NativeFunction = NativeFunction {
 static TO_LOWER_CASE: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
-      Val::String(string_data) => {
-        let lowercased_string = string_data.to_lowercase();
-        Val::String(Rc::new(lowercased_string))
-      }
-      _ => return format_err!("string indirection"),
+      Val::String(string_data) => string_data.to_lowercase().to_val(),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -657,7 +653,7 @@ static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
       Val::String(string_data) => Val::String(string_data.clone()),
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -665,11 +661,8 @@ static TO_STRING: NativeFunction = NativeFunction {
 static TO_UPPER_CASE: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
-      Val::String(string_data) => {
-        let uppercased_string = string_data.to_uppercase();
-        Val::String(Rc::new(uppercased_string))
-      }
-      _ => return format_err!("string indirection"),
+      Val::String(string_data) => string_data.to_uppercase().to_val(),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -677,11 +670,8 @@ static TO_UPPER_CASE: NativeFunction = NativeFunction {
 static TRIM: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
-      Val::String(string_data) => {
-        let trimmed_string = string_data.trim();
-        Val::String(Rc::new(trimmed_string.to_owned()))
-      }
-      _ => return format_err!("string indirection"),
+      Val::String(string_data) => string_data.trim().to_val(),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -689,11 +679,8 @@ static TRIM: NativeFunction = NativeFunction {
 static TRIM_END: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
-      Val::String(string_data) => {
-        let trimmed_string = string_data.trim_end();
-        Val::String(Rc::new(trimmed_string.to_owned()))
-      }
-      _ => return format_err!("string indirection"),
+      Val::String(string_data) => string_data.trim_end().to_val(),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -701,11 +688,8 @@ static TRIM_END: NativeFunction = NativeFunction {
 static TRIM_START: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
-      Val::String(string_data) => {
-        let trimmed_string = string_data.trim_start();
-        Val::String(Rc::new(trimmed_string.to_owned()))
-      }
-      _ => return format_err!("string indirection"),
+      Val::String(string_data) => string_data.trim_start().to_val(),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };
@@ -714,7 +698,7 @@ static VALUE_OF: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
       Val::String(string_data) => Val::String(string_data.clone()),
-      _ => return format_err!("string indirection"),
+      _ => return Err("string indirection".to_error()),
     })
   },
 };

@@ -1,3 +1,7 @@
+use std::rc::Rc;
+
+use crate::vs_value::ToVal;
+
 use super::vs_value::Val;
 
 #[derive(Debug)]
@@ -7,3 +11,9 @@ pub struct VsClass {
 }
 
 impl VsClass {}
+
+impl ToVal for VsClass {
+  fn to_val(self) -> Val {
+    Val::Class(Rc::new(self))
+  }
+}

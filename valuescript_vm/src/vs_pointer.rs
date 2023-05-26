@@ -3,7 +3,8 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::format_err;
+use crate::builtins::error_builtin::ToError;
+use crate::vs_value::ToVal;
 
 use super::bytecode_decoder::{BytecodeDecoder, BytecodeType};
 use super::vs_array::VsArray;
@@ -18,12 +19,12 @@ pub struct VsPointer {
 }
 
 impl VsPointer {
-  pub fn new(bytecode: &Rc<Vec<u8>>, pos: usize) -> Val {
-    return Val::Custom(Rc::new(VsPointer {
+  pub fn new(bytecode: &Rc<Vec<u8>>, pos: usize) -> VsPointer {
+    VsPointer {
       bytecode: bytecode.clone(),
       pos,
       resolved: RefCell::new(None),
-    }));
+    }
   }
 
   fn resolve(&self) -> Val {
@@ -146,7 +147,7 @@ impl ValTrait for VsPointer {
   }
 
   fn submov(&mut self, _subscript: Val, _value: Val) -> Result<(), Val> {
-    format_err!("TODO: Probably an exception, but might be possible")
+    Err("TODO: Probably an exception, but might be possible".to_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {
@@ -159,5 +160,11 @@ impl ValTrait for VsPointer {
 
   fn codify(&self) -> String {
     self.resolve().codify()
+  }
+}
+
+impl ToVal for VsPointer {
+  fn to_val(self) -> Val {
+    Val::Custom(Rc::new(self))
   }
 }

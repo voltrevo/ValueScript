@@ -1,12 +1,10 @@
-use std::rc::Rc;
-
 use num_bigint::BigInt;
 
 use crate::{
-  format_err,
+  builtins::error_builtin::ToError,
   native_function::{NativeFunction, ThisWrapper},
   todo_fn::TODO,
-  vs_value::{Val, ValTrait},
+  vs_value::{ToValString, Val, ValTrait},
 };
 
 pub fn op_sub_bigint(_bigint: &BigInt, subscript: &Val) -> Val {
@@ -23,12 +21,12 @@ static TO_STRING: NativeFunction = NativeFunction {
     Ok(match this.get() {
       Val::BigInt(_) => match params.get(0) {
         Some(_) => {
-          return format_err!("TODO: toString with radix");
+          return Err("TODO: toString with radix".to_error());
         }
 
-        None => Val::String(Rc::new(this.get().val_to_string())),
+        None => this.get().to_val_string(),
       },
-      _ => return format_err!("TODO: bigint indirection"),
+      _ => return Err("TODO: bigint indirection".to_error()),
     })
   },
 };
@@ -37,7 +35,7 @@ static VALUE_OF: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
       Val::BigInt(bigint) => Val::BigInt(bigint.clone()),
-      _ => return format_err!("TODO: bigint indirection"),
+      _ => return Err("TODO: bigint indirection".to_error()),
     })
   },
 };

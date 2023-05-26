@@ -6,8 +6,7 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
-use crate::format_val;
-use crate::native_function::ThisWrapper;
+use crate::native_function::{NativeFunction, ThisWrapper};
 use crate::operations::{op_sub, op_submov};
 use crate::stack_frame::StackFrame;
 use crate::vs_array::VsArray;
@@ -53,6 +52,37 @@ pub enum LoadFunctionResult {
   NotAFunction,
   StackFrame(StackFrame),
   NativeFunction(fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val>),
+}
+
+pub trait ToLoadFunctionResult {
+  fn to_load_function_result(self) -> LoadFunctionResult;
+}
+
+impl ToLoadFunctionResult for StackFrame {
+  fn to_load_function_result(self) -> LoadFunctionResult {
+    LoadFunctionResult::StackFrame(self)
+  }
+}
+
+impl ToLoadFunctionResult for fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
+  fn to_load_function_result(self) -> LoadFunctionResult {
+    LoadFunctionResult::NativeFunction(self)
+  }
+}
+
+impl ToLoadFunctionResult for NativeFunction {
+  fn to_load_function_result(self) -> LoadFunctionResult {
+    self.fn_.to_load_function_result()
+  }
+}
+
+impl<T> From<T> for LoadFunctionResult
+where
+  T: ToLoadFunctionResult,
+{
+  fn from(value: T) -> Self {
+    value.to_load_function_result()
+  }
 }
 
 pub trait ValTrait {
@@ -238,10 +268,10 @@ impl ValTrait for Val {
 
   fn to_primitive(&self) -> Val {
     if self.is_primitive() {
-      return self.clone();
+      self.clone()
+    } else {
+      self.to_val_string()
     }
-
-    return Val::String(Rc::new(self.val_to_string()));
   }
 
   fn is_truthy(&self) -> bool {
@@ -290,7 +320,7 @@ impl ValTrait for Val {
     use Val::*;
 
     return match self {
-      Function(f) => Some(Val::Function(Rc::new(f.bind(params)))),
+      Function(f) => Some(f.bind(params).to_val()),
       Custom(val) => val.bind(params),
 
       _ => None,
@@ -368,7 +398,7 @@ impl ValTrait for Val {
     match self {
       // TODO: iterator
       _ => {
-        let next_fn = op_sub(self.clone(), Val::String(Rc::new("next".into())));
+        let next_fn = op_sub(self.clone(), "next".to_val());
 
         match next_fn {
           Ok(next_fn) => next_fn.load_function(),
@@ -416,7 +446,7 @@ impl ValTrait for Val {
         let mut res = String::new();
 
         if let Some(proto) = &object.prototype {
-          match op_sub(proto.clone(), format_val!("name")) {
+          match op_sub(proto.clone(), "name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
                 res += format!("{}", name.val_to_string()).as_str();
@@ -459,6 +489,71 @@ impl ValTrait for Val {
   }
 }
 
+pub trait ToValString {
+  fn to_val_string(&self) -> Val;
+}
+
+impl<T: ValTrait> ToValString for T {
+  fn to_val_string(&self) -> Val {
+    Val::String(Rc::new(self.val_to_string()))
+  }
+}
+
+pub trait ToVal {
+  fn to_val(self) -> Val;
+}
+
+impl<T> From<T> for Val
+where
+  T: ToVal,
+{
+  fn from(value: T) -> Val {
+    value.to_val()
+  }
+}
+
+impl ToVal for char {
+  fn to_val(self) -> Val {
+    self.to_string().to_val()
+  }
+}
+
+impl ToVal for &str {
+  fn to_val(self) -> Val {
+    Val::String(Rc::new(self.to_string()))
+  }
+}
+
+impl ToVal for String {
+  fn to_val(self) -> Val {
+    Val::String(Rc::new(self))
+  }
+}
+
+impl ToVal for f64 {
+  fn to_val(self) -> Val {
+    Val::Number(self)
+  }
+}
+
+impl ToVal for bool {
+  fn to_val(self) -> Val {
+    Val::Bool(self)
+  }
+}
+
+impl ToVal for BigInt {
+  fn to_val(self) -> Val {
+    Val::BigInt(self)
+  }
+}
+
+impl ToVal for Vec<Val> {
+  fn to_val(self) -> Val {
+    Val::Array(Rc::new(VsArray::from(self)))
+  }
+}
+
 impl std::fmt::Display for Val {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
@@ -493,7 +588,7 @@ impl std::fmt::Display for Val {
       }
       Val::Object(object) => {
         if let Some(proto) = &object.prototype {
-          match op_sub(proto.clone(), format_val!("name")) {
+          match op_sub(proto.clone(), "name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
                 write!(f, "{} ", name.val_to_string())?;

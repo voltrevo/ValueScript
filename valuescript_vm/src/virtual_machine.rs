@@ -1,10 +1,8 @@
 use std::rc::Rc;
 
-use crate::builtins::error_builtin::to_error;
+use crate::builtins::error_builtin::ToError;
 use crate::bytecode_decoder::BytecodeDecoder;
-use crate::error;
 use crate::first_stack_frame::FirstStackFrame;
-use crate::native_function::ThisWrapper;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::StackFrame;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
@@ -52,7 +50,7 @@ impl VirtualMachine {
           }
         }
 
-        error!("step limit reached")
+        Err("step limit reached".to_error())
       }
       None => {
         while self.stack.len() > 0 {

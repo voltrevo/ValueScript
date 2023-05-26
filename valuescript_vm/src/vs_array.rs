@@ -8,14 +8,15 @@ use crate::array_higher_functions::{
   array_flat_map::FLAT_MAP, array_map::MAP, array_reduce::REDUCE, array_reduce_right::REDUCE_RIGHT,
   array_some::SOME, array_sort::SORT,
 };
-use crate::format_err;
+use crate::builtins::error_builtin::ToError;
+use crate::builtins::type_error_builtin::ToTypeError;
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
 use crate::native_function::{NativeFunction, ThisWrapper};
 use crate::operations::op_triple_eq_impl;
+use crate::todo_fn::TODO;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::vs_value::{LoadFunctionResult, ToVal, ToValString, Val, ValTrait, VsType};
 
 #[derive(Clone, Debug)]
 pub struct VsArray {
@@ -47,6 +48,12 @@ impl VsArray {
   }
 }
 
+impl ToVal for VsArray {
+  fn to_val(self) -> Val {
+    Val::Array(Rc::new(self))
+  }
+}
+
 pub struct ArrayPrototype {}
 
 static ARRAY_PROTOTYPE: ArrayPrototype = ArrayPrototype {};
@@ -68,7 +75,7 @@ impl ValTrait for ArrayPrototype {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new("".to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -116,7 +123,7 @@ impl ValTrait for ArrayPrototype {
       "includes" => &INCLUDES,
       "indexOf" => &INDEX_OF,
       "join" => &JOIN,
-      "keys" => &KEYS,
+      "keys" => &TODO,
       "lastIndexOf" => &LAST_INDEX_OF,
       "map" => &MAP,
       "pop" => &POP,
@@ -129,16 +136,16 @@ impl ValTrait for ArrayPrototype {
       "some" => &SOME,
       "sort" => &SORT,
       "splice" => &SPLICE,
-      "toLocaleString" => &TO_LOCALE_STRING,
+      "toLocaleString" => &TODO,
       "toString" => &TO_STRING,
       "unshift" => &UNSHIFT,
-      "values" => &VALUES,
+      "values" => &TODO,
       _ => return Ok(Val::Undefined),
     }))
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of Array.prototype")
+    Err("Cannot assign to subscript of Array.prototype".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {
@@ -161,7 +168,7 @@ static AT: NativeFunction = NativeFunction {
         None => Val::Undefined,
         Some(i) => array_data.elements[i].clone(),
       },
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -185,9 +192,9 @@ static CONCAT: NativeFunction = NativeFunction {
           }
         }
 
-        Val::Array(Rc::new(new_array))
+        new_array.to_val()
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -202,7 +209,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
         let ulen = array_data_mut.elements.len();
 
         if ulen > isize::MAX as usize {
-          return format_err!("TODO: array len exceeds isize");
+          return Err("TODO: array len exceeds isize".to_error());
         }
 
         let mut target = match params.get(0) {
@@ -261,7 +268,7 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 
         this.clone()
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -269,8 +276,8 @@ static COPY_WITHIN: NativeFunction = NativeFunction {
 static ENTRIES: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     match this.get() {
-      Val::Array(_array_data) => return format_err!("TODO: iterators"),
-      _ => return format_err!("array indirection"),
+      Val::Array(_array_data) => return Err("TODO: iterators".to_error()),
+      _ => return Err("array indirection".to_error()),
     };
   },
 };
@@ -302,7 +309,7 @@ static FILL: NativeFunction = NativeFunction {
 
         this.clone()
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -312,7 +319,7 @@ static FLAT: NativeFunction = NativeFunction {
     Ok(match this.get() {
       Val::Array(array_data) => {
         if params.len() > 0 {
-          return format_err!("TODO: .flat depth parameter");
+          return Err("TODO: .flat depth parameter".to_error());
         }
 
         let mut new_elems = Vec::<Val>::new();
@@ -330,9 +337,9 @@ static FLAT: NativeFunction = NativeFunction {
           }
         }
 
-        Val::Array(Rc::new(VsArray::from(new_elems)))
+        new_elems.to_val()
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -355,7 +362,7 @@ static INCLUDES: NativeFunction = NativeFunction {
 
         Val::Bool(false)
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -378,7 +385,7 @@ static INDEX_OF: NativeFunction = NativeFunction {
 
         Val::Number(-1.0)
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -388,11 +395,11 @@ static JOIN: NativeFunction = NativeFunction {
     Ok(match this.get() {
       Val::Array(vals) => {
         if vals.elements.len() == 0 {
-          return Ok(Val::String(Rc::new("".to_string())));
+          return Ok("".to_val());
         }
 
         if vals.elements.len() == 1 {
-          return Ok(Val::String(Rc::new(vals.elements[0].val_to_string())));
+          return Ok(vals.elements[0].to_val_string());
         }
 
         let separator = params.get(0).unwrap_or(&Val::Undefined);
@@ -416,22 +423,10 @@ static JOIN: NativeFunction = NativeFunction {
           };
         }
 
-        Val::String(Rc::new(res))
+        res.to_val()
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
-  },
-};
-
-static KEYS: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    // TODO: Ok(...)
-    match this.get() {
-      Val::Array(_array_data) => {
-        return format_err!("TODO: KEYS");
-      }
-      _ => return format_err!("array indirection"),
-    };
   },
 };
 
@@ -453,7 +448,7 @@ static LAST_INDEX_OF: NativeFunction = NativeFunction {
 
         Val::Number(-1_f64)
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -479,7 +474,7 @@ static POP: NativeFunction = NativeFunction {
           _ => removed_el,
         }
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -498,7 +493,7 @@ static PUSH: NativeFunction = NativeFunction {
 
         Val::Number(array_data_mut.elements.len() as f64)
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -527,7 +522,7 @@ static REVERSE: NativeFunction = NativeFunction {
 
         this.clone()
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -546,7 +541,7 @@ static SHIFT: NativeFunction = NativeFunction {
 
         array_data_mut.elements.remove(0)
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -571,9 +566,9 @@ static SLICE: NativeFunction = NativeFunction {
           new_elems.push(array_data.elements[i as usize].clone());
         }
 
-        Val::Array(Rc::new(VsArray::from(new_elems)))
+        new_elems.to_val()
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
   },
 };
@@ -650,29 +645,17 @@ static SPLICE: NativeFunction = NativeFunction {
           }
         }
 
-        Val::Array(Rc::new(VsArray::from(deleted_elements)))
+        deleted_elements.to_val()
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
-  },
-};
-
-static TO_LOCALE_STRING: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    // TODO: Ok(...)
-    match this.get() {
-      Val::Array(_array_data) => {
-        return format_err!("TODO: TO_LOCALE_STRING");
-      }
-      _ => return format_err!("array indirection"),
-    };
   },
 };
 
 // TODO: Share this? (JS doesn't?)
 static TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(Val::String(Rc::new(this.get().val_to_string())))
+    Ok(this.get().to_val_string())
   },
 };
 
@@ -693,19 +676,7 @@ static UNSHIFT: NativeFunction = NativeFunction {
 
         Val::Number(array_data_mut.elements.len() as f64)
       }
-      _ => return format_err!("array indirection"),
+      _ => return Err("array indirection".to_error()),
     })
-  },
-};
-
-static VALUES: NativeFunction = NativeFunction {
-  fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    // TODO: Ok(...)
-    match this.get() {
-      Val::Array(_array_data) => {
-        return format_err!("TODO: VALUES");
-      }
-      _ => return format_err!("array indirection"),
-    };
   },
 };

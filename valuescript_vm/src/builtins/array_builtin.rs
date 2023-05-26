@@ -4,17 +4,17 @@ use num_bigint::BigInt;
 
 use crate::{
   builtins::range_error_builtin::to_range_error,
-  builtins::type_error_builtin::to_type_error,
-  format_err,
   native_function::{NativeFunction, ThisWrapper},
   operations::op_sub,
-  range_error, type_error,
+  range_error,
   vs_array::VsArray,
   vs_class::VsClass,
   vs_object::VsObject,
-  vs_value::{LoadFunctionResult, Val, VsType},
+  vs_value::{LoadFunctionResult, ToVal, ToValString, Val, VsType},
   ValTrait,
 };
+
+use super::type_error_builtin::ToTypeError;
 
 pub struct ArrayBuiltin {}
 
@@ -37,7 +37,7 @@ impl ValTrait for ArrayBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new("function Array() { [native code] }".to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -75,7 +75,7 @@ impl ValTrait for ArrayBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of Array builtin")
+    Err("Cannot assign to subscript of Array builtin".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {
@@ -106,36 +106,31 @@ static IS_ARRAY: NativeFunction = NativeFunction {
 static FROM: NativeFunction = NativeFunction {
   fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
     let first_param = match params.get(0) {
-      None => return type_error!("undefined is not iterable"),
+      None => return Err("undefined is not iterable".to_type_error()),
       Some(p) => p,
     };
 
     if params.len() > 1 {
-      return format_err!("TODO: Using Array.from with a map function");
+      return Err(format!("TODO: Using Array.from with a map function").to_val());
     }
 
     Ok(match first_param {
       Val::Array(arr) => Val::Array(arr.clone()),
-      Val::String(s) => Val::Array(Rc::new(VsArray::from(
-        s.chars()
-          .map(|c| Val::String(Rc::new(c.to_string())))
-          .collect(),
-      ))),
-      Val::Void | Val::Undefined | Val::Null => return type_error!("items is not iterable"),
+      Val::String(s) => s.chars().map(|c| c.to_val()).collect::<Vec<Val>>().to_val(),
+      Val::Void | Val::Undefined | Val::Null => {
+        return Err("items is not iterable".to_type_error())
+      }
       Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => {
-        Val::Array(Rc::new(VsArray::new()))
+        VsArray::new().to_val()
       }
       Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Custom(..) => {
-        let len = op_sub(
-          first_param.clone(),
-          Val::String(Rc::new("length".to_string())),
-        )
-        .map_err(|e| e.val_to_string())
-        .unwrap() // TODO: Exception
-        .to_number();
+        let len = op_sub(first_param.clone(), "length".to_val())
+          .map_err(|e| e.val_to_string())
+          .unwrap() // TODO: Exception
+          .to_number();
 
         if len.is_sign_negative() || len.is_nan() {
-          return Ok(Val::Array(Rc::new(VsArray::new())));
+          return Ok(VsArray::new().to_val());
         }
 
         if len.is_infinite() {
@@ -156,7 +151,7 @@ static FROM: NativeFunction = NativeFunction {
           );
         }
 
-        Val::Array(Rc::new(VsArray::from(arr)))
+        VsArray::from(arr).to_val()
       }
     })
   },
@@ -164,13 +159,13 @@ static FROM: NativeFunction = NativeFunction {
 
 static OF: NativeFunction = NativeFunction {
   fn_: |_this: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(Val::Array(Rc::new(VsArray::from(params))))
+    Ok(VsArray::from(params).to_val())
   },
 };
 
 fn to_array(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   if params.len() != 1 {
-    return Ok(Val::Array(Rc::new(VsArray::from(params))));
+    return Ok(VsArray::from(params).to_val());
   }
 
   Ok(match params[0] {
@@ -187,8 +182,8 @@ fn to_array(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
         arr.push(Val::Void);
       }
 
-      Val::Array(Rc::new(VsArray::from(arr)))
+      VsArray::from(arr).to_val()
     }
-    _ => Val::Array(Rc::new(VsArray::from(params))),
+    _ => VsArray::from(params).to_val(),
   })
 }

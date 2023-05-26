@@ -3,16 +3,15 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::{
-  builtins::type_error_builtin::to_type_error,
-  native_function::ThisWrapper,
-  type_error,
   vs_array::VsArray,
   vs_class::VsClass,
   vs_object::VsObject,
   vs_symbol::VsSymbol,
-  vs_value::{LoadFunctionResult, Val, VsType},
+  vs_value::{LoadFunctionResult, ToValString, Val, VsType},
   ValTrait,
 };
+
+use super::type_error_builtin::ToTypeError;
 
 pub struct SymbolBuiltin {}
 
@@ -35,7 +34,7 @@ impl ValTrait for SymbolBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new("[object Symbol]".to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -71,7 +70,7 @@ impl ValTrait for SymbolBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of Symbol builtin")
+    Err("Cannot assign to subscript of Symbol builtin".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {

@@ -1,9 +1,8 @@
-use std::rc::Rc;
+use crate::vs_value::ToVal;
 
-use super::super::vs_value::{Val};
-use super::super::vs_array::VsArray;
 use super::super::native_frame_function::NativeFrameFunction;
-use super::array_mapping_frame::{ArrayMappingState, ArrayMappingFrame};
+use super::super::vs_value::Val;
+use super::array_mapping_frame::{ArrayMappingFrame, ArrayMappingState};
 
 pub static MAP: NativeFrameFunction = NativeFrameFunction {
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(MapState::default()))),
@@ -23,6 +22,6 @@ impl ArrayMappingState for MapState {
   fn finish(&mut self) -> Val {
     let mut map_results = Vec::new();
     std::mem::swap(&mut self.map_results, &mut map_results);
-    return Val::Array(Rc::new(VsArray::from(map_results)));
+    map_results.to_val()
   }
 }

@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
+use crate::builtins::type_error_builtin::ToTypeError;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::native_function::ThisWrapper;
 use crate::stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrameTrait};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
 
 pub static REDUCE: NativeFrameFunction = NativeFrameFunction {
   make_frame: || {
@@ -50,7 +50,7 @@ impl StackFrameTrait for ReduceFrame {
 
   fn step(&mut self) -> FrameStepResult {
     let array_data = match &self.this {
-      None => return type_error!("reduce called on non-array"),
+      None => return Err("reduce called on non-array".to_type_error()),
       Some(ad) => ad,
     };
 
@@ -66,7 +66,9 @@ impl StackFrameTrait for ReduceFrame {
             FrameStepOk::Continue
           }
           Some(value) => match self.reducer.load_function() {
-            LoadFunctionResult::NotAFunction => return type_error!("reduce fn is not a function"),
+            LoadFunctionResult::NotAFunction => {
+              return Err("reduce fn is not a function".to_type_error())
+            }
             LoadFunctionResult::NativeFunction(native_fn) => {
               self.value = Some(native_fn(
                 ThisWrapper::new(true, &mut Val::Undefined),
@@ -91,7 +93,7 @@ impl StackFrameTrait for ReduceFrame {
         },
       },
       None => match &self.value {
-        None => return type_error!("reduce of empty array with no initial value"),
+        None => return Err("reduce of empty array with no initial value".to_type_error()),
         Some(value) => FrameStepOk::Pop(CallResult {
           return_: value.clone(),
           this: Val::Array(array_data.clone()),

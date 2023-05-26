@@ -2,12 +2,12 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::format_err;
+use crate::builtins::error_builtin::ToError;
+use crate::builtins::type_error_builtin::ToTypeError;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::vs_value::{LoadFunctionResult, ToVal, ToValString, Val, ValTrait, VsType};
 
 pub struct ThisWrapper<'a> {
   const_: bool,
@@ -25,7 +25,7 @@ impl<'a> ThisWrapper<'a> {
 
   pub fn get_mut(&mut self) -> Result<&mut Val, Val> {
     if self.const_ {
-      return type_error!("Cannot mutate this because it is const");
+      return Err("Cannot mutate this because it is const".to_type_error());
     }
 
     Ok(self.this)
@@ -53,7 +53,7 @@ impl ValTrait for NativeFunction {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new(self.val_to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -84,11 +84,11 @@ impl ValTrait for NativeFunction {
   }
 
   fn sub(&self, _key: Val) -> Result<Val, Val> {
-    format_err!("TODO: Subscript native function")
+    Err("TODO: Subscript native function".to_error())
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of native function")
+    Err("Cannot assign to subscript of native function".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {
@@ -101,5 +101,11 @@ impl ValTrait for NativeFunction {
 
   fn codify(&self) -> String {
     "function() { [native code] }".into()
+  }
+}
+
+impl ToVal for &'static NativeFunction {
+  fn to_val(self) -> Val {
+    Val::Static(self)
   }
 }

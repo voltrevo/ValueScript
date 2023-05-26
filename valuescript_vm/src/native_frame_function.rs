@@ -2,14 +2,13 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::format_err;
-use crate::native_function::ThisWrapper;
+use crate::builtins::error_builtin::ToError;
+use crate::builtins::type_error_builtin::ToTypeError;
 use crate::stack_frame::StackFrame;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::vs_value::{LoadFunctionResult, ToValString, Val, ValTrait, VsType};
 
 pub struct NativeFrameFunction {
   pub make_frame: fn() -> StackFrame,
@@ -32,7 +31,7 @@ impl ValTrait for NativeFrameFunction {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new(self.val_to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -63,11 +62,11 @@ impl ValTrait for NativeFrameFunction {
   }
 
   fn sub(&self, _key: Val) -> Result<Val, Val> {
-    format_err!("TODO: Subscript native function")
+    Err("TODO: Subscript native function".to_error())
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of native function")
+    Err("Cannot assign to subscript of native function".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {

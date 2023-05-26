@@ -1,9 +1,8 @@
-use std::rc::Rc;
-
+use crate::builtins::error_builtin::ToError;
 use crate::native_function::ThisWrapper;
+use crate::vs_value::{ToVal, ToValString};
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
 use crate::{
-  format_err, format_val,
   native_function::NativeFunction,
   todo_fn::TODO,
   vs_value::{Val, ValTrait},
@@ -26,16 +25,19 @@ static TO_FIXED: NativeFunction = NativeFunction {
     Ok(match this.get() {
       Val::Number(number) => {
         if number.is_infinite() {
-          return Ok(if number.is_sign_positive() {
-            Val::String(Rc::new("Infinity".to_string()))
-          } else {
-            Val::String(Rc::new("-Infinity".to_string()))
-          });
+          return Ok(
+            if number.is_sign_positive() {
+              "Infinity"
+            } else {
+              "-Infinity"
+            }
+            .to_val(),
+          );
         }
 
         let mut precision = match params.get(0) {
           Some(p) => p.to_number(),
-          _ => return Ok(Val::String(Rc::new(this.get().val_to_string()))),
+          _ => return Ok(this.get().to_val_string()),
         };
 
         precision = f64::floor(precision);
@@ -44,9 +46,9 @@ static TO_FIXED: NativeFunction = NativeFunction {
           return range_error!("precision must be between 1 and 100");
         }
 
-        format_val!("{:.*}", precision as usize, number)
+        format!("{:.*}", precision as usize, number).to_val()
       }
-      _ => return format_err!("TODO: number indirection"),
+      _ => return Err(format!("TODO: number indirection").to_val()),
     })
   },
 };
@@ -67,7 +69,7 @@ static TO_EXPONENTIAL: NativeFunction = NativeFunction {
         }
         None => format_exponential(*number, None),
       },
-      _ => return format_err!("number indirection"),
+      _ => return Err("number indirection".to_error()),
     })
   },
 };
@@ -75,8 +77,8 @@ static TO_EXPONENTIAL: NativeFunction = NativeFunction {
 static TODO_LOCALE: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     match this.get() {
-      Val::Number(_number) => return format_err!("TODO: locale"),
-      _ => return format_err!("number indirection"),
+      Val::Number(_number) => return Err("TODO: locale".to_error()),
+      _ => return Err("number indirection".to_error()),
     }
   },
 };
@@ -86,12 +88,12 @@ static TO_STRING: NativeFunction = NativeFunction {
     Ok(match this.get() {
       Val::Number(_) => match params.get(0) {
         Some(_) => {
-          return format_err!("TODO: toString with radix");
+          return Err("TODO: toString with radix".to_error());
         }
 
-        None => Val::String(Rc::new(this.get().val_to_string())),
+        None => this.get().to_val_string(),
       },
-      _ => return format_err!("number indirection"),
+      _ => return Err("number indirection".to_error()),
     })
   },
 };
@@ -100,7 +102,7 @@ static VALUE_OF: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
     Ok(match this.get() {
       Val::Number(number) => Val::Number(*number),
-      _ => return format_err!("number indirection"),
+      _ => return Err("number indirection".to_error()),
     })
   },
 };
@@ -108,10 +110,11 @@ static VALUE_OF: NativeFunction = NativeFunction {
 fn format_exponential(number: f64, precision: Option<usize>) -> Val {
   if number.is_infinite() {
     return if number.is_sign_positive() {
-      Val::String(Rc::new("Infinity".to_string()))
+      "Infinity"
     } else {
-      Val::String(Rc::new("-Infinity".to_string()))
-    };
+      "-Infinity"
+    }
+    .to_val();
   }
 
   let exp_format = match precision {
@@ -125,7 +128,7 @@ fn format_exponential(number: f64, precision: Option<usize>) -> Val {
 
   let exponent = match parts.next() {
     Some(e) => e,
-    None => return Val::String(Rc::new(exp_format)),
+    None => return exp_format.to_val(),
   };
 
   let string = if exponent.starts_with('-') {
@@ -134,5 +137,5 @@ fn format_exponential(number: f64, precision: Option<usize>) -> Val {
     format!("{}e+{}", mantissa, exponent)
   };
 
-  Val::String(Rc::new(string))
+  string.to_val()
 }

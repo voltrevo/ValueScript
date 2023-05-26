@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use crate::vs_value::ToVal;
+
 use super::bytecode_decoder::BytecodeDecoder;
 use super::bytecode_stack_frame::BytecodeStackFrame;
 use super::stack_frame::StackFrame;
@@ -58,5 +60,11 @@ impl VsFunction {
       return_target: None,
       catch_setting: None,
     });
+  }
+}
+
+impl ToVal for VsFunction {
+  fn to_val(self) -> Val {
+    Val::Function(Rc::new(self))
   }
 }

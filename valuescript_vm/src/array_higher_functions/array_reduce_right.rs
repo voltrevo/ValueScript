@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
+use crate::builtins::type_error_builtin::ToTypeError;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::native_function::ThisWrapper;
 use crate::stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrameTrait};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
-use crate::{builtins::type_error_builtin::to_type_error, format_err, type_error};
 
 pub static REDUCE_RIGHT: NativeFrameFunction = NativeFrameFunction {
   make_frame: || {
@@ -56,14 +56,14 @@ impl StackFrameTrait for ReduceRightFrame {
 
   fn step(&mut self) -> FrameStepResult {
     let array_data = match &self.this {
-      None => return type_error!("reduceRight called on non-array"),
+      None => return Err("reduceRight called on non-array".to_type_error()),
       Some(ad) => ad,
     };
 
     if self.array_i == 0 {
       match &self.value {
         None => {
-          return type_error!("reduceRight of empty array with no initial value");
+          return Err("reduceRight of empty array with no initial value".to_type_error());
         }
         Some(value) => {
           return Ok(FrameStepOk::Pop(CallResult {
@@ -88,7 +88,7 @@ impl StackFrameTrait for ReduceRightFrame {
         }
         Some(value) => match self.reducer.load_function() {
           LoadFunctionResult::NotAFunction => {
-            return format_err!("TpeError: reduceRight fn is not a function")
+            return Err("reduceRight fn is not a function".to_type_error())
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
             self.value = Some(native_fn(

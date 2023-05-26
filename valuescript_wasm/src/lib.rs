@@ -1,7 +1,4 @@
-use std::{
-  collections::{BTreeMap, HashMap},
-  rc::Rc,
-};
+use std::collections::{BTreeMap, HashMap};
 
 use wasm_bindgen::prelude::*;
 
@@ -10,8 +7,9 @@ use valuescript_compiler::{
   CompileResult, Diagnostic, ResolvedPath,
 };
 use valuescript_vm::{
-  vs_array::VsArray, vs_object::VsObject, vs_value::Val, LoadFunctionResult, ValTrait,
-  VirtualMachine,
+  vs_object::VsObject,
+  vs_value::{ToVal, Val},
+  LoadFunctionResult, ValTrait, VirtualMachine,
 };
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -161,51 +159,58 @@ fn parse_args(args: &str) -> Result<Vec<Val>, Val> {
 
   let arr = match value {
     Value::Array(arr) => arr,
-    _ => return Err(Val::String(Rc::new("Expected array".into()))),
+    _ => return Err("Expected array".to_val()),
   };
 
   let mut result = Vec::<Val>::new();
 
   for arg in arr.values {
-    result.push(value_to_val(arg)?);
+    result.push(arg.try_to_val()?);
   }
 
   Ok(result)
 }
 
-fn value_to_val(value: Value) -> Result<Val, Val> {
-  Ok(match value {
-    Value::Undefined => Val::Undefined,
-    Value::Null => Val::Null,
-    Value::Bool(b) => Val::Bool(b),
-    Value::Number(n) => Val::Number(n),
-    Value::BigInt(n) => Val::BigInt(n),
-    Value::String(s) => Val::String(Rc::new(s)),
-    Value::Array(arr) => {
-      let mut result = Vec::<Val>::new();
+pub trait TryToVal {
+  fn try_to_val(self) -> Result<Val, Val>;
+}
 
-      for value in arr.values {
-        result.push(value_to_val(value)?);
+impl TryToVal for Value {
+  fn try_to_val(self) -> Result<Val, Val> {
+    Ok(match self {
+      Value::Undefined => Val::Undefined,
+      Value::Null => Val::Null,
+      Value::Bool(b) => b.to_val(),
+      Value::Number(n) => n.to_val(),
+      Value::BigInt(n) => n.to_val(),
+      Value::String(s) => s.to_val(),
+      Value::Array(arr) => {
+        let mut result = Vec::<Val>::new();
+
+        for value in arr.values {
+          result.push(value.try_to_val()?);
+        }
+
+        result.to_val()
+      }
+      Value::Object(obj) => {
+        let mut string_map = BTreeMap::<String, Val>::new();
+
+        for (key, value) in obj.properties {
+          string_map.insert(key.try_to_val()?.val_to_string(), value.try_to_val()?);
+        }
+
+        VsObject {
+          string_map,
+          symbol_map: Default::default(),
+          prototype: None,
+        }
+        .to_val()
       }
 
-      Val::Array(Rc::new(VsArray::from(result)))
-    }
-    Value::Object(obj) => {
-      let mut string_map = BTreeMap::<String, Val>::new();
-
-      for (key, value) in obj.properties {
-        string_map.insert(value_to_val(key)?.val_to_string(), value_to_val(value)?);
+      Value::Void | Value::Register(..) | Value::Pointer(..) | Value::Builtin(..) => {
+        return Err("Invalid argument".to_val());
       }
-
-      Val::Object(Rc::new(VsObject {
-        string_map,
-        symbol_map: Default::default(),
-        prototype: None,
-      }))
-    }
-
-    Value::Void | Value::Register(..) | Value::Pointer(..) | Value::Builtin(..) => {
-      return Err(Val::String(Rc::new("Invalid argument".into())));
-    }
-  })
+    })
+  }
 }

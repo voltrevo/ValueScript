@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use crate::vs_symbol::VsSymbol;
+use crate::vs_value::ToVal;
 
 use super::operations::op_sub;
 use super::vs_value::{Val, ValTrait};
@@ -30,5 +32,11 @@ impl VsObject {
         .unwrap(), // TODO: Exception
       None => Val::Undefined,
     }
+  }
+}
+
+impl ToVal for VsObject {
+  fn to_val(self) -> Val {
+    Val::Object(Rc::new(self))
   }
 }

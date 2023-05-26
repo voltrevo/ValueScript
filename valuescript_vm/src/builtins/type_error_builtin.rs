@@ -3,9 +3,8 @@ use std::{collections::BTreeMap, rc::Rc};
 use num_bigint::BigInt;
 
 use crate::native_function::ThisWrapper;
-use crate::type_error;
+use crate::vs_value::{ToVal, ToValString};
 use crate::{
-  format_val,
   native_function::NativeFunction,
   operations::{op_sub, op_submov},
   vs_array::VsArray,
@@ -36,9 +35,7 @@ impl ValTrait for TypeErrorBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new(
-      "function TypeError() { [native code] }".to_string(),
-    ))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -66,7 +63,15 @@ impl ValTrait for TypeErrorBuiltin {
   }
 
   fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NativeFunction(to_type_error)
+    LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+      Ok(
+        match params.get(0) {
+          Some(param) => param.to_val_string(),
+          None => "".to_val(),
+        }
+        .to_type_error(),
+      )
+    })
   }
 
   fn sub(&self, _key: Val) -> Result<Val, Val> {
@@ -74,7 +79,7 @@ impl ValTrait for TypeErrorBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of TypeError builtin")
+    Err("Cannot assign to subscript of TypeError builtin".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {
@@ -90,33 +95,17 @@ impl ValTrait for TypeErrorBuiltin {
   }
 }
 
-pub fn to_type_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
-  Ok(Val::Object(Rc::new(VsObject {
-    string_map: BTreeMap::from([(
-      "message".to_string(),
-      Val::String(Rc::new(match params.get(0) {
-        Some(param) => param.val_to_string(),
-        None => "".to_string(),
-      })),
-    )]),
-    symbol_map: Default::default(),
-    prototype: Some(make_type_error_prototype()),
-  })))
-}
-
 // TODO: Static? (Rc -> Arc?)
 fn make_type_error_prototype() -> Val {
-  Val::Object(Rc::new(VsObject {
+  VsObject {
     string_map: BTreeMap::from([
-      (
-        "name".to_string(),
-        Val::String(Rc::new("TypeError".to_string())),
-      ),
-      ("toString".to_string(), Val::Static(&TYPE_ERROR_TO_STRING)),
+      ("name".to_string(), "TypeError".to_val()),
+      ("toString".to_string(), TYPE_ERROR_TO_STRING.to_val()),
     ]),
     symbol_map: Default::default(),
     prototype: None,
-  }))
+  }
+  .to_val()
 }
 
 static SET_MESSAGE: NativeFunction = NativeFunction {
@@ -126,11 +115,7 @@ static SET_MESSAGE: NativeFunction = NativeFunction {
       None => "".to_string(),
     };
 
-    op_submov(
-      this.get_mut()?,
-      format_val!("message"),
-      format_val!("{}", message),
-    )?;
+    op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
 
     Ok(Val::Undefined)
   },
@@ -138,18 +123,34 @@ static SET_MESSAGE: NativeFunction = NativeFunction {
 
 static TYPE_ERROR_TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    let message = op_sub(this.get().clone(), format_val!("message"))?;
-    Ok(format_val!("TypeError({})", message))
+    let message = op_sub(this.get().clone(), "message".to_val())?;
+    Ok(format!("TypeError({})", message).to_val())
   },
 };
 
-#[macro_export]
-macro_rules! type_error {
-  ($fmt:expr $(, $($arg:expr),*)?) => {{
-    let formatted_string = format!($fmt $(, $($arg),*)?);
-    Err(to_type_error(
-      ThisWrapper::new(true, &mut Val::Undefined),
-      vec![Val::String(Rc::new(formatted_string))],
-    ).unwrap())
-  }};
+pub trait ToTypeError {
+  fn to_type_error(self) -> Val;
+}
+
+impl ToTypeError for &str {
+  fn to_type_error(self) -> Val {
+    self.to_string().to_type_error()
+  }
+}
+
+impl ToTypeError for String {
+  fn to_type_error(self) -> Val {
+    self.to_val().to_type_error()
+  }
+}
+
+impl ToTypeError for Val {
+  fn to_type_error(self) -> Val {
+    VsObject {
+      string_map: BTreeMap::from([("message".to_string(), self)]),
+      symbol_map: Default::default(),
+      prototype: Some(make_type_error_prototype()),
+    }
+    .to_val()
+  }
 }

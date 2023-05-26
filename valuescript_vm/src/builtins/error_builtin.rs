@@ -3,9 +3,8 @@ use std::{collections::BTreeMap, rc::Rc};
 use num_bigint::BigInt;
 
 use crate::native_function::ThisWrapper;
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::vs_value::{ToVal, ToValString};
 use crate::{
-  format_val,
   native_function::NativeFunction,
   operations::{op_sub, op_submov},
   vs_array::VsArray,
@@ -14,6 +13,8 @@ use crate::{
   vs_value::{LoadFunctionResult, Val, VsType},
   ValTrait,
 };
+
+use super::type_error_builtin::ToTypeError;
 
 pub struct ErrorBuiltin {}
 
@@ -36,7 +37,7 @@ impl ValTrait for ErrorBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new("function Error() { [native code] }".to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -64,7 +65,15 @@ impl ValTrait for ErrorBuiltin {
   }
 
   fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NativeFunction(to_error)
+    LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+      Ok(
+        match params.get(0) {
+          Some(param) => param.to_val_string(),
+          None => "".to_val(),
+        }
+        .to_error(),
+      )
+    })
   }
 
   fn sub(&self, _key: Val) -> Result<Val, Val> {
@@ -72,7 +81,7 @@ impl ValTrait for ErrorBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of Error builtin")
+    Err("Cannot assign to subscript of Error builtin".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {
@@ -88,44 +97,44 @@ impl ValTrait for ErrorBuiltin {
   }
 }
 
-#[macro_export]
-macro_rules! error {
-  ($fmt:expr $(, $($arg:expr),*)?) => {{
-    let formatted_string = format!($fmt $(, $($arg),*)?);
-    Err(to_error(
-      ThisWrapper::new(true, &mut Val::Undefined),
-      vec![Val::String(Rc::new(formatted_string))],
-    ).unwrap())
-  }};
+pub trait ToError {
+  fn to_error(self) -> Val;
 }
 
-pub fn to_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
-  Ok(Val::Object(Rc::new(VsObject {
-    string_map: BTreeMap::from([(
-      "message".to_string(),
-      Val::String(Rc::new(match params.get(0) {
-        Some(param) => param.val_to_string(),
-        None => "".to_string(),
-      })),
-    )]),
-    symbol_map: Default::default(),
-    prototype: Some(make_error_prototype()),
-  })))
+impl ToError for Val {
+  fn to_error(self) -> Val {
+    VsObject {
+      string_map: BTreeMap::from([("message".to_string(), self.to_val_string())]),
+      symbol_map: Default::default(),
+      prototype: Some(make_error_prototype()),
+    }
+    .to_val()
+  }
+}
+
+impl ToError for String {
+  fn to_error(self) -> Val {
+    self.to_val().to_error()
+  }
+}
+
+impl ToError for &str {
+  fn to_error(self) -> Val {
+    self.to_string().to_error()
+  }
 }
 
 // TODO: Static? (Rc -> Arc?)
 fn make_error_prototype() -> Val {
-  Val::Object(Rc::new(VsObject {
+  VsObject {
     string_map: BTreeMap::from([
-      (
-        "name".to_string(),
-        Val::String(Rc::new("Error".to_string())),
-      ),
-      ("toString".to_string(), Val::Static(&ERROR_TO_STRING)),
+      ("name".to_string(), "Error".to_val()),
+      ("toString".to_string(), ERROR_TO_STRING.to_val()),
     ]),
     symbol_map: Default::default(),
     prototype: None,
-  }))
+  }
+  .to_val()
 }
 
 static SET_MESSAGE: NativeFunction = NativeFunction {
@@ -135,11 +144,7 @@ static SET_MESSAGE: NativeFunction = NativeFunction {
       None => "".to_string(),
     };
 
-    op_submov(
-      this.get_mut()?,
-      format_val!("message"),
-      format_val!("{}", message),
-    )?;
+    op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
 
     Ok(Val::Undefined)
   },
@@ -147,7 +152,7 @@ static SET_MESSAGE: NativeFunction = NativeFunction {
 
 static ERROR_TO_STRING: NativeFunction = NativeFunction {
   fn_: |this: ThisWrapper, _params: Vec<Val>| -> Result<Val, Val> {
-    let message = op_sub(this.get().clone(), format_val!("message"))?;
-    Ok(format_val!("Error({})", message)) // TODO: Fixes needed here (and other errors)
+    let message = op_sub(this.get().clone(), "message".to_val())?;
+    Ok(format!("Error({})", message).to_val()) // TODO: Fixes needed here (and other errors)
   },
 };

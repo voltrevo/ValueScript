@@ -1,8 +1,6 @@
-use std::rc::Rc;
-
 use valuescript_common::InstructionByte;
 
-use crate::builtins::type_error_builtin::to_type_error;
+use crate::builtins::type_error_builtin::ToTypeError;
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
 use crate::native_function::ThisWrapper;
@@ -10,8 +8,8 @@ use crate::operations;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, StackFrame, StackFrameTrait};
-use crate::type_error;
 use crate::vs_object::VsObject;
+use crate::vs_value::ToVal;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
 pub struct BytecodeStackFrame {
@@ -371,15 +369,16 @@ impl StackFrameTrait for BytecodeStackFrame {
         let class = match self.decoder.decode_val(&self.registers).as_class_data() {
           Some(class) => class,
           None => {
-            return type_error!("value is not a constructor");
+            return Err("value is not a constructor".to_type_error());
           }
         };
 
-        let mut instance = Val::Object(Rc::new(VsObject {
+        let mut instance = VsObject {
           string_map: Default::default(),
           symbol_map: Default::default(),
           prototype: Some(class.instance_prototype.clone()),
-        }));
+        }
+        .to_val();
 
         match class.constructor {
           Val::Void => {
@@ -456,7 +455,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
       RequireMutableThis => {
         if self.const_this {
-          return type_error!("Cannot mutate this because it is const");
+          return Err("Cannot mutate this because it is const".to_type_error());
         }
       }
     };

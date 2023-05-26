@@ -3,7 +3,7 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::native_function::ThisWrapper;
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::vs_value::ToValString;
 use crate::{
   native_function::NativeFunction,
   vs_array::VsArray,
@@ -12,6 +12,8 @@ use crate::{
   vs_value::{LoadFunctionResult, Val, VsType},
   ValTrait,
 };
+
+use super::type_error_builtin::ToTypeError;
 
 pub struct NumberBuiltin {}
 
@@ -34,7 +36,7 @@ impl ValTrait for NumberBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new("function Number() { [native code] }".to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -83,7 +85,7 @@ impl ValTrait for NumberBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of Number builtin")
+    Err("Cannot assign to subscript of Number builtin".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {

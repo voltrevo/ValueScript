@@ -7,8 +7,9 @@ use crate::operations::to_u32;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::vs_value::{LoadFunctionResult, ToValString, Val, ValTrait, VsType};
+
+use super::type_error_builtin::ToTypeError;
 
 pub struct MathBuiltin {}
 
@@ -31,7 +32,7 @@ impl ValTrait for MathBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new(self.val_to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -114,7 +115,7 @@ impl ValTrait for MathBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of Math builtin")
+    Err("Cannot assign to subscript of Math builtin".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {

@@ -3,8 +3,8 @@ use std::rc::Rc;
 use num_bigint::BigInt;
 
 use crate::native_function::ThisWrapper;
+use crate::vs_value::{ToVal, ToValString};
 use crate::{builtins::range_error_builtin::to_range_error, range_error};
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
 use crate::{
   native_function::NativeFunction,
   vs_array::VsArray,
@@ -13,6 +13,8 @@ use crate::{
   vs_value::{LoadFunctionResult, Val, VsType},
   ValTrait,
 };
+
+use super::type_error_builtin::ToTypeError;
 
 pub struct StringBuiltin {}
 
@@ -35,7 +37,7 @@ impl ValTrait for StringBuiltin {
     false
   }
   fn to_primitive(&self) -> Val {
-    Val::String(Rc::new("function String() { [native code] }".to_string()))
+    self.to_val_string()
   }
   fn is_truthy(&self) -> bool {
     true
@@ -76,7 +78,7 @@ impl ValTrait for StringBuiltin {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of String builtin")
+    Err("Cannot assign to subscript of String builtin".to_type_error())
   }
 
   fn next(&mut self) -> LoadFunctionResult {
@@ -107,14 +109,14 @@ static FROM_CODE_POINT: NativeFunction = NativeFunction {
       result.push(char);
     }
 
-    Ok(Val::String(Rc::new(result)))
+    Ok(result.to_val())
   },
 };
 
 fn to_string(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
   Ok(if let Some(value) = params.get(0) {
-    Val::String(Rc::new(value.val_to_string()))
+    value.to_val_string()
   } else {
-    Val::String(Rc::new("".to_string()))
+    "".to_val()
   })
 }

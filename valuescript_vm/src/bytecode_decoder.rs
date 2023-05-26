@@ -6,12 +6,12 @@ use num_bigint::Sign;
 use valuescript_common::InstructionByte;
 
 use crate::builtins::BUILTIN_VALS;
-use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
 use crate::vs_object::VsObject;
 use crate::vs_pointer::VsPointer;
 use crate::vs_symbol::VsSymbol;
+use crate::vs_value::ToVal;
 use crate::vs_value::Val;
 use crate::vs_value::ValTrait;
 
@@ -100,9 +100,9 @@ impl BytecodeDecoder {
       BytecodeType::Null => Val::Null,
       BytecodeType::False => Val::Bool(false),
       BytecodeType::True => Val::Bool(true),
-      BytecodeType::SignedByte => Val::Number(self.decode_signed_byte() as f64),
-      BytecodeType::Number => Val::Number(self.decode_number()),
-      BytecodeType::String => Val::String(Rc::new(self.decode_string())),
+      BytecodeType::SignedByte => (self.decode_signed_byte() as f64).to_val(),
+      BytecodeType::Number => self.decode_number().to_val(),
+      BytecodeType::String => self.decode_string().to_val(),
       BytecodeType::Array => {
         let mut vals: Vec<Val> = Vec::new();
 
@@ -112,7 +112,7 @@ impl BytecodeDecoder {
 
         self.decode_type(); // End (TODO: assert)
 
-        Val::Array(Rc::new(VsArray::from(vals)))
+        vals.to_val()
       }
       BytecodeType::Object => {
         let mut string_map: BTreeMap<String, Val> = BTreeMap::new();
@@ -131,11 +131,12 @@ impl BytecodeDecoder {
 
         self.decode_type(); // End (TODO: assert)
 
-        Val::Object(Rc::new(VsObject {
+        VsObject {
           string_map,
           symbol_map,
           prototype: None,
-        }))
+        }
+        .to_val()
       }
       BytecodeType::Function => self.decode_function_header(),
       BytecodeType::Pointer => self.decode_pointer(),
@@ -144,11 +145,12 @@ impl BytecodeDecoder {
         val => val,
       },
       BytecodeType::Builtin => Val::Static(BUILTIN_VALS[self.decode_varsize_uint()]),
-      BytecodeType::Class => Val::Class(Rc::new(VsClass {
+      BytecodeType::Class => VsClass {
         constructor: self.decode_val(registers),
         instance_prototype: self.decode_val(registers),
-      })),
-      BytecodeType::BigInt => Val::BigInt(self.decode_bigint()),
+      }
+      .to_val(),
+      BytecodeType::BigInt => self.decode_bigint().to_val(),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
   }
@@ -249,7 +251,7 @@ impl BytecodeDecoder {
       }
     }
 
-    return VsPointer::new(&self.data, pos);
+    VsPointer::new(&self.data, pos).to_val()
   }
 
   pub fn decode_function_header(&mut self) -> Val {
@@ -257,13 +259,14 @@ impl BytecodeDecoder {
     let register_count = self.decode_byte() as usize;
     let parameter_count = self.decode_byte() as usize;
 
-    return Val::Function(Rc::new(VsFunction {
+    return VsFunction {
       bytecode: self.data.clone(),
-      register_count: register_count,
-      parameter_count: parameter_count,
+      register_count,
+      parameter_count,
       start: self.pos,
       binds: Vec::new(),
-    }));
+    }
+    .to_val();
   }
 
   pub fn decode_instruction(&mut self) -> InstructionByte {
