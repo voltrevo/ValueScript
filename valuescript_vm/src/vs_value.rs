@@ -66,7 +66,6 @@ pub trait ValTrait: fmt::Display {
 
   fn as_bigint_data(&self) -> Option<BigInt>;
   fn as_array_data(&self) -> Option<Rc<VsArray>>;
-  fn as_object_data(&self) -> Option<Rc<VsObject>>;
   fn as_class_data(&self) -> Option<Rc<VsClass>>;
 
   fn load_function(&self) -> LoadFunctionResult;
@@ -267,17 +266,6 @@ impl ValTrait for Val {
     return match self {
       Array(a) => Some(a.clone()),
       Custom(val) => val.as_array_data(),
-
-      _ => None,
-    };
-  }
-
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    use Val::*;
-
-    return match self {
-      Object(obj) => Some(obj.clone()),
-      Custom(val) => val.as_object_data(),
 
       _ => None,
     };

@@ -7,7 +7,6 @@ use crate::builtins::error_builtin::ToError;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
-use crate::vs_object::VsObject;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 pub struct ThisWrapper<'a> {
@@ -71,9 +70,6 @@ impl ValTrait for NativeFunction {
     None
   }
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
-    None
-  }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
     None
   }
   fn as_class_data(&self) -> Option<Rc<VsClass>> {

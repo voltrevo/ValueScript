@@ -89,9 +89,6 @@ impl ValTrait for ArrayPrototype {
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
     None
   }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    None
-  }
   fn as_class_data(&self) -> Option<Rc<VsClass>> {
     None
   }

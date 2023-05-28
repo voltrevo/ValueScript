@@ -3,25 +3,19 @@ use std::{fmt, rc::Rc};
 use num_bigint::BigInt;
 
 use crate::{
+  builtins::type_error_builtin::ToTypeError,
   vs_array::VsArray,
   vs_class::VsClass,
-  vs_value::{Val, VsType},
+  vs_value::{ToVal, Val, VsType},
   LoadFunctionResult, ValTrait,
 };
 
-use super::type_error_builtin::ToTypeError;
-
-pub trait BuiltinObject: fmt::Display {
-  fn bo_name() -> &'static str;
-  fn bo_sub(key: &str) -> Val;
-  fn bo_load_function() -> LoadFunctionResult;
-  fn bo_as_class_data() -> Option<Rc<VsClass>>;
+struct IterationResult {
+  pub value: Val,
+  pub done: bool,
 }
 
-impl<T> ValTrait for T
-where
-  T: BuiltinObject,
-{
+impl ValTrait for IterationResult {
   fn typeof_(&self) -> VsType {
     VsType::Object
   }
@@ -59,26 +53,39 @@ where
   }
 
   fn as_class_data(&self) -> Option<Rc<VsClass>> {
-    Self::bo_as_class_data()
+    None
   }
 
   fn load_function(&self) -> LoadFunctionResult {
-    Self::bo_load_function()
+    LoadFunctionResult::NotAFunction
   }
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
-    Ok(Self::bo_sub(&key.to_string()))
+    Ok(match key.to_string().as_str() {
+      "value" => self.value.clone(),
+      "done" => self.done.to_val(),
+      _ => Val::Undefined,
+    })
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    Err(format!("Cannot assign to subscript of {} builtin", Self::bo_name()).to_type_error())
+    Err("Cannot assign to iteration result".to_type_error())
   }
 
-  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "\x1b[36m[{}]\x1b[39m", Self::bo_name())
+  fn pretty_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self.done {
+      false => write!(f, "Iteration({})", self.value.pretty()),
+      true => write!(f, "IterationDone({})", self.value.pretty()),
+    }
   }
 
   fn codify(&self) -> String {
-    Self::bo_name().into()
+    format!("{{ value: {}, done: {} }}", self.value.codify(), self.done)
+  }
+}
+
+impl fmt::Display for IterationResult {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.write_str("[object Object]")
   }
 }

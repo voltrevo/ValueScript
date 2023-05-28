@@ -8,7 +8,6 @@ use crate::builtins::type_error_builtin::ToTypeError;
 use crate::stack_frame::StackFrame;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
-use crate::vs_object::VsObject;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait, VsType};
 
 pub struct NativeFrameFunction {
@@ -43,9 +42,6 @@ impl ValTrait for NativeFrameFunction {
     None
   }
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
-    None
-  }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
     None
   }
   fn as_class_data(&self) -> Option<Rc<VsClass>> {
