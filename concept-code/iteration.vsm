@@ -4,8 +4,7 @@ export @_anon0 {}
   mov 0 %sum
   mov [1, 2, 3] %nums
 
-  sub $Symbol "iterator" %symbol_dot_iterator
-  subcall %nums %symbol_dot_iterator [] %_iter0
+  subcall %nums $SymbolIterator [] %_iter0
   jmp :for_continue0
 
 for_test0:

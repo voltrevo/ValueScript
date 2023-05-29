@@ -12,7 +12,10 @@ pub mod type_error_builtin;
 
 use valuescript_common::BUILTIN_COUNT;
 
-use crate::vs_value::{ToVal, Val};
+use crate::{
+  vs_symbol::VsSymbol,
+  vs_value::{ToVal, Val},
+};
 
 use self::{
   array_builtin::ArrayBuiltin, boolean_builtin::BooleanBuiltin, debug_builtin::DebugBuiltin,
@@ -36,4 +39,5 @@ pub static BUILTIN_VALS: [fn() -> Val; BUILTIN_COUNT] = [
   || TypeErrorBuiltin {}.to_val(),
   || RangeErrorBuiltin {}.to_val(),
   || SymbolBuiltin {}.to_val(),
+  || Val::Symbol(VsSymbol::ITERATOR),
 ];

@@ -811,9 +811,13 @@ impl<'a> AssemblyParser<'a> {
   fn assemble_builtin(&mut self) -> Builtin {
     self.parse_exact("$");
 
-    Builtin {
-      name: self.parse_one_of(&BUILTIN_NAMES),
+    let name = self.parse_identifier();
+
+    if !BUILTIN_NAMES.contains(&name.as_str()) {
+      panic!("Unrecognized builtin ${}", name);
     }
+
+    Builtin { name }
   }
 
   fn test_label(&self) -> Option<String> {
