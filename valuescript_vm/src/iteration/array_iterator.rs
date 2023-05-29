@@ -7,11 +7,12 @@ use crate::{
   native_function::{native_fn, NativeFunction},
   vs_array::VsArray,
   vs_class::VsClass,
+  vs_symbol::VsSymbol,
   vs_value::{dynamic_make_mut, ToDynamicVal, ToVal, Val, VsType},
   LoadFunctionResult, ValTrait,
 };
 
-use super::iteration_result::IterationResult;
+use super::{iteration_result::IterationResult, return_this::RETURN_THIS};
 
 #[derive(Clone)]
 pub struct ArrayIterator {
@@ -73,6 +74,14 @@ impl ValTrait for ArrayIterator {
   fn sub(&self, key: Val) -> Result<Val, Val> {
     if key.to_string() == "next" {
       return Ok(NEXT.to_val());
+    }
+
+    if let Val::Symbol(key) = key {
+      match key {
+        VsSymbol::ITERATOR => {
+          return Ok(RETURN_THIS.to_val());
+        }
+      }
     }
 
     Ok(Val::Undefined)
