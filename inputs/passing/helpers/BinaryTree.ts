@@ -1,4 +1,6 @@
-export default class BinaryTree<T extends {}> {
+import type NotNullish from "./NotNullish.ts";
+
+export default class BinaryTree<T extends NotNullish> {
   left?: BinaryTree<T>;
   value?: T;
   right?: BinaryTree<T>;
