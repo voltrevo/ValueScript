@@ -661,11 +661,9 @@ static VALUE_OF: NativeFunction = native_fn(|this, _params| {
   })
 });
 
-static VALUES: NativeFunction = native_fn(|this, _params| {
-  Ok(match this.get() {
-    Val::String(string_data) => StringIterator::new(string_data.clone()).to_dynamic_val(),
-    _ => return Err("string indirection".to_error()),
-  })
+static VALUES: NativeFunction = native_fn(|this, _params| match this.get() {
+  Val::String(string_data) => Ok(StringIterator::new(string_data.clone()).to_dynamic_val()),
+  _ => Err("string indirection".to_error()),
 });
 
 /**

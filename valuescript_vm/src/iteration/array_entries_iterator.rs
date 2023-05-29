@@ -14,54 +14,18 @@ use crate::{
 use super::iteration_result::IterationResult;
 
 #[derive(Clone)]
-pub struct StringIterator {
-  pub string: Rc<String>,
+pub struct ArrayEntriesIterator {
+  pub array: Rc<VsArray>,
   pub index: usize,
 }
 
-impl StringIterator {
-  pub fn new(string: Rc<String>) -> StringIterator {
-    StringIterator { string, index: 0 }
-  }
-
-  fn next(&mut self) -> Option<char> {
-    let bytes = self.string.as_bytes();
-
-    if self.index >= bytes.len() {
-      return None;
-    }
-
-    let byte = bytes[self.index];
-    self.index += 1;
-
-    let leading_ones = byte.leading_ones() as usize;
-
-    if leading_ones == 0 {
-      return Some(std::char::from_u32(byte as u32).expect("Invalid code point"));
-    }
-
-    if leading_ones == 1 || leading_ones > 4 || (self.index - 1) + leading_ones > bytes.len() {
-      panic!("Invalid unicode");
-    }
-
-    let mut value = (byte & (0x7F >> leading_ones)) as u32;
-
-    for _ in 1..leading_ones {
-      let next_byte = bytes[self.index];
-      self.index += 1;
-
-      if next_byte.leading_ones() != 1 {
-        return None;
-      }
-
-      value = (value << 6) | (next_byte & 0x3F) as u32;
-    }
-
-    Some(std::char::from_u32(value as u32).expect("Invalid code point"))
+impl ArrayEntriesIterator {
+  pub fn new(array: Rc<VsArray>) -> ArrayEntriesIterator {
+    ArrayEntriesIterator { array, index: 0 }
   }
 }
 
-impl ValTrait for StringIterator {
+impl ValTrait for ArrayEntriesIterator {
   fn typeof_(&self) -> VsType {
     VsType::Object
   }
@@ -115,25 +79,25 @@ impl ValTrait for StringIterator {
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    Err("Cannot assign to subscript of string iterator".to_type_error())
+    Err("Cannot assign to subscript of array iterator".to_type_error())
   }
 
   fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "\x1b[36m[StringIterator]\x1b[39m")
+    write!(f, "\x1b[36m[ArrayEntriesIterator]\x1b[39m")
   }
 
   fn codify(&self) -> String {
     format!(
-      "StringIterator({{ string: {}, index: {} }})",
-      Val::String(self.string.clone()).codify(),
+      "ArrayEntriesIterator({{ array: {}, index: {} }})",
+      Val::Array(self.array.clone()).codify(),
       self.index
     )
   }
 }
 
-impl fmt::Display for StringIterator {
+impl fmt::Display for ArrayEntriesIterator {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "[object String Iterator]")
+    write!(f, "[object Array Iterator]")
   }
 }
 
@@ -145,20 +109,29 @@ static NEXT: NativeFunction = native_fn(|mut this, _| {
 
   let iter = dynamic_make_mut(dynamic)
     .as_any_mut()
-    .downcast_mut::<StringIterator>()
-    .ok_or_else(|| "StringIterator.next called on different object".to_type_error())?;
+    .downcast_mut::<ArrayEntriesIterator>()
+    .ok_or_else(|| "ArrayEntriesIterator.next called on different object".to_type_error())?;
 
-  Ok(
-    match iter.next() {
-      Some(c) => IterationResult {
-        value: c.to_val(),
-        done: false,
-      },
-      None => IterationResult {
+  match iter.array.elements.get(iter.index) {
+    Some(item) => {
+      let res = Ok(
+        IterationResult {
+          value: vec![(iter.index as f64).to_val(), item.clone()].to_val(),
+          done: false,
+        }
+        .to_dynamic_val(),
+      );
+
+      iter.index += 1;
+
+      res
+    }
+    None => Ok(
+      IterationResult {
         value: Val::Undefined,
         done: true,
-      },
-    }
-    .to_dynamic_val(),
-  )
+      }
+      .to_dynamic_val(),
+    ),
+  }
 });

@@ -12,6 +12,7 @@ use crate::array_higher_functions::{
 use crate::builtins::error_builtin::ToError;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
+use crate::iteration::array_entries_iterator::ArrayEntriesIterator;
 use crate::iteration::array_iterator::ArrayIterator;
 use crate::native_function::{native_fn, NativeFunction};
 use crate::operations::op_triple_eq_impl;
@@ -272,11 +273,9 @@ static COPY_WITHIN: NativeFunction = native_fn(|mut this, params| {
   })
 });
 
-static ENTRIES: NativeFunction = native_fn(|this, _params| {
-  match this.get() {
-    Val::Array(_array_data) => return Err("TODO: iterators".to_error()),
-    _ => return Err("array indirection".to_error()),
-  };
+static ENTRIES: NativeFunction = native_fn(|this, _params| match this.get() {
+  Val::Array(array_data) => Ok(ArrayEntriesIterator::new(array_data.clone()).to_dynamic_val()),
+  _ => Err("array indirection".to_error()),
 });
 
 static FILL: NativeFunction = native_fn(|mut this, params| {
@@ -646,9 +645,7 @@ static UNSHIFT: NativeFunction = native_fn(|mut this, params| {
   })
 });
 
-static VALUES: NativeFunction = native_fn(|this, _params| {
-  Ok(match this.get() {
-    Val::Array(array_data) => ArrayIterator::new(array_data.clone()).to_dynamic_val(),
-    _ => return Err("array indirection".to_error()),
-  })
+static VALUES: NativeFunction = native_fn(|this, _params| match this.get() {
+  Val::Array(array_data) => Ok(ArrayIterator::new(array_data.clone()).to_dynamic_val()),
+  _ => Err("array indirection".to_error()),
 });
