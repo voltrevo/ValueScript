@@ -921,6 +921,7 @@ impl<'a> AssemblyParser<'a> {
           let name = self.parse_identifier();
           Value::Pointer(Pointer { name })
         }
+        '$' => Value::Builtin(self.assemble_builtin()),
         '}' => {
           self.pos.next();
           break object;
