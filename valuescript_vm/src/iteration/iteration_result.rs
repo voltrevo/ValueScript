@@ -10,7 +10,8 @@ use crate::{
   LoadFunctionResult, ValTrait,
 };
 
-struct IterationResult {
+#[derive(Clone)]
+pub struct IterationResult {
   pub value: Val,
   pub done: bool,
 }
@@ -74,8 +75,8 @@ impl ValTrait for IterationResult {
 
   fn pretty_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self.done {
-      false => write!(f, "\x1b[36mIteration({})\x1b[39m", self.value.pretty()),
-      true => write!(f, "\x1b[36mIterationDone({})\x1b[39m", self.value.pretty()),
+      false => write!(f, "Iteration({})", self.value.pretty()),
+      true => write!(f, "IterationDone({})", self.value.pretty()),
     }
   }
 

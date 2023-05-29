@@ -3,13 +3,17 @@ use std::{fmt, rc::Rc};
 use num_bigint::BigInt;
 
 use crate::{
-  builtins::type_error_builtin::ToTypeError,
+  builtins::{error_builtin::ToError, type_error_builtin::ToTypeError},
+  native_function::{native_fn, NativeFunction},
   vs_array::VsArray,
   vs_class::VsClass,
-  vs_value::{Val, VsType},
+  vs_value::{dynamic_make_mut, ToDynamicVal, ToVal, Val, VsType},
   LoadFunctionResult, ValTrait,
 };
 
+use super::iteration_result::IterationResult;
+
+#[derive(Clone)]
 pub struct ArrayIterator {
   pub array: Rc<VsArray>,
   pub index: usize,
@@ -66,8 +70,12 @@ impl ValTrait for ArrayIterator {
     LoadFunctionResult::NotAFunction
   }
 
-  fn sub(&self, _key: Val) -> Result<Val, Val> {
-    todo!()
+  fn sub(&self, key: Val) -> Result<Val, Val> {
+    if key.to_string() == "next" {
+      return Ok(NEXT.to_val());
+    }
+
+    Ok(Val::Undefined)
   }
 
   fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
@@ -92,3 +100,36 @@ impl fmt::Display for ArrayIterator {
     write!(f, "[object Array Iterator]")
   }
 }
+
+static NEXT: NativeFunction = native_fn(|mut this, _| {
+  let dynamic = match this.get_mut()? {
+    Val::Dynamic(dynamic) => dynamic,
+    _ => return Err("TODO: indirection".to_error()),
+  };
+
+  let iter = dynamic_make_mut(dynamic)
+    .as_any_mut()
+    .downcast_mut::<ArrayIterator>()
+    .ok_or_else(|| "ArrayIterator.next called on different object".to_type_error())?;
+
+  match iter.array.elements.get(iter.index) {
+    Some(item) => {
+      iter.index += 1;
+
+      Ok(
+        IterationResult {
+          value: item.clone(),
+          done: false,
+        }
+        .to_dynamic_val(),
+      )
+    }
+    None => Ok(
+      IterationResult {
+        value: Val::Undefined,
+        done: true,
+      }
+      .to_dynamic_val(),
+    ),
+  }
+});

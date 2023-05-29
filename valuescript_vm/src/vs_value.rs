@@ -1,4 +1,5 @@
 use core::fmt;
+use std::any::Any;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -30,7 +31,7 @@ pub enum Val {
   Function(Rc<VsFunction>),
   Class(Rc<VsClass>),
   Static(&'static dyn ValTrait),
-  Dynamic(Rc<dyn ValTrait>),
+  Dynamic(Rc<dyn DynValTrait>),
 }
 
 #[derive(PartialEq, Debug)]
@@ -77,9 +78,48 @@ pub trait ValTrait: fmt::Display {
   fn codify(&self) -> String;
 }
 
+pub trait DynValTrait: ValTrait {
+  fn clone_interior(&self) -> Rc<dyn DynValTrait>;
+  fn as_any(&self) -> &dyn Any;
+  fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T> DynValTrait for T
+where
+  T: 'static + ValTrait + Clone,
+{
+  fn clone_interior(&self) -> Rc<dyn DynValTrait> {
+    Rc::new(self.clone())
+  }
+
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any {
+    self
+  }
+}
+
+pub fn dynamic_make_mut(rc: &mut Rc<dyn DynValTrait>) -> &mut dyn DynValTrait {
+  if Rc::get_mut(rc).is_none() {
+    *rc = rc.clone_interior();
+  }
+
+  Rc::get_mut(rc).unwrap()
+}
+
 impl fmt::Debug for dyn ValTrait {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "(dyn ValTrait)(")?;
+    self.pretty_fmt(f)?;
+    write!(f, ")")
+  }
+}
+
+impl fmt::Debug for dyn DynValTrait {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "(dyn DynValTrait)(")?;
     self.pretty_fmt(f)?;
     write!(f, ")")
   }
@@ -510,7 +550,7 @@ pub trait ToDynamicVal {
 
 impl<T> ToDynamicVal for T
 where
-  T: ValTrait + 'static,
+  T: DynValTrait + 'static,
 {
   fn to_dynamic_val(self) -> Val {
     Val::Dynamic(Rc::new(self))
