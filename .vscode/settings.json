@@ -4,6 +4,7 @@
     "source.fixAll": false
   },
   "editor.tabSize": 2,
+  "deno.config": "./.vscode/deno.jsonc",
   "deno.enable": true,
   "deno.lint": true,
   "deno.unstable": true,
