@@ -10,9 +10,15 @@ use crate::{
   LoadFunctionResult, ValTrait,
 };
 
-struct ArrayIterator {
-  array: Rc<VsArray>,
-  index: usize,
+pub struct ArrayIterator {
+  pub array: Rc<VsArray>,
+  pub index: usize,
+}
+
+impl ArrayIterator {
+  pub fn new(array: Rc<VsArray>) -> ArrayIterator {
+    ArrayIterator { array, index: 0 }
+  }
 }
 
 impl ValTrait for ArrayIterator {

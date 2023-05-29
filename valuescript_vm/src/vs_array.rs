@@ -12,12 +12,14 @@ use crate::array_higher_functions::{
 use crate::builtins::error_builtin::ToError;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
+use crate::iteration::array_iterator::ArrayIterator;
 use crate::native_function::{native_fn, NativeFunction};
 use crate::operations::op_triple_eq_impl;
 use crate::todo_fn::TODO;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
-use crate::vs_value::{LoadFunctionResult, ToVal, Val, ValTrait, VsType};
+use crate::vs_symbol::VsSymbol;
+use crate::vs_value::{LoadFunctionResult, ToCustomVal, ToVal, Val, ValTrait, VsType};
 
 #[derive(Clone, Debug)]
 pub struct VsArray {
@@ -59,6 +61,7 @@ pub struct ArrayPrototype {}
 
 static ARRAY_PROTOTYPE: ArrayPrototype = ArrayPrototype {};
 
+// TODO: Use BuiltinObject
 impl ValTrait for ArrayPrototype {
   fn typeof_(&self) -> VsType {
     VsType::Object
@@ -98,6 +101,15 @@ impl ValTrait for ArrayPrototype {
   }
 
   fn sub(&self, key: Val) -> Result<Val, Val> {
+    if let Val::Symbol(symbol) = key {
+      return Ok(
+        match symbol {
+          VsSymbol::ITERATOR => &VALUES,
+        }
+        .to_val(),
+      );
+    }
+
     Ok(Val::Static(match key.to_string().as_str() {
       "at" => &AT,
       "concat" => &CONCAT,
@@ -131,7 +143,7 @@ impl ValTrait for ArrayPrototype {
       "toLocaleString" => &TODO,
       "toString" => &TO_STRING,
       "unshift" => &UNSHIFT,
-      "values" => &TODO,
+      "values" => &VALUES,
       _ => return Ok(Val::Undefined),
     }))
   }
@@ -630,6 +642,13 @@ static UNSHIFT: NativeFunction = native_fn(|mut this, params| {
 
       Val::Number(array_data_mut.elements.len() as f64)
     }
+    _ => return Err("array indirection".to_error()),
+  })
+});
+
+pub static VALUES: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::Array(array_data) => ArrayIterator::new(array_data.clone()).to_custom_val(),
     _ => return Err("array indirection".to_error()),
   })
 });

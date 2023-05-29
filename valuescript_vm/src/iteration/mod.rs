@@ -1,2 +1,2 @@
-mod array_iterator;
-mod iteration_result;
+pub mod array_iterator;
+pub mod iteration_result;

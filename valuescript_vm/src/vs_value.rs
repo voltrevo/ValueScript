@@ -504,6 +504,19 @@ where
   }
 }
 
+pub trait ToCustomVal {
+  fn to_custom_val(self) -> Val;
+}
+
+impl<T> ToCustomVal for T
+where
+  T: ValTrait + 'static,
+{
+  fn to_custom_val(self) -> Val {
+    Val::Custom(Rc::new(self))
+  }
+}
+
 pub struct PrettyVal<'a> {
   val: &'a Val,
 }
