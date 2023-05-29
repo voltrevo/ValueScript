@@ -25,6 +25,7 @@ a, a:visited {
   display: flex;
   width: 50vw;
   max-width: 50vw;
+  height: 3em;
   border-bottom: 1px solid black;
   user-select: none;
 
@@ -34,6 +35,7 @@ a, a:visited {
     display: flex;
     flex-direction: row;
     flex-grow: 1;
+    align-items: center;
     overflow-x: auto;
 
     #file-location-text {
@@ -87,8 +89,8 @@ a, a:visited {
 #editor {
   position: absolute;
   left: 0;
-  top: 4em;
-  height: calc(100vh - 8em);
+  top: 5em;
+  height: calc(100vh - 9em);
   width: 50vw;
 }
 
@@ -180,7 +182,7 @@ a, a:visited {
 
 #display > div, #state {
   white-space: pre-wrap;
-  padding: 1.5em;
+  padding: 1.75em;
 }
 
 #display > div:not(:first-child) {
@@ -188,8 +190,12 @@ a, a:visited {
 }
 
 #display .display-title {
+  display: flex;
   text-align: center;
   font-size: 1.5em;
+  height: 2em;
+  align-items: center;
+  justify-content: center;
   background-color: #181818;
   padding: 0.5em;
   white-space: normal;
