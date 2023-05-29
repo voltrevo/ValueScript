@@ -26,3 +26,7 @@ self.MonacoEnvironment = {
 };
 
 monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+
+monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+  allowImportingTsExtensions: true,
+});
