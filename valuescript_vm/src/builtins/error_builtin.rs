@@ -16,8 +16,6 @@ use super::builtin_object::BuiltinObject;
 
 pub struct ErrorBuiltin {}
 
-pub static ERROR_BUILTIN: ErrorBuiltin = ErrorBuiltin {};
-
 impl BuiltinObject for ErrorBuiltin {
   fn bo_name() -> &'static str {
     "Error"

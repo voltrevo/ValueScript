@@ -12,21 +12,28 @@ pub mod type_error_builtin;
 
 use valuescript_common::BUILTIN_COUNT;
 
-use crate::ValTrait;
+use crate::vs_value::{ToVal, Val};
 
-pub static BUILTIN_VALS: [&'static (dyn ValTrait + Sync); BUILTIN_COUNT] = [
-  &debug_builtin::DEBUG_BUILTIN,
-  &math_builtin::MATH_BUILTIN,
-  &string_builtin::STRING_BUILTIN,
-  &number_builtin::NUMBER_BUILTIN,
-  &boolean_builtin::BOOLEAN_BUILTIN,
-  &array_builtin::ARRAY_BUILTIN,
-  &number_builtin::IS_FINITE,
-  &number_builtin::IS_NAN,
-  &number_builtin::PARSE_FLOAT,
-  &number_builtin::PARSE_INT,
-  &error_builtin::ERROR_BUILTIN,
-  &type_error_builtin::TYPE_ERROR_BUILTIN,
-  &range_error_builtin::RANGE_ERROR_BUILTIN,
-  &symbol_builtin::SYMBOL_BUILTIN,
+use self::{
+  array_builtin::ArrayBuiltin, boolean_builtin::BooleanBuiltin, debug_builtin::DebugBuiltin,
+  error_builtin::ErrorBuiltin, math_builtin::MathBuiltin, number_builtin::NumberBuiltin,
+  range_error_builtin::RangeErrorBuiltin, string_builtin::StringBuiltin,
+  symbol_builtin::SymbolBuiltin, type_error_builtin::TypeErrorBuiltin,
+};
+
+pub static BUILTIN_VALS: [fn() -> Val; BUILTIN_COUNT] = [
+  || DebugBuiltin {}.to_val(),
+  || MathBuiltin {}.to_val(),
+  || StringBuiltin {}.to_val(),
+  || NumberBuiltin {}.to_val(),
+  || BooleanBuiltin {}.to_val(),
+  || ArrayBuiltin {}.to_val(),
+  || number_builtin::IS_FINITE.to_val(),
+  || number_builtin::IS_NAN.to_val(),
+  || number_builtin::PARSE_FLOAT.to_val(),
+  || number_builtin::PARSE_INT.to_val(),
+  || ErrorBuiltin {}.to_val(),
+  || TypeErrorBuiltin {}.to_val(),
+  || RangeErrorBuiltin {}.to_val(),
+  || SymbolBuiltin {}.to_val(),
 ];

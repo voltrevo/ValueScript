@@ -10,8 +10,6 @@ use super::builtin_object::BuiltinObject;
 
 pub struct MathBuiltin {}
 
-pub static MATH_BUILTIN: MathBuiltin = MathBuiltin {};
-
 impl BuiltinObject for MathBuiltin {
   fn bo_name() -> &'static str {
     "Math"

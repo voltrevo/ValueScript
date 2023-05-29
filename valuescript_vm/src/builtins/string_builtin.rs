@@ -15,8 +15,6 @@ use super::range_error_builtin::ToRangeError;
 
 pub struct StringBuiltin {}
 
-pub static STRING_BUILTIN: StringBuiltin = StringBuiltin {};
-
 impl BuiltinObject for StringBuiltin {
   fn bo_name() -> &'static str {
     "String"

@@ -14,8 +14,6 @@ use super::builtin_object::BuiltinObject;
 
 pub struct NumberBuiltin {}
 
-pub static NUMBER_BUILTIN: NumberBuiltin = NumberBuiltin {};
-
 impl BuiltinObject for NumberBuiltin {
   fn bo_name() -> &'static str {
     "Number"

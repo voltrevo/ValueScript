@@ -9,8 +9,6 @@ use super::builtin_object::BuiltinObject;
 
 pub struct DebugBuiltin {}
 
-pub static DEBUG_BUILTIN: DebugBuiltin = DebugBuiltin {};
-
 impl BuiltinObject for DebugBuiltin {
   fn bo_name() -> &'static str {
     "Debug"

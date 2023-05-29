@@ -11,8 +11,6 @@ use super::builtin_object::BuiltinObject;
 
 pub struct BooleanBuiltin {}
 
-pub static BOOLEAN_BUILTIN: BooleanBuiltin = BooleanBuiltin {};
-
 impl BuiltinObject for BooleanBuiltin {
   fn bo_name() -> &'static str {
     "Boolean"

@@ -10,8 +10,6 @@ use super::builtin_object::BuiltinObject;
 
 pub struct SymbolBuiltin {}
 
-pub static SYMBOL_BUILTIN: SymbolBuiltin = SymbolBuiltin {};
-
 impl BuiltinObject for SymbolBuiltin {
   fn bo_name() -> &'static str {
     "Symbol"

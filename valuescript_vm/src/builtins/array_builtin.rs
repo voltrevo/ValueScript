@@ -15,8 +15,6 @@ use super::{
 
 pub struct ArrayBuiltin {}
 
-pub static ARRAY_BUILTIN: ArrayBuiltin = ArrayBuiltin {};
-
 impl BuiltinObject for ArrayBuiltin {
   fn bo_name() -> &'static str {
     "Array"

@@ -15,8 +15,6 @@ use super::builtin_object::BuiltinObject;
 
 pub struct TypeErrorBuiltin {}
 
-pub static TYPE_ERROR_BUILTIN: TypeErrorBuiltin = TypeErrorBuiltin {};
-
 impl BuiltinObject for TypeErrorBuiltin {
   fn bo_name() -> &'static str {
     "TypeError"

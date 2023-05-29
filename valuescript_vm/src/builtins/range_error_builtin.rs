@@ -15,8 +15,6 @@ use super::builtin_object::BuiltinObject;
 
 pub struct RangeErrorBuiltin {}
 
-pub static RANGE_ERROR_BUILTIN: RangeErrorBuiltin = RangeErrorBuiltin {};
-
 impl BuiltinObject for RangeErrorBuiltin {
   fn bo_name() -> &'static str {
     "RangeError"

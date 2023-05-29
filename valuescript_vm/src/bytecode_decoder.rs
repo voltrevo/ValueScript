@@ -143,7 +143,7 @@ impl BytecodeDecoder {
         Val::Void => Val::Undefined,
         val => val,
       },
-      BytecodeType::Builtin => Val::Static(BUILTIN_VALS[self.decode_varsize_uint()]),
+      BytecodeType::Builtin => BUILTIN_VALS[self.decode_varsize_uint()](),
       BytecodeType::Class => VsClass {
         constructor: self.decode_val(registers),
         instance_prototype: self.decode_val(registers),
