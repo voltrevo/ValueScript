@@ -19,7 +19,7 @@ use crate::todo_fn::TODO;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
 use crate::vs_symbol::VsSymbol;
-use crate::vs_value::{LoadFunctionResult, ToCustomVal, ToVal, Val, ValTrait, VsType};
+use crate::vs_value::{LoadFunctionResult, ToDynamicVal, ToVal, Val, ValTrait, VsType};
 
 #[derive(Clone, Debug)]
 pub struct VsArray {
@@ -648,7 +648,7 @@ static UNSHIFT: NativeFunction = native_fn(|mut this, params| {
 
 pub static VALUES: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
-    Val::Array(array_data) => ArrayIterator::new(array_data.clone()).to_custom_val(),
+    Val::Array(array_data) => ArrayIterator::new(array_data.clone()).to_dynamic_val(),
     _ => return Err("array indirection".to_error()),
   })
 });

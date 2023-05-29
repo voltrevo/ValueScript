@@ -410,7 +410,7 @@ pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
     Val::Object(object_data) => Ok(object_data.sub(right)),
     Val::Function(_) | Val::Class(_) => Ok(Val::Undefined),
     Val::Static(s) => s.sub(right),
-    Val::Custom(custom_data) => custom_data.sub(right),
+    Val::Dynamic(dynamic_data) => dynamic_data.sub(right),
   }
 }
 
@@ -465,7 +465,7 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val
     Val::Function(_) => Err("TODO: function subscript assignment".to_type_error()),
     Val::Class(_) => Err("Cannot assign to subscript of class".to_type_error()),
     Val::Static(_) => Err("Cannot assign to subscript of static value".to_type_error()),
-    Val::Custom(_) => Err("TODO: Assign to subscript of custom value".to_type_error()),
+    Val::Dynamic(_) => Err("TODO: Assign to subscript of dynamic value".to_type_error()),
   }
 }
 

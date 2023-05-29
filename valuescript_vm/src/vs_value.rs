@@ -30,7 +30,7 @@ pub enum Val {
   Function(Rc<VsFunction>),
   Class(Rc<VsClass>),
   Static(&'static dyn ValTrait),
-  Custom(Rc<dyn ValTrait>),
+  Dynamic(Rc<dyn ValTrait>),
 }
 
 #[derive(PartialEq, Debug)]
@@ -120,7 +120,7 @@ impl ValTrait for Val {
       Function(_) => VsType::Function,
       Class(_) => VsType::Class,
       Static(val) => val.typeof_(),
-      Custom(val) => val.typeof_(),
+      Dynamic(val) => val.typeof_(),
     };
   }
 
@@ -145,7 +145,7 @@ impl ValTrait for Val {
       Function(_) => f64::NAN,
       Class(_) => f64::NAN,
       Static(val) => val.to_number(),
-      Custom(val) => val.to_number(),
+      Dynamic(val) => val.to_number(),
     };
   }
 
@@ -169,7 +169,7 @@ impl ValTrait for Val {
       Function(_) => None,
       Class(_) => None,
       Static(val) => val.to_index(),
-      Custom(val) => val.to_index(),
+      Dynamic(val) => val.to_index(),
     };
   }
 
@@ -190,7 +190,7 @@ impl ValTrait for Val {
       Function(_) => false,
       Class(_) => false,
       Static(val) => val.is_primitive(), // TODO: false?
-      Custom(val) => val.is_primitive(),
+      Dynamic(val) => val.is_primitive(),
     };
   }
 
@@ -211,7 +211,7 @@ impl ValTrait for Val {
       Function(_) => true,
       Class(_) => true,
       Static(val) => val.is_truthy(), // TODO: true?
-      Custom(val) => val.is_truthy(),
+      Dynamic(val) => val.is_truthy(),
     };
   }
 
@@ -232,7 +232,7 @@ impl ValTrait for Val {
       Function(_) => false,
       Class(_) => false,
       Static(_) => false,
-      Custom(val) => val.is_nullish(),
+      Dynamic(val) => val.is_nullish(),
     };
   }
 
@@ -242,7 +242,7 @@ impl ValTrait for Val {
     return match self {
       Function(f) => Some(f.bind(params).to_val()),
       Static(val) => val.bind(params),
-      Custom(val) => val.bind(params),
+      Dynamic(val) => val.bind(params),
 
       _ => None,
     };
@@ -254,7 +254,7 @@ impl ValTrait for Val {
     return match self {
       BigInt(b) => Some(b.clone()),
       // TODO: Static? Others too?
-      Custom(val) => val.as_bigint_data(),
+      Dynamic(val) => val.as_bigint_data(),
 
       _ => None,
     };
@@ -265,7 +265,7 @@ impl ValTrait for Val {
 
     return match self {
       Array(a) => Some(a.clone()),
-      Custom(val) => val.as_array_data(),
+      Dynamic(val) => val.as_array_data(),
 
       _ => None,
     };
@@ -277,7 +277,7 @@ impl ValTrait for Val {
     return match self {
       Class(class) => Some(class.clone()),
       Static(s) => s.as_class_data(),
-      Custom(val) => val.as_class_data(),
+      Dynamic(val) => val.as_class_data(),
 
       _ => None,
     };
@@ -289,7 +289,7 @@ impl ValTrait for Val {
     return match self {
       Function(f) => LoadFunctionResult::StackFrame(f.make_frame()),
       Static(s) => s.load_function(),
-      Custom(val) => val.load_function(),
+      Dynamic(val) => val.load_function(),
 
       _ => LoadFunctionResult::NotAFunction,
     };
@@ -380,7 +380,7 @@ impl ValTrait for Val {
       Val::Function(_) => "() => { [unavailable] }".to_string(),
       Val::Class(_) => "class { [unavailable] }".to_string(),
       Val::Static(val) => val.codify(),
-      Val::Custom(val) => val.codify(),
+      Val::Dynamic(val) => val.codify(),
     }
   }
 }
@@ -435,7 +435,7 @@ impl fmt::Display for Val {
       Function(_) => write!(f, "[function]"),
       Class(_) => write!(f, "[class]"),
       Static(val) => val.fmt(f),
-      Custom(val) => val.fmt(f),
+      Dynamic(val) => val.fmt(f),
     }
   }
 }
@@ -504,16 +504,16 @@ where
   }
 }
 
-pub trait ToCustomVal {
-  fn to_custom_val(self) -> Val;
+pub trait ToDynamicVal {
+  fn to_dynamic_val(self) -> Val;
 }
 
-impl<T> ToCustomVal for T
+impl<T> ToDynamicVal for T
 where
   T: ValTrait + 'static,
 {
-  fn to_custom_val(self) -> Val {
-    Val::Custom(Rc::new(self))
+  fn to_dynamic_val(self) -> Val {
+    Val::Dynamic(Rc::new(self))
   }
 }
 
@@ -601,7 +601,7 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
 
       // TODO: Improve printing these
       Val::Static(s) => s.pretty_fmt(f),
-      Val::Custom(c) => c.pretty_fmt(f),
+      Val::Dynamic(c) => c.pretty_fmt(f),
     }
   }
 }
