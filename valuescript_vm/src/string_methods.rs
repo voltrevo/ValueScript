@@ -3,35 +3,40 @@ use std::{rc::Rc, str::Chars};
 use crate::{
   builtins::error_builtin::ToError,
   helpers::{to_wrapping_index, to_wrapping_index_clamped},
+  iteration::string_iterator::StringIterator,
   native_function::{native_fn, NativeFunction},
-  vs_value::{ToVal, Val},
+  vs_symbol::VsSymbol,
+  vs_value::{ToDynamicVal, ToVal, Val},
   ValTrait,
 };
 
 pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
-  let right_index = match subscript.to_index() {
-    None => {
-      let method = subscript.to_string();
-      let method_str = method.as_str();
+  if let Some(subscript) = subscript.to_index() {
+    let string_bytes = string_data.as_bytes();
 
-      return match method_str {
-        "length" => Val::Number(string_data.as_bytes().len() as f64),
-        _ => get_string_method(method_str),
-      };
+    if subscript >= string_bytes.len() {
+      return Val::Undefined;
     }
-    Some(i) => i,
+
+    return match unicode_at(string_bytes, string_bytes.len(), subscript) {
+      Some(char) => char.to_string().to_val(),
+      None => "".to_val(),
+    };
+  }
+
+  if let Val::Symbol(subscript) = subscript {
+    match subscript {
+      VsSymbol::ITERATOR => return VALUES.to_val(),
+    }
+  }
+
+  let method = subscript.to_string();
+  let method_str = method.as_str();
+
+  return match method_str {
+    "length" => Val::Number(string_data.as_bytes().len() as f64),
+    _ => get_string_method(method_str),
   };
-
-  let string_bytes = string_data.as_bytes();
-
-  if right_index >= string_bytes.len() {
-    return Val::Undefined;
-  }
-
-  match unicode_at(string_bytes, string_bytes.len(), right_index) {
-    Some(char) => char.to_string().to_val(),
-    None => "".to_val(),
-  }
 }
 
 pub fn get_string_method(method: &str) -> Val {
@@ -652,6 +657,13 @@ static TRIM_START: NativeFunction = native_fn(|this, _params| {
 static VALUE_OF: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::String(string_data) => Val::String(string_data.clone()),
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static VALUES: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::String(string_data) => StringIterator::new(string_data.clone()).to_dynamic_val(),
     _ => return Err("string indirection".to_error()),
   })
 });

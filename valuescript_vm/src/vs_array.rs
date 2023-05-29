@@ -646,7 +646,7 @@ static UNSHIFT: NativeFunction = native_fn(|mut this, params| {
   })
 });
 
-pub static VALUES: NativeFunction = native_fn(|this, _params| {
+static VALUES: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::Array(array_data) => ArrayIterator::new(array_data.clone()).to_dynamic_val(),
     _ => return Err("array indirection".to_error()),
