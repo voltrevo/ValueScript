@@ -231,6 +231,15 @@ impl Assembler {
         self.label_ref(label_ref);
         self.register(register);
       }
+      Next(iter, dst) => {
+        self.register(iter);
+        self.register(dst);
+      }
+      UnpackIterRes(iter_res, value_dst, done_dst) => {
+        self.register(iter_res);
+        self.register(value_dst);
+        self.register(done_dst);
+      }
     }
   }
 

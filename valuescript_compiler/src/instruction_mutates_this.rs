@@ -50,6 +50,11 @@ pub fn instruction_mutates_this(instruction: &Instruction) -> bool {
     | ConstSubCall(_, _, _, reg)
     | ThisSubCall(_, _, _, reg) => reg == &Register::This,
 
+    Next(iter, res) => iter == &Register::This || res == &Register::This,
+    UnpackIterRes(_, value_reg, done_reg) => {
+      value_reg == &Register::This || done_reg == &Register::This
+    }
+
     Apply(_, ctx, _, reg) | SubCall(ctx, _, _, reg) => {
       reg == &Register::This
         || match ctx {

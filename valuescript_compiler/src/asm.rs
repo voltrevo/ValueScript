@@ -290,6 +290,8 @@ pub enum Instruction {
   ConstSubCall(Value, Value, Value, Register),
   RequireMutableThis,
   ThisSubCall(Value, Value, Value, Register),
+  Next(Register, Register),
+  UnpackIterRes(Register, Register, Register),
 }
 
 impl std::fmt::Display for Instruction {
@@ -445,6 +447,16 @@ impl std::fmt::Display for Instruction {
           obj, subscript, args, register
         )
       }
+      Instruction::Next(obj, register) => {
+        write!(f, "next {} {}", obj, register)
+      }
+      Instruction::UnpackIterRes(obj, value_register, done_register) => {
+        write!(
+          f,
+          "unpack_iter_res {} {} {}",
+          obj, value_register, done_register
+        )
+      }
     }
   }
 }
@@ -507,6 +519,8 @@ impl Instruction {
       ConstSubCall(..) => InstructionByte::ConstSubCall,
       RequireMutableThis => InstructionByte::RequireMutableThis,
       ThisSubCall(..) => InstructionByte::ThisSubCall,
+      Next(..) => InstructionByte::Next,
+      UnpackIterRes(..) => InstructionByte::UnpackIterRes,
     }
   }
 }

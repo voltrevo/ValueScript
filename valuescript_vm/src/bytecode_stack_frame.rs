@@ -458,6 +458,9 @@ impl StackFrameTrait for BytecodeStackFrame {
           return Err("Cannot mutate this because it is const".to_type_error());
         }
       }
+
+      Next => todo!(),
+      UnpackIterRes => todo!(),
     };
 
     Ok(FrameStepOk::Continue)

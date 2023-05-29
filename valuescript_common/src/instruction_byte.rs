@@ -52,6 +52,8 @@ pub enum InstructionByte {
   ConstSubCall = 0x31,
   RequireMutableThis = 0x32,
   ThisSubCall = 0x33,
+  Next = 0x34,
+  UnpackIterRes = 0x35,
 }
 
 impl InstructionByte {
@@ -111,6 +113,8 @@ impl InstructionByte {
       0x31 => ConstSubCall,
       0x32 => RequireMutableThis,
       0x33 => ThisSubCall,
+      0x34 => Next,
+      0x35 => UnpackIterRes,
 
       _ => panic!("Unrecognized instruction: {}", byte),
     };
