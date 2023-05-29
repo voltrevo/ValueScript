@@ -6,8 +6,8 @@ use std::rc::Rc;
 use swc_common::Spanned;
 
 use crate::asm::{
-  Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Label, Pointer,
-  Register, Value,
+  Array, Builtin, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Label,
+  Pointer, Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
@@ -999,21 +999,34 @@ impl FunctionCompiler {
   }
 
   fn for_of(&mut self, for_of: &swc_ecma_ast::ForOfStmt) {
-    let index_reg = self.allocate_numbered_reg(&"_for_of_i".to_string());
-    self.push(Instruction::Mov(Value::Number(0.0), index_reg.clone()));
-
-    let array_reg = self.allocate_numbered_reg(&"_for_of_array".to_string());
-
     let mut ec = ExpressionCompiler { fnc: self };
 
-    ec.compile(&for_of.right, Some(array_reg.clone()));
+    let pat = match &for_of.left {
+      swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
+        if var_decl.decls.len() != 1 {
+          panic!("Unexpected number of declarations on left side of for-of loop");
+        }
 
-    let len_reg = ec.fnc.allocate_numbered_reg(&"_for_of_len".to_string());
+        &var_decl.decls[0].name
+      }
+      swc_ecma_ast::VarDeclOrPat::Pat(pat) => pat,
+    };
 
-    ec.fnc.push(Instruction::Sub(
-      Value::Register(array_reg.clone()),
-      Value::String("length".to_string()),
-      len_reg.clone(),
+    let value_reg = ec.fnc.get_pattern_register(pat);
+
+    let iter_reg = ec.fnc.allocate_numbered_reg(&"_iter".to_string());
+    let iter_res_reg = ec.fnc.allocate_numbered_reg(&"_iter_res".to_string());
+    let done_reg = ec.fnc.allocate_numbered_reg(&"_done".to_string());
+
+    ec.compile(&for_of.right, Some(iter_reg.clone()));
+
+    ec.fnc.push(Instruction::SubCall(
+      Value::Register(iter_reg.clone()),
+      Value::Builtin(Builtin {
+        name: "SymbolIterator".to_string(),
+      }),
+      Value::Array(Box::new(Array::default())),
+      iter_reg.clone(),
     ));
 
     let for_test_label = Label {
@@ -1037,6 +1050,8 @@ impl FunctionCompiler {
         .allocate_numbered(&"for_end".to_string()),
     };
 
+    ec.fnc.push(Instruction::Jmp(for_continue_label.ref_()));
+
     ec.fnc.label(for_test_label.clone());
 
     ec.fnc.loop_labels.push(LoopLabels {
@@ -1044,45 +1059,24 @@ impl FunctionCompiler {
       break_: for_end_label.clone(),
     });
 
-    let cond_reg = ec.fnc.allocate_numbered_reg(&"_for_of_cond".to_string());
-
-    ec.fnc.push(Instruction::OpTripleEq(
-      Value::Register(index_reg.clone()),
-      Value::Register(len_reg.clone()),
-      cond_reg.clone(),
-    ));
-
     ec.fnc.push(Instruction::JmpIf(
-      Value::Register(cond_reg.clone()),
+      Value::Register(done_reg.clone()),
       for_end_label.ref_(),
     ));
 
-    let pat = match &for_of.left {
-      swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
-        if var_decl.decls.len() != 1 {
-          panic!("Unexpected number of declarations on left side of for-of loop");
-        }
-
-        &var_decl.decls[0].name
-      }
-      swc_ecma_ast::VarDeclOrPat::Pat(pat) => pat,
-    };
-
-    let element_reg = ec.fnc.get_pattern_register(pat);
-
-    ec.fnc.push(Instruction::Sub(
-      Value::Register(array_reg.clone()),
-      Value::Register(index_reg.clone()),
-      element_reg.clone(),
-    ));
-
-    ec.pat(pat, &element_reg, true);
+    ec.pat(pat, &value_reg, true);
 
     self.statement(&for_of.body, false);
 
     self.label(for_continue_label);
+    self.push(Instruction::Next(iter_reg, iter_res_reg.clone()));
 
-    self.push(Instruction::OpInc(index_reg.clone()));
+    self.push(Instruction::UnpackIterRes(
+      iter_res_reg,
+      value_reg,
+      done_reg,
+    ));
+
     self.push(Instruction::Jmp(for_test_label.ref_()));
 
     self.label(for_end_label);
