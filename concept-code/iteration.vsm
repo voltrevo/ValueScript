@@ -1,19 +1,20 @@
 export @_anon0 {}
 
 @_anon0 = function() {
-  mov 0 %sub
+  mov 0 %sum
   mov [1, 2, 3] %nums
 
-  sub %nums $SymbolIterator %_iter0
+  sub $Symbol "iterator" %symbol_dot_iterator
+  subcall %nums %symbol_dot_iterator [] %_iter0
   jmp :for_continue0
 
 for_test0:
   jmpif %_done0 :for_end0
-  op+ %sub %_value0 %sub
+  op+ %sum %_value0 %sum
 
 for_continue0:
   next %_iter0 %_iter_res0
-  unpack_iter_res %_value0 %_done0
+  unpack_iter_res %_iter_res0 %_value0 %_done0
   jmp :for_test0
 
 for_end0:

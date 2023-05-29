@@ -459,8 +459,54 @@ impl StackFrameTrait for BytecodeStackFrame {
         }
       }
 
-      Next => todo!(),
-      UnpackIterRes => todo!(),
+      Next => {
+        let iter_i = match self.decoder.decode_register_index() {
+          Some(i) => i,
+          None => panic!("The ignore register is not iterable"),
+        };
+
+        let res_i = self.decoder.decode_register_index();
+
+        let next_fn = operations::op_sub(self.registers[iter_i].clone(), "next".to_val())?;
+
+        match next_fn.load_function() {
+          LoadFunctionResult::NotAFunction => {
+            return Err(".next() is not a function".to_type_error())
+          }
+          LoadFunctionResult::NativeFunction(fn_) => {
+            let res = fn_(ThisWrapper::new(false, &mut self.registers[iter_i]), vec![])?;
+
+            if let Some(res_i) = res_i {
+              self.registers[res_i] = res;
+            }
+          }
+          LoadFunctionResult::StackFrame(mut new_frame) => {
+            new_frame.write_this(false, self.registers[iter_i].clone())?;
+
+            self.return_target = res_i;
+            self.this_target = Some(iter_i);
+
+            return Ok(FrameStepOk::Push(new_frame));
+          }
+        };
+      }
+
+      UnpackIterRes => {
+        let iter_res_i = match self.decoder.decode_register_index() {
+          Some(i) => i,
+          None => panic!("Can't unpack the ignore register"),
+        };
+
+        if let Some(value_i) = self.decoder.decode_register_index() {
+          self.registers[value_i] =
+            operations::op_sub(self.registers[iter_res_i].clone(), "value".to_val())?;
+        }
+
+        if let Some(done_i) = self.decoder.decode_register_index() {
+          self.registers[done_i] =
+            operations::op_sub(self.registers[iter_res_i].clone(), "done".to_val())?;
+        }
+      }
     };
 
     Ok(FrameStepOk::Continue)
