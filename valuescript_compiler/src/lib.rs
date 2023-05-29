@@ -15,6 +15,7 @@ mod name_allocator;
 mod resolve_path;
 mod scope;
 mod scope_analysis;
+mod static_eval_expr;
 
 pub use assembler::assemble;
 pub use assembly_parser::parse_module;

@@ -14,9 +14,10 @@ use crate::asm::{
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
 use crate::function_compiler::{FunctionCompiler, Functionish};
-use crate::name_allocator::NameAllocator;
+use crate::name_allocator::{ident_from_str, NameAllocator};
 use crate::scope::OwnerId;
 use crate::scope_analysis::ScopeAnalysis;
+use crate::static_eval_expr::static_eval_expr;
 
 struct DiagnosticCollector {
   diagnostics: Arc<Mutex<Vec<Diagnostic>>>,
@@ -781,14 +782,28 @@ impl ModuleCompiler {
         Constructor(_) => {}
         Method(method) => {
           let name = match &method.key {
-            swc_ecma_ast::PropName::Ident(ident) => ident.sym.to_string(),
+            swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
+            swc_ecma_ast::PropName::Computed(computed) => match static_eval_expr(&computed.expr) {
+              None => {
+                self.todo(
+                  computed.span,
+                  "Couldn't statically evaluate computed prop name",
+                );
+                continue;
+              }
+              Some(value) => value,
+            },
             _ => {
               self.todo(method.span, "Non-identifier method name");
               continue;
             }
           };
 
-          let method_defn_name = self.allocate_defn(&format!("{}_{}", defn_name.name, name));
+          let method_defn_name = self.allocate_defn(&ident_from_str(&format!(
+            "{}_{}",
+            defn_name.name,
+            name.to_string()
+          )));
 
           dependent_definitions.append(&mut self.compile_fn(
             method_defn_name.clone(),
@@ -798,7 +813,7 @@ impl ModuleCompiler {
 
           methods
             .properties
-            .push((Value::String(name), Value::Pointer(method_defn_name)));
+            .push((name, Value::Pointer(method_defn_name)));
         }
         PrivateMethod(private_method) => self.todo(private_method.span, "PrivateMethod"),
 

@@ -67,6 +67,43 @@ impl NameAllocator {
   }
 }
 
+pub fn ident_from_str(str: &str) -> String {
+  let mut res = "".to_string();
+  let mut first = false;
+  let mut last_sep = false;
+
+  for c in str.chars() {
+    if first {
+      first = false;
+
+      if c.is_ascii_alphabetic() {
+        res.push(c);
+        continue;
+      }
+
+      res.push('_');
+      last_sep = true;
+    }
+
+    if !c.is_ascii_alphanumeric() {
+      if !last_sep {
+        res.push('_');
+        last_sep = true;
+      }
+
+      continue;
+    }
+
+    res.push(c);
+    last_sep = false;
+  }
+
+  match last_sep && res.len() > 1 {
+    false => res,
+    true => res[0..res.len() - 1].to_string(),
+  }
+}
+
 #[derive(Default)]
 pub struct PointerAllocator {
   alloc: NameAllocator,
