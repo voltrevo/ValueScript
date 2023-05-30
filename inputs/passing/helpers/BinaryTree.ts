@@ -23,18 +23,52 @@ export default class BinaryTree<T extends NotNullish> {
   toArray() {
     let res: T[] = [];
 
-    if (this.left) {
-      res = res.concat(this.left.toArray());
-    }
-
-    if (this.value !== undefined) {
-      res.push(this.value);
-    }
-
-    if (this.right) {
-      res = res.concat(this.right.toArray());
+    for (const value of this) {
+      res.push(value);
     }
 
     return res;
+  }
+
+  [Symbol.iterator]() {
+    let iter = new BinaryTreeIterator<T>();
+    iter.stack.push({ type: "tree", data: this });
+
+    return iter;
+  }
+}
+
+class BinaryTreeIterator<T extends NotNullish> {
+  stack:
+    ({ type: "tree"; data: BinaryTree<T> } | { type: "value"; data: T })[] = [];
+
+  next(): { done: true } | { value: T; done: false } {
+    const item = this.stack.pop();
+
+    if (item === undefined) {
+      return { done: true };
+    }
+
+    if (item.type === "tree") {
+      this.pushTree(item.data.right);
+      this.pushValue(item.data.value);
+      this.pushTree(item.data.left);
+
+      return this.next();
+    }
+
+    return { value: item.data, done: false };
+  }
+
+  pushTree(tree?: BinaryTree<T>) {
+    if (tree !== undefined) {
+      this.stack.push({ type: "tree", data: tree });
+    }
+  }
+
+  pushValue(value?: T) {
+    if (value !== undefined) {
+      this.stack.push({ type: "value", data: value });
+    }
   }
 }
