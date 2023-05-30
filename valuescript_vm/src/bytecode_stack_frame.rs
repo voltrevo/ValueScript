@@ -57,36 +57,56 @@ impl BytecodeStackFrame {
   }
 
   pub fn transfer_parameters(&mut self, new_frame: &mut StackFrame) {
-    let bytecode_type = self.decoder.decode_type();
+    let bytecode_type = self.decoder.peek_type();
 
-    if bytecode_type != BytecodeType::Array {
-      panic!("Not implemented: call instruction not using inline array");
+    if bytecode_type == BytecodeType::Array {
+      self.decoder.decode_type();
+
+      while self.decoder.peek_type() != BytecodeType::End {
+        let p = self.decoder.decode_val(&self.registers);
+        new_frame.write_param(p);
+      }
+
+      self.decoder.decode_type(); // End (TODO: assert)
+
+      return;
     }
 
-    while self.decoder.peek_type() != BytecodeType::End {
-      let p = self.decoder.decode_val(&self.registers);
-      new_frame.write_param(p);
-    }
+    let params = self.decoder.decode_val(&self.registers);
 
-    self.decoder.decode_type(); // End (TODO: assert)
+    match params {
+      Val::Array(array_data) => {
+        for param in &array_data.elements {
+          new_frame.write_param(param.clone())
+        }
+      }
+      _ => panic!("Unexpected non-array params"),
+    }
   }
 
   pub fn decode_parameters(&mut self) -> Vec<Val> {
     let mut res = Vec::<Val>::new();
 
-    let bytecode_type = self.decoder.decode_type();
+    let bytecode_type = self.decoder.peek_type();
 
-    if bytecode_type != BytecodeType::Array {
-      panic!("Not implemented: call instruction not using inline array");
+    if bytecode_type == BytecodeType::Array {
+      self.decoder.decode_type();
+
+      while self.decoder.peek_type() != BytecodeType::End {
+        res.push(self.decoder.decode_val(&self.registers));
+      }
+
+      self.decoder.decode_type(); // End (TODO: assert)
+
+      return res;
     }
 
-    while self.decoder.peek_type() != BytecodeType::End {
-      res.push(self.decoder.decode_val(&self.registers));
+    let params = self.decoder.decode_val(&self.registers);
+
+    match params {
+      Val::Array(array_data) => array_data.elements.clone(),
+      _ => panic!("Unexpected non-array params"),
     }
-
-    self.decoder.decode_type(); // End (TODO: assert)
-
-    return res;
   }
 }
 
