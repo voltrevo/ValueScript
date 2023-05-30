@@ -1,4 +1,4 @@
-// test_output! "right"
+//! test_output("right")
 
 export default function main() {
   let x;

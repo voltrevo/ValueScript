@@ -1,4 +1,4 @@
-// test_output! [[true,false,true,false,false,true]]
+//! test_output([[true,false,true,false,false,true]])
 
 export default function () {
   const startsWithTests = [

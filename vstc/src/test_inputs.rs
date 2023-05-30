@@ -3,11 +3,12 @@ mod tests {
   use std::collections::HashSet;
   use std::fs;
   use std::path::{Path, PathBuf};
+  use std::rc::Rc;
 
   use valuescript_compiler::compile;
   use valuescript_compiler::{assemble, parse_module};
-  use valuescript_vm::ValTrait;
   use valuescript_vm::VirtualMachine;
+  use valuescript_vm::{Bytecode, ValTrait};
 
   use crate::handle_diagnostics_cli::handle_diagnostics_cli;
   use crate::resolve_entry_path::resolve_entry_path;
@@ -32,11 +33,11 @@ mod tests {
       let file_contents = fs::read_to_string(&file_path).expect("Failed to read file contents");
 
       if let Some(first_line) = file_contents.lines().next() {
-        if first_line.starts_with("//! test_output ") {
+        if first_line.starts_with("// test_output! ") {
           println!("\nTesting {} ...", file_path.to_str().unwrap());
 
           let output_str = first_line
-            .split_once("//! test_output ")
+            .split_once("// test_output! ")
             .map(|x| x.1)
             .unwrap_or("");
 
@@ -70,20 +71,20 @@ mod tests {
             .module
             .expect("Should have exited if module is None");
 
-          let bytecode = assemble(&module);
+          let bytecode = Rc::new(Bytecode::new(assemble(&module)));
 
           let assembly = module.to_string();
           let parsed_assembly = parse_module(&assembly);
           let bytecode_via_assembly = assemble(&parsed_assembly);
 
-          if bytecode != bytecode_via_assembly {
+          if bytecode.code != bytecode_via_assembly {
             println!("  Bytecode mismatch between original and parsed assembly");
             failed_paths.insert(file_path.clone());
           }
 
           let mut vm = VirtualMachine::new();
 
-          let result = vm.run(&bytecode, &[]);
+          let result = vm.run(bytecode, Some(2_000_000), &[]);
 
           let result_str = match result {
             Ok(val) => val.codify(),

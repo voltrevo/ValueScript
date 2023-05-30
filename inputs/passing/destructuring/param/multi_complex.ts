@@ -1,4 +1,4 @@
-// test_output! [55,145,237,43,31]
+//! test_output([55,145,237,43,31])
 
 export default function main() {
   return [

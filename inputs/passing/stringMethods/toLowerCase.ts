@@ -1,4 +1,4 @@
-// test_output! [["abc","xyz","a1b2c3","hello world","áéíóú"]]
+//! test_output([["abc","xyz","a1b2c3","hello world","áéíóú"]])
 
 export default function () {
   const toLowerCaseTests = [

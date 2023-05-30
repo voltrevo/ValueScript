@@ -1,4 +1,4 @@
-// test_output! false
+//! test_output(false)
 
 export default function main() {
   const leftBowl = ["apple", "mango"];

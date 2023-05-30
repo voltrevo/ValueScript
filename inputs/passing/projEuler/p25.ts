@@ -1,4 +1,4 @@
-// test_output! 4782
+//! test_output(4782)
 
 export default function main() {
   let fibLast = 1n;

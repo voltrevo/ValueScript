@@ -1,4 +1,4 @@
-// test_output! [1,4,9]
+//! test_output([1,4,9])
 
 export default function main() {
   let x = 0;

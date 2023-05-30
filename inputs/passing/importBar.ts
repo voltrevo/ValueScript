@@ -1,4 +1,4 @@
-// test_output! ["this is the bar function","this is the bar function"]
+//! test_output(["this is the bar function","this is the bar function"])
 
 import { bar, barExported } from "./helpers/bar.ts";
 

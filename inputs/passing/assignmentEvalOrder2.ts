@@ -1,4 +1,4 @@
-// test_output! ["a","b"]
+//! test_output(["a","b"])
 
 export default function main() {
   let log = [];

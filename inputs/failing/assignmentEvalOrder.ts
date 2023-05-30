@@ -1,4 +1,4 @@
-// test_output! {"right":"right"}
+//! test_output({"right":"right"})
 // (This is wrong.)
 // Note: The reason for the error (at the time of writing) is not actually
 // evaluation order but the use of the *register* %key for the left side. `key`

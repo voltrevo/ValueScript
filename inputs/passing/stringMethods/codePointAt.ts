@@ -1,4 +1,4 @@
-// test_output! [128640,undefined,undefined,undefined,127865,undefined,undefined,undefined,97,98,99,163,undefined,54620,undefined,undefined,127912,undefined,undefined,undefined]
+//! test_output([128640,undefined,undefined,undefined,127865,undefined,undefined,undefined,97,98,99,163,undefined,54620,undefined,undefined,127912,undefined,undefined,undefined])
 
 // ValueScript uses utf8, so it deviates from JavaScript's utf16.
 // We're also not really doing the utf8 equivalent of JavaScript's utf16 either.

@@ -1,4 +1,4 @@
-// test_output! 4
+//! test_output(4)
 // (This is wrong.)
 
 export default function main() {

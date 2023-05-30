@@ -1,4 +1,4 @@
-// test_output! [["abc","abc","abc","a b c",""]]
+//! test_output([["abc","abc","abc","a b c",""]])
 
 export default function () {
   const trimTests = [

@@ -1,4 +1,4 @@
-// test_output! 137846528820
+//! test_output(137846528820)
 
 export default function main() {
   let rc = new RouteCalculator();

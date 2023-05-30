@@ -1,4 +1,4 @@
-// test_output! [[1,2,5],[1,2,3,4,5]]
+//! test_output([[1,2,5],[1,2,3,4,5]])
 
 import BinaryTree from "./helpers/BinaryTree.ts";
 

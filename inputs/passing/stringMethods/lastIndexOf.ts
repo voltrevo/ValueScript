@@ -1,4 +1,4 @@
-// test_output! [[4,2,4,6],[-1,-1]]
+//! test_output([[4,2,4,6],[-1,-1]])
 
 export default function () {
   const positive = [

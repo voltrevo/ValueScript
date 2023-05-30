@@ -1,4 +1,4 @@
-// test_output! "Probably 5537376230 (trailing digits: 39036)"
+//! test_output("Probably 5537376230 (trailing digits: 39036)")
 
 export default function main() {
   const numStrs = [

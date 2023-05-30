@@ -1,4 +1,4 @@
-// test_output! ["b","a"]
+//! test_output(["b","a"])
 
 export default function main() {
   const x = ['a', 'b'];
