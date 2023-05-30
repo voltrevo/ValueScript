@@ -3,6 +3,7 @@ use valuescript_common::InstructionByte;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
+use crate::cat_stack_frame::CatStackFrame;
 use crate::native_function::ThisWrapper;
 use crate::operations;
 use crate::stack_frame::FrameStepOk;
@@ -521,31 +522,20 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Cat => {
-        let mut vals = Vec::<Val>::new();
+        assert!(
+          self.decoder.decode_type() == BytecodeType::Array,
+          "TODO: cat non-inline arrays"
+        );
 
-        let bytecode_type = self.decoder.decode_type();
+        let cat_frame = CatStackFrame {
+          args: self.decoder.decode_vec_val(&self.registers),
+          i: 0,
+          res: vec![],
+        };
 
-        if bytecode_type != BytecodeType::Array {
-          panic!("Not implemented: cat instruction not using inline array");
-        }
+        self.return_target = self.decoder.decode_register_index();
 
-        while self.decoder.peek_type() != BytecodeType::End {
-          let iterable = self.decoder.decode_val(&self.registers);
-
-          match iterable {
-            Val::Array(array_data) => {
-              for item in &array_data.elements {
-                vals.push(item.clone());
-              }
-            }
-            _ => todo!("Cat: Non-array iterable"),
-          }
-        }
-
-        // TODO: Just skip the byte in release builds?
-        assert!(self.decoder.decode_type() == BytecodeType::End);
-
-        self.registers[self.decoder.decode_register_index().unwrap()] = vals.to_val();
+        return Ok(FrameStepOk::Push(Box::new(cat_frame)));
       }
     };
 

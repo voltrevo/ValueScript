@@ -34,6 +34,12 @@ pub enum Val {
   Dynamic(Rc<dyn DynValTrait>),
 }
 
+impl Default for Val {
+  fn default() -> Self {
+    Val::Void
+  }
+}
+
 #[derive(PartialEq, Debug)]
 pub enum VsType {
   Undefined,

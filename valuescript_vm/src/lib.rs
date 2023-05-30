@@ -4,6 +4,7 @@ mod builtins;
 mod bytecode;
 mod bytecode_decoder;
 mod bytecode_stack_frame;
+mod cat_stack_frame;
 mod first_stack_frame;
 mod helpers;
 mod iteration;

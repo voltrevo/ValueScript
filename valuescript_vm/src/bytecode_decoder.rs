@@ -102,17 +102,7 @@ impl BytecodeDecoder {
       BytecodeType::SignedByte => (self.decode_signed_byte() as f64).to_val(),
       BytecodeType::Number => self.decode_number().to_val(),
       BytecodeType::String => self.decode_string().to_val(),
-      BytecodeType::Array => {
-        let mut vals: Vec<Val> = Vec::new();
-
-        while self.peek_type() != BytecodeType::End {
-          vals.push(self.decode_val(registers));
-        }
-
-        self.decode_type(); // End (TODO: assert)
-
-        vals.to_val()
-      }
+      BytecodeType::Array => self.decode_vec_val(registers).to_val(),
       BytecodeType::Object => {
         let mut string_map: BTreeMap<String, Val> = BTreeMap::new();
         let mut symbol_map: BTreeMap<VsSymbol, Val> = BTreeMap::new();
@@ -152,6 +142,18 @@ impl BytecodeDecoder {
       BytecodeType::BigInt => self.decode_bigint().to_val(),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
+  }
+
+  pub fn decode_vec_val(&mut self, registers: &Vec<Val>) -> Vec<Val> {
+    let mut vals: Vec<Val> = Vec::new();
+
+    while self.peek_type() != BytecodeType::End {
+      vals.push(self.decode_val(registers));
+    }
+
+    self.decode_type(); // End (TODO: assert)
+
+    vals
   }
 
   pub fn decode_signed_byte(&mut self) -> i8 {

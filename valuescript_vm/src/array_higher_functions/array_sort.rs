@@ -316,6 +316,6 @@ impl StackFrameTrait for SortFrame {
   }
 
   fn catch_exception(&mut self, _exception: Val) -> bool {
-    return false;
+    false
   }
 }
