@@ -583,7 +583,9 @@ impl<'a> ExpressionCompiler<'a> {
       self.fnc.release_reg(&reg);
     }
 
-    segments.push(Value::Array(Box::new(Array { values: current })));
+    if !current.is_empty() {
+      segments.push(Value::Array(Box::new(Array { values: current })));
+    }
 
     let mut nested_registers = Vec::<Register>::new();
 
