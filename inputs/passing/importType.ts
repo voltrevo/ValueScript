@@ -1,6 +1,6 @@
 // test_output! "done"
 
-import { type Type } from "./Type.ts";
+import { type Type } from "./helpers/Type.ts";
 
 export default function main() {
   const msg: Type = "done";
