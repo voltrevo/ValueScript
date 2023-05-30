@@ -524,6 +524,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         let cat_frame = CatStackFrame::from_args(self.decoder.decode_vec_val(&self.registers));
 
+        self.this_target = None;
         self.return_target = self.decoder.decode_register_index();
 
         return Ok(FrameStepOk::Push(Box::new(cat_frame)));
