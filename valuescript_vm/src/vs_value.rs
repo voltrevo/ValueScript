@@ -388,7 +388,7 @@ impl ValTrait for Val {
         let mut res = String::new();
 
         if let Some(proto) = &object.prototype {
-          match op_sub(proto.clone(), "name".to_val()) {
+          match proto.sub("name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
                 res += &name.to_string();
@@ -607,7 +607,7 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
       }
       Val::Object(object) => {
         if let Some(proto) = &object.prototype {
-          match op_sub(proto.clone(), "name".to_val()) {
+          match proto.sub("name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
                 write!(f, "{} ", name)?;

@@ -3,9 +3,10 @@ use std::{collections::BTreeMap, rc::Rc};
 
 use crate::native_function::{native_fn, ThisWrapper};
 use crate::vs_value::ToVal;
+use crate::ValTrait;
 use crate::{
   native_function::NativeFunction,
-  operations::{op_sub, op_submov},
+  operations::op_submov,
   vs_class::VsClass,
   vs_object::VsObject,
   vs_value::{LoadFunctionResult, Val},
@@ -84,7 +85,7 @@ pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
 }
 
 static RANGE_ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
-  let message = op_sub(this.get().clone(), "message".to_val())?;
+  let message = this.get().sub("message".to_val())?;
   Ok(format!("RangeError({})", message).to_val())
 });
 

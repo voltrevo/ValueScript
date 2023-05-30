@@ -3,7 +3,7 @@ use std::{fmt, rc::Rc};
 use crate::{
   vs_class::VsClass,
   vs_symbol::VsSymbol,
-  vs_value::{LoadFunctionResult, Val},
+  vs_value::{LoadFunctionResult, ToVal, Val},
 };
 
 use super::builtin_object::BuiltinObject;
@@ -17,7 +17,7 @@ impl BuiltinObject for SymbolBuiltin {
 
   fn bo_sub(key: &str) -> Val {
     match key {
-      "iterator" => Val::Symbol(VsSymbol::ITERATOR),
+      "iterator" => VsSymbol::ITERATOR.to_val(),
       _ => Val::Undefined,
     }
   }

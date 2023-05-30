@@ -306,13 +306,10 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         let subscript = self.decoder.decode_val(&self.registers);
 
-        let fn_ = operations::op_sub(
-          match &obj {
-            ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
-            ThisArg::Val(val) => val.clone(),
-          },
-          subscript,
-        )?;
+        let fn_ = match &obj {
+          ThisArg::Register(reg_i) => self.registers[reg_i.clone()].sub(subscript)?,
+          ThisArg::Val(val) => val.sub(subscript)?,
+        };
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
@@ -480,7 +477,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         let res_i = self.decoder.decode_register_index();
 
-        let next_fn = operations::op_sub(self.registers[iter_i].clone(), "next".to_val())?;
+        let next_fn = self.registers[iter_i].sub("next".to_val())?;
 
         match next_fn.load_function() {
           LoadFunctionResult::NotAFunction => {
@@ -511,13 +508,11 @@ impl StackFrameTrait for BytecodeStackFrame {
         };
 
         if let Some(value_i) = self.decoder.decode_register_index() {
-          self.registers[value_i] =
-            operations::op_sub(self.registers[iter_res_i].clone(), "value".to_val())?;
+          self.registers[value_i] = self.registers[iter_res_i].sub("value".to_val())?;
         }
 
         if let Some(done_i) = self.decoder.decode_register_index() {
-          self.registers[done_i] =
-            operations::op_sub(self.registers[iter_res_i].clone(), "done".to_val())?;
+          self.registers[done_i] = self.registers[iter_res_i].sub("done".to_val())?;
         }
       }
 
@@ -527,11 +522,7 @@ impl StackFrameTrait for BytecodeStackFrame {
           "TODO: cat non-inline arrays"
         );
 
-        let cat_frame = CatStackFrame {
-          args: self.decoder.decode_vec_val(&self.registers),
-          i: 0,
-          res: vec![],
-        };
+        let cat_frame = CatStackFrame::from_args(self.decoder.decode_vec_val(&self.registers));
 
         self.return_target = self.decoder.decode_register_index();
 

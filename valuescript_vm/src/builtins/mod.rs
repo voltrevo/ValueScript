@@ -39,5 +39,5 @@ pub static BUILTIN_VALS: [fn() -> Val; BUILTIN_COUNT] = [
   || TypeErrorBuiltin {}.to_val(),
   || RangeErrorBuiltin {}.to_val(),
   || SymbolBuiltin {}.to_val(),
-  || Val::Symbol(VsSymbol::ITERATOR),
+  || VsSymbol::ITERATOR.to_val(),
 ];

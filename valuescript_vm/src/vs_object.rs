@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use crate::vs_symbol::VsSymbol;
 use crate::vs_value::ToVal;
+use crate::ValTrait;
 
-use super::operations::op_sub;
 use super::vs_value::Val;
 
 #[derive(Clone, Default, Debug)]
@@ -27,9 +27,7 @@ impl VsObject {
     }
 
     match &self.prototype {
-      Some(prototype) => op_sub(prototype.clone(), key)
-        .map_err(|e| e.to_string())
-        .unwrap(), // TODO: Exception
+      Some(prototype) => prototype.sub(key).map_err(|e| e.to_string()).unwrap(), // TODO: Exception
       None => Val::Undefined,
     }
   }

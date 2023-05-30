@@ -1020,7 +1020,7 @@ impl FunctionCompiler {
 
     ec.compile(&for_of.right, Some(iter_reg.clone()));
 
-    ec.fnc.push(Instruction::SubCall(
+    ec.fnc.push(Instruction::ConstSubCall(
       Value::Register(iter_reg.clone()),
       Value::Builtin(Builtin {
         name: "SymbolIterator".to_string(),

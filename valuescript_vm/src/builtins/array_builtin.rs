@@ -2,7 +2,6 @@ use std::{fmt, rc::Rc};
 
 use crate::{
   native_function::{native_fn, NativeFunction, ThisWrapper},
-  operations::op_sub,
   vs_array::VsArray,
   vs_class::VsClass,
   vs_value::{LoadFunctionResult, ToVal, Val},
@@ -70,7 +69,8 @@ static FROM: NativeFunction = native_fn(|_this, params| {
     Val::Void | Val::Undefined | Val::Null => return Err("items is not iterable".to_type_error()),
     Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => VsArray::new().to_val(),
     Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Dynamic(..) => {
-      let len = op_sub(first_param.clone(), "length".to_val())
+      let len = first_param
+        .sub("length".to_val())
         .map_err(|e| e.to_string())
         .unwrap() // TODO: Exception
         .to_number();
@@ -88,10 +88,10 @@ static FROM: NativeFunction = native_fn(|_this, params| {
       let mut arr = Vec::with_capacity(len);
 
       // TODO: We should probably use a frame and step through this
-      // Also using op_sub is slow. Should write specialized stuff instead.
       for i in 0..len {
         arr.push(
-          op_sub(first_param.clone(), Val::Number(i as f64))
+          first_param
+            .sub((i as f64).to_val())
             .map_err(|e| e.to_string())
             .unwrap(), // TODO: Exception
         );
