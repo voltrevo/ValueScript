@@ -128,14 +128,26 @@ impl StackFrameTrait for BytecodeStackFrame {
       OpInc => {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut val = self.registers[register_index].clone();
-        val = operations::op_plus(val, Val::Number(1_f64))?; // TODO: BigInt
+
+        match &mut val {
+          Val::Number(n) => *n += 1.0,
+          Val::BigInt(bi) => *bi += 1,
+          _ => val = operations::op_plus(val, 1.0.to_val())?,
+        };
+
         self.registers[register_index] = val;
       }
 
       OpDec => {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut val = self.registers[register_index].clone();
-        val = operations::op_minus(val, Val::Number(1_f64))?; // TODO: BigInt
+
+        match &mut val {
+          Val::Number(n) => *n -= 1.0,
+          Val::BigInt(bi) => *bi -= 1,
+          _ => val = operations::op_minus(val, 1.0.to_val())?,
+        };
+
         self.registers[register_index] = val;
       }
 
