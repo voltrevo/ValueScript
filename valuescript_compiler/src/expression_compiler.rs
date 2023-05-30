@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::mem::take;
 
 use queues::*;
 
@@ -527,46 +528,80 @@ impl<'a> ExpressionCompiler<'a> {
     array_exp: &swc_ecma_ast::ArrayLit,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let mut array_asm = Array::default();
+    let mut segments = Vec::<Value>::new();
+    let mut current = Vec::<Value>::new();
     let mut sub_nested_registers = Vec::<Register>::new();
 
     for i in 0..array_exp.elems.len() {
       match &array_exp.elems[i] {
         None => {
-          array_asm.values.push(Value::Void);
+          current.push(Value::Void);
         }
         Some(elem) => {
-          if elem.spread.is_some() {
-            self.fnc.todo(elem.span(), "spread expression");
-
-            let reg = self.fnc.allocate_numbered_reg("_todo_spread");
-
-            array_asm.values.push(Value::Register(reg));
-          } else {
-            let mut compiled_elem = self.compile(&*elem.expr, None);
-            array_asm.values.push(compiled_elem.value);
-            sub_nested_registers.append(&mut compiled_elem.nested_registers);
-            compiled_elem.release_checker.has_unreleased_registers = false;
+          if elem.spread.is_some() && !current.is_empty() {
+            segments.push(Value::Array(Box::new(Array {
+              values: take(&mut current),
+            })));
           }
+
+          let mut compiled_elem = self.compile(&*elem.expr, None);
+
+          if elem.spread.is_some() {
+            segments.push(compiled_elem.value);
+          } else {
+            current.push(compiled_elem.value);
+          }
+
+          sub_nested_registers.append(&mut compiled_elem.nested_registers);
+          compiled_elem.release_checker.has_unreleased_registers = false;
         }
       }
     }
 
-    return match target_register {
-      None => CompiledExpression::new(Value::Array(Box::new(array_asm)), sub_nested_registers),
-      Some(tr) => {
-        self.fnc.push(Instruction::Mov(
-          Value::Array(Box::new(array_asm)),
-          tr.clone(),
-        ));
+    if segments.is_empty() {
+      return match target_register {
+        None => CompiledExpression::new(
+          Value::Array(Box::new(Array { values: current })),
+          sub_nested_registers,
+        ),
+        Some(tr) => {
+          self.fnc.push(Instruction::Mov(
+            Value::Array(Box::new(Array { values: current })),
+            tr.clone(),
+          ));
 
-        for reg in sub_nested_registers {
-          self.fnc.release_reg(&reg);
+          for reg in sub_nested_registers {
+            self.fnc.release_reg(&reg);
+          }
+
+          CompiledExpression::new(Value::Register(tr), vec![])
         }
+      };
+    }
 
-        CompiledExpression::new(Value::Register(tr), vec![])
+    for reg in sub_nested_registers {
+      self.fnc.release_reg(&reg);
+    }
+
+    segments.push(Value::Array(Box::new(Array { values: current })));
+
+    let mut nested_registers = Vec::<Register>::new();
+
+    let res_reg = match target_register {
+      Some(target_register) => target_register,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
+        tmp
       }
     };
+
+    self.fnc.push(Instruction::Cat(
+      Value::Array(Box::new(Array { values: segments })),
+      res_reg.clone(),
+    ));
+
+    CompiledExpression::new(Value::Register(res_reg), nested_registers)
   }
 
   pub fn object_expression(
