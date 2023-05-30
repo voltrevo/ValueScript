@@ -14,5 +14,5 @@ export default function main() {
   tree.insert(3);
   tree.insert(4);
 
-  return [treeSnapshot.toArray(), tree.toArray()];
+  return [[...treeSnapshot], [...tree]];
 }

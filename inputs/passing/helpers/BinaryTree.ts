@@ -20,16 +20,6 @@ export default class BinaryTree<T extends NotNullish> {
     }
   }
 
-  toArray() {
-    let res: T[] = [];
-
-    for (const value of this) {
-      res.push(value);
-    }
-
-    return res;
-  }
-
   [Symbol.iterator]() {
     let iter = new BinaryTreeIterator<T>();
     iter.stack.push({ type: "tree", data: this });
