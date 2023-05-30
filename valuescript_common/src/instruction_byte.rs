@@ -54,6 +54,7 @@ pub enum InstructionByte {
   ThisSubCall = 0x33,
   Next = 0x34,
   UnpackIterRes = 0x35,
+  Cat = 0x36,
 }
 
 impl InstructionByte {
@@ -115,6 +116,7 @@ impl InstructionByte {
       0x33 => ThisSubCall,
       0x34 => Next,
       0x35 => UnpackIterRes,
+      0x36 => Cat,
 
       _ => panic!("Unrecognized instruction: {}", byte),
     };

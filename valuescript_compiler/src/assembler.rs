@@ -240,6 +240,10 @@ impl Assembler {
         self.register(value_dst);
         self.register(done_dst);
       }
+      Cat(iterables, dst) => {
+        self.value(iterables);
+        self.register(dst);
+      }
     }
   }
 

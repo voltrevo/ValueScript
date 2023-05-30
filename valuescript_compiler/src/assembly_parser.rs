@@ -229,6 +229,7 @@ impl<'a> AssemblyParser<'a> {
       ("this_subcall", InstructionByte::ThisSubCall),
       ("next", InstructionByte::Next),
       ("unpack_iter_res", InstructionByte::UnpackIterRes),
+      ("cat", InstructionByte::Cat),
     ]);
 
     for (word, instruction) in instruction_word_map {
@@ -693,6 +694,7 @@ impl<'a> AssemblyParser<'a> {
         self.assemble_register(),
         self.assemble_register(),
       ),
+      Cat => Instruction::Cat(self.assemble_value(), self.assemble_register()),
     }
   }
 

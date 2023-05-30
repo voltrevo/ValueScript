@@ -292,6 +292,7 @@ pub enum Instruction {
   ThisSubCall(Value, Value, Value, Register),
   Next(Register, Register),
   UnpackIterRes(Register, Register, Register),
+  Cat(Value, Register),
 }
 
 impl std::fmt::Display for Instruction {
@@ -457,6 +458,9 @@ impl std::fmt::Display for Instruction {
           obj, value_register, done_register
         )
       }
+      Instruction::Cat(iterables, register) => {
+        write!(f, "cat {} {}", iterables, register)
+      }
     }
   }
 }
@@ -521,6 +525,7 @@ impl Instruction {
       ThisSubCall(..) => InstructionByte::ThisSubCall,
       Next(..) => InstructionByte::Next,
       UnpackIterRes(..) => InstructionByte::UnpackIterRes,
+      Cat(..) => InstructionByte::Cat,
     }
   }
 }

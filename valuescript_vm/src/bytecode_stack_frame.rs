@@ -519,6 +519,34 @@ impl StackFrameTrait for BytecodeStackFrame {
             operations::op_sub(self.registers[iter_res_i].clone(), "done".to_val())?;
         }
       }
+
+      Cat => {
+        let mut vals = Vec::<Val>::new();
+
+        let bytecode_type = self.decoder.decode_type();
+
+        if bytecode_type != BytecodeType::Array {
+          panic!("Not implemented: cat instruction not using inline array");
+        }
+
+        while self.decoder.peek_type() != BytecodeType::End {
+          let iterable = self.decoder.decode_val(&self.registers);
+
+          match iterable {
+            Val::Array(array_data) => {
+              for item in &array_data.elements {
+                vals.push(item.clone());
+              }
+            }
+            _ => todo!("Cat: Non-array iterable"),
+          }
+        }
+
+        // TODO: Just skip the byte in release builds?
+        assert!(self.decoder.decode_type() == BytecodeType::End);
+
+        self.registers[self.decoder.decode_register_index().unwrap()] = vals.to_val();
+      }
     };
 
     Ok(FrameStepOk::Continue)
