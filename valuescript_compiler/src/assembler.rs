@@ -244,6 +244,10 @@ impl Assembler {
         self.value(iterables);
         self.register(dst);
       }
+      Yield(value, dst) => {
+        self.value(value);
+        self.register(dst);
+      }
     }
   }
 

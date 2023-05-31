@@ -293,6 +293,7 @@ pub enum Instruction {
   Next(Register, Register),
   UnpackIterRes(Register, Register, Register),
   Cat(Value, Register),
+  Yield(Value, Register),
 }
 
 impl std::fmt::Display for Instruction {
@@ -461,6 +462,9 @@ impl std::fmt::Display for Instruction {
       Instruction::Cat(iterables, register) => {
         write!(f, "cat {} {}", iterables, register)
       }
+      Instruction::Yield(value, register) => {
+        write!(f, "yield {} {}", value, register)
+      }
     }
   }
 }
@@ -526,6 +530,7 @@ impl Instruction {
       Next(..) => InstructionByte::Next,
       UnpackIterRes(..) => InstructionByte::UnpackIterRes,
       Cat(..) => InstructionByte::Cat,
+      Yield(..) => InstructionByte::Yield,
     }
   }
 }

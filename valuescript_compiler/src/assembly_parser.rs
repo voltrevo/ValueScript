@@ -230,6 +230,7 @@ impl<'a> AssemblyParser<'a> {
       ("next", InstructionByte::Next),
       ("unpack_iter_res", InstructionByte::UnpackIterRes),
       ("cat", InstructionByte::Cat),
+      ("yield", InstructionByte::Yield),
     ]);
 
     for (word, instruction) in instruction_word_map {
@@ -695,6 +696,7 @@ impl<'a> AssemblyParser<'a> {
         self.assemble_register(),
       ),
       Cat => Instruction::Cat(self.assemble_value(), self.assemble_register()),
+      Yield => Instruction::Yield(self.assemble_value(), self.assemble_register()),
     }
   }
 

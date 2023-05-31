@@ -49,7 +49,8 @@ pub fn instruction_mutates_this(instruction: &Instruction) -> bool {
     | SetCatch(_, reg)
     | ConstSubCall(_, _, _, reg)
     | ThisSubCall(_, _, _, reg)
-    | Cat(_, reg) => reg == &Register::This,
+    | Cat(_, reg)
+    | Yield(_, reg) => reg == &Register::This,
 
     Next(iter, res) => iter == &Register::This || res == &Register::This,
     UnpackIterRes(_, value_reg, done_reg) => {

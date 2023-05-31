@@ -549,6 +549,10 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         return Ok(FrameStepOk::Push(Box::new(cat_frame)));
       }
+
+      Yield => {
+        panic!("TODO: yield");
+      }
     };
 
     Ok(FrameStepOk::Continue)

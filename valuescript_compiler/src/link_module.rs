@@ -245,7 +245,8 @@ where
       | Import(arg, _)
       | ImportStar(arg, _)
       | Throw(arg)
-      | Cat(arg, _) => {
+      | Cat(arg, _)
+      | Yield(arg, _) => {
         self.value(Some(owner), arg);
       }
       OpPlus(arg1, arg2, _)
