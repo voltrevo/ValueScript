@@ -1,4 +1,4 @@
-// test_output! E: Error{"message":"teraboom"}
+//! test_output(E: Error{"message":"teraboom"})
 
 export default function () {
   try {

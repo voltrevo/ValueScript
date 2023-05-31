@@ -1,4 +1,4 @@
-// test_output! [[],["item"]]
+//! test_output([[],["item"]])
 
 export default function () {
   return [

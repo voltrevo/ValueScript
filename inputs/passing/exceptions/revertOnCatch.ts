@@ -1,4 +1,4 @@
-// test_output! [0,1]
+//! test_output([0,1])
 
 export default function () {
   return [

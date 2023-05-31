@@ -1,4 +1,4 @@
-// test_error! ["outer finally",Error{"message":"inner finally"}]
+//! test_error(["outer finally",Error{"message":"inner finally"}])
 
 export default function () {
   let logs: unknown[] = [];

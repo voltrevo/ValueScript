@@ -1,4 +1,4 @@
-// test_output! 7
+//! test_output(7)
 
 export default function main() {
   function foo() {

@@ -1,4 +1,4 @@
-// test_output! "this thing"
+//! test_output("this thing")
 
 export default function () {
   while (true) {

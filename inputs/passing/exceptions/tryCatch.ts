@@ -1,4 +1,4 @@
-// test_output! Error{"message":"Something went wrong"}
+//! test_output(Error{"message":"Something went wrong"})
 
 export default function () {
   try {

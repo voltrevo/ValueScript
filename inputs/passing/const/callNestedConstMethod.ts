@@ -1,4 +1,4 @@
-// test_output! 37
+//! test_output(37)
 
 export default function () {
   const foo = new Foo();

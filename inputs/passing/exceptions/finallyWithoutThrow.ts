@@ -1,4 +1,4 @@
-// test_output! "Ok"
+//! test_output("Ok")
 
 export default function () {
   let result: string;

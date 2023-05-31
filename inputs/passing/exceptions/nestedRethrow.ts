@@ -1,4 +1,4 @@
-// test_error! Error{"message":"nested error"}
+//! test_error(Error{"message":"nested error"})
 
 export default function () {
   try {

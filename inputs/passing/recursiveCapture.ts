@@ -1,4 +1,4 @@
-// test_output! 120
+//! test_output(120)
 
 export default function main() {
   const one = 1;

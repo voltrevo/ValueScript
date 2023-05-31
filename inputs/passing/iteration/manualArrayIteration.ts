@@ -1,4 +1,4 @@
-// test_output! [[1,false],[2,false],[3,false],[undefined,true],[undefined,true]]
+//! test_output([[1,false],[2,false],[3,false],[undefined,true],[undefined,true]])
 
 export default function () {
   const vals = [1, 2, 3];

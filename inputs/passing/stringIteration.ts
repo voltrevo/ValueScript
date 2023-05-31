@@ -1,4 +1,4 @@
-// test_output! ["🚀","🍹","a","b","c","£","한","🎨"]
+//! test_output(["🚀","🍹","a","b","c","£","한","🎨"])
 
 export default function () {
   const str = "🚀🍹abc£한🎨";
