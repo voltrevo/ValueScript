@@ -1,4 +1,4 @@
-// //! test_output({})
+//! test_output({})
 
 export default function () {
   let x = new X();
