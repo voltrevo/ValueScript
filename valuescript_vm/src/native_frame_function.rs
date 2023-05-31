@@ -18,18 +18,23 @@ impl ValTrait for NativeFrameFunction {
   fn typeof_(&self) -> VsType {
     VsType::Function
   }
+
   fn to_number(&self) -> f64 {
     f64::NAN
   }
+
   fn to_index(&self) -> Option<usize> {
     None
   }
+
   fn is_primitive(&self) -> bool {
     false
   }
+
   fn is_truthy(&self) -> bool {
     true
   }
+
   fn is_nullish(&self) -> bool {
     false
   }
@@ -41,9 +46,11 @@ impl ValTrait for NativeFrameFunction {
   fn as_bigint_data(&self) -> Option<BigInt> {
     None
   }
+
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
     None
   }
+
   fn as_class_data(&self) -> Option<Rc<VsClass>> {
     None
   }

@@ -1,12 +1,12 @@
-use super::super::vs_value::{Val, ValTrait};
 use super::super::native_frame_function::NativeFrameFunction;
-use super::array_mapping_frame::{ArrayMappingState, ArrayMappingFrame};
+use super::super::vs_value::{Val, ValTrait};
+use super::array_mapping_frame::{ArrayMappingFrame, ArrayMappingState};
 
 pub static FIND: NativeFrameFunction = NativeFrameFunction {
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(FindState::default()))),
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct FindState {}
 
 impl ArrayMappingState for FindState {
@@ -19,5 +19,9 @@ impl ArrayMappingState for FindState {
 
   fn finish(&mut self) -> Val {
     Val::Undefined
+  }
+
+  fn clone_to_array_mapping_state(&self) -> Box<dyn ArrayMappingState> {
+    Box::new(self.clone())
   }
 }

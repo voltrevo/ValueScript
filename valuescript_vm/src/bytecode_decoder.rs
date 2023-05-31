@@ -14,6 +14,7 @@ use crate::vs_symbol::VsSymbol;
 use crate::vs_value::ToVal;
 use crate::vs_value::Val;
 
+#[derive(Clone)]
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
   pub bytecode: Rc<Bytecode>,
@@ -40,6 +41,7 @@ pub enum BytecodeType {
   Builtin = 0x10,
   Class = 0x11,
   BigInt = 0x13,
+  GeneratorFunction = 0x14,
   Unrecognized = 0xff,
 }
 
@@ -62,10 +64,12 @@ impl BytecodeType {
       0x0b => Function,
       0x0d => Pointer,
       0x0e => Register,
+
       0x10 => Builtin,
       0x11 => Class,
 
       0x13 => BigInt,
+      0x14 => GeneratorFunction,
 
       _ => Unrecognized,
     };
@@ -127,7 +131,7 @@ impl BytecodeDecoder {
         }
         .to_val()
       }
-      BytecodeType::Function => self.decode_function_header(),
+      BytecodeType::Function => self.decode_function(false),
       BytecodeType::Pointer => self.decode_pointer(registers),
       BytecodeType::Register => match registers[self.decode_register_index().unwrap()].clone() {
         Val::Void => Val::Undefined,
@@ -140,6 +144,7 @@ impl BytecodeDecoder {
       }
       .to_val(),
       BytecodeType::BigInt => self.decode_bigint().to_val(),
+      BytecodeType::GeneratorFunction => self.decode_function(true),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
   }
@@ -270,13 +275,14 @@ impl BytecodeDecoder {
     }
   }
 
-  pub fn decode_function_header(&mut self) -> Val {
+  pub fn decode_function(&mut self, is_generator: bool) -> Val {
     // TODO: Support >256
     let register_count = self.decode_byte() as usize;
     let parameter_count = self.decode_byte() as usize;
 
     return VsFunction {
       bytecode: self.bytecode.clone(),
+      is_generator,
       register_count,
       parameter_count,
       start: self.pos,

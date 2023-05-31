@@ -13,6 +13,7 @@ use crate::vs_object::VsObject;
 use crate::vs_value::ToVal;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
+#[derive(Clone)]
 pub struct BytecodeStackFrame {
   pub decoder: BytecodeDecoder,
   pub registers: Vec<Val>,
@@ -24,6 +25,7 @@ pub struct BytecodeStackFrame {
   pub catch_setting: Option<CatchSetting>,
 }
 
+#[derive(Clone)]
 pub struct CatchSetting {
   pub pos: usize,
   pub register: Option<usize>,
@@ -591,6 +593,10 @@ impl StackFrameTrait for BytecodeStackFrame {
     } else {
       false
     }
+  }
+
+  fn clone_to_stack_frame(&self) -> StackFrame {
+    Box::new(self.clone())
   }
 }
 

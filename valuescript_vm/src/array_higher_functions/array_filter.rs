@@ -8,7 +8,7 @@ pub static FILTER: NativeFrameFunction = NativeFrameFunction {
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(FilterState::default()))),
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct FilterState {
   filter_results: Vec<Val>,
 }
@@ -26,5 +26,9 @@ impl ArrayMappingState for FilterState {
     let mut filter_results = Vec::new();
     std::mem::swap(&mut self.filter_results, &mut filter_results);
     filter_results.to_val()
+  }
+
+  fn clone_to_array_mapping_state(&self) -> Box<dyn ArrayMappingState> {
+    Box::new(self.clone())
   }
 }

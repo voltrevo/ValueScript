@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::native_function::ThisWrapper;
-use crate::stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrameTrait};
+use crate::stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrame, StackFrameTrait};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
@@ -19,6 +19,7 @@ pub static REDUCE: NativeFrameFunction = NativeFrameFunction {
   },
 };
 
+#[derive(Clone)]
 struct ReduceFrame {
   this: Option<Rc<VsArray>>,
   array_i: usize,
@@ -112,5 +113,9 @@ impl StackFrameTrait for ReduceFrame {
 
   fn catch_exception(&mut self, _exception: Val) -> bool {
     return false;
+  }
+
+  fn clone_to_stack_frame(&self) -> StackFrame {
+    Box::new(self.clone())
   }
 }

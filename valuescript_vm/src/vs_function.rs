@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use crate::bytecode::Bytecode;
+use crate::make_generator_frame::MakeGeneratorFrame;
 use crate::vs_value::ToVal;
 
 use super::bytecode_decoder::BytecodeDecoder;
@@ -8,9 +9,10 @@ use super::bytecode_stack_frame::BytecodeStackFrame;
 use super::stack_frame::StackFrame;
 use super::vs_value::Val;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VsFunction {
   pub bytecode: Rc<Bytecode>,
+  pub is_generator: bool,
   pub register_count: usize,
   pub parameter_count: usize,
   pub start: usize,
@@ -27,6 +29,7 @@ impl VsFunction {
 
     return VsFunction {
       bytecode: self.bytecode.clone(),
+      is_generator: self.is_generator,
       register_count: self.register_count,
       parameter_count: self.parameter_count,
       start: self.start,
@@ -34,7 +37,7 @@ impl VsFunction {
     };
   }
 
-  pub fn make_frame(&self) -> StackFrame {
+  pub fn make_bytecode_frame(&self) -> BytecodeStackFrame {
     let mut registers: Vec<Val> = Vec::with_capacity(self.register_count - 1);
 
     registers.push(Val::Undefined);
@@ -48,7 +51,7 @@ impl VsFunction {
       registers.push(Val::Void);
     }
 
-    return Box::new(BytecodeStackFrame {
+    return BytecodeStackFrame {
       decoder: BytecodeDecoder {
         bytecode: self.bytecode.clone(),
         pos: self.start,
@@ -60,7 +63,16 @@ impl VsFunction {
       this_target: None,
       return_target: None,
       catch_setting: None,
-    });
+    };
+  }
+
+  pub fn make_frame(&self) -> StackFrame {
+    let frame = self.make_bytecode_frame();
+
+    match self.is_generator {
+      false => Box::new(frame),
+      true => Box::new(MakeGeneratorFrame::new(frame)),
+    }
   }
 }
 

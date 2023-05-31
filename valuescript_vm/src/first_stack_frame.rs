@@ -1,6 +1,9 @@
+use crate::stack_frame::StackFrame;
+
 use super::stack_frame::{CallResult, FrameStepResult, StackFrameTrait};
 use super::vs_value::Val;
 
+#[derive(Clone)]
 pub struct FirstStackFrame {
   call_result: CallResult,
 }
@@ -39,5 +42,9 @@ impl StackFrameTrait for FirstStackFrame {
 
   fn catch_exception(&mut self, _exception: Val) -> bool {
     panic!("Not appropriate for FirstStackFrame");
+  }
+
+  fn clone_to_stack_frame(&self) -> StackFrame {
+    Box::new(self.clone())
   }
 }

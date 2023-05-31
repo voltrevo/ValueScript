@@ -23,4 +23,11 @@ pub trait StackFrameTrait {
   fn apply_call_result(&mut self, call_result: CallResult);
   fn get_call_result(&mut self) -> CallResult;
   fn catch_exception(&mut self, exception: Val) -> bool;
+  fn clone_to_stack_frame(&self) -> StackFrame;
+}
+
+impl Clone for StackFrame {
+  fn clone(&self) -> Self {
+    self.clone_to_stack_frame()
+  }
 }

@@ -3,8 +3,8 @@ use std::rc::Rc;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::native_frame_function::NativeFrameFunction;
 use crate::native_function::ThisWrapper;
-use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
+use crate::stack_frame::{FrameStepResult, StackFrame};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, ToVal, Val, ValTrait};
 
@@ -22,6 +22,7 @@ pub static SORT: NativeFrameFunction = NativeFrameFunction {
   },
 };
 
+#[derive(Clone)]
 struct SortFrame {
   this: Option<Rc<VsArray>>,
 
@@ -32,6 +33,7 @@ struct SortFrame {
   started: bool,
 }
 
+#[derive(Clone)]
 struct VecPos<T> {
   vec: Vec<T>,
   pos: usize,
@@ -43,6 +45,7 @@ struct VecSlice<'a, T> {
   end: usize,
 }
 
+#[derive(Clone)]
 struct SortTreeNode {
   data: SortTreeNodeData,
 }
@@ -199,6 +202,7 @@ impl SortTreeNode {
   }
 }
 
+#[derive(Clone)]
 enum SortTreeNodeData {
   Branch(Box<SortTreeNode>, Box<SortTreeNode>),
   Sorting(Vec<Val>, VecPos<Val>, VecPos<Val>),
@@ -317,5 +321,9 @@ impl StackFrameTrait for SortFrame {
 
   fn catch_exception(&mut self, _exception: Val) -> bool {
     false
+  }
+
+  fn clone_to_stack_frame(&self) -> StackFrame {
+    Box::new(self.clone())
   }
 }

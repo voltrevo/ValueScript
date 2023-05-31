@@ -32,7 +32,7 @@ impl ValTrait for ArrayEntriesIterator {
   }
 
   fn to_number(&self) -> f64 {
-    core::f64::NAN
+    f64::NAN
   }
 
   fn to_index(&self) -> Option<usize> {

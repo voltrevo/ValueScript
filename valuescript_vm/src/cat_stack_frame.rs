@@ -4,13 +4,13 @@ use crate::{
   builtins::type_error_builtin::ToTypeError,
   native_function::ThisWrapper,
   operations::op_sub,
-  stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrameTrait},
+  stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrame, StackFrameTrait},
   vs_symbol::VsSymbol,
   vs_value::{ToVal, Val},
   LoadFunctionResult, ValTrait,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CatStackFrame {
   pub state: CatFrameState,
   pub iter_result: Option<Val>,
@@ -19,7 +19,7 @@ pub struct CatStackFrame {
   pub res: Vec<Val>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum CatFrameState {
   ReadNext,
   MakingIterator,
@@ -145,5 +145,9 @@ impl StackFrameTrait for CatStackFrame {
 
   fn catch_exception(&mut self, _exception: Val) -> bool {
     false
+  }
+
+  fn clone_to_stack_frame(&self) -> StackFrame {
+    Box::new(self.clone())
   }
 }

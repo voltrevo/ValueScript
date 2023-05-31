@@ -8,7 +8,7 @@ pub static FLAT_MAP: NativeFrameFunction = NativeFrameFunction {
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(FlatMapState::default()))),
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct FlatMapState {
   flat_map_results: Vec<Val>,
 }
@@ -31,5 +31,9 @@ impl ArrayMappingState for FlatMapState {
     let mut flat_map_results = Vec::new();
     std::mem::swap(&mut self.flat_map_results, &mut flat_map_results);
     flat_map_results.to_val()
+  }
+
+  fn clone_to_array_mapping_state(&self) -> Box<dyn ArrayMappingState> {
+    Box::new(self.clone())
   }
 }

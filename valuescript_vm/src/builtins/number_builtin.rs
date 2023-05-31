@@ -21,14 +21,14 @@ impl BuiltinObject for NumberBuiltin {
 
   fn bo_sub(key: &str) -> Val {
     match key {
-      "EPSILON" => core::f64::EPSILON.to_val(),
-      "MAX_VALUE" => core::f64::MAX.to_val(),
+      "EPSILON" => f64::EPSILON.to_val(),
+      "MAX_VALUE" => f64::MAX.to_val(),
       "MAX_SAFE_INTEGER" => (2f64.powi(53) - 1f64).to_val(),
       "MIN_SAFE_INTEGER" => (-(2f64.powi(53) - 1f64)).to_val(),
-      "MIN_VALUE" => core::f64::MIN_POSITIVE.to_val(),
-      "NEGATIVE_INFINITY" => core::f64::NEG_INFINITY.to_val(),
-      "POSITIVE_INFINITY" => core::f64::INFINITY.to_val(),
-      "NaN" => core::f64::NAN.to_val(),
+      "MIN_VALUE" => f64::MIN_POSITIVE.to_val(),
+      "NEGATIVE_INFINITY" => f64::NEG_INFINITY.to_val(),
+      "POSITIVE_INFINITY" => f64::INFINITY.to_val(),
+      "NaN" => f64::NAN.to_val(),
       "isFinite" => IS_FINITE.to_val(),
       "isInteger" => IS_INTEGER.to_val(),
       "isNaN" => IS_NAN.to_val(),
@@ -111,10 +111,10 @@ pub static PARSE_FLOAT: NativeFunction = native_fn(|_this, params| {
 
     match string_value.parse::<f64>() {
       Ok(number) => Val::Number(number),
-      Err(_) => Val::Number(core::f64::NAN),
+      Err(_) => Val::Number(f64::NAN),
     }
   } else {
-    Val::Number(core::f64::NAN)
+    Val::Number(f64::NAN)
   })
 });
 
@@ -124,7 +124,7 @@ pub static PARSE_INT: NativeFunction = native_fn(|_this, params| {
     let radix = params.get(1).and_then(|v| v.to_index()).unwrap_or(10);
 
     if radix < 2 || radix > 36 {
-      return Ok(Val::Number(core::f64::NAN));
+      return Ok(Val::Number(f64::NAN));
     }
 
     let (is_negative, string_value) = if string_value.starts_with('-') {
@@ -143,9 +143,9 @@ pub static PARSE_INT: NativeFunction = native_fn(|_this, params| {
         let number = if is_negative { -number } else { number };
         Val::Number(number as f64)
       }
-      Err(_) => Val::Number(core::f64::NAN),
+      Err(_) => Val::Number(f64::NAN),
     }
   } else {
-    Val::Number(core::f64::NAN)
+    Val::Number(f64::NAN)
   })
 });

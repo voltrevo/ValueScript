@@ -2,16 +2,24 @@ use std::rc::Rc;
 
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::native_function::ThisWrapper;
-use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
+use crate::stack_frame::{FrameStepResult, StackFrame};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
 pub trait ArrayMappingState {
   fn process(&mut self, i: usize, element: &Val, mapped: Val) -> Option<Val>;
   fn finish(&mut self) -> Val;
+  fn clone_to_array_mapping_state(&self) -> Box<dyn ArrayMappingState>;
 }
 
+impl Clone for Box<dyn ArrayMappingState> {
+  fn clone(&self) -> Self {
+    self.clone_to_array_mapping_state()
+  }
+}
+
+#[derive(Clone)]
 pub struct ArrayMappingFrame {
   state: Box<dyn ArrayMappingState>,
   early_exit: Option<Result<Val, Val>>,
@@ -140,5 +148,9 @@ impl StackFrameTrait for ArrayMappingFrame {
 
   fn catch_exception(&mut self, _exception: Val) -> bool {
     return false;
+  }
+
+  fn clone_to_stack_frame(&self) -> StackFrame {
+    Box::new(self.clone())
   }
 }

@@ -8,7 +8,7 @@ pub static MAP: NativeFrameFunction = NativeFrameFunction {
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(MapState::default()))),
 };
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct MapState {
   map_results: Vec<Val>,
 }
@@ -23,5 +23,9 @@ impl ArrayMappingState for MapState {
     let mut map_results = Vec::new();
     std::mem::swap(&mut self.map_results, &mut map_results);
     map_results.to_val()
+  }
+
+  fn clone_to_array_mapping_state(&self) -> Box<dyn ArrayMappingState> {
+    Box::new(self.clone())
   }
 }
