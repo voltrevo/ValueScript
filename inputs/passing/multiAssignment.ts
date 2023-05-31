@@ -1,4 +1,4 @@
-// test_output! [1,1]
+//! test_output([1,1])
 
 export default function main() {
   let a;

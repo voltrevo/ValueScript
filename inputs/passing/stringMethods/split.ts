@@ -1,4 +1,4 @@
-// test_output! [["🚀","🍹","a","b","c","£","한","🎨"],["f","","bar"],["","bar"],["foo",""],["one","two","three"]]
+//! test_output([["🚀","🍹","a","b","c","£","한","🎨"],["f","","bar"],["","bar"],["foo",""],["one","two","three"]])
 
 export default function () {
   return [

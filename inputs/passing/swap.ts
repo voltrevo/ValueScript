@@ -1,4 +1,4 @@
-// test_output! ["b","a"]
+//! test_output(["b","a"])
 
 export default function main() {
   let x = ["a", "b"];

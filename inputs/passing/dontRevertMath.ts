@@ -1,4 +1,4 @@
-// test_output! undefined
+//! test_output(undefined)
 
 export default function () {
   try {

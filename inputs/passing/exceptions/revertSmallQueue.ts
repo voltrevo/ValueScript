@@ -1,4 +1,4 @@
-// test_output! [1,3,"SmallQueue is already full"]
+//! test_output([1,3,"SmallQueue is already full"])
 
 export default function () {
   let a = new SmallQueue(["item1"]);

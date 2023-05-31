@@ -1,4 +1,4 @@
-// test_output! 23514624000
+//! test_output(23514624000)
 
 export default function main() {
   const digits = [

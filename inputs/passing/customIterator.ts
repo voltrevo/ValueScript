@@ -1,4 +1,4 @@
-// test_output! [5,6,7,8,9]
+//! test_output([5,6,7,8,9])
 
 export default function () {
   let vals: number[] = [];

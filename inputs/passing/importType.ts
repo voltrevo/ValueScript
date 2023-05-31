@@ -1,4 +1,4 @@
-// test_output! "done"
+//! test_output("done")
 
 import { type Type } from "./helpers/Type.ts";
 

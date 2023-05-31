@@ -1,4 +1,4 @@
-// test_output! 1366
+//! test_output(1366)
 
 import plus from "./helpers/plus.ts";
 

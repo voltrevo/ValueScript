@@ -1,4 +1,4 @@
-// test_output! [[true,true,true,true,true,true,true],[false,false,false,false,false]]
+//! test_output([[true,true,true,true,true,true,true],[false,false,false,false,false]])
 
 export default function () {
   const integers = [

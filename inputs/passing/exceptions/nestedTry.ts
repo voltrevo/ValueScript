@@ -1,4 +1,4 @@
-// test_output! ["boom"]
+//! test_output(["boom"])
 //
 // Note: the original intention was for this to output ["here","nested boom","boom"] to check where
 // the control flow goes. This worked at the time, but now that snapshotting variables that can be

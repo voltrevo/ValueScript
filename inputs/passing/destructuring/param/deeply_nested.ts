@@ -1,4 +1,4 @@
-// test_ouput! 42
+//! test_output(42)
 
 export default function main() {
   return foo([[[{ x: { y: [[{ z: 42 }]] } }]]]);

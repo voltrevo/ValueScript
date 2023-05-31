@@ -1,4 +1,4 @@
-// test_output! [true,false,false,[1,2,3],["a","b","c"],[],[1,2,3],[],[,,],[3,1],[true]]
+//! test_output([true,false,false,[1,2,3],["a","b","c"],[],[1,2,3],[],[,,],[3,1],[true]])
 
 export default function () {
   return [

@@ -33,13 +33,19 @@ mod tests {
       let file_contents = fs::read_to_string(&file_path).expect("Failed to read file contents");
 
       if let Some(first_line) = file_contents.lines().next() {
-        if first_line.starts_with("// test_output! ") {
+        if first_line.starts_with("//! test_output(") {
           println!("\nTesting {} ...", file_path.to_str().unwrap());
 
-          let output_str = first_line
-            .split_once("// test_output! ")
+          let mut output_string = first_line
+            .split_once("//! test_output(")
             .map(|x| x.1)
-            .unwrap_or("");
+            .unwrap_or("")
+            .to_string();
+
+          if output_string.pop() != Some(')') {
+            println!("  Bad test_output format");
+            failed_paths.insert(file_path.clone());
+          }
 
           let resolved_path = resolve_entry_path(
             &file_path
@@ -86,15 +92,15 @@ mod tests {
 
           let result = vm.run(bytecode, Some(2_000_000), &[]);
 
-          let result_str = match result {
+          let result_string = match result {
             Ok(val) => val.codify(),
             Err(err) => format!("E: {}", err.codify()),
           };
 
-          if result_str != output_str {
+          if result_string != output_string {
             println!(
               "  Expected: \"{}\"\n  Actual:   \"{}\"\n",
-              output_str, result_str,
+              output_string, result_string,
             );
 
             failed_paths.insert(file_path.clone());

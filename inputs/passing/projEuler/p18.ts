@@ -1,4 +1,4 @@
-// test_output! 1074
+//! test_output(1074)
 
 export default function main() {
   let tower = [

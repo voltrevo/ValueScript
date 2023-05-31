@@ -1,4 +1,4 @@
-// test_output! [".abc.",".abc.",".abc.",".abc."]
+//! test_output([".abc.",".abc.",".abc.",".abc."])
 
 export default function () {
   const middle = ["a", "b", "c"] as const;

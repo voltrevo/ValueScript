@@ -1,4 +1,4 @@
-// test_output! 42
+//! test_output(42)
 
 export default function () {
   try {

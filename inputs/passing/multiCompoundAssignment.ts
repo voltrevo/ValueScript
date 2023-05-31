@@ -1,4 +1,4 @@
-// test_output! [17,15,12]
+//! test_output([17,15,12])
 
 export default function main() {
   let a = 2;

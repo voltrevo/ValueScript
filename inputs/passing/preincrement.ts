@@ -1,4 +1,4 @@
-// test_output! 2
+//! test_output(2)
 
 export default function main() {
   let value = 1;

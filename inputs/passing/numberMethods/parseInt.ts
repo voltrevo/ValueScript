@@ -1,4 +1,4 @@
-// test_output! [[37,-37,15,37,37,31],[NaN,NaN]]
+//! test_output([[37,-37,15,37,37,31],[NaN,NaN]])
 
 export default function () {
   const positive_and_negative = [

@@ -1,4 +1,4 @@
-// test_output! [[37,-37,37.1,37,37.1,1.5,0.1,1.23],[NaN]]
+//! test_output([[37,-37,37.1,37,37.1,1.5,0.1,1.23],[NaN]])
 
 export default function () {
   const numbers = [

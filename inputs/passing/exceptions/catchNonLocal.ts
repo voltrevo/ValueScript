@@ -1,4 +1,4 @@
-// test_output!: "Caught: boom"
+//! test_output("Caught: boom")
 
 export default function () {
   try {

@@ -1,4 +1,4 @@
-// test_output! [true,false,false,true,true,true,true,false,true,false,false,false]
+//! test_output([true,false,false,true,true,true,true,false,true,false,false,false])
 
 export default function () {
   return [

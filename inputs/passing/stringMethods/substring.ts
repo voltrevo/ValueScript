@@ -1,4 +1,4 @@
-// test_output! [["abc","de","abcde","cde","bcd"],["","abc",""],["abc","cde","bcd"]]
+//! test_output([["abc","de","abcde","cde","bcd"],["","abc",""],["abc","cde","bcd"]])
 
 export default function () {
   const positive = [

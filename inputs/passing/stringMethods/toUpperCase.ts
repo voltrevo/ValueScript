@@ -1,4 +1,4 @@
-// test_output! [["ABC","XYZ","A1B2C3","HELLO WORLD","ÁÉÍÓÚ"]]
+//! test_output([["ABC","XYZ","A1B2C3","HELLO WORLD","ÁÉÍÓÚ"]])
 
 export default function () {
   const toUpperCaseTests = [

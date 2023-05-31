@@ -1,4 +1,4 @@
-// test_output! 70600674
+//! test_output(70600674)
 
 export default function main() {
   const grid = [

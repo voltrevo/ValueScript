@@ -1,4 +1,4 @@
-// test_output! "Done"
+//! test_output("Done")
 
 export default function () {
   return "Done";

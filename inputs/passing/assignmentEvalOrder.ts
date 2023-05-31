@@ -1,4 +1,4 @@
-// test_output! {"left":"right"}
+//! test_output({"left":"right"})
 
 export default function main() {
   let x = {} as any;

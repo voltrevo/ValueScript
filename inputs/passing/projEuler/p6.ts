@@ -1,4 +1,4 @@
-// test_output! 25164150
+//! test_output(25164150)
 
 export default function main() {
   return squareOfSum(100) - sumOfSquares(100);

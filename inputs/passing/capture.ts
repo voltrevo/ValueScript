@@ -1,4 +1,4 @@
-// test_output! [1,6,17]
+//! test_output([1,6,17])
 
 export default function () {
   const poly = buildPoly([1, 2, 3]); // 1 + 2*x + 3*x^2

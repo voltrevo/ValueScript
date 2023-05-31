@@ -1,4 +1,4 @@
-// test_output! 3
+//! test_output(3)
 
 export default function main() {
   return foo({ a: 1, b: 2 });
