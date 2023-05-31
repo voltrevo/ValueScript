@@ -555,6 +555,10 @@ impl StackFrameTrait for BytecodeStackFrame {
       Yield => {
         panic!("TODO: yield");
       }
+
+      YieldStar => {
+        panic!("TODO: yield*");
+      }
     };
 
     Ok(FrameStepOk::Continue)

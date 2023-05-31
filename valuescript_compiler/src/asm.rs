@@ -299,6 +299,7 @@ pub enum Instruction {
   UnpackIterRes(Register, Register, Register),
   Cat(Value, Register),
   Yield(Value, Register),
+  YieldStar(Value, Register),
 }
 
 impl std::fmt::Display for Instruction {
@@ -470,6 +471,9 @@ impl std::fmt::Display for Instruction {
       Instruction::Yield(value, register) => {
         write!(f, "yield {} {}", value, register)
       }
+      Instruction::YieldStar(value, register) => {
+        write!(f, "yield* {} {}", value, register)
+      }
     }
   }
 }
@@ -536,6 +540,7 @@ impl Instruction {
       UnpackIterRes(..) => InstructionByte::UnpackIterRes,
       Cat(..) => InstructionByte::Cat,
       Yield(..) => InstructionByte::Yield,
+      YieldStar(..) => InstructionByte::YieldStar,
     }
   }
 }

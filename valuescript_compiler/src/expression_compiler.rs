@@ -1225,7 +1225,10 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let instr = Instruction::Yield(self.fnc.use_(arg_compiled), dst.clone());
+    let instr = match yield_expr.delegate {
+      false => Instruction::Yield(self.fnc.use_(arg_compiled), dst.clone()),
+      true => Instruction::YieldStar(self.fnc.use_(arg_compiled), dst.clone()),
+    };
 
     self.fnc.push(instr);
 

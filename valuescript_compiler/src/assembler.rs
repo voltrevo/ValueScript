@@ -251,6 +251,10 @@ impl Assembler {
         self.value(value);
         self.register(dst);
       }
+      YieldStar(value, dst) => {
+        self.value(value);
+        self.register(dst);
+      }
     }
   }
 

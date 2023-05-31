@@ -56,6 +56,7 @@ pub enum InstructionByte {
   UnpackIterRes = 0x35,
   Cat = 0x36,
   Yield = 0x37,
+  YieldStar = 0x38,
 }
 
 impl InstructionByte {
@@ -119,6 +120,7 @@ impl InstructionByte {
       0x35 => UnpackIterRes,
       0x36 => Cat,
       0x37 => Yield,
+      0x38 => YieldStar,
 
       _ => panic!("Unrecognized instruction: {}", byte),
     };
