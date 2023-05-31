@@ -24,7 +24,7 @@ export default class BinaryTree<T extends NotNullish> {
     let res: T[] = [];
 
     if (this.left) {
-      res = res.concat(this.left.toArray());
+      res.push(...this.left.toArray());
     }
 
     if (this.value !== undefined) {
@@ -32,7 +32,7 @@ export default class BinaryTree<T extends NotNullish> {
     }
 
     if (this.right) {
-      res = res.concat(this.right.toArray());
+      res.push(...this.right.toArray());
     }
 
     return res;

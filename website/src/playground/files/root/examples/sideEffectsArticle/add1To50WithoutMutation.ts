@@ -7,5 +7,5 @@ function makeRange(start: number, end: number): number[] {
     return [];
   }
 
-  return [start].concat(makeRange(start + 1, end));
+  return [start, ...makeRange(start + 1, end)];
 }
