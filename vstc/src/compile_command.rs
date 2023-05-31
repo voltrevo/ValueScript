@@ -33,6 +33,8 @@ pub fn compile_command(args: &Vec<String>) {
   file
     .write(module.to_string().as_bytes())
     .expect("Failed to write out.vsm");
+
+  file.write(b"\n").expect("Failed to write out.vsm");
 }
 
 fn show_help() {
