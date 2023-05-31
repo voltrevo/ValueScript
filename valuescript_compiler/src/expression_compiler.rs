@@ -213,11 +213,7 @@ impl<'a> ExpressionCompiler<'a> {
         return CompiledExpression::empty();
       }
       TsConstAssertion(ts_const_assertion) => {
-        self
-          .fnc
-          .todo(ts_const_assertion.span, "TsConstAssertion expression");
-
-        return CompiledExpression::empty();
+        return self.compile(&ts_const_assertion.expr, target_register);
       }
       TsNonNull(ts_non_null_exp) => {
         return self.compile(&ts_non_null_exp.expr, target_register);
@@ -529,82 +525,9 @@ impl<'a> ExpressionCompiler<'a> {
     array_exp: &swc_ecma_ast::ArrayLit,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let mut segments = Vec::<Value>::new();
-    let mut current = Vec::<Value>::new();
-    let mut sub_nested_registers = Vec::<Register>::new();
+    let args = array_exp.elems.iter().map(|x| x.as_ref());
 
-    for i in 0..array_exp.elems.len() {
-      match &array_exp.elems[i] {
-        None => {
-          current.push(Value::Void);
-        }
-        Some(elem) => {
-          if elem.spread.is_some() && !current.is_empty() {
-            segments.push(Value::Array(Box::new(Array {
-              values: take(&mut current),
-            })));
-          }
-
-          let mut compiled_elem = self.compile(&*elem.expr, None);
-
-          if elem.spread.is_some() {
-            segments.push(compiled_elem.value);
-          } else {
-            current.push(compiled_elem.value);
-          }
-
-          sub_nested_registers.append(&mut compiled_elem.nested_registers);
-          compiled_elem.release_checker.has_unreleased_registers = false;
-        }
-      }
-    }
-
-    if segments.is_empty() {
-      return match target_register {
-        None => CompiledExpression::new(
-          Value::Array(Box::new(Array { values: current })),
-          sub_nested_registers,
-        ),
-        Some(tr) => {
-          self.fnc.push(Instruction::Mov(
-            Value::Array(Box::new(Array { values: current })),
-            tr.clone(),
-          ));
-
-          for reg in sub_nested_registers {
-            self.fnc.release_reg(&reg);
-          }
-
-          CompiledExpression::new(Value::Register(tr), vec![])
-        }
-      };
-    }
-
-    for reg in sub_nested_registers {
-      self.fnc.release_reg(&reg);
-    }
-
-    if !current.is_empty() {
-      segments.push(Value::Array(Box::new(Array { values: current })));
-    }
-
-    let mut nested_registers = Vec::<Register>::new();
-
-    let res_reg = match target_register {
-      Some(target_register) => target_register,
-      None => {
-        let tmp = self.fnc.allocate_tmp();
-        nested_registers.push(tmp.clone());
-        tmp
-      }
-    };
-
-    self.fnc.push(Instruction::Cat(
-      Value::Array(Box::new(Array { values: segments })),
-      res_reg.clone(),
-    ));
-
-    CompiledExpression::new(Value::Register(res_reg), nested_registers)
+    self.args(args, target_register)
   }
 
   pub fn object_expression(
@@ -855,9 +778,8 @@ impl<'a> ExpressionCompiler<'a> {
     target_register: Option<Register>,
   ) -> CompiledExpression {
     let mut nested_registers = Vec::<Register>::new();
-    let mut sub_nested_registers = Vec::<Register>::new();
 
-    let mut callee = match &call_exp.callee {
+    let callee = match &call_exp.callee {
       swc_ecma_ast::Callee::Expr(expr) => self.compile(&*expr, None),
       _ => {
         self
@@ -868,48 +790,27 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    callee.release_checker.has_unreleased_registers = false;
-    sub_nested_registers.append(&mut callee.nested_registers);
+    let args = call_exp.args.iter().map(|x| Some(x));
+    let compiled_args = self.args(args, None);
 
-    let mut args = Array::default();
-
-    for i in 0..call_exp.args.len() {
-      let arg = &call_exp.args[i];
-
-      if arg.spread.is_some() {
-        self.fnc.todo(arg.spread.span(), "argument spreading");
-      }
-
-      let mut compiled_arg = self.compile(&*arg.expr, None);
-      compiled_arg.release_checker.has_unreleased_registers = false;
-      sub_nested_registers.append(&mut compiled_arg.nested_registers);
-
-      args.values.push(compiled_arg.value);
-    }
-
-    let tmp_dest: Register;
-
-    let dest = match &target_register {
+    let dest = match target_register {
       Some(tr) => tr,
       None => {
-        tmp_dest = self.fnc.allocate_tmp();
-        nested_registers.push(tmp_dest.clone());
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
 
-        &tmp_dest
+        tmp
       }
     };
 
-    self.fnc.push(Instruction::Call(
-      callee.value,
-      Value::Array(Box::new(args)),
-      dest.clone(),
-    ));
+    let args_value = self.fnc.use_(compiled_args);
+    let callee_value = self.fnc.use_(callee);
 
-    for reg in sub_nested_registers {
-      self.fnc.release_reg(&reg);
-    }
+    self
+      .fnc
+      .push(Instruction::Call(callee_value, args_value, dest.clone()));
 
-    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
+    CompiledExpression::new(Value::Register(dest), nested_registers)
   }
 
   pub fn new_expression(
@@ -920,57 +821,35 @@ impl<'a> ExpressionCompiler<'a> {
     // TODO: Try to deduplicate with call_expression
 
     let mut nested_registers = Vec::<Register>::new();
-    let mut sub_nested_registers = Vec::<Register>::new();
 
-    let mut callee = self.compile(&new_exp.callee, None);
+    let callee = self.compile(&new_exp.callee, None);
 
-    callee.release_checker.has_unreleased_registers = false;
-    sub_nested_registers.append(&mut callee.nested_registers);
-
-    // let mut instr = "  new ".to_string();
-    // instr += &callee.value.to_string();
-    // instr += " ";
-
-    let mut args = Array::default();
-
-    for new_args in &new_exp.args {
-      for i in 0..new_args.len() {
-        let arg = &new_args[i];
-
-        if arg.spread.is_some() {
-          self.fnc.todo(arg.spread.span(), "argument spreading");
-        }
-
-        let mut compiled_arg = self.compile(&*arg.expr, None);
-        sub_nested_registers.append(&mut compiled_arg.nested_registers);
-
-        args.values.push(self.fnc.use_(compiled_arg));
-      }
-    }
-
-    let tmp_dest: Register;
-
-    let dest = match &target_register {
-      Some(tr) => tr,
-      None => {
-        tmp_dest = self.fnc.allocate_tmp();
-        nested_registers.push(tmp_dest.clone());
-
-        &tmp_dest
+    let compiled_args = match &new_exp.args {
+      None => CompiledExpression::new(Value::Array(Box::new(Array::default())), vec![]),
+      Some(new_exp_args) => {
+        let args = new_exp_args.iter().map(|x| Some(x));
+        self.args(args, None)
       }
     };
 
-    self.fnc.push(Instruction::New(
-      callee.value,
-      Value::Array(Box::new(args)),
-      dest.clone(),
-    ));
+    let dest = match target_register {
+      Some(tr) => tr,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
 
-    for reg in sub_nested_registers {
-      self.fnc.release_reg(&reg);
-    }
+        tmp
+      }
+    };
 
-    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
+    let callee_value = self.fnc.use_(callee);
+    let args_value = self.fnc.use_(compiled_args);
+
+    self
+      .fnc
+      .push(Instruction::New(callee_value, args_value, dest.clone()));
+
+    CompiledExpression::new(Value::Register(dest), nested_registers)
   }
 
   pub fn method_call_expression(
@@ -1008,31 +887,18 @@ impl<'a> ExpressionCompiler<'a> {
     prop.release_checker.has_unreleased_registers = false;
     sub_nested_registers.append(&mut prop.nested_registers);
 
-    let mut asm_args = Array::default();
+    let compiled_args = {
+      let args_iter = args.iter().map(|x| Some(x));
+      self.args(args_iter, None)
+    };
 
-    for i in 0..args.len() {
-      let arg = &args[i];
-
-      if arg.spread.is_some() {
-        self.fnc.todo(arg.spread.span(), "argument spreading");
-      }
-
-      let mut compiled_arg = self.compile(&*arg.expr, None);
-      compiled_arg.release_checker.has_unreleased_registers = false;
-      sub_nested_registers.append(&mut compiled_arg.nested_registers);
-
-      asm_args.values.push(compiled_arg.value);
-    }
-
-    let tmp_dest: Register;
-
-    let dest = match &target_register {
+    let dest = match target_register {
       Some(tr) => tr,
       None => {
-        tmp_dest = self.fnc.allocate_tmp();
-        nested_registers.push(tmp_dest.clone());
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
 
-        &tmp_dest
+        tmp
       }
     };
 
@@ -1040,31 +906,21 @@ impl<'a> ExpressionCompiler<'a> {
       TargetAccessorOrCompiledExpression::TargetAccessor(mut ta) => {
         let targets_this = ta.targets_this();
 
+        let args_value = self.fnc.use_(compiled_args);
+
         let instr = match targets_this {
-          false => Instruction::SubCall(
-            obj_value.clone(),
-            prop.value,
-            Value::Array(Box::new(asm_args)),
-            dest.clone(),
-          ),
-          true => Instruction::ThisSubCall(
-            obj_value.clone(),
-            prop.value,
-            Value::Array(Box::new(asm_args)),
-            dest.clone(),
-          ),
+          false => Instruction::SubCall(obj_value.clone(), prop.value, args_value, dest.clone()),
+          true => Instruction::ThisSubCall(obj_value.clone(), prop.value, args_value, dest.clone()),
         };
 
         self.fnc.push(instr);
         ta.assign_and_packup(self, &obj_value, targets_this);
       }
       TargetAccessorOrCompiledExpression::CompiledExpression(ce) => {
-        let instr = Instruction::ConstSubCall(
-          obj_value.clone(),
-          prop.value,
-          Value::Array(Box::new(asm_args)),
-          dest.clone(),
-        );
+        let args_value = self.fnc.use_(compiled_args);
+
+        let instr =
+          Instruction::ConstSubCall(obj_value.clone(), prop.value, args_value, dest.clone());
 
         self.fnc.push(instr);
         self.fnc.use_(ce);
@@ -1619,6 +1475,93 @@ impl<'a> ExpressionCompiler<'a> {
     }
 
     self.fnc.label(initialized_label);
+  }
+
+  fn args<'b, IterT>(
+    &mut self,
+    arg_list: IterT,
+    target_register: Option<Register>,
+  ) -> CompiledExpression
+  where
+    IterT: Iterator<Item = Option<&'b swc_ecma_ast::ExprOrSpread>>,
+  {
+    let mut segments = Vec::<Value>::new();
+    let mut current = Vec::<Value>::new();
+    let mut sub_nested_registers = Vec::<Register>::new();
+
+    for arg in arg_list {
+      let arg = match arg {
+        None => {
+          current.push(Value::Void);
+          continue;
+        }
+        Some(arg) => arg,
+      };
+
+      if arg.spread.is_some() && !current.is_empty() {
+        segments.push(Value::Array(Box::new(Array {
+          values: take(&mut current),
+        })));
+      }
+
+      let mut compiled_elem = self.compile(&*arg.expr, None);
+
+      if arg.spread.is_some() {
+        segments.push(compiled_elem.value);
+      } else {
+        current.push(compiled_elem.value);
+      }
+
+      sub_nested_registers.append(&mut compiled_elem.nested_registers);
+      compiled_elem.release_checker.has_unreleased_registers = false;
+    }
+
+    if segments.is_empty() {
+      return match target_register {
+        None => CompiledExpression::new(
+          Value::Array(Box::new(Array { values: current })),
+          sub_nested_registers,
+        ),
+        Some(tr) => {
+          self.fnc.push(Instruction::Mov(
+            Value::Array(Box::new(Array { values: current })),
+            tr.clone(),
+          ));
+
+          for reg in sub_nested_registers {
+            self.fnc.release_reg(&reg);
+          }
+
+          CompiledExpression::new(Value::Register(tr), vec![])
+        }
+      };
+    }
+
+    for reg in sub_nested_registers {
+      self.fnc.release_reg(&reg);
+    }
+
+    if !current.is_empty() {
+      segments.push(Value::Array(Box::new(Array { values: current })));
+    }
+
+    let mut nested_registers = Vec::<Register>::new();
+
+    let res_reg = match target_register {
+      Some(target_register) => target_register,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
+        tmp
+      }
+    };
+
+    self.fnc.push(Instruction::Cat(
+      Value::Array(Box::new(Array { values: segments })),
+      res_reg.clone(),
+    ));
+
+    CompiledExpression::new(Value::Register(res_reg), nested_registers)
   }
 }
 
