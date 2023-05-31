@@ -769,6 +769,7 @@ impl ModuleCompiler {
       dependent_definitions.push(Definition {
         pointer: ctor_defn_name.clone(),
         content: DefinitionContent::Function(Function {
+          is_generator: false,
           parameters: vec![],
           body: member_initializers_assembly,
         }),

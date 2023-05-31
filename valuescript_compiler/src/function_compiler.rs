@@ -1,6 +1,7 @@
 use queues::*;
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::mem::take;
 use std::rc::Rc;
 
 use swc_common::Spanned;
@@ -246,6 +247,16 @@ impl FunctionCompiler {
   }
 
   fn compile_functionish(&mut self, definition_pointer: Pointer, functionish: &Functionish) {
+    self.current.is_generator = match functionish {
+      Functionish::Fn(_, fn_) => fn_.is_generator,
+
+      // Note: It isn't currently possible to have an arrow generator, but SWC includes the
+      // possibility in the ast.
+      Functionish::Arrow(arrow_expr) => arrow_expr.is_generator,
+
+      Functionish::Constructor(..) => false,
+    };
+
     // TODO: Use a new FunctionCompiler per function instead of this hack
     self.reg_allocator = match self
       .scope_analysis
@@ -330,7 +341,7 @@ impl FunctionCompiler {
 
     self.definitions.push(Definition {
       pointer: definition_pointer,
-      content: DefinitionContent::Function(std::mem::take(&mut self.current)),
+      content: DefinitionContent::Function(take(&mut self.current)),
     });
   }
 

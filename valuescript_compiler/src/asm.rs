@@ -102,13 +102,18 @@ impl std::fmt::Display for Pointer {
 
 #[derive(Default, Debug, Clone)]
 pub struct Function {
+  pub is_generator: bool,
   pub parameters: Vec<Register>,
   pub body: Vec<InstructionOrLabel>,
 }
 
 impl std::fmt::Display for Function {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "function(")?;
+    match self.is_generator {
+      false => write!(f, "function(")?,
+      true => write!(f, "function*(")?,
+    }
+
     for (i, parameter) in self.parameters.iter().enumerate() {
       if i > 0 {
         write!(f, ", ")?;
