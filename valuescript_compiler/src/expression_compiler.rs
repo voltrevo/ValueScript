@@ -163,9 +163,8 @@ impl<'a> ExpressionCompiler<'a> {
         self.fnc.todo(class_exp.span(), "Class expression");
         return CompiledExpression::empty();
       }
-      Yield(yield_exp) => {
-        self.fnc.todo(yield_exp.span, "Yield expression");
-        return CompiledExpression::empty();
+      Yield(yield_expr) => {
+        return self.yield_expr(yield_expr, target_register);
       }
       MetaProp(meta_prop) => {
         self.fnc.todo(meta_prop.span, "MetaProp expression");
@@ -1203,6 +1202,34 @@ impl<'a> ExpressionCompiler<'a> {
     }
 
     return CompiledExpression::new(Value::Register(acc_reg), nested_registers);
+  }
+
+  pub fn yield_expr(
+    &mut self,
+    yield_expr: &swc_ecma_ast::YieldExpr,
+    target_register: Option<Register>,
+  ) -> CompiledExpression {
+    let mut nested_registers = Vec::<Register>::new();
+
+    let arg_compiled = match &yield_expr.arg {
+      Some(arg) => self.compile(arg, None),
+      None => CompiledExpression::empty(),
+    };
+
+    let dst = match target_register {
+      Some(t) => t,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
+        tmp
+      }
+    };
+
+    let instr = Instruction::Yield(self.fnc.use_(arg_compiled), dst.clone());
+
+    self.fnc.push(instr);
+
+    return CompiledExpression::new(Value::Register(dst), nested_registers);
   }
 
   pub fn literal(
