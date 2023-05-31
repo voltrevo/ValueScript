@@ -3,14 +3,14 @@ use std::{fmt, rc::Rc};
 use num_bigint::BigInt;
 
 use crate::{
-  builtins::type_error_builtin::ToTypeError,
+  builtins::{error_builtin::ToError, type_error_builtin::ToTypeError},
   iteration::{iteration_result::IterationResult, return_this::RETURN_THIS},
   native_function::{native_fn, NativeFunction},
   stack_frame::StackFrame,
   vs_array::VsArray,
   vs_class::VsClass,
   vs_symbol::VsSymbol,
-  vs_value::{ToDynamicVal, ToVal, Val, VsType},
+  vs_value::{dynamic_make_mut, ToDynamicVal, ToVal, Val, VsType},
   LoadFunctionResult, ValTrait,
 };
 
@@ -21,6 +21,8 @@ pub struct Generator {
 
   #[allow(dead_code)] // TODO
   stack: Vec<StackFrame>,
+
+  done: bool,
 }
 
 impl Generator {
@@ -28,6 +30,7 @@ impl Generator {
     return Generator {
       frame,
       stack: vec![],
+      done: false,
     };
   }
 }
@@ -118,21 +121,24 @@ impl fmt::Display for Generator {
 // must have the same output, therefore it can store the generated exception in that case instead of
 // needing to copy.
 //
-static NEXT: NativeFunction = native_fn(|mut _this, _| {
-  // let dynamic = match this.get_mut()? {
-  //   Val::Dynamic(dynamic) => dynamic,
-  //   _ => return Err("TODO: indirection".to_error()),
-  // };
+static NEXT: NativeFunction = native_fn(|mut this, _| {
+  let dynamic = match this.get_mut()? {
+    Val::Dynamic(dynamic) => dynamic,
+    _ => return Err("TODO: indirection".to_error()),
+  };
 
-  // let _generator = dynamic_make_mut(dynamic)
-  //   .as_any_mut()
-  //   .downcast_mut::<Generator>()
-  //   .ok_or_else(|| "Generator.next called on different object".to_type_error())?;
+  let generator = dynamic_make_mut(dynamic)
+    .as_any_mut()
+    .downcast_mut::<Generator>()
+    .ok_or_else(|| "Generator.next called on different object".to_type_error())?;
+
+  let done = generator.done;
+  generator.done = true;
 
   Ok(
     IterationResult {
       value: "TODO".to_val(),
-      done: false,
+      done,
     }
     .to_dynamic_val(),
   )
