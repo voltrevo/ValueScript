@@ -16,6 +16,7 @@ mod resolve_path;
 mod scope;
 mod scope_analysis;
 mod static_eval_expr;
+mod target_accessor;
 
 pub use assembler::assemble;
 pub use assembly_parser::parse_module;
