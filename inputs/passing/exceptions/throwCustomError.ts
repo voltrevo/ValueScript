@@ -1,4 +1,4 @@
-//! test_error(E: {"code":"400","message":"Bad request"})
+//! test_output(E: {"code":400,"message":"Bad request"})
 
 export default function () {
   throw new CustomError(400, "Bad request");

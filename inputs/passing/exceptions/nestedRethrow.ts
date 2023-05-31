@@ -1,6 +1,6 @@
-//! test_error(Error{"message":"nested error"})
+//! test_output(E: [Error{"message":"nested error"}])
 
-export default function () {
+export default function main() {
   try {
     try {
       throw new Error("nested error");
@@ -8,6 +8,6 @@ export default function () {
       throw error;
     }
   } catch (error) {
-    throw error;
+    throw [error];
   }
 }

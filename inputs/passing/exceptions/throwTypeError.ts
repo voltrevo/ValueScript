@@ -1,4 +1,4 @@
-//! test_error(E: TypeError{"message":"Cannot subscript undefined"})
+//! test_output(E: TypeError{"message":"Cannot subscript undefined"})
 
 export default function () {
   const arr = undefined;

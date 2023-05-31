@@ -1,4 +1,4 @@
-//! test_error(E: ["rethrow",Error{"message":"Something went wrong"}])
+//! test_output(E: ["rethrow",Error{"message":"Something went wrong"}])
 
 export default function () {
   try {
