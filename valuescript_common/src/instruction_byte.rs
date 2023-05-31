@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InstructionByte {
   End = 0x00,
   Mov = 0x01,
@@ -47,6 +47,14 @@ pub enum InstructionByte {
   Throw = 0x2c,
   Import = 0x2d,
   ImportStar = 0x2e,
+  SetCatch = 0x2f,
+  UnsetCatch = 0x30,
+  ConstSubCall = 0x31,
+  RequireMutableThis = 0x32,
+  ThisSubCall = 0x33,
+  Next = 0x34,
+  UnpackIterRes = 0x35,
+  Cat = 0x36,
 }
 
 impl InstructionByte {
@@ -101,6 +109,14 @@ impl InstructionByte {
       0x2c => Throw,
       0x2d => Import,
       0x2e => ImportStar,
+      0x2f => SetCatch,
+      0x30 => UnsetCatch,
+      0x31 => ConstSubCall,
+      0x32 => RequireMutableThis,
+      0x33 => ThisSubCall,
+      0x34 => Next,
+      0x35 => UnpackIterRes,
+      0x36 => Cat,
 
       _ => panic!("Unrecognized instruction: {}", byte),
     };

@@ -1,111 +1,113 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+use swc_common::Spanned;
 
 use valuescript_common::BUILTIN_NAMES;
 
-use crate::{
-  asm::{Builtin, Pointer, Register, Value},
-  constants::CONSTANTS,
-};
+use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::{asm::Builtin, constants::CONSTANTS};
 
-use super::function_compiler::QueuedFunction;
-
-#[derive(Clone, Debug)]
-pub enum MappedName {
-  Register(Register),
-  Definition(Pointer),
-  QueuedFunction(QueuedFunction),
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
+pub enum NameId {
+  Span(swc_common::Span),
   Builtin(Builtin),
-  Constant(Value),
+  Constant(&'static str),
 }
 
-pub fn scope_reg(name: String) -> MappedName {
-  if name == "return" || name == "this" || name == "ignore" {
-    std::panic!("Invalid register name (use Register enum)");
+impl Spanned for NameId {
+  fn span(&self) -> swc_common::Span {
+    match self {
+      NameId::Span(span) => *span,
+      NameId::Builtin(_) => swc_common::DUMMY_SP,
+      NameId::Constant(_) => swc_common::DUMMY_SP,
+    }
   }
-
-  MappedName::Register(Register::Named(name))
 }
 
 pub struct ScopeData {
-  pub name_map: HashMap<String, MappedName>,
-  pub parent: Option<Scope>,
+  pub owner_id: OwnerId,
+  pub name_map: HashMap<swc_atoms::JsWord, NameId>,
+  pub parent: Option<Rc<RefCell<ScopeData>>>,
 }
 
-#[derive(Clone)]
-pub struct Scope {
-  pub rc: Rc<RefCell<ScopeData>>,
+pub type Scope = Rc<RefCell<ScopeData>>;
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum OwnerId {
+  Span(swc_common::Span),
+  Module,
 }
 
-impl Scope {
-  pub fn get(&self, name: &String) -> Option<MappedName> {
-    match self.rc.borrow().name_map.get(name) {
+pub trait ScopeTrait {
+  fn get(&self, name: &swc_atoms::JsWord) -> Option<NameId>;
+  fn set(
+    &self,
+    name: &swc_atoms::JsWord,
+    name_id: NameId,
+    span: swc_common::Span,
+    diagnostics: &mut Vec<Diagnostic>,
+  );
+  fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<ScopeData>>;
+}
+
+impl ScopeTrait for Scope {
+  fn get(&self, name: &swc_atoms::JsWord) -> Option<NameId> {
+    match self.borrow().name_map.get(name) {
       Some(mapped_name) => Some(mapped_name.clone()),
-      None => match &self.rc.borrow().parent {
+      None => match &self.borrow().parent {
         Some(parent) => parent.get(name),
         None => None,
       },
     }
   }
 
-  pub fn get_defn(&self, name: &String) -> Option<Pointer> {
-    let get_result = self.get(name);
-
-    return match get_result {
-      Some(MappedName::Definition(d)) => Some(d.clone()),
-      _ => None,
-    };
-  }
-
-  pub fn set(&self, name: String, mapped_name: MappedName) {
-    let old_mapping = self.rc.borrow_mut().name_map.insert(name, mapped_name);
+  fn set(
+    &self,
+    name: &swc_atoms::JsWord,
+    name_id: NameId,
+    span: swc_common::Span,
+    diagnostics: &mut Vec<Diagnostic>,
+  ) {
+    let old_mapping = self.borrow_mut().name_map.insert(name.clone(), name_id);
 
     if old_mapping.is_some() {
-      std::panic!("Scope overwrite occurred (not implemented: being permissive about this)");
+      diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::Error,
+        message: "Scope overwrite occurred (TODO: being permissive about this)".to_string(),
+        span,
+      });
     }
   }
 
-  pub fn nest(&self) -> Scope {
-    return Scope {
-      rc: Rc::new(RefCell::new(ScopeData {
-        name_map: Default::default(),
-        parent: Some(self.clone()),
-      })),
-    };
+  fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<ScopeData>> {
+    return Rc::new(RefCell::new(ScopeData {
+      owner_id: name_owner_location.unwrap_or(self.borrow().owner_id.clone()),
+      name_map: Default::default(),
+      parent: Some(self.clone()),
+    }));
   }
 }
 
-pub fn _init_scope() -> Scope {
-  return Scope {
-    rc: Rc::new(RefCell::new(ScopeData {
-      name_map: Default::default(),
-      parent: None,
-    })),
-  };
-}
-
 pub fn init_std_scope() -> Scope {
-  let mut name_map: HashMap<String, MappedName> = Default::default();
+  let mut name_map = HashMap::new();
 
   for name in BUILTIN_NAMES {
     name_map.insert(
-      name.to_string(),
-      MappedName::Builtin(Builtin {
+      swc_atoms::JsWord::from(name),
+      NameId::Builtin(Builtin {
         name: name.to_string(),
       }),
     );
   }
 
-  for (name, value) in CONSTANTS {
-    name_map.insert(name.to_string(), MappedName::Constant(value.clone()));
+  for (name, _) in CONSTANTS {
+    name_map.insert(swc_atoms::JsWord::from(name), NameId::Constant(name));
   }
 
-  Scope {
-    rc: Rc::new(RefCell::new(ScopeData {
-      name_map,
-      parent: None,
-    })),
-  }
-  .nest()
+  Rc::new(RefCell::new(ScopeData {
+    owner_id: OwnerId::Module,
+    name_map,
+    parent: None,
+  }))
+  .nest(None)
 }

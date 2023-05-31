@@ -285,6 +285,14 @@ pub enum Instruction {
   Throw(Value),
   Import(Value, Register),
   ImportStar(Value, Register),
+  SetCatch(LabelRef, Register),
+  UnsetCatch,
+  ConstSubCall(Value, Value, Value, Register),
+  RequireMutableThis,
+  ThisSubCall(Value, Value, Value, Register),
+  Next(Register, Register),
+  UnpackIterRes(Register, Register, Register),
+  Cat(Value, Register),
 }
 
 impl std::fmt::Display for Instruction {
@@ -421,6 +429,38 @@ impl std::fmt::Display for Instruction {
       Instruction::ImportStar(value, register) => {
         write!(f, "import* {} {}", value, register)
       }
+      Instruction::SetCatch(label, register) => {
+        write!(f, "set_catch {} {}", label, register)
+      }
+      Instruction::UnsetCatch => write!(f, "unset_catch"),
+      Instruction::ConstSubCall(obj, subscript, args, register) => {
+        write!(
+          f,
+          "const_subcall {} {} {} {}",
+          obj, subscript, args, register
+        )
+      }
+      Instruction::RequireMutableThis => write!(f, "require_mutable_this"),
+      Instruction::ThisSubCall(obj, subscript, args, register) => {
+        write!(
+          f,
+          "this_subcall {} {} {} {}",
+          obj, subscript, args, register
+        )
+      }
+      Instruction::Next(obj, register) => {
+        write!(f, "next {} {}", obj, register)
+      }
+      Instruction::UnpackIterRes(obj, value_register, done_register) => {
+        write!(
+          f,
+          "unpack_iter_res {} {} {}",
+          obj, value_register, done_register
+        )
+      }
+      Instruction::Cat(iterables, register) => {
+        write!(f, "cat {} {}", iterables, register)
+      }
     }
   }
 }
@@ -478,6 +518,14 @@ impl Instruction {
       Throw(..) => InstructionByte::Throw,
       Import(..) => InstructionByte::Import,
       ImportStar(..) => InstructionByte::ImportStar,
+      SetCatch(..) => InstructionByte::SetCatch,
+      UnsetCatch => InstructionByte::UnsetCatch,
+      ConstSubCall(..) => InstructionByte::ConstSubCall,
+      RequireMutableThis => InstructionByte::RequireMutableThis,
+      ThisSubCall(..) => InstructionByte::ThisSubCall,
+      Next(..) => InstructionByte::Next,
+      UnpackIterRes(..) => InstructionByte::UnpackIterRes,
+      Cat(..) => InstructionByte::Cat,
     }
   }
 }

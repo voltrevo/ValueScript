@@ -1,144 +1,117 @@
+use std::fmt;
 use std::{collections::BTreeMap, rc::Rc};
 
-use num_bigint::BigInt;
-
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::native_function::{native_fn, ThisWrapper};
+use crate::vs_value::ToVal;
+use crate::ValTrait;
 use crate::{
-  format_val,
   native_function::NativeFunction,
-  operations::{op_sub, op_submov},
-  vs_array::VsArray,
+  operations::op_submov,
   vs_class::VsClass,
   vs_object::VsObject,
-  vs_value::{LoadFunctionResult, Val, VsType},
-  ValTrait,
+  vs_value::{LoadFunctionResult, Val},
 };
+
+use super::builtin_object::BuiltinObject;
 
 pub struct RangeErrorBuiltin {}
 
-pub static RANGE_ERROR_BUILTIN: RangeErrorBuiltin = RangeErrorBuiltin {};
+impl BuiltinObject for RangeErrorBuiltin {
+  fn bo_name() -> &'static str {
+    "RangeError"
+  }
 
-impl ValTrait for RangeErrorBuiltin {
-  fn typeof_(&self) -> VsType {
-    VsType::Object
+  fn bo_sub(_key: &str) -> Val {
+    Val::Undefined
   }
-  fn val_to_string(&self) -> String {
-    "function RangeError() { [native code] }".to_string()
+
+  fn bo_load_function() -> LoadFunctionResult {
+    LoadFunctionResult::NativeFunction(to_range_error)
   }
-  fn to_number(&self) -> f64 {
-    core::f64::NAN
-  }
-  fn to_index(&self) -> Option<usize> {
-    None
-  }
-  fn is_primitive(&self) -> bool {
-    false
-  }
-  fn to_primitive(&self) -> Val {
-    Val::String(Rc::new(
-      "function RangeError() { [native code] }".to_string(),
-    ))
-  }
-  fn is_truthy(&self) -> bool {
-    true
-  }
-  fn is_nullish(&self) -> bool {
-    false
-  }
-  fn bind(&self, _params: Vec<Val>) -> Option<Val> {
-    None
-  }
-  fn as_bigint_data(&self) -> Option<BigInt> {
-    None
-  }
-  fn as_array_data(&self) -> Option<Rc<VsArray>> {
-    None
-  }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    None
-  }
-  fn as_class_data(&self) -> Option<Rc<VsClass>> {
+
+  fn bo_as_class_data() -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
       constructor: Val::Static(&SET_MESSAGE),
       instance_prototype: make_range_error_prototype(),
     }))
   }
-
-  fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NativeFunction(to_range_error)
-  }
-
-  fn sub(&self, _key: Val) -> Result<Val, Val> {
-    Ok(Val::Undefined)
-  }
-
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of RangeError builtin")
-  }
-
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "\x1b[36m[RangeError]\x1b[39m")
-  }
-
-  fn codify(&self) -> String {
-    "RangeError".into()
-  }
 }
 
-pub fn to_range_error(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
-  Ok(Val::Object(Rc::new(VsObject {
-    string_map: BTreeMap::from([(
-      "message".to_string(),
-      Val::String(Rc::new(match params.get(0) {
-        Some(param) => param.val_to_string(),
-        None => "".to_string(),
-      })),
-    )]),
-    prototype: Some(make_range_error_prototype()),
-  })))
+impl fmt::Display for RangeErrorBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "function RangeError() {{ [native code] }}")
+  }
 }
 
 // TODO: Static? (Rc -> Arc?)
 fn make_range_error_prototype() -> Val {
-  Val::Object(Rc::new(VsObject {
+  VsObject {
     string_map: BTreeMap::from([
-      (
-        "name".to_string(),
-        Val::String(Rc::new("RangeError".to_string())),
-      ),
+      ("name".to_string(), "RangeError".to_val()),
       ("toString".to_string(), Val::Static(&RANGE_ERROR_TO_STRING)),
     ]),
+    symbol_map: Default::default(),
     prototype: None,
-  }))
+  }
+  .to_val()
 }
 
-static SET_MESSAGE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    let message = match params.get(0) {
-      Some(param) => param.val_to_string(),
-      None => "".to_string(),
-    };
+static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
+  let message = match params.get(0) {
+    Some(param) => param.to_string(),
+    None => "".to_string(),
+  };
 
-    op_submov(this, format_val!("message"), format_val!("{}", message))?;
+  op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
 
-    Ok(Val::Undefined)
-  },
-};
+  Ok(Val::Undefined)
+});
 
-static RANGE_ERROR_TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    let message = op_sub(this.clone(), format_val!("message"))?;
-    Ok(format_val!("RangeError({})", message))
-  },
-};
+pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
+  Ok(
+    VsObject {
+      string_map: BTreeMap::from([(
+        "message".to_string(),
+        match params.get(0) {
+          Some(param) => param.clone().to_val_string(),
+          None => "".to_val(),
+        },
+      )]),
+      symbol_map: Default::default(),
+      prototype: Some(make_range_error_prototype()),
+    }
+    .to_val(),
+  )
+}
 
-#[macro_export]
-macro_rules! range_error {
-  ($fmt:expr $(, $($arg:expr),*)?) => {{
-    let mut this = Val::Undefined;
-    let formatted_string = format!($fmt $(, $($arg),*)?);
-    Err(to_range_error(
-      &mut this, vec![Val::String(Rc::new(formatted_string))]
-    ).unwrap())
-  }};
+static RANGE_ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
+  let message = this.get().sub("message".to_val())?;
+  Ok(format!("RangeError({})", message).to_val())
+});
+
+pub trait ToRangeError {
+  fn to_range_error(self) -> Val;
+}
+
+impl ToRangeError for &str {
+  fn to_range_error(self) -> Val {
+    self.to_string().to_range_error()
+  }
+}
+
+impl ToRangeError for String {
+  fn to_range_error(self) -> Val {
+    self.to_val().to_range_error()
+  }
+}
+
+impl ToRangeError for Val {
+  fn to_range_error(self) -> Val {
+    VsObject {
+      string_map: BTreeMap::from([("message".to_string(), self)]),
+      symbol_map: Default::default(),
+      prototype: Some(make_range_error_prototype()),
+    }
+    .to_val()
+  }
 }

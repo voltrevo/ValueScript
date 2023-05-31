@@ -1,0 +1,29 @@
+name: Test
+
+on: [pull_request]
+
+jobs:
+  test:
+    name: Run cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cargo
+          restore-keys: pr-dot-cargo
+      - uses: actions/cache@v2
+        with:
+          path: target
+          key: pr-target
+          restore-keys: pr-target
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Run cargo test
+        run: cargo test

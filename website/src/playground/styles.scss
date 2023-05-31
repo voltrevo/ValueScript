@@ -1,3 +1,5 @@
+@import '@sweetalert2/themes/dark/dark.scss';
+
 body {
   background-color: #1e1e1e;
   color: #d4d4d4;
@@ -6,6 +8,7 @@ body {
   margin: 0;
   overflow: hidden;
   position: fixed;
+  height: 100vh;
 }
 
 a, a:visited {
@@ -13,7 +16,7 @@ a, a:visited {
   text-decoration: none;
 }
 
-#file-selector {
+#file-menu {
   background-color: #181818;
   position: absolute;
   left: 0;
@@ -21,17 +24,55 @@ a, a:visited {
   font-size: 1.5em;
   display: flex;
   width: 50vw;
+  max-width: 50vw;
+  height: 3em;
   border-bottom: 1px solid black;
   user-select: none;
+
+  #file-location {
+    padding: 0.5em 0;
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+    align-items: center;
+    overflow-x: auto;
+
+    #file-location-text {
+      white-space: nowrap;
+    }
+  }
+
+  #list-btn {
+    padding: 0 0.75em;
+  }
+
+  #delete-btn {
+    padding-right: 0.75em;
+  }
+
+  .icon-btn {
+    padding: 0 0.5em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+
+    &.disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  }
 }
 
-#file-selector > div {
-  width: 2em;
-  padding: 0.5em;
-}
-
-#file-location {
+.grow-spacer {
   flex-grow: 1;
+  flex-basis: 0;
+}
+
+.icon-spacer {
+  display: inline-block;
+  width: 0.5em;
 }
 
 #file-location select, #file-location option {
@@ -45,19 +86,45 @@ a, a:visited {
   cursor: pointer;
 }
 
-#file-previous, #file-next {
-  color: hsl(44, 100%, 50%);
-  font-weight: bold;
-  text-align: center;
-  cursor: pointer;
-}
-
 #editor {
   position: absolute;
   left: 0;
-  top: 4em;
-  height: calc(100vh - 4em);
+  top: 5em;
+  height: calc(100vh - 9em);
   width: 50vw;
+}
+
+#monaco-editor {
+  height: 100%;
+  width: 100%;
+}
+
+#file-list {
+  display: none;
+  gap: 0.5em;
+  flex-direction: column;
+  overflow: auto;
+  max-height: 100%;
+  padding: 0 1.5em;
+
+  .file {
+    padding: 0.5em 1.5em;
+    cursor: pointer;
+    border: 1px solid black;
+    border-radius: 0.5em;
+    background-color: rgba(255, 255, 255, 0.02);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+
+    &.current {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    &:hover {
+      background-color: rgba(0, 0, 255, 0.1);
+    }
+  }
 }
 
 #editor-loading {
@@ -66,6 +133,40 @@ a, a:visited {
   background-image: url('Ripple-2s-200px.svg');
   background-repeat: no-repeat;
   background-position: center;
+}
+
+#footer-buttons {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 50vw;
+  background-color: #181818;
+  border-top: 1px solid black;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    flex-basis: 0;
+    text-align: center;
+    border-left: 1px solid black;
+    cursor: pointer;
+    font-size: 1.5em;
+    user-select: none;
+    padding: 0.72em;
+
+    &:first-child {
+      border-left: none;
+    }
+
+    &:hover {
+      background-color: rgba(0, 0, 255, 0.1);
+    }
+  }
 }
 
 #display {
@@ -81,7 +182,7 @@ a, a:visited {
 
 #display > div, #state {
   white-space: pre-wrap;
-  padding: 1.5em;
+  padding: 1.75em;
 }
 
 #display > div:not(:first-child) {
@@ -89,8 +190,12 @@ a, a:visited {
 }
 
 #display .display-title {
+  display: flex;
   text-align: center;
   font-size: 1.5em;
+  height: 2em;
+  align-items: center;
+  justify-content: center;
   background-color: #181818;
   padding: 0.5em;
   white-space: normal;

@@ -234,8 +234,8 @@ where
     use Instruction::*;
 
     match instruction {
-      End => {}
-      OpInc(_) | OpDec(_) => {}
+      End | UnsetCatch | RequireMutableThis | OpInc(..) | OpDec(..) | Jmp(..) | SetCatch(..)
+      | Next(..) | UnpackIterRes(..) => {}
       Mov(arg, _)
       | OpNot(arg, _)
       | OpBitNot(arg, _)
@@ -244,7 +244,8 @@ where
       | UnaryMinus(arg, _)
       | Import(arg, _)
       | ImportStar(arg, _)
-      | Throw(arg) => {
+      | Throw(arg)
+      | Cat(arg, _) => {
         self.value(Some(owner), arg);
       }
       OpPlus(arg1, arg2, _)
@@ -281,12 +282,14 @@ where
         self.value(Some(owner), arg1);
         self.value(Some(owner), arg2);
       }
-      Apply(arg1, arg2, arg3, _) | SubCall(arg1, arg2, arg3, _) => {
+      Apply(arg1, arg2, arg3, _)
+      | SubCall(arg1, arg2, arg3, _)
+      | ConstSubCall(arg1, arg2, arg3, _)
+      | ThisSubCall(arg1, arg2, arg3, _) => {
         self.value(Some(owner), arg1);
         self.value(Some(owner), arg2);
         self.value(Some(owner), arg3);
       }
-      Jmp(_) => {}
       JmpIf(arg, _) => {
         self.value(Some(owner), arg);
       }

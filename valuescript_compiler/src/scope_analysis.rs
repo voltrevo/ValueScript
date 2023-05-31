@@ -1,22 +1,22 @@
-use std::{cell::RefCell, collections::HashMap, collections::HashSet, rc::Rc};
+use std::{
+  collections::HashMap,
+  collections::{BTreeMap, HashSet},
+};
 
 use swc_common::Spanned;
 use valuescript_common::BUILTIN_NAMES;
 
-use crate::{asm::Builtin, constants::CONSTANTS};
+use crate::{
+  asm::{Builtin, Register, Value},
+  constants::CONSTANTS,
+  name_allocator::{PointerAllocator, RegAllocator},
+  scope::{init_std_scope, NameId, OwnerId, Scope, ScopeTrait},
+};
 
 use super::diagnostic::{Diagnostic, DiagnosticLevel};
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug)]
-pub enum NameId {
-  Span(swc_common::Span),
-  Builtin(Builtin),
-  Constant(&'static str),
-}
-
-// TODO: Make use of these in the next phase of the compiler, remove the
-// allow(dead_code) attributes
-#[derive(Clone)]
+// TODO: Find a use for these or remove them
+#[derive(Clone, Debug)]
 pub struct Capture {
   #[allow(dead_code)]
   ref_: swc_common::Span,
@@ -25,8 +25,8 @@ pub struct Capture {
   captor_id: OwnerId,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum NameType {
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NameType {
   Var,
   Let,
   Const,
@@ -38,21 +38,38 @@ enum NameType {
   Constant,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Name {
-  id: NameId,
-  owner_id: OwnerId,
-  sym: swc_atoms::JsWord,
-  type_: NameType,
-  mutations: Vec<swc_common::Span>,
-  captures: Vec<Capture>,
+  pub id: NameId,
+  pub owner_id: OwnerId,
+  pub sym: swc_atoms::JsWord,
+  pub type_: NameType,
+  pub effectively_const: bool,
+  pub value: Value,
+  pub tdz_end: Option<swc_common::BytePos>,
+  pub mutations: Vec<swc_common::Span>,
+  pub captures: Vec<Capture>,
+}
+
+#[derive(Debug)]
+pub struct Ref {
+  pub name_id: NameId,
+  pub owner_id: OwnerId,
+  pub span: swc_common::Span,
 }
 
 #[derive(Default)]
 pub struct ScopeAnalysis {
   pub names: HashMap<NameId, Name>,
-  pub captures: HashMap<OwnerId, HashSet<swc_common::Span>>,
+  pub owners: HashMap<OwnerId, HashSet<swc_common::Span>>,
+  pub captures: HashMap<OwnerId, HashSet<NameId>>,
+  pub capture_values: HashMap<(OwnerId, NameId), Value>,
+  pub mutations: BTreeMap<swc_common::Span, NameId>,
+  pub optional_mutations: BTreeMap<swc_common::Span, NameId>,
+  pub refs: HashMap<swc_common::Span, Ref>,
   pub diagnostics: Vec<Diagnostic>,
+  pub pointer_allocator: PointerAllocator,
+  pub reg_allocators: HashMap<OwnerId, RegAllocator>,
 }
 
 impl ScopeAnalysis {
@@ -68,17 +85,20 @@ impl ScopeAnalysis {
       sa.names.insert(
         NameId::Builtin(builtin.clone()),
         Name {
-          id: NameId::Builtin(builtin),
+          id: NameId::Builtin(builtin.clone()),
           owner_id: OwnerId::Module,
           sym: swc_atoms::JsWord::from(builtin_name),
           type_: NameType::Builtin,
+          effectively_const: true,
+          value: Value::Builtin(builtin),
+          tdz_end: None,
           mutations: vec![],
           captures: vec![],
         },
       );
     }
 
-    for (name, _) in CONSTANTS {
+    for (name, value) in CONSTANTS {
       sa.names.insert(
         NameId::Constant(name),
         Name {
@@ -86,6 +106,9 @@ impl ScopeAnalysis {
           owner_id: OwnerId::Module,
           sym: swc_atoms::JsWord::from(name),
           type_: NameType::Constant,
+          effectively_const: true,
+          value,
+          tdz_end: None,
           mutations: vec![],
           captures: vec![],
         },
@@ -98,55 +121,99 @@ impl ScopeAnalysis {
       sa.module_item(&scope, module_item);
     }
 
-    for (name_id, name) in &sa.names {
-      if name.captures.len() > 0 {
-        if name.type_ == NameType::Let {
-          match name_id {
-            NameId::Span(span) => {
-              sa.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::Lint,
-                message: format!(
-                  "`{}` should be declared using `const` because it is implicitly \
-                  const due to capture",
-                  name.sym
-                ),
-                span: *span,
-              });
-            }
-            NameId::Builtin(_) | NameId::Constant(_) => {
-              sa.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "Builtin/constant should not have type_ let".to_string(),
-                span: swc_common::DUMMY_SP,
-              });
-            }
-          }
-        }
+    sa.find_capture_mutations();
+    sa.expand_captures();
 
-        for mutation in &name.mutations {
-          sa.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: format!("Cannot mutate captured variable `{}`", name.sym),
-            span: *mutation,
-          });
-        }
-      }
-    }
+    sa.expand_effectively_const();
+    sa.diagnose_const_mutations();
+    sa.process_optional_mutations();
+
+    sa.diagnose_tdz_violations();
 
     return sa;
   }
 
-  fn insert_name(&mut self, scope: &XScope, type_: NameType, origin_ident: &swc_ecma_ast::Ident) {
+  pub fn lookup(&self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
+    let name_id = &self.refs.get(&ident.span)?.name_id;
+    self.names.get(name_id)
+  }
+
+  pub fn lookup_value(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+    let name_id = &self.refs.get(&ident.span)?.name_id;
+    self.lookup_by_name_id(scope, name_id)
+  }
+
+  pub fn lookup_by_name_id(&self, scope: &OwnerId, name_id: &NameId) -> Option<Value> {
+    let name = self.names.get(name_id)?;
+
+    match &name.value {
+      Value::Register(_) => {
+        if &name.owner_id == scope {
+          Some(name.value.clone())
+        } else {
+          self.lookup_capture(scope, name_id)
+        }
+      }
+      _ => Some(name.value.clone()),
+    }
+  }
+
+  pub fn lookup_capture(&self, scope: &OwnerId, name_id: &NameId) -> Option<Value> {
+    let value = self.capture_values.get(&(scope.clone(), name_id.clone()))?;
+    Some(value.clone())
+  }
+
+  fn allocate_reg(&mut self, scope: &OwnerId, based_on_name: &str) -> Register {
+    self
+      .reg_allocators
+      .entry(scope.clone())
+      .or_insert_with(|| RegAllocator::default())
+      .allocate(based_on_name)
+  }
+
+  fn insert_name(
+    &mut self,
+    scope: &Scope,
+    type_: NameType,
+    value: Value,
+    origin_ident: &swc_ecma_ast::Ident,
+    tdz_end: Option<swc_common::BytePos>,
+  ) {
     let name = Name {
       id: NameId::Span(origin_ident.span),
       owner_id: scope.borrow().owner_id.clone(),
       sym: origin_ident.sym.clone(),
       type_,
+      effectively_const: match type_ {
+        NameType::Var | NameType::Let | NameType::Param => false,
+        NameType::Const
+        | NameType::Function
+        | NameType::Class
+        | NameType::Import
+        | NameType::Builtin
+        | NameType::Constant => true,
+      },
+      value,
+      tdz_end,
       mutations: Vec::new(),
       captures: Vec::new(),
     };
 
     self.names.insert(name.id.clone(), name.clone());
+    self.refs.insert(
+      origin_ident.span,
+      Ref {
+        name_id: name.id.clone(),
+        owner_id: scope.borrow().owner_id.clone(),
+        span: origin_ident.span,
+      },
+    );
+
+    self
+      .owners
+      .entry(name.owner_id.clone())
+      .or_insert_with(HashSet::new)
+      .insert(origin_ident.span);
 
     scope.set(
       &origin_ident.sym,
@@ -154,6 +221,41 @@ impl ScopeAnalysis {
       origin_ident.span,
       &mut self.diagnostics,
     );
+  }
+
+  fn insert_pointer_name(
+    &mut self,
+    scope: &Scope,
+    type_: NameType,
+    origin_ident: &swc_ecma_ast::Ident,
+  ) {
+    match scope.get(&origin_ident.sym) {
+      None => {
+        let pointer = Value::Pointer(self.pointer_allocator.allocate(&origin_ident.sym));
+        self.insert_name(scope, type_, pointer, origin_ident, None);
+      }
+      Some(name_id) => {
+        let name = self.names.get(&name_id).expect("Name not found");
+
+        match &name.value {
+          Value::Pointer(_) => {}
+          _ => {
+            panic!("Expected pointer value for name: {:?}", name);
+          }
+        }
+      }
+    }
+  }
+
+  fn insert_reg_name(
+    &mut self,
+    scope: &Scope,
+    type_: NameType,
+    origin_ident: &swc_ecma_ast::Ident,
+    tdz_end: Option<swc_common::BytePos>,
+  ) {
+    let reg = Value::Register(self.allocate_reg(&scope.borrow().owner_id, &origin_ident.sym));
+    self.insert_name(scope, type_, reg, origin_ident, tdz_end);
   }
 
   fn insert_capture(&mut self, captor_id: &OwnerId, name_id: &NameId, ref_: swc_common::Span) {
@@ -169,11 +271,28 @@ impl ScopeAnalysis {
       }
     };
 
-    self
+    let inserted = self
       .captures
       .entry(captor_id.clone())
       .or_insert_with(HashSet::new)
-      .insert(ref_);
+      .insert(name_id.clone());
+
+    if inserted {
+      let key = (captor_id.clone(), name_id.clone());
+
+      if let Value::Register(_) = name.value {
+        // This is just self.allocate_reg, but we can't borrow all of self right now
+        let reg = self
+          .reg_allocators
+          .entry(captor_id.clone())
+          .or_insert_with(|| RegAllocator::default())
+          .allocate(&name.sym);
+
+        self.capture_values.insert(key, Value::Register(reg));
+      } else {
+        self.capture_values.insert(key, name.value.clone());
+      }
+    }
 
     name.captures.push(Capture {
       ref_,
@@ -181,7 +300,7 @@ impl ScopeAnalysis {
     });
   }
 
-  fn module_item(&mut self, scope: &XScope, module_item: &swc_ecma_ast::ModuleItem) {
+  fn module_item(&mut self, scope: &Scope, module_item: &swc_ecma_ast::ModuleItem) {
     use swc_ecma_ast::ModuleDecl;
     use swc_ecma_ast::ModuleItem;
 
@@ -191,7 +310,14 @@ impl ScopeAnalysis {
         ModuleDecl::ExportDecl(ed) => {
           self.decl(&scope, &ed.decl);
         }
-        ModuleDecl::ExportNamed(_) => {}
+        ModuleDecl::ExportNamed(en) => match en.src {
+          Some(_) => {}
+          None => {
+            for specifier in &en.specifiers {
+              self.export_specifier(&scope, specifier);
+            }
+          }
+        },
         ModuleDecl::ExportDefaultDecl(edd) => {
           self.default_decl(&scope, &edd.decl);
         }
@@ -227,13 +353,13 @@ impl ScopeAnalysis {
     };
   }
 
-  fn import_decl(&mut self, scope: &XScope, import_decl: &swc_ecma_ast::ImportDecl) {
+  fn import_decl(&mut self, scope: &Scope, import_decl: &swc_ecma_ast::ImportDecl) {
     for specifier in &import_decl.specifiers {
       self.import_specifier(&scope, specifier);
     }
   }
 
-  fn import_specifier(&mut self, scope: &XScope, import_specifier: &swc_ecma_ast::ImportSpecifier) {
+  fn import_specifier(&mut self, scope: &Scope, import_specifier: &swc_ecma_ast::ImportSpecifier) {
     use swc_ecma_ast::ImportSpecifier::*;
 
     match import_specifier {
@@ -242,19 +368,57 @@ impl ScopeAnalysis {
           return;
         }
 
-        self.insert_name(scope, NameType::Import, &named_specifier.local);
+        self.insert_pointer_name(scope, NameType::Import, &named_specifier.local);
       }
       Default(default_specifier) => {
-        self.insert_name(scope, NameType::Import, &default_specifier.local);
+        self.insert_pointer_name(scope, NameType::Import, &default_specifier.local);
       }
       Namespace(namespace_specifier) => {
-        self.insert_name(scope, NameType::Import, &namespace_specifier.local);
+        self.insert_pointer_name(scope, NameType::Import, &namespace_specifier.local);
       }
     }
   }
 
-  fn decl(&mut self, scope: &XScope, decl: &swc_ecma_ast::Decl) {
+  fn export_specifier(&mut self, scope: &Scope, export_specifier: &swc_ecma_ast::ExportSpecifier) {
+    use swc_ecma_ast::ExportSpecifier::*;
+    use swc_ecma_ast::ModuleExportName;
+
+    match export_specifier {
+      Named(named_specifier) => {
+        if named_specifier.is_type_only {
+          return;
+        }
+
+        match &named_specifier.orig {
+          ModuleExportName::Ident(ident) => self.ident(scope, ident),
+          ModuleExportName::Str(_) => self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: "TODO: ModuleExportName::Str".to_string(),
+            span: export_specifier.span(),
+          }),
+        }
+      }
+      Default(default_specifier) => self.ident(scope, &default_specifier.exported),
+      Namespace(namespace_specifier) => match &namespace_specifier.name {
+        ModuleExportName::Ident(ident) => self.ident(scope, ident),
+        ModuleExportName::Str(_) => self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "TODO: ModuleExportName::Str".to_string(),
+          span: export_specifier.span(),
+        }),
+      },
+    }
+  }
+
+  fn decl(&mut self, scope: &Scope, decl: &swc_ecma_ast::Decl) {
     use swc_ecma_ast::Decl;
+
+    if is_declare(decl) {
+      // E.g.:
+      //   declare function foo(): void;
+      // These are just type declarations, so we can ignore them
+      return;
+    }
 
     match decl {
       Decl::Class(class_decl) => {
@@ -289,14 +453,14 @@ impl ScopeAnalysis {
 
   fn function(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     name: &Option<swc_ecma_ast::Ident>,
     function: &swc_ecma_ast::Function,
   ) {
-    let child_scope = scope.nest(Some(OwnerId::Span(function.span.clone())));
+    let child_scope = scope.nest(Some(fn_to_owner_id(name, function)));
 
     if let Some(name) = name {
-      self.insert_name(&child_scope, NameType::Function, name);
+      self.insert_pointer_name(&child_scope, NameType::Function, name);
     }
 
     for param in &function.params {
@@ -309,13 +473,13 @@ impl ScopeAnalysis {
     }
   }
 
-  fn module_level_hoists(&mut self, scope: &XScope, module: &swc_ecma_ast::Module) {
+  fn module_level_hoists(&mut self, scope: &Scope, module: &swc_ecma_ast::Module) {
     for item in &module.body {
       self.module_level_hoists_item(scope, item);
     }
   }
 
-  fn module_level_hoists_item(&mut self, scope: &XScope, module_item: &swc_ecma_ast::ModuleItem) {
+  fn module_level_hoists_item(&mut self, scope: &Scope, module_item: &swc_ecma_ast::ModuleItem) {
     use swc_ecma_ast::ModuleDecl;
     use swc_ecma_ast::ModuleItem;
 
@@ -326,10 +490,10 @@ impl ScopeAnalysis {
         }
         ModuleDecl::ExportDecl(ed) => match &ed.decl {
           swc_ecma_ast::Decl::Class(class_decl) => {
-            self.insert_name(&scope, NameType::Class, &class_decl.ident);
+            self.insert_pointer_name(&scope, NameType::Class, &class_decl.ident);
           }
           swc_ecma_ast::Decl::Fn(fn_decl) => {
-            self.insert_name(&scope, NameType::Function, &fn_decl.ident);
+            self.insert_pointer_name(&scope, NameType::Function, &fn_decl.ident);
           }
           swc_ecma_ast::Decl::Var(var_decl) => {
             let name_type = match var_decl.kind {
@@ -340,7 +504,7 @@ impl ScopeAnalysis {
 
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(&scope, name_type, &ident);
+                self.insert_pointer_name(&scope, name_type, &ident);
               }
             }
           }
@@ -357,12 +521,12 @@ impl ScopeAnalysis {
         ModuleDecl::ExportDefaultDecl(edd) => match &edd.decl {
           swc_ecma_ast::DefaultDecl::Class(class_decl) => {
             if let Some(ident) = &class_decl.ident {
-              self.insert_name(&scope, NameType::Class, ident);
+              self.insert_pointer_name(&scope, NameType::Class, ident);
             }
           }
           swc_ecma_ast::DefaultDecl::Fn(fn_decl) => {
             if let Some(ident) = &fn_decl.ident {
-              self.insert_name(&scope, NameType::Function, ident);
+              self.insert_pointer_name(&scope, NameType::Function, ident);
             }
           }
           swc_ecma_ast::DefaultDecl::TsInterfaceDecl(_) => {}
@@ -386,13 +550,13 @@ impl ScopeAnalysis {
     };
   }
 
-  fn function_level_hoists(&mut self, scope: &XScope, block: &swc_ecma_ast::BlockStmt) {
+  fn function_level_hoists(&mut self, scope: &Scope, block: &swc_ecma_ast::BlockStmt) {
     for stmt in &block.stmts {
       self.function_level_hoists_stmt(scope, stmt);
     }
   }
 
-  fn function_level_hoists_stmt(&mut self, scope: &XScope, stmt: &swc_ecma_ast::Stmt) {
+  fn function_level_hoists_stmt(&mut self, scope: &Scope, stmt: &swc_ecma_ast::Stmt) {
     use swc_ecma_ast::Decl;
     use swc_ecma_ast::Stmt;
 
@@ -402,7 +566,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident, None);
               }
             }
           }
@@ -419,7 +583,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident, None);
               }
             }
           }
@@ -430,7 +594,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident, None);
               }
             }
           }
@@ -441,7 +605,7 @@ impl ScopeAnalysis {
           if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_name(scope, NameType::Var, &ident);
+                self.insert_reg_name(scope, NameType::Var, &ident, None);
               }
             }
           }
@@ -451,41 +615,47 @@ impl ScopeAnalysis {
     }
   }
 
-  fn block_level_hoists(&mut self, scope: &XScope, block: &swc_ecma_ast::BlockStmt) {
+  fn block_level_hoists(&mut self, scope: &Scope, block: &swc_ecma_ast::BlockStmt) {
     for stmt in &block.stmts {
       self.block_level_hoists_stmt(scope, stmt);
     }
   }
 
-  fn block_level_hoists_stmt(&mut self, scope: &XScope, stmt: &swc_ecma_ast::Stmt) {
+  fn block_level_hoists_stmt(&mut self, scope: &Scope, stmt: &swc_ecma_ast::Stmt) {
     use swc_ecma_ast::Decl;
     use swc_ecma_ast::Stmt;
 
-    match stmt {
-      Stmt::Decl(decl) => match decl {
-        Decl::Class(class) => {
-          self.insert_name(scope, NameType::Class, &class.ident);
-        }
-        Decl::Fn(fn_) => {
-          self.insert_name(scope, NameType::Function, &fn_.ident);
-        }
-        Decl::Var(var_decl) => {
-          self.block_level_hoists_var_decl(scope, var_decl);
-        }
-        Decl::TsInterface(_) => {}
-        Decl::TsTypeAlias(_) => {}
-        Decl::TsEnum(_) => {
-          // Diagnostic emitted after hoist processing
-        }
-        Decl::TsModule(_) => {
-          // Diagnostic emitted after hoist processing
-        }
-      },
-      _ => {}
+    let decl = match stmt {
+      Stmt::Decl(decl) => decl,
+      _ => return,
+    };
+
+    if is_declare(decl) {
+      return;
+    }
+
+    match decl {
+      Decl::Class(class) => {
+        self.insert_pointer_name(scope, NameType::Class, &class.ident);
+      }
+      Decl::Fn(fn_) => {
+        self.insert_pointer_name(scope, NameType::Function, &fn_.ident);
+      }
+      Decl::Var(var_decl) => {
+        self.block_level_hoists_var_decl(scope, var_decl);
+      }
+      Decl::TsInterface(_) => {}
+      Decl::TsTypeAlias(_) => {}
+      Decl::TsEnum(_) => {
+        // Diagnostic emitted after hoist processing
+      }
+      Decl::TsModule(_) => {
+        // Diagnostic emitted after hoist processing
+      }
     }
   }
 
-  fn block_level_hoists_var_decl(&mut self, scope: &XScope, var_decl: &swc_ecma_ast::VarDecl) {
+  fn block_level_hoists_var_decl(&mut self, scope: &Scope, var_decl: &swc_ecma_ast::VarDecl) {
     let name_type = match var_decl.kind {
       swc_ecma_ast::VarDeclKind::Var => return,
       swc_ecma_ast::VarDeclKind::Let => NameType::Let,
@@ -494,7 +664,7 @@ impl ScopeAnalysis {
 
     for decl in &var_decl.decls {
       for ident in self.get_pat_idents(&decl.name) {
-        self.insert_name(scope, name_type, &ident);
+        self.insert_reg_name(scope, name_type, &ident, Some(decl.span.hi));
       }
     }
   }
@@ -561,7 +731,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn arrow(&mut self, scope: &XScope, arrow: &swc_ecma_ast::ArrowExpr) {
+  fn arrow(&mut self, scope: &Scope, arrow: &swc_ecma_ast::ArrowExpr) {
     let child_scope = scope.nest(Some(OwnerId::Span(arrow.span.clone())));
 
     for param in &arrow.params {
@@ -578,7 +748,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn var_declarator_pat(&mut self, scope: &XScope, type_: NameType, pat: &swc_ecma_ast::Pat) {
+  fn var_declarator_pat(&mut self, scope: &Scope, type_: NameType, pat: &swc_ecma_ast::Pat) {
     use swc_ecma_ast::Pat;
 
     match pat {
@@ -634,7 +804,7 @@ impl ScopeAnalysis {
 
   fn var_declarator(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     kind: swc_ecma_ast::VarDeclKind,
     var_declarator: &swc_ecma_ast::VarDeclarator,
   ) {
@@ -651,7 +821,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn default_decl(&mut self, scope: &XScope, default_decl: &swc_ecma_ast::DefaultDecl) {
+  fn default_decl(&mut self, scope: &Scope, default_decl: &swc_ecma_ast::DefaultDecl) {
     use swc_ecma_ast::DefaultDecl;
 
     match &default_decl {
@@ -667,14 +837,14 @@ impl ScopeAnalysis {
 
   fn class_(
     &mut self,
-    scope: &XScope,
+    scope: &Scope,
     ident: &Option<swc_ecma_ast::Ident>,
     class_: &swc_ecma_ast::Class,
   ) {
     let child_scope = scope.nest(Some(OwnerId::Span(class_.span)));
 
     if let Some(ident) = ident {
-      self.insert_name(&child_scope, NameType::Class, ident);
+      self.insert_pointer_name(&child_scope, NameType::Class, ident);
     }
 
     for member in &class_.body {
@@ -682,7 +852,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn class_member(&mut self, scope: &XScope, class_member: &swc_ecma_ast::ClassMember) {
+  fn class_member(&mut self, scope: &Scope, class_member: &swc_ecma_ast::ClassMember) {
     use swc_ecma_ast::ClassMember::*;
 
     match class_member {
@@ -697,7 +867,7 @@ impl ScopeAnalysis {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
               match &ts_param_prop.param {
                 swc_ecma_ast::TsParamPropParam::Ident(ident) => {
-                  self.insert_name(&child_scope, NameType::Param, &ident.id);
+                  self.insert_reg_name(&child_scope, NameType::Param, &ident.id, None);
                 }
                 swc_ecma_ast::TsParamPropParam::Assign(assign) => {
                   self.param_pat(&child_scope, &assign.left);
@@ -747,11 +917,11 @@ impl ScopeAnalysis {
     }
   }
 
-  fn fn_expr(&mut self, scope: &XScope, fn_expr: &swc_ecma_ast::FnExpr) {
+  fn fn_expr(&mut self, scope: &Scope, fn_expr: &swc_ecma_ast::FnExpr) {
     self.function(scope, &fn_expr.ident, &fn_expr.function);
   }
 
-  fn expr(&mut self, scope: &XScope, expr: &swc_ecma_ast::Expr) {
+  fn expr(&mut self, scope: &Scope, expr: &swc_ecma_ast::Expr) {
     use swc_ecma_ast::Expr;
 
     match expr {
@@ -782,7 +952,7 @@ impl ScopeAnalysis {
           swc_ecma_ast::UnaryOp::TypeOf => {}
           swc_ecma_ast::UnaryOp::Void => {}
           swc_ecma_ast::UnaryOp::Delete => {
-            self.mutate_expr(scope, &unary.arg);
+            self.mutate_expr(scope, &unary.arg, false);
           }
           swc_ecma_ast::UnaryOp::Plus => {}
           swc_ecma_ast::UnaryOp::Minus => {}
@@ -792,20 +962,26 @@ impl ScopeAnalysis {
       }
       Expr::Update(update) => {
         self.expr(scope, &update.arg);
-        self.mutate_expr(scope, &update.arg);
+        self.mutate_expr(scope, &update.arg, false);
       }
       Expr::Bin(bin) => {
         self.expr(scope, &bin.left);
         self.expr(scope, &bin.right);
       }
-      Expr::Assign(assign) => match &assign.left {
-        swc_ecma_ast::PatOrExpr::Pat(pat) => {
-          self.mutate_pat(scope, pat);
+      Expr::Assign(assign) => {
+        match &assign.left {
+          swc_ecma_ast::PatOrExpr::Pat(pat) => {
+            self.pat(scope, pat);
+            self.mutate_pat(scope, pat);
+          }
+          swc_ecma_ast::PatOrExpr::Expr(expr) => {
+            self.expr(scope, expr);
+            self.mutate_expr(scope, expr, false);
+          }
         }
-        swc_ecma_ast::PatOrExpr::Expr(expr) => {
-          self.mutate_expr(scope, expr);
-        }
-      },
+
+        self.expr(scope, &assign.right);
+      }
       Expr::Seq(seq) => {
         for expr in &seq.exprs {
           self.expr(scope, expr);
@@ -828,22 +1004,8 @@ impl ScopeAnalysis {
           span: await_.span,
         });
       }
-      Expr::Member(member) => {
-        self.expr(scope, &member.obj);
-      }
-      Expr::Call(call) => {
-        match &call.callee {
-          swc_ecma_ast::Callee::Super(_) => {}
-          swc_ecma_ast::Callee::Import(_) => {}
-          swc_ecma_ast::Callee::Expr(expr) => {
-            self.expr(scope, expr);
-          }
-        }
-
-        for arg in &call.args {
-          self.expr(scope, &arg.expr);
-        }
-      }
+      Expr::Member(member) => self.member(scope, member),
+      Expr::Call(call) => self.call(scope, call),
       Expr::New(new) => {
         self.expr(scope, &new.callee);
 
@@ -853,9 +1015,7 @@ impl ScopeAnalysis {
           }
         }
       }
-      Expr::Paren(paren) => {
-        self.expr(scope, &paren.expr);
-      }
+      Expr::Paren(paren) => self.expr(scope, &paren.expr),
       Expr::Tpl(tpl) => {
         for elem in &tpl.exprs {
           self.expr(scope, elem);
@@ -872,12 +1032,24 @@ impl ScopeAnalysis {
       }
       Expr::MetaProp(_) => {}
       Expr::Invalid(_) => {}
-      Expr::TsTypeAssertion(_) => {}
-      Expr::TsConstAssertion(_) => {}
-      Expr::TsNonNull(_) => {}
-      Expr::TsAs(_) => {}
-      Expr::OptChain(_) => {}
+      Expr::TsTypeAssertion(tta) => self.expr(scope, &tta.expr),
+      Expr::TsConstAssertion(tca) => self.expr(scope, &tca.expr),
+      Expr::TsNonNull(tnn) => self.expr(scope, &tnn.expr),
+      Expr::TsAs(ta) => self.expr(scope, &ta.expr),
+      Expr::OptChain(opt_chain) => {
+        use swc_ecma_ast::OptChainBase;
 
+        match &opt_chain.base {
+          OptChainBase::Call(call) => {
+            self.expr(scope, &call.callee);
+
+            for arg in &call.args {
+              self.expr(scope, &arg.expr);
+            }
+          }
+          OptChainBase::Member(member) => self.member(scope, member),
+        }
+      }
       Expr::SuperProp(super_prop) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
@@ -931,63 +1103,147 @@ impl ScopeAnalysis {
     }
   }
 
-  fn mutate_expr(&mut self, scope: &XScope, expr: &swc_ecma_ast::Expr) {
+  fn member(&mut self, scope: &Scope, member: &swc_ecma_ast::MemberExpr) {
+    self.expr(scope, &member.obj);
+
+    use swc_ecma_ast::MemberProp;
+
+    match &member.prop {
+      MemberProp::Ident(_) | MemberProp::PrivateName(_) => {}
+      MemberProp::Computed(computed) => {
+        self.expr(scope, &computed.expr);
+      }
+    }
+  }
+
+  fn call(&mut self, scope: &Scope, call: &swc_ecma_ast::CallExpr) {
+    match &call.callee {
+      swc_ecma_ast::Callee::Super(_) => {}
+      swc_ecma_ast::Callee::Import(_) => {}
+      swc_ecma_ast::Callee::Expr(expr) => {
+        self.expr(scope, expr);
+
+        match &**expr {
+          swc_ecma_ast::Expr::Member(member) => {
+            self.mutate_expr(scope, &member.obj, true);
+          }
+          _ => {}
+        };
+      }
+    }
+
+    for arg in &call.args {
+      self.expr(scope, &arg.expr);
+    }
+  }
+
+  fn pat(&mut self, scope: &Scope, pat: &swc_ecma_ast::Pat) {
+    use swc_ecma_ast::Pat;
+
+    match pat {
+      Pat::Ident(ident) => {
+        self.ident(scope, &ident.id);
+      }
+      Pat::Array(array) => {
+        for elem in &array.elems {
+          if let Some(elem) = elem {
+            self.pat(scope, elem);
+          }
+        }
+      }
+      Pat::Rest(rest) => {
+        self.pat(scope, &rest.arg);
+      }
+      Pat::Object(object) => {
+        for prop in &object.props {
+          match prop {
+            swc_ecma_ast::ObjectPatProp::KeyValue(key_value) => {
+              self.prop_key(scope, &key_value.key);
+              self.pat(scope, &key_value.value);
+            }
+            swc_ecma_ast::ObjectPatProp::Assign(assign) => {
+              self.ident(scope, &assign.key);
+
+              if let Some(value) = &assign.value {
+                self.expr(scope, value);
+              }
+            }
+            swc_ecma_ast::ObjectPatProp::Rest(rest) => {
+              self.pat(scope, &rest.arg);
+            }
+          }
+        }
+      }
+      Pat::Assign(assign) => {
+        self.pat(scope, &assign.left);
+        self.expr(scope, &assign.right);
+      }
+      Pat::Invalid(_) => {}
+      Pat::Expr(expr) => {
+        self.expr(scope, expr);
+      }
+    }
+  }
+
+  fn mutate_expr(&mut self, scope: &Scope, expr: &swc_ecma_ast::Expr, optional: bool) {
     use swc_ecma_ast::Expr;
+
+    let mut diagnostic: Option<Diagnostic> = None;
 
     match expr {
       Expr::Ident(ident) => {
-        self.mutate_ident(scope, ident);
+        self.mutate_ident(scope, ident, optional);
       }
       Expr::Member(member) => {
-        self.mutate_expr(scope, &member.obj);
+        self.mutate_expr(scope, &member.obj, optional);
       }
       Expr::Call(call) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Call expressions cannot be mutated".to_string(),
           span: call.span,
         });
       }
       Expr::New(new) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "New expressions cannot be mutated".to_string(),
           span: new.span,
         });
       }
       Expr::Paren(paren) => {
-        self.mutate_expr(scope, &paren.expr);
+        self.mutate_expr(scope, &paren.expr, optional);
       }
       Expr::Tpl(tpl) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Template literals cannot be mutated".to_string(),
           span: tpl.span,
         });
       }
       Expr::TaggedTpl(tagged_tpl) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Tagged template literals cannot be mutated".to_string(),
           span: tagged_tpl.span,
         });
       }
       Expr::Arrow(arrow) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Arrow functions cannot be mutated".to_string(),
           span: arrow.span,
         });
       }
       Expr::Class(class) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Class expressions cannot be mutated".to_string(),
           span: class.class.span,
         });
       }
       Expr::MetaProp(meta_prop) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Meta properties cannot be mutated".to_string(),
           span: meta_prop.span,
@@ -1001,19 +1257,19 @@ impl ScopeAnalysis {
         });
       }
       Expr::TsTypeAssertion(ts_type_assertion) => {
-        self.mutate_expr(scope, &ts_type_assertion.expr);
+        self.mutate_expr(scope, &ts_type_assertion.expr, optional);
       }
       Expr::TsConstAssertion(ts_const_assertion) => {
-        self.mutate_expr(scope, &ts_const_assertion.expr);
+        self.mutate_expr(scope, &ts_const_assertion.expr, optional);
       }
       Expr::TsNonNull(ts_non_null) => {
-        self.mutate_expr(scope, &ts_non_null.expr);
+        self.mutate_expr(scope, &ts_non_null.expr, optional);
       }
       Expr::TsAs(as_expr) => {
-        self.mutate_expr(scope, &as_expr.expr);
+        self.mutate_expr(scope, &as_expr.expr, optional);
       }
       Expr::OptChain(opt_chain) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Optional property accesses (a?.b) cannot be mutated".to_string(),
           span: opt_chain.span,
@@ -1024,7 +1280,7 @@ impl ScopeAnalysis {
         // TODO: Add capture+mutation analysis for `this`.
       }
       Expr::Array(array) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Mutating a (non-pattern) array expression is not valid. \
             This is an unusual case that can occur with things like [a,b]+=c."
@@ -1033,7 +1289,7 @@ impl ScopeAnalysis {
         });
       }
       Expr::Object(object) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Mutating a (non-pattern) object expression is not valid. \
             This is an unusual case - it's not clear whether SWC ever emit it. \
@@ -1044,70 +1300,70 @@ impl ScopeAnalysis {
         });
       }
       Expr::Fn(fn_) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: fn_.function.span,
         });
       }
       Expr::Unary(unary) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: unary.span,
         });
       }
       Expr::Update(update) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: update.span,
         });
       }
       Expr::Bin(bin) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: bin.span,
         });
       }
       Expr::Assign(assign) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: assign.span,
         });
       }
       Expr::SuperProp(super_prop) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: super_prop.span,
         });
       }
       Expr::Cond(cond) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: cond.span,
         });
       }
       Expr::Seq(seq) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: seq.span,
         });
       }
       Expr::Lit(_) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: expr.span(),
         });
       }
       Expr::Yield(yield_) => {
-        self.diagnostics.push(Diagnostic {
+        diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: "TODO".to_string(),
           span: yield_.span,
@@ -1116,7 +1372,7 @@ impl ScopeAnalysis {
       Expr::Await(await_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
-          message: "await is not supported".to_string(),
+          message: "TODO".to_string(),
           span: await_.span,
         });
       }
@@ -1164,14 +1420,20 @@ impl ScopeAnalysis {
         });
       }
     }
+
+    if !optional {
+      if let Some(diagnostic) = diagnostic {
+        self.diagnostics.push(diagnostic);
+      }
+    }
   }
 
-  fn mutate_pat(&mut self, scope: &XScope, pat: &swc_ecma_ast::Pat) {
+  fn mutate_pat(&mut self, scope: &Scope, pat: &swc_ecma_ast::Pat) {
     use swc_ecma_ast::Pat;
 
     match pat {
       Pat::Ident(ident) => {
-        self.mutate_ident(scope, &ident.id);
+        self.mutate_ident(scope, &ident.id, false);
       }
       Pat::Array(array_pat) => {
         for elem in &array_pat.elems {
@@ -1192,7 +1454,7 @@ impl ScopeAnalysis {
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
               // TODO: How is `({ y: x = 3 } = { y: 4 })` handled?
 
-              self.mutate_ident(scope, &assign.key);
+              self.mutate_ident(scope, &assign.key, false);
 
               if let Some(value) = &assign.value {
                 // Note: Generally mutate_* only processes the mutation aspect
@@ -1221,12 +1483,12 @@ impl ScopeAnalysis {
         });
       }
       Pat::Expr(expr) => {
-        self.mutate_expr(&scope, expr);
+        self.mutate_expr(&scope, expr, false);
       }
     }
   }
 
-  fn mutate_ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
+  fn mutate_ident(&mut self, scope: &Scope, ident: &swc_ecma_ast::Ident, optional: bool) {
     let name_id = match scope.get(&ident.sym) {
       Some(name_id) => name_id,
       None => {
@@ -1251,10 +1513,24 @@ impl ScopeAnalysis {
       }
     };
 
-    name.mutations.push(ident.span);
+    if optional {
+      self.optional_mutations.insert(ident.span, name_id.clone());
+    } else {
+      name.mutations.push(ident.span);
+      self.mutations.insert(ident.span, name_id.clone());
+    }
+
+    self.refs.insert(
+      ident.span,
+      Ref {
+        name_id,
+        owner_id: scope.borrow().owner_id.clone(),
+        span: ident.span,
+      },
+    );
   }
 
-  fn ident(&mut self, scope: &XScope, ident: &swc_ecma_ast::Ident) {
+  fn ident(&mut self, scope: &Scope, ident: &swc_ecma_ast::Ident) {
     if ident.sym.to_string() == "undefined" {
       // The way that `undefined` is considered to be an identifier is an artifact of history. It's
       // not an identifier (unless used in an identifier context like an object key), instead it's a
@@ -1274,6 +1550,15 @@ impl ScopeAnalysis {
       }
     };
 
+    self.refs.insert(
+      ident.span,
+      Ref {
+        name_id: name_id.clone(),
+        owner_id: scope.borrow().owner_id.clone(),
+        span: ident.span,
+      },
+    );
+
     let name = match self.names.get(&name_id) {
       Some(name) => name,
       None => {
@@ -1291,7 +1576,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn prop_key(&mut self, scope: &XScope, prop_name: &swc_ecma_ast::PropName) {
+  fn prop_key(&mut self, scope: &Scope, prop_name: &swc_ecma_ast::PropName) {
     use swc_ecma_ast::PropName;
 
     match prop_name {
@@ -1305,7 +1590,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn prop_or_spread(&mut self, scope: &XScope, prop_or_spread: &swc_ecma_ast::PropOrSpread) {
+  fn prop_or_spread(&mut self, scope: &Scope, prop_or_spread: &swc_ecma_ast::PropOrSpread) {
     use swc_ecma_ast::PropOrSpread;
 
     match prop_or_spread {
@@ -1350,7 +1635,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn stmt(&mut self, scope: &XScope, stmt: &swc_ecma_ast::Stmt) {
+  fn stmt(&mut self, scope: &Scope, stmt: &swc_ecma_ast::Stmt) {
     use swc_ecma_ast::Stmt;
 
     match stmt {
@@ -1496,7 +1781,7 @@ impl ScopeAnalysis {
     };
   }
 
-  fn block_stmt(&mut self, scope: &XScope, block_stmt: &swc_ecma_ast::BlockStmt) {
+  fn block_stmt(&mut self, scope: &Scope, block_stmt: &swc_ecma_ast::BlockStmt) {
     let child_scope = scope.nest(None);
     self.block_level_hoists(&child_scope, block_stmt);
 
@@ -1505,12 +1790,15 @@ impl ScopeAnalysis {
     }
   }
 
-  fn param_pat(&mut self, scope: &XScope, param_pat: &swc_ecma_ast::Pat) {
+  fn param_pat(&mut self, scope: &Scope, param_pat: &swc_ecma_ast::Pat) {
+    // Note this version of pattern processing is strictly for parameter patterns, since we use None
+    // for tdz_end.
+
     use swc_ecma_ast::Pat;
 
     match param_pat {
       Pat::Ident(ident) => {
-        self.insert_name(&scope, NameType::Param, &ident.id);
+        self.insert_reg_name(&scope, NameType::Param, &ident.id, None);
       }
       Pat::Array(array_pat) => {
         for elem in &array_pat.elems {
@@ -1530,7 +1818,7 @@ impl ScopeAnalysis {
               self.param_pat(&scope, &key_value.value);
             }
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
-              self.insert_name(&scope, NameType::Param, &assign.key);
+              self.insert_reg_name(&scope, NameType::Param, &assign.key, None);
 
               if let Some(default) = &assign.value {
                 self.expr(&scope, default);
@@ -1559,97 +1847,265 @@ impl ScopeAnalysis {
     }
   }
 
-  fn var_decl(&mut self, scope: &XScope, var_decl: &swc_ecma_ast::VarDecl) {
+  fn var_decl(&mut self, scope: &Scope, var_decl: &swc_ecma_ast::VarDecl) {
     for decl in &var_decl.decls {
       self.var_declarator(&scope, var_decl.kind, decl);
     }
   }
-}
 
-struct XScopeData {
-  pub owner_id: OwnerId,
-  pub name_map: HashMap<swc_atoms::JsWord, NameId>,
-  pub parent: Option<Rc<RefCell<XScopeData>>>,
-}
+  fn find_capture_mutations(&mut self) {
+    for (name_id, name) in &self.names {
+      if name.captures.len() > 0 {
+        if name.type_ == NameType::Let {
+          match name_id {
+            NameId::Span(span) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::Lint,
+                message: format!(
+                  "`{}` should be declared using `const` because it is implicitly \
+                  const due to capture",
+                  name.sym
+                ),
+                span: *span,
+              });
+            }
+            NameId::Builtin(_) | NameId::Constant(_) => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "Builtin/constant should not have type_ let".to_string(),
+                span: swc_common::DUMMY_SP,
+              });
+            }
+          }
+        }
 
-type XScope = Rc<RefCell<XScopeData>>;
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum OwnerId {
-  Span(swc_common::Span),
-  Module,
-}
-
-trait XScopeTrait {
-  fn get(&self, name: &swc_atoms::JsWord) -> Option<NameId>;
-  fn set(
-    &self,
-    name: &swc_atoms::JsWord,
-    name_id: NameId,
-    span: swc_common::Span,
-    diagnostics: &mut Vec<Diagnostic>,
-  );
-  fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<XScopeData>>;
-}
-
-impl XScopeTrait for XScope {
-  fn get(&self, name: &swc_atoms::JsWord) -> Option<NameId> {
-    match self.borrow().name_map.get(name) {
-      Some(mapped_name) => Some(mapped_name.clone()),
-      None => match &self.borrow().parent {
-        Some(parent) => parent.get(name),
-        None => None,
-      },
+        for mutation in &name.mutations {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: format!("Cannot mutate captured variable `{}`", name.sym),
+            span: *mutation,
+          });
+        }
+      }
     }
   }
 
-  fn set(
-    &self,
-    name: &swc_atoms::JsWord,
-    name_id: NameId,
-    span: swc_common::Span,
-    diagnostics: &mut Vec<Diagnostic>,
-  ) {
-    let old_mapping = self.borrow_mut().name_map.insert(name.clone(), name_id);
+  pub fn name_id_to_owner_id(&mut self, name_id: &NameId) -> Option<OwnerId> {
+    let name = match self.names.get(name_id) {
+      Some(name) => name,
+      None => {
+        // TODO: Add a name lookup helper that does this diagnostic
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: "NameId not found".to_string(),
+          span: swc_common::DUMMY_SP,
+        });
 
-    if old_mapping.is_some() {
+        return None;
+      }
+    };
+
+    if name.type_ == NameType::Function {
+      match name_id {
+        NameId::Span(span) => Some(OwnerId::Span(*span)),
+        NameId::Builtin(_) | NameId::Constant(_) => None,
+      }
+    } else {
+      None
+    }
+  }
+
+  fn expand_captures(&mut self) {
+    let captors: Vec<OwnerId> = self.captures.keys().map(|k| k.clone()).collect();
+
+    for captor in captors {
+      let mut full_captures = HashSet::<NameId>::new();
+
+      let mut owners_to_process = Vec::<OwnerId>::new();
+      owners_to_process.push(captor.clone());
+      let mut owners_to_process_i = 0;
+
+      let mut owners_processed = HashSet::<OwnerId>::new();
+
+      loop {
+        let owner = match owners_to_process.get(owners_to_process_i) {
+          Some(o) => o,
+          None => break,
+        };
+
+        owners_to_process_i += 1;
+
+        let inserted = owners_processed.insert(owner.clone());
+
+        if !inserted {
+          continue;
+        }
+
+        let captures = match self.captures.get(&owner) {
+          Some(captures) => captures.clone(),
+          None => continue,
+        };
+
+        for cap in captures.iter() {
+          let name = self.names.get(cap).expect("Failed to get name");
+
+          if name.owner_id == captor {
+            continue;
+          }
+
+          full_captures.insert(cap.clone());
+
+          let owner_id = match self.name_id_to_owner_id(cap) {
+            Some(owner_id) => owner_id,
+            None => continue,
+          };
+
+          owners_to_process.push(owner_id);
+        }
+      }
+
+      for cap in &full_captures {
+        self
+          .capture_values
+          .entry((captor.clone(), cap.clone()))
+          .or_insert_with(|| {
+            let name = self.names.get(cap).expect("Failed to get name");
+
+            if let Value::Register(_) = name.value {
+              // This is just self.allocate_reg, but we can't borrow all of self right now
+              let reg = self
+                .reg_allocators
+                .entry(captor.clone())
+                .or_insert_with(|| RegAllocator::default())
+                .allocate(&name.sym);
+
+              Value::Register(reg)
+            } else {
+              name.value.clone()
+            }
+          });
+      }
+
+      self.captures.insert(captor, full_captures);
+    }
+  }
+
+  fn expand_effectively_const(&mut self) {
+    for (_, name) in &mut self.names {
+      if !name.captures.is_empty() {
+        name.effectively_const = true;
+      }
+    }
+  }
+
+  fn diagnose_const_mutations(&mut self) {
+    let mut diagnostics = Vec::<Diagnostic>::new();
+
+    for (_, name) in &self.names {
+      if !name.captures.is_empty() {
+        // More specific diagnostics are emitted for these mutations elsewhere
+        continue;
+      }
+
+      if name.effectively_const {
+        for mutation in &name.mutations {
+          diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: format!("Cannot mutate const {}", name.sym),
+            span: *mutation,
+          });
+        }
+      }
+    }
+
+    self.diagnostics.append(&mut diagnostics);
+  }
+
+  fn process_optional_mutations(&mut self) {
+    let mut new_mutations = Vec::<(swc_common::Span, NameId)>::new();
+
+    for (span, name_id) in &self.optional_mutations {
+      let name = self.names.get(&name_id).expect("Name not found");
+
+      if !name.effectively_const {
+        new_mutations.push((*span, name_id.clone()));
+      }
+    }
+
+    for (span, name_id) in new_mutations {
+      let name = self.names.get_mut(&name_id).expect("Name not found");
+      name.mutations.push(span);
+
+      self.mutations.insert(span, name_id);
+    }
+  }
+
+  fn diagnose_tdz_violations(&mut self) {
+    let mut diagnostics = Vec::<Diagnostic>::new();
+
+    for (_, ref_) in &self.refs {
+      let name = self.names.get(&ref_.name_id).expect("Name not found");
+
+      if ref_.owner_id != name.owner_id {
+        // Captures are processed when the value is bound instead. Being syntactically in the TDZ is
+        // actually ok sometimes, see captureButNotRefBeforeInit.ts.
+        continue;
+      }
+
+      let name_span = match &ref_.name_id {
+        NameId::Span(span) => *span,
+        NameId::Builtin(_) | NameId::Constant(_) => continue,
+      };
+
+      if ref_.span.lo == name_span.lo {
+        // The origin of a name is allowed, eg
+        // const x = 42;
+        //       ^ Not a tdz violation
+
+        continue;
+      }
+
+      let tdz_end = match name.tdz_end {
+        Some(tdz_end) => tdz_end,
+        None => continue,
+      };
+
+      if ref_.span.lo() > tdz_end {
+        continue;
+      }
+
       diagnostics.push(Diagnostic {
         level: DiagnosticLevel::Error,
-        message: "Scope overwrite occurred (TODO: being permissive about this)".to_string(),
-        span,
+        message: format!(
+          "Referencing {} is invalid before its declaration (temporal dead zone)",
+          name.sym,
+        ),
+        span: ref_.span,
       });
     }
-  }
 
-  fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<XScopeData>> {
-    return Rc::new(RefCell::new(XScopeData {
-      owner_id: name_owner_location.unwrap_or(self.borrow().owner_id.clone()),
-      name_map: Default::default(),
-      parent: Some(self.clone()),
-    }));
+    self.diagnostics.append(&mut diagnostics);
   }
 }
 
-fn init_std_scope() -> XScope {
-  let mut name_map = HashMap::new();
-
-  for name in BUILTIN_NAMES {
-    name_map.insert(
-      swc_atoms::JsWord::from(name),
-      NameId::Builtin(Builtin {
-        name: name.to_string(),
-      }),
-    );
+fn is_declare(decl: &swc_ecma_ast::Decl) -> bool {
+  match decl {
+    swc_ecma_ast::Decl::Class(class_decl) => class_decl.declare,
+    swc_ecma_ast::Decl::Fn(fn_decl) => fn_decl.declare,
+    swc_ecma_ast::Decl::Var(var_decl) => var_decl.declare,
+    swc_ecma_ast::Decl::TsInterface(ts_interface_decl) => ts_interface_decl.declare,
+    swc_ecma_ast::Decl::TsTypeAlias(ts_type_alias_decl) => ts_type_alias_decl.declare,
+    swc_ecma_ast::Decl::TsEnum(ts_enum_decl) => ts_enum_decl.declare,
+    swc_ecma_ast::Decl::TsModule(ts_module_decl) => ts_module_decl.declare,
   }
+}
 
-  for (name, _) in CONSTANTS {
-    name_map.insert(swc_atoms::JsWord::from(name), NameId::Constant(name));
-  }
-
-  Rc::new(RefCell::new(XScopeData {
-    owner_id: OwnerId::Module,
-    name_map,
-    parent: None,
-  }))
-  .nest(None)
+pub fn fn_to_owner_id(
+  name: &Option<swc_ecma_ast::Ident>,
+  function: &swc_ecma_ast::Function,
+) -> OwnerId {
+  OwnerId::Span(match name {
+    Some(name) => name.span,
+    None => function.span,
+  })
 }

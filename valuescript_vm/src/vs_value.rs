@@ -1,4 +1,5 @@
 use core::fmt;
+use std::any::Any;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -6,13 +7,14 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
-use crate::format_val;
+use crate::native_function::ThisWrapper;
 use crate::operations::{op_sub, op_submov};
 use crate::stack_frame::StackFrame;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
 use crate::vs_object::VsObject;
+use crate::vs_symbol::{symbol_to_name, VsSymbol};
 
 #[derive(Clone, Debug)]
 pub enum Val {
@@ -22,13 +24,20 @@ pub enum Val {
   Bool(bool),
   Number(f64),
   BigInt(BigInt),
+  Symbol(VsSymbol),
   String(Rc<String>),
   Array(Rc<VsArray>),
   Object(Rc<VsObject>),
   Function(Rc<VsFunction>),
   Class(Rc<VsClass>),
   Static(&'static dyn ValTrait),
-  Custom(Rc<dyn ValTrait>),
+  Dynamic(Rc<dyn DynValTrait>),
+}
+
+impl Default for Val {
+  fn default() -> Self {
+    Val::Void
+  }
 }
 
 #[derive(PartialEq, Debug)]
@@ -38,6 +47,7 @@ pub enum VsType {
   Bool,
   Number,
   BigInt,
+  Symbol,
   String,
   Array,
   Object,
@@ -48,16 +58,14 @@ pub enum VsType {
 pub enum LoadFunctionResult {
   NotAFunction,
   StackFrame(StackFrame),
-  NativeFunction(fn(this: &mut Val, params: Vec<Val>) -> Result<Val, Val>),
+  NativeFunction(fn(this: ThisWrapper, params: Vec<Val>) -> Result<Val, Val>),
 }
 
-pub trait ValTrait {
+pub trait ValTrait: fmt::Display {
   fn typeof_(&self) -> VsType;
-  fn val_to_string(&self) -> String;
   fn to_number(&self) -> f64;
   fn to_index(&self) -> Option<usize>;
   fn is_primitive(&self) -> bool;
-  fn to_primitive(&self) -> Val;
   fn is_truthy(&self) -> bool;
   fn is_nullish(&self) -> bool;
 
@@ -65,7 +73,6 @@ pub trait ValTrait {
 
   fn as_bigint_data(&self) -> Option<BigInt>;
   fn as_array_data(&self) -> Option<Rc<VsArray>>;
-  fn as_object_data(&self) -> Option<Rc<VsObject>>;
   fn as_class_data(&self) -> Option<Rc<VsClass>>;
 
   fn load_function(&self) -> LoadFunctionResult;
@@ -73,15 +80,71 @@ pub trait ValTrait {
   fn sub(&self, key: Val) -> Result<Val, Val>;
   fn submov(&mut self, key: Val, value: Val) -> Result<(), Val>;
 
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
+  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
   fn codify(&self) -> String;
+}
+
+pub trait DynValTrait: ValTrait {
+  fn clone_interior(&self) -> Rc<dyn DynValTrait>;
+  fn as_any(&self) -> &dyn Any;
+  fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+
+impl<T> DynValTrait for T
+where
+  T: 'static + ValTrait + Clone,
+{
+  fn clone_interior(&self) -> Rc<dyn DynValTrait> {
+    Rc::new(self.clone())
+  }
+
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any {
+    self
+  }
+}
+
+pub fn dynamic_make_mut(rc: &mut Rc<dyn DynValTrait>) -> &mut dyn DynValTrait {
+  if Rc::get_mut(rc).is_none() {
+    *rc = rc.clone_interior();
+  }
+
+  Rc::get_mut(rc).unwrap()
 }
 
 impl fmt::Debug for dyn ValTrait {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "(dyn ValTrait)(")?;
-    self.fmt(f)?;
+    self.pretty_fmt(f)?;
     write!(f, ")")
+  }
+}
+
+impl fmt::Debug for dyn DynValTrait {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "(dyn DynValTrait)(")?;
+    self.pretty_fmt(f)?;
+    write!(f, ")")
+  }
+}
+
+impl Val {
+  pub fn to_primitive(&self) -> Val {
+    if self.is_primitive() {
+      self.clone()
+    } else {
+      self.clone().to_val_string()
+    }
+  }
+
+  pub fn to_val_string(self) -> Val {
+    match self {
+      Val::String(_) => self,
+      _ => self.to_string().to_val(),
+    }
   }
 }
 
@@ -96,65 +159,14 @@ impl ValTrait for Val {
       Bool(_) => VsType::Bool,
       Number(_) => VsType::Number,
       BigInt(_) => VsType::BigInt,
+      Symbol(_) => VsType::Symbol,
       String(_) => VsType::String,
       Array(_) => VsType::Array,
       Object(_) => VsType::Object,
       Function(_) => VsType::Function,
       Class(_) => VsType::Class,
       Static(val) => val.typeof_(),
-      Custom(val) => val.typeof_(),
-    };
-  }
-
-  fn val_to_string(&self) -> String {
-    use Val::*;
-
-    return match self {
-      Void => "".to_string(),
-      Undefined => "undefined".to_string(),
-      Null => "null".to_string(),
-      Bool(b) => b.to_string(),
-      Number(x) => {
-        if x.is_infinite() {
-          if x.is_sign_positive() {
-            "Infinity".to_string()
-          } else {
-            "-Infinity".to_string()
-          }
-        } else {
-          x.to_string()
-        }
-      } // TODO: Match js's number string format
-      BigInt(x) => x.to_string(),
-      String(s) => s.to_string(),
-      Array(vals) => {
-        if vals.elements.len() == 0 {
-          "".to_string()
-        } else if vals.elements.len() == 1 {
-          vals.elements[0].val_to_string()
-        } else {
-          let mut iter = vals.elements.iter();
-          let mut res = iter.next().unwrap().val_to_string();
-
-          for val in iter {
-            res += ",";
-
-            match val.typeof_() {
-              VsType::Undefined => {}
-              _ => {
-                res += &val.val_to_string();
-              }
-            };
-          }
-
-          res
-        }
-      }
-      Object(_) => "[object Object]".to_string(),
-      Function(_) => "[function]".to_string(),
-      Class(_) => "[class]".to_string(),
-      Static(val) => val.val_to_string(),
-      Custom(val) => val.val_to_string(),
+      Dynamic(val) => val.typeof_(),
     };
   }
 
@@ -168,6 +180,7 @@ impl ValTrait for Val {
       Bool(b) => *b as u8 as f64,
       Number(x) => *x,
       BigInt(x) => x.to_f64().unwrap_or(f64::NAN),
+      Symbol(_) => f64::NAN, // TODO: Should be TypeError
       String(s) => f64::from_str(s).unwrap_or(f64::NAN),
       Array(vals) => match vals.elements.len() {
         0 => 0_f64,
@@ -178,7 +191,7 @@ impl ValTrait for Val {
       Function(_) => f64::NAN,
       Class(_) => f64::NAN,
       Static(val) => val.to_number(),
-      Custom(val) => val.to_number(),
+      Dynamic(val) => val.to_number(),
     };
   }
 
@@ -192,6 +205,7 @@ impl ValTrait for Val {
       Bool(_) => None,
       Number(x) => number_to_index(*x),
       BigInt(b) => number_to_index(b.to_f64().unwrap_or(f64::NAN)),
+      Symbol(_) => None,
       String(s) => match f64::from_str(s) {
         Ok(x) => number_to_index(x),
         Err(_) => None,
@@ -201,7 +215,7 @@ impl ValTrait for Val {
       Function(_) => None,
       Class(_) => None,
       Static(val) => val.to_index(),
-      Custom(val) => val.to_index(),
+      Dynamic(val) => val.to_index(),
     };
   }
 
@@ -215,22 +229,15 @@ impl ValTrait for Val {
       Bool(_) => true,
       Number(_) => true,
       BigInt(_) => true,
+      Symbol(_) => true,
       String(_) => true,
       Array(_) => false,
       Object(_) => false,
       Function(_) => false,
       Class(_) => false,
       Static(val) => val.is_primitive(), // TODO: false?
-      Custom(val) => val.is_primitive(),
+      Dynamic(val) => val.is_primitive(),
     };
-  }
-
-  fn to_primitive(&self) -> Val {
-    if self.is_primitive() {
-      return self.clone();
-    }
-
-    return Val::String(Rc::new(self.val_to_string()));
   }
 
   fn is_truthy(&self) -> bool {
@@ -243,13 +250,14 @@ impl ValTrait for Val {
       Bool(b) => *b,
       Number(x) => *x != 0_f64 && !x.is_nan(),
       BigInt(x) => !x.is_zero(),
+      Symbol(_) => true,
       String(s) => s.len() > 0,
       Array(_) => true,
       Object(_) => true,
       Function(_) => true,
       Class(_) => true,
       Static(val) => val.is_truthy(), // TODO: true?
-      Custom(val) => val.is_truthy(),
+      Dynamic(val) => val.is_truthy(),
     };
   }
 
@@ -263,13 +271,14 @@ impl ValTrait for Val {
       Bool(_) => false,
       Number(_) => false,
       BigInt(_) => false,
+      Symbol(_) => false,
       String(_) => false,
       Array(_) => false,
       Object(_) => false,
       Function(_) => false,
       Class(_) => false,
       Static(_) => false,
-      Custom(val) => val.is_nullish(),
+      Dynamic(val) => val.is_nullish(),
     };
   }
 
@@ -277,8 +286,9 @@ impl ValTrait for Val {
     use Val::*;
 
     return match self {
-      Function(f) => Some(Val::Function(Rc::new(f.bind(params)))),
-      Custom(val) => val.bind(params),
+      Function(f) => Some(f.bind(params).to_val()),
+      Static(val) => val.bind(params),
+      Dynamic(val) => val.bind(params),
 
       _ => None,
     };
@@ -290,7 +300,7 @@ impl ValTrait for Val {
     return match self {
       BigInt(b) => Some(b.clone()),
       // TODO: Static? Others too?
-      Custom(val) => val.as_bigint_data(),
+      Dynamic(val) => val.as_bigint_data(),
 
       _ => None,
     };
@@ -301,18 +311,7 @@ impl ValTrait for Val {
 
     return match self {
       Array(a) => Some(a.clone()),
-      Custom(val) => val.as_array_data(),
-
-      _ => None,
-    };
-  }
-
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    use Val::*;
-
-    return match self {
-      Object(obj) => Some(obj.clone()),
-      Custom(val) => val.as_object_data(),
+      Dynamic(val) => val.as_array_data(),
 
       _ => None,
     };
@@ -324,7 +323,7 @@ impl ValTrait for Val {
     return match self {
       Class(class) => Some(class.clone()),
       Static(s) => s.as_class_data(),
-      Custom(val) => val.as_class_data(),
+      Dynamic(val) => val.as_class_data(),
 
       _ => None,
     };
@@ -336,7 +335,7 @@ impl ValTrait for Val {
     return match self {
       Function(f) => LoadFunctionResult::StackFrame(f.make_frame()),
       Static(s) => s.load_function(),
-      Custom(val) => val.load_function(),
+      Dynamic(val) => val.load_function(),
 
       _ => LoadFunctionResult::NotAFunction,
     };
@@ -351,8 +350,8 @@ impl ValTrait for Val {
     op_submov(self, key, value)
   }
 
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    std::fmt::Display::fmt(self, f)
+  fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    std::fmt::Display::fmt(&self.pretty(), f)
   }
 
   fn codify(&self) -> String {
@@ -360,9 +359,10 @@ impl ValTrait for Val {
       Val::Void => "".into(),
       Val::Undefined => "undefined".into(),
       Val::Null => "null".into(),
-      Val::Bool(_) => self.val_to_string(),
-      Val::Number(_) => self.val_to_string(),
-      Val::BigInt(_) => self.val_to_string() + "n",
+      Val::Bool(_) => self.to_string(),
+      Val::Number(_) => self.to_string(),
+      Val::BigInt(_) => self.to_string() + "n",
+      Val::Symbol(s) => format!("Symbol.{}", symbol_to_name(s.clone())),
       Val::String(str) => stringify_string(str),
       Val::Array(vals) => {
         if vals.elements.len() == 0 {
@@ -388,10 +388,10 @@ impl ValTrait for Val {
         let mut res = String::new();
 
         if let Some(proto) = &object.prototype {
-          match op_sub(proto.clone(), format_val!("name")) {
+          match proto.sub("name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
-                res += format!("{}", name.val_to_string()).as_str();
+                res += &name.to_string();
               }
             }
             Err(_) => {}
@@ -426,27 +426,170 @@ impl ValTrait for Val {
       Val::Function(_) => "() => { [unavailable] }".to_string(),
       Val::Class(_) => "class { [unavailable] }".to_string(),
       Val::Static(val) => val.codify(),
-      Val::Custom(val) => val.codify(),
+      Val::Dynamic(val) => val.codify(),
     }
   }
 }
 
-impl std::fmt::Display for Val {
+impl fmt::Display for Val {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    use Val::*;
+
     match self {
+      Void => Ok(()),
+      Undefined => write!(f, "undefined"),
+      Null => write!(f, "null"),
+      Bool(b) => b.fmt(f),
+      Number(x) => {
+        if x.is_infinite() {
+          if x.is_sign_positive() {
+            write!(f, "Infinity")
+          } else {
+            write!(f, "-Infinity")
+          }
+        } else {
+          x.fmt(f)
+        }
+      } // TODO: Match js's number string format
+      BigInt(x) => x.fmt(f),
+      Symbol(s) => write!(f, "Symbol(Symbol.{})", symbol_to_name(s.clone())),
+      String(s) => s.fmt(f),
+      Array(vals) => {
+        if vals.elements.len() == 0 {
+          Ok(())
+        } else if vals.elements.len() == 1 {
+          vals.elements[0].fmt(f)
+        } else {
+          let mut iter = vals.elements.iter();
+          iter.next().unwrap().fmt(f)?;
+
+          for val in iter {
+            write!(f, ",")?;
+
+            match val.typeof_() {
+              VsType::Undefined => {}
+              _ => {
+                val.fmt(f)?;
+              }
+            };
+          }
+
+          Ok(())
+        }
+      }
+      Object(_) => write!(f, "[object Object]"),
+      Function(_) => write!(f, "[function]"),
+      Class(_) => write!(f, "[class]"),
+      Static(val) => val.fmt(f),
+      Dynamic(val) => val.fmt(f),
+    }
+  }
+}
+
+pub trait ToVal {
+  fn to_val(self) -> Val;
+}
+
+impl<T> From<T> for Val
+where
+  T: ToVal,
+{
+  fn from(value: T) -> Val {
+    value.to_val()
+  }
+}
+
+impl ToVal for char {
+  fn to_val(self) -> Val {
+    self.to_string().to_val()
+  }
+}
+
+impl ToVal for &str {
+  fn to_val(self) -> Val {
+    Val::String(Rc::new(self.to_string()))
+  }
+}
+
+impl ToVal for String {
+  fn to_val(self) -> Val {
+    Val::String(Rc::new(self))
+  }
+}
+
+impl ToVal for f64 {
+  fn to_val(self) -> Val {
+    Val::Number(self)
+  }
+}
+
+impl ToVal for bool {
+  fn to_val(self) -> Val {
+    Val::Bool(self)
+  }
+}
+
+impl ToVal for BigInt {
+  fn to_val(self) -> Val {
+    Val::BigInt(self)
+  }
+}
+
+impl ToVal for Vec<Val> {
+  fn to_val(self) -> Val {
+    Val::Array(Rc::new(VsArray::from(self)))
+  }
+}
+
+impl<T> ToVal for &'static T
+where
+  T: ValTrait,
+{
+  fn to_val(self) -> Val {
+    Val::Static(self)
+  }
+}
+
+pub trait ToDynamicVal {
+  fn to_dynamic_val(self) -> Val;
+}
+
+impl<T> ToDynamicVal for T
+where
+  T: DynValTrait + 'static,
+{
+  fn to_dynamic_val(self) -> Val {
+    Val::Dynamic(Rc::new(self))
+  }
+}
+
+pub struct PrettyVal<'a> {
+  val: &'a Val,
+}
+
+impl<'a> Val {
+  pub fn pretty(&'a self) -> PrettyVal<'a> {
+    PrettyVal { val: self }
+  }
+}
+
+impl<'a> std::fmt::Display for PrettyVal<'a> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self.val {
       Val::Void => write!(f, "void"),
       Val::Undefined => write!(f, "\x1b[90mundefined\x1b[39m"),
       Val::Null => write!(f, "\x1b[1mnull\x1b[22m"),
-      Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
-      Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val_to_string()),
-      Val::BigInt(_) => write!(f, "\x1b[33m{}n\x1b[39m", self.val_to_string()),
-      Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.codify()),
+      Val::Bool(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val),
+      Val::Number(_) => write!(f, "\x1b[33m{}\x1b[39m", self.val),
+      Val::BigInt(_) => write!(f, "\x1b[33m{}n\x1b[39m", self.val),
+      Val::Symbol(_) => write!(f, "\x1b[32m{}\x1b[39m", self.val.codify()),
+      Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.val.codify()),
       Val::Array(array) => {
         if array.elements.len() == 0 {
           return write!(f, "[]");
         }
 
-        write!(f, "[ ").expect("Failed to write");
+        write!(f, "[ ")?;
 
         let mut first = true;
 
@@ -454,20 +597,20 @@ impl std::fmt::Display for Val {
           if first {
             first = false;
           } else {
-            write!(f, ", ").expect("Failed to write");
+            write!(f, ", ")?;
           }
 
-          write!(f, "{}", elem).expect("Failed to write");
+          write!(f, "{}", elem.pretty())?;
         }
 
         write!(f, " ]")
       }
       Val::Object(object) => {
         if let Some(proto) = &object.prototype {
-          match op_sub(proto.clone(), format_val!("name")) {
+          match proto.sub("name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
-                write!(f, "{} ", name.val_to_string())?;
+                write!(f, "{} ", name)?;
               }
             }
             Err(_) => {}
@@ -491,10 +634,10 @@ impl std::fmt::Display for Val {
           if first {
             first = false;
           } else {
-            write!(f, ", ").expect("Failed to write");
+            write!(f, ", ")?;
           }
 
-          write!(f, "{}: {}", k, v).expect("Failed to write");
+          write!(f, "{}: {}", k, v.pretty())?;
         }
 
         f.write_str(" }")
@@ -503,8 +646,8 @@ impl std::fmt::Display for Val {
       Val::Class(_) => write!(f, "\x1b[36m[Class]\x1b[39m"),
 
       // TODO: Improve printing these
-      Val::Static(s) => s.fmt(f),
-      Val::Custom(c) => c.fmt(f),
+      Val::Static(s) => s.pretty_fmt(f),
+      Val::Dynamic(c) => c.pretty_fmt(f),
     }
   }
 }

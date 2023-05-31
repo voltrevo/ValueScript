@@ -1,11 +1,11 @@
 use std::{process::exit, rc::Rc};
 
-use valuescript_vm::VirtualMachine;
+use valuescript_vm::{Bytecode, VirtualMachine};
 
 pub fn main() {
   let mut vm = VirtualMachine::new();
   let result = vm.run(
-    &Rc::new(vec![
+    Rc::new(Bytecode::new(vec![
       //
       // This is the compiled bytecode for inputs/passing/projEuler/p28.ts.
       //
@@ -46,14 +46,15 @@ pub fn main() {
       0x05, 0x02, 0x06, 0x06, 0x03, 0x0e, 0x04, 0x06, 0x05, 0x0e, 0x02, 0x0e, 0x06, 0x07, 0x04,
       0x0e, 0x07, 0x0e, 0x03, 0x06, 0x01, 0x09, 0x0e, 0x04, 0x0e, 0x05, 0x0e, 0x06, 0x00, 0x00,
       0x00, 0x0b, 0x05, 0x02, 0x04, 0x0e, 0x02, 0x0e, 0x03, 0x00, 0x00,
-    ]),
+    ])),
+    None,
     &[],
   );
 
   match result {
-    Ok(result) => println!("{}", result),
+    Ok(result) => println!("{}", result.pretty()),
     Err(err) => {
-      println!("Uncaught exception: {}", err);
+      println!("Uncaught exception: {}", err.pretty());
       exit(1);
     }
   }

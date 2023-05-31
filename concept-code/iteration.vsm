@@ -1,0 +1,23 @@
+export @_anon0 {}
+
+@_anon0 = function() {
+  mov 0 %sum
+  mov [1, 2, 3] %nums
+
+  subcall %nums $SymbolIterator [] %_iter0
+  jmp :for_continue0
+
+for_test0:
+  jmpif %_done0 :for_end0
+  op+ %sum %_value0 %sum
+
+for_continue0:
+  next %_iter0 %_iter_res0
+  unpack_iter_res %_iter_res0 %_value0 %_done0
+  jmp :for_test0
+
+for_end0:
+
+  mov %sum %_tmp0
+  mov %_tmp0 %return
+}

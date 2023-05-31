@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use serde_qs as qs;
 use url::Url;
@@ -6,6 +6,10 @@ use url::Url;
 use valuescript_compiler::{Diagnostic, DiagnosticLevel};
 
 pub fn handle_diagnostics_cli(file_path: &String, diagnostics: &Vec<Diagnostic>) {
+  let current_dir = std::env::current_dir().expect("Failed to get current directory");
+  let abs_path = PathBuf::from(file_path);
+  let path = abs_path.strip_prefix(&current_dir).unwrap_or(&abs_path);
+
   let mut level_counts = HashMap::<DiagnosticLevel, usize>::new();
 
   let text = std::fs::read_to_string(file_path).unwrap();
@@ -16,7 +20,11 @@ pub fn handle_diagnostics_cli(file_path: &String, diagnostics: &Vec<Diagnostic>)
 
     let line = format!(
       "{}:{}:{}: {}: {}",
-      file_path, line, col, diagnostic.level, diagnostic.message
+      path.display(),
+      line,
+      col,
+      diagnostic.level,
+      diagnostic.message
     );
 
     println!("{}", line);

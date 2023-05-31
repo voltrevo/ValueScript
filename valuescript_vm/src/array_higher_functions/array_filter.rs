@@ -1,9 +1,8 @@
-use std::rc::Rc;
+use crate::vs_value::ToVal;
 
-use super::super::vs_value::{Val, ValTrait};
-use super::super::vs_array::VsArray;
 use super::super::native_frame_function::NativeFrameFunction;
-use super::array_mapping_frame::{ArrayMappingState, ArrayMappingFrame};
+use super::super::vs_value::{Val, ValTrait};
+use super::array_mapping_frame::{ArrayMappingFrame, ArrayMappingState};
 
 pub static FILTER: NativeFrameFunction = NativeFrameFunction {
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(FilterState::default()))),
@@ -26,6 +25,6 @@ impl ArrayMappingState for FilterState {
   fn finish(&mut self) -> Val {
     let mut filter_results = Vec::new();
     std::mem::swap(&mut self.filter_results, &mut filter_results);
-    return Val::Array(Rc::new(VsArray::from(filter_results)));
+    filter_results.to_val()
   }
 }

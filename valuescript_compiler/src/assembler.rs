@@ -1,6 +1,5 @@
 use std::{
   collections::{HashMap, HashSet},
-  rc::Rc,
   str::FromStr,
 };
 
@@ -13,7 +12,7 @@ use crate::asm::{
   Label, LabelRef, Lazy, Module, Object, Pointer, Register, Value,
 };
 
-pub fn assemble(module: &Module) -> Rc<Vec<u8>> {
+pub fn assemble(module: &Module) -> Vec<u8> {
   let mut assembler = Assembler {
     output: Vec::new(),
     fn_data: Default::default(),
@@ -25,8 +24,7 @@ pub fn assemble(module: &Module) -> Rc<Vec<u8>> {
 
   assembler.module(module);
 
-  // TODO: Don't use Rc
-  return Rc::new(assembler.output);
+  assembler.output
 }
 
 struct Assembler {
@@ -160,7 +158,7 @@ impl Assembler {
     self.output.push(instruction.byte() as u8);
 
     match instruction {
-      End => {}
+      End | UnsetCatch | RequireMutableThis => {}
       OpInc(dst) | OpDec(dst) => {
         self.register(dst);
       }
@@ -210,7 +208,10 @@ impl Assembler {
         self.value(arg2);
         self.register(dst);
       }
-      Apply(arg1, arg2, arg3, dst) | SubCall(arg1, arg2, arg3, dst) => {
+      Apply(arg1, arg2, arg3, dst)
+      | SubCall(arg1, arg2, arg3, dst)
+      | ConstSubCall(arg1, arg2, arg3, dst)
+      | ThisSubCall(arg1, arg2, arg3, dst) => {
         self.value(arg1);
         self.value(arg2);
         self.value(arg3);
@@ -225,6 +226,23 @@ impl Assembler {
       }
       Throw(value) => {
         self.value(value);
+      }
+      SetCatch(label_ref, register) => {
+        self.label_ref(label_ref);
+        self.register(register);
+      }
+      Next(iter, dst) => {
+        self.register(iter);
+        self.register(dst);
+      }
+      UnpackIterRes(iter_res, value_dst, done_dst) => {
+        self.register(iter_res);
+        self.register(value_dst);
+        self.register(done_dst);
+      }
+      Cat(iterables, dst) => {
+        self.value(iterables);
+        self.register(dst);
       }
     }
   }

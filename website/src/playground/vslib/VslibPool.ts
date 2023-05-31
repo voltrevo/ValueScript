@@ -1,36 +1,64 @@
-import { valuescript } from "../deps.ts";
+import * as valuescript from "valuescript";
 import nil from "../helpers/nil.ts";
 import { initVslib } from "./index.ts";
 
-const workerScript = [
-  initVslib.toString(),
-  (async function main() {
-    const vslib = await initVslib();
+async function main() {
+  const vslib = await initVslib();
 
-    self.postMessage("ready");
+  self.postMessage("ready");
 
-    self.onmessage = (evt) => {
-      const { method, args } = evt.data;
+  self.onmessage = (evt) => {
+    const { method, args } = evt.data;
 
-      if (method === "compile") {
-        try {
-          self.postMessage({ ok: vslib.compile(args[0]) });
-        } catch (err) {
-          self.postMessage({ err });
-        }
+    if (method === "compile") {
+      const [entryPoint, files] = args;
+
+      try {
+        self.postMessage({
+          ok: vslib.compile(entryPoint, makeLookupFile(files)),
+        });
+      } catch (err) {
+        self.postMessage({ err });
+      }
+    }
+
+    if (method === "run") {
+      const [entryPoint, files, argsStr] = args;
+
+      try {
+        self.postMessage({
+          ok: vslib.run(entryPoint, makeLookupFile(files), argsStr),
+        });
+      } catch (err) {
+        self.postMessage({ err });
+      }
+    }
+  };
+
+  function makeLookupFile(files: Record<string, string | nil>) {
+    return (filePath: string) => {
+      let content = files[filePath];
+
+      if (content === undefined && !hasExtension(filePath)) {
+        content = files[`${filePath}.ts`] ?? files[`${filePath}.js`];
       }
 
-      if (method === "run") {
-        try {
-          self.postMessage({ ok: vslib.run(args[0]) });
-        } catch (err) {
-          self.postMessage({ err });
-        }
+      if (content === undefined) {
+        throw new Error("Not found");
       }
+
+      return content;
     };
-  }).toString(),
-  "main();",
-].join("\n\n");
+  }
+
+  function hasExtension(path: string) {
+    return path.split("/").at(-1)?.includes(".") ?? false;
+  }
+}
+
+const workerScript = [initVslib.toString(), `(${main.toString()})()`].join(
+  "\n\n",
+);
 
 const workerUrl = URL.createObjectURL(
   new Blob([workerScript], { type: "application/javascript" }),
@@ -47,15 +75,13 @@ export type Diagnostic = {
 };
 
 export type CompilerOutput = {
-  diagnostics: Diagnostic[];
+  diagnostics: Record<string, Diagnostic[]>;
   assembly: string[];
 };
 
 export type RunResult = {
-  diagnostics: Diagnostic[];
-  output:
-    | { Ok: string }
-    | { Err: string };
+  diagnostics: Record<string, Diagnostic[]>;
+  output: { Ok: string } | { Err: string };
 };
 
 export type Job<T> = {
@@ -73,12 +99,20 @@ export function mapJob<U, V>(job: Job<U>, f: (x: U) => V): Job<V> {
 export default class VslibPool {
   #pool = new valuescript.WorkerPool(workerUrl);
 
-  run(source: string) {
-    return this.#Job("run", [source]) as Job<RunResult>;
+  run(
+    entryPoint: string,
+    files: Record<string, string | nil>,
+    args: unknown[],
+  ) {
+    return this.#Job("run", [
+      entryPoint,
+      files,
+      JSON.stringify(args),
+    ]) as Job<RunResult>;
   }
 
-  compile(source: string) {
-    return this.#Job("compile", [source]) as Job<CompilerOutput>;
+  compile(entryPoint: string, files: Record<string, string | nil>) {
+    return this.#Job("compile", [entryPoint, files]) as Job<CompilerOutput>;
   }
 
   #Job(method: string, args: unknown[]) {

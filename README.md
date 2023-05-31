@@ -39,7 +39,7 @@ onto `rightBowl` is interpreted as a change to the `rightBowl` variable itself,
 not the data it points to.
 
 You can
-[see this in the playground](https://valuescript.org/playground/#tutorial/valueSemantics.ts),
+[see this in the playground](https://valuescript.org/playground/#/tutorial/valueSemantics.ts),
 or run it locally:
 
 ```sh
@@ -216,10 +216,10 @@ instances (and the methods on those class instances). In ValueScript, everything
 is plain data.
 
 In fact, because ValueScript doesn't require garbage collection, it's also
-possible to build up large structures that wouldn't fit into memory. Garbage
-collection is a limiting factor on traditional languages on this point, because
-you need to periodically fully traverse the memory to find things that can be
-cleaned up.
+possible to build up large structures that wouldn't fit into memory. In garbage
+collected languages, the garbage collector needs to be able to fully traverse
+all the data (as a last resort) to find cycles to clean up, so growing beyond
+memory limits isn't very practical. ValueScript doesn't have this limitation.
 
 </details>
 
@@ -347,7 +347,7 @@ const fValue = f(z).wait();
 Suppose instead that `f`, `widget.calculate`, and `expensiveCalculation` are all
 sync functions. Suppose that `f` is part of an important API - it has users and
 you can't require them to make changes. Allowing `.wait` means those users can
-still benefit this multithreaded version of `f`:
+still benefit from this multi-threaded version of `f`:
 
 ```ts
 const f = (z: number): number => {
@@ -415,9 +415,12 @@ not the subset of ValueScript that has actually been implemented.
 - Loops
 - Recursion
 - Destructuring
-- Throwing exceptions
-- Local imports (not yet in the playground)
-- Tree shaking (not yet in the playground)
+- Exceptions
+  - Variables changed during try block are reverted on catch
+- Enforcing `const`
+- Temporal dead zones
+- Local imports
+- Tree shaking
 - Copy-on-write optimizations
 - utf8 strings (_not_ JS's utf16 strings)
   - `"🫣".length -> 4`
@@ -466,9 +469,6 @@ not the subset of ValueScript that has actually been implemented.
   - `{} === {} -> true`
   - JS: `-> false`
   - This is a value semantics thing - objects don't have identity
-- Catching exceptions
-- Enforcing `const`
-- Temporal dead zones
 - Iterators
 - Rest and spread
 - Generators

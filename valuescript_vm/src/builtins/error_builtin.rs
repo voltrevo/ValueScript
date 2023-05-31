@@ -1,131 +1,109 @@
-use std::{collections::BTreeMap, rc::Rc};
+use std::collections::BTreeMap;
+use std::fmt;
+use std::rc::Rc;
 
-use num_bigint::BigInt;
-
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::native_function::{native_fn, ThisWrapper};
+use crate::vs_class::VsClass;
+use crate::vs_value::ToVal;
+use crate::ValTrait;
 use crate::{
-  format_val,
   native_function::NativeFunction,
-  operations::{op_sub, op_submov},
-  vs_array::VsArray,
-  vs_class::VsClass,
+  operations::op_submov,
   vs_object::VsObject,
-  vs_value::{LoadFunctionResult, Val, VsType},
-  ValTrait,
+  vs_value::{LoadFunctionResult, Val},
 };
+
+use super::builtin_object::BuiltinObject;
 
 pub struct ErrorBuiltin {}
 
-pub static ERROR_BUILTIN: ErrorBuiltin = ErrorBuiltin {};
+impl BuiltinObject for ErrorBuiltin {
+  fn bo_name() -> &'static str {
+    "Error"
+  }
 
-impl ValTrait for ErrorBuiltin {
-  fn typeof_(&self) -> VsType {
-    VsType::Object
+  fn bo_sub(_key: &str) -> Val {
+    Val::Undefined
   }
-  fn val_to_string(&self) -> String {
-    "function Error() { [native code] }".to_string()
+
+  fn bo_load_function() -> LoadFunctionResult {
+    LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
+      Ok(
+        match params.get(0) {
+          Some(param) => param.clone().to_val_string(),
+          None => "".to_val(),
+        }
+        .to_error(),
+      )
+    })
   }
-  fn to_number(&self) -> f64 {
-    core::f64::NAN
-  }
-  fn to_index(&self) -> Option<usize> {
-    None
-  }
-  fn is_primitive(&self) -> bool {
-    false
-  }
-  fn to_primitive(&self) -> Val {
-    Val::String(Rc::new("function Error() { [native code] }".to_string()))
-  }
-  fn is_truthy(&self) -> bool {
-    true
-  }
-  fn is_nullish(&self) -> bool {
-    false
-  }
-  fn bind(&self, _params: Vec<Val>) -> Option<Val> {
-    None
-  }
-  fn as_bigint_data(&self) -> Option<BigInt> {
-    None
-  }
-  fn as_array_data(&self) -> Option<Rc<VsArray>> {
-    None
-  }
-  fn as_object_data(&self) -> Option<Rc<VsObject>> {
-    None
-  }
-  fn as_class_data(&self) -> Option<Rc<VsClass>> {
+
+  fn bo_as_class_data() -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
-      constructor: Val::Static(&SET_MESSAGE),
+      constructor: SET_MESSAGE.to_val(),
       instance_prototype: make_error_prototype(),
     }))
   }
+}
 
-  fn load_function(&self) -> LoadFunctionResult {
-    LoadFunctionResult::NativeFunction(to_error)
-  }
-
-  fn sub(&self, _key: Val) -> Result<Val, Val> {
-    Ok(Val::Undefined)
-  }
-
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
-    type_error!("Cannot assign to subscript of Error builtin")
-  }
-
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "\x1b[36m[Error]\x1b[39m")
-  }
-
-  fn codify(&self) -> String {
-    "Error".into()
+impl fmt::Display for ErrorBuiltin {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "function Error() {{ [native code] }}")
   }
 }
 
-fn to_error(_: &mut Val, params: Vec<Val>) -> Result<Val, Val> {
-  Ok(Val::Object(Rc::new(VsObject {
-    string_map: BTreeMap::from([(
-      "message".to_string(),
-      Val::String(Rc::new(match params.get(0) {
-        Some(param) => param.val_to_string(),
-        None => "".to_string(),
-      })),
-    )]),
-    prototype: Some(make_error_prototype()),
-  })))
+pub trait ToError {
+  fn to_error(self) -> Val;
+}
+
+impl ToError for Val {
+  fn to_error(self) -> Val {
+    VsObject {
+      string_map: BTreeMap::from([("message".to_string(), self.to_val_string())]),
+      symbol_map: Default::default(),
+      prototype: Some(make_error_prototype()),
+    }
+    .to_val()
+  }
+}
+
+impl ToError for String {
+  fn to_error(self) -> Val {
+    self.to_val().to_error()
+  }
+}
+
+impl ToError for &str {
+  fn to_error(self) -> Val {
+    self.to_string().to_error()
+  }
 }
 
 // TODO: Static? (Rc -> Arc?)
 fn make_error_prototype() -> Val {
-  Val::Object(Rc::new(VsObject {
+  VsObject {
     string_map: BTreeMap::from([
-      (
-        "name".to_string(),
-        Val::String(Rc::new("Error".to_string())),
-      ),
-      ("toString".to_string(), Val::Static(&ERROR_TO_STRING)),
+      ("name".to_string(), "Error".to_val()),
+      ("toString".to_string(), ERROR_TO_STRING.to_val()),
     ]),
+    symbol_map: Default::default(),
     prototype: None,
-  }))
+  }
+  .to_val()
 }
 
-static SET_MESSAGE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    let message = match params.get(0) {
-      Some(param) => param.val_to_string(),
-      None => "".to_string(),
-    };
+static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
+  let message = match params.get(0) {
+    Some(param) => param.to_string(),
+    None => "".to_string(),
+  };
 
-    op_submov(this, format_val!("message"), format_val!("{}", message))?;
+  op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
 
-    Ok(Val::Undefined)
-  },
-};
+  Ok(Val::Undefined)
+});
 
-static ERROR_TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    let message = op_sub(this.clone(), format_val!("message"))?;
-    Ok(format_val!("Error({})", message)) // TODO: Fixes needed here (and other errors)
-  },
-};
+static ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
+  let message = this.get().sub("message".to_val())?;
+  Ok(format!("Error({})", message).to_val()) // TODO: Fixes needed here (and other errors)
+});

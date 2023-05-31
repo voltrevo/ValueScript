@@ -1,13 +1,16 @@
+use std::collections::HashSet;
+use std::mem::take;
+
 use queues::*;
 
 use swc_common::Spanned;
 
-use crate::asm::{Array, Instruction, Label, Object, Pointer, Register, Value};
-
-use super::capture_finder::CaptureFinder;
-use super::diagnostic::{Diagnostic, DiagnosticLevel};
-use super::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
-use super::scope::{init_std_scope, MappedName, Scope};
+use crate::asm::{Array, Instruction, Label, Object, Register, Value};
+use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
+use crate::scope::{NameId, OwnerId};
+use crate::scope_analysis::{fn_to_owner_id, NameType};
+use crate::target_accessor::TargetAccessor;
 
 pub struct CompiledExpression {
   /** It is usually better to access this via functionCompiler.use_ */
@@ -58,7 +61,6 @@ impl Drop for ReleaseChecker {
 }
 
 pub struct ExpressionCompiler<'a> {
-  pub scope: &'a Scope,
   pub fnc: &'a mut FunctionCompiler,
 }
 
@@ -211,11 +213,7 @@ impl<'a> ExpressionCompiler<'a> {
         return CompiledExpression::empty();
       }
       TsConstAssertion(ts_const_assertion) => {
-        self
-          .fnc
-          .todo(ts_const_assertion.span, "TsConstAssertion expression");
-
-        return CompiledExpression::empty();
+        return self.compile(&ts_const_assertion.expr, target_register);
       }
       TsNonNull(ts_non_null_exp) => {
         return self.compile(&ts_non_null_exp.expr, target_register);
@@ -318,15 +316,17 @@ impl<'a> ExpressionCompiler<'a> {
     return CompiledExpression::new(Value::Register(target), nested_registers);
   }
 
-  fn get_register_for_ident_mutation(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
-    let (reg, err_msg) = match self.scope.get(&ident.sym.to_string()) {
-      None => (None, Some("Unresolved identifier")),
-      Some(MappedName::Definition(_)) => (None, Some("Invalid: definition mutation")),
-      Some(MappedName::QueuedFunction(_)) => (None, Some("Invalid: declaration mutation")),
-      Some(MappedName::Register(reg)) => (Some(reg), None),
-      Some(MappedName::Builtin(_) | MappedName::Constant(_)) => {
-        (None, Some("Invalid: builtin/constant mutation"))
-      }
+  pub fn get_register_for_ident_mutation(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
+    let (reg, err_msg) = match self.fnc.lookup_value(ident) {
+      Some(Value::Register(reg)) => (Some(reg), None),
+      lookup_result => (
+        None,
+        Some(format!(
+          "Invalid: Can't mutate {} because its lookup result is {:?}",
+          ident.sym.to_string(),
+          lookup_result,
+        )),
+      ),
     };
 
     if let Some(err_msg) = err_msg {
@@ -343,7 +343,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self
       .fnc
-      .allocate_numbered_reg(&format!("_couldnt_mutate_{}_", ident.sym.to_string()))
+      .allocate_numbered_reg(&format!("_couldnt_mutate_{}_", ident.sym))
   }
 
   pub fn assign_expression(
@@ -395,7 +395,7 @@ impl<'a> ExpressionCompiler<'a> {
       // at is already assigned by compiling directly into at.direct_register()
       // and also doesn't need to be packed up, since it's just a register
     } else {
-      at.assign_and_packup(self, &rhs.value);
+      at.assign_and_packup(self, &rhs.value, false);
     }
 
     rhs
@@ -411,7 +411,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let rhs = self.compile(assign_expr_right, Some(rhs_reg.clone()));
 
-    self.pat(pat, &rhs_reg, true, &self.scope);
+    self.pat(pat, &rhs_reg, true);
 
     if let Some(target_reg) = target_register {
       self
@@ -515,7 +515,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    target.assign_and_packup(self, &Value::Register(target_read));
+    target.assign_and_packup(self, &Value::Register(target_read), false);
 
     CompiledExpression::new(Value::Register(result_reg), nested_registers)
   }
@@ -525,46 +525,9 @@ impl<'a> ExpressionCompiler<'a> {
     array_exp: &swc_ecma_ast::ArrayLit,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let mut array_asm = Array::default();
-    let mut sub_nested_registers = Vec::<Register>::new();
+    let args = array_exp.elems.iter().map(|x| x.as_ref());
 
-    for i in 0..array_exp.elems.len() {
-      match &array_exp.elems[i] {
-        None => {
-          array_asm.values.push(Value::Void);
-        }
-        Some(elem) => {
-          if elem.spread.is_some() {
-            self.fnc.todo(elem.span(), "spread expression");
-
-            let reg = self.fnc.allocate_numbered_reg("_todo_spread");
-
-            array_asm.values.push(Value::Register(reg));
-          } else {
-            let mut compiled_elem = self.compile(&*elem.expr, None);
-            array_asm.values.push(compiled_elem.value);
-            sub_nested_registers.append(&mut compiled_elem.nested_registers);
-            compiled_elem.release_checker.has_unreleased_registers = false;
-          }
-        }
-      }
-    }
-
-    return match target_register {
-      None => CompiledExpression::new(Value::Array(Box::new(array_asm)), sub_nested_registers),
-      Some(tr) => {
-        self.fnc.push(Instruction::Mov(
-          Value::Array(Box::new(array_asm)),
-          tr.clone(),
-        ));
-
-        for reg in sub_nested_registers {
-          self.fnc.release_reg(&reg);
-        }
-
-        CompiledExpression::new(Value::Register(tr), vec![])
-      }
-    };
+    self.args(args, target_register)
   }
 
   pub fn object_expression(
@@ -739,7 +702,19 @@ impl<'a> ExpressionCompiler<'a> {
               }
             }
 
-            reg.clone()
+            let res = self.fnc.allocate_tmp();
+            nested_registers.push(res.clone());
+
+            // Always copy pre-increment value into a new register.
+            // This is a bit heavy-handed (FIXME), but it's consistent with the current policy of
+            // doing this whenever the variable is mutated, which it clearly is. Really though, the
+            // issue is when *other* mutations to this variable occur between now and when it's
+            // inserted.
+            self
+              .fnc
+              .push(Instruction::Mov(Value::Register(reg.clone()), res.clone()));
+
+            res
           }
           TargetAccessor::Nested(nta) => match target_register {
             Some(tr) => {
@@ -792,7 +767,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    target.assign_and_packup(self, &Value::Register(target_read));
+    target.assign_and_packup(self, &Value::Register(target_read), false);
 
     return res;
   }
@@ -803,9 +778,8 @@ impl<'a> ExpressionCompiler<'a> {
     target_register: Option<Register>,
   ) -> CompiledExpression {
     let mut nested_registers = Vec::<Register>::new();
-    let mut sub_nested_registers = Vec::<Register>::new();
 
-    let mut callee = match &call_exp.callee {
+    let callee = match &call_exp.callee {
       swc_ecma_ast::Callee::Expr(expr) => self.compile(&*expr, None),
       _ => {
         self
@@ -816,48 +790,27 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    callee.release_checker.has_unreleased_registers = false;
-    sub_nested_registers.append(&mut callee.nested_registers);
+    let args = call_exp.args.iter().map(|x| Some(x));
+    let compiled_args = self.args(args, None);
 
-    let mut args = Array::default();
-
-    for i in 0..call_exp.args.len() {
-      let arg = &call_exp.args[i];
-
-      if arg.spread.is_some() {
-        self.fnc.todo(arg.spread.span(), "argument spreading");
-      }
-
-      let mut compiled_arg = self.compile(&*arg.expr, None);
-      compiled_arg.release_checker.has_unreleased_registers = false;
-      sub_nested_registers.append(&mut compiled_arg.nested_registers);
-
-      args.values.push(compiled_arg.value);
-    }
-
-    let tmp_dest: Register;
-
-    let dest = match &target_register {
+    let dest = match target_register {
       Some(tr) => tr,
       None => {
-        tmp_dest = self.fnc.allocate_tmp();
-        nested_registers.push(tmp_dest.clone());
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
 
-        &tmp_dest
+        tmp
       }
     };
 
-    self.fnc.push(Instruction::Call(
-      callee.value,
-      Value::Array(Box::new(args)),
-      dest.clone(),
-    ));
+    let args_value = self.fnc.use_(compiled_args);
+    let callee_value = self.fnc.use_(callee);
 
-    for reg in sub_nested_registers {
-      self.fnc.release_reg(&reg);
-    }
+    self
+      .fnc
+      .push(Instruction::Call(callee_value, args_value, dest.clone()));
 
-    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
+    CompiledExpression::new(Value::Register(dest), nested_registers)
   }
 
   pub fn new_expression(
@@ -868,59 +821,35 @@ impl<'a> ExpressionCompiler<'a> {
     // TODO: Try to deduplicate with call_expression
 
     let mut nested_registers = Vec::<Register>::new();
-    let mut sub_nested_registers = Vec::<Register>::new();
 
-    let mut callee = self.compile(&new_exp.callee, None);
+    let callee = self.compile(&new_exp.callee, None);
 
-    callee.release_checker.has_unreleased_registers = false;
-    sub_nested_registers.append(&mut callee.nested_registers);
-
-    // let mut instr = "  new ".to_string();
-    // instr += &callee.value.to_string();
-    // instr += " ";
-
-    let mut args = Array::default();
-
-    for new_args in &new_exp.args {
-      for i in 0..new_args.len() {
-        let arg = &new_args[i];
-
-        if arg.spread.is_some() {
-          self.fnc.todo(arg.spread.span(), "argument spreading");
-        }
-
-        let mut compiled_arg = self.compile(&*arg.expr, None);
-        sub_nested_registers.append(&mut compiled_arg.nested_registers);
-
-        args.values.push(compiled_arg.value);
-      }
-    }
-
-    // instr += &format!("{} ", args);
-
-    let tmp_dest: Register;
-
-    let dest = match &target_register {
-      Some(tr) => tr,
-      None => {
-        tmp_dest = self.fnc.allocate_tmp();
-        nested_registers.push(tmp_dest.clone());
-
-        &tmp_dest
+    let compiled_args = match &new_exp.args {
+      None => CompiledExpression::new(Value::Array(Box::new(Array::default())), vec![]),
+      Some(new_exp_args) => {
+        let args = new_exp_args.iter().map(|x| Some(x));
+        self.args(args, None)
       }
     };
 
-    self.fnc.push(Instruction::New(
-      callee.value,
-      Value::Array(Box::new(args)),
-      dest.clone(),
-    ));
+    let dest = match target_register {
+      Some(tr) => tr,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
 
-    for reg in sub_nested_registers {
-      self.fnc.release_reg(&reg);
-    }
+        tmp
+      }
+    };
 
-    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
+    let callee_value = self.fnc.use_(callee);
+    let args_value = self.fnc.use_(compiled_args);
+
+    self
+      .fnc
+      .push(Instruction::New(callee_value, args_value, dest.clone()));
+
+    CompiledExpression::new(Value::Register(dest), nested_registers)
   }
 
   pub fn method_call_expression(
@@ -958,48 +887,42 @@ impl<'a> ExpressionCompiler<'a> {
     prop.release_checker.has_unreleased_registers = false;
     sub_nested_registers.append(&mut prop.nested_registers);
 
-    let mut asm_args = Array::default();
+    let compiled_args = {
+      let args_iter = args.iter().map(|x| Some(x));
+      self.args(args_iter, None)
+    };
 
-    for i in 0..args.len() {
-      let arg = &args[i];
-
-      if arg.spread.is_some() {
-        self.fnc.todo(arg.spread.span(), "argument spreading");
-      }
-
-      let mut compiled_arg = self.compile(&*arg.expr, None);
-      compiled_arg.release_checker.has_unreleased_registers = false;
-      sub_nested_registers.append(&mut compiled_arg.nested_registers);
-
-      asm_args.values.push(compiled_arg.value);
-    }
-
-    let tmp_dest: Register;
-
-    let dest = match &target_register {
+    let dest = match target_register {
       Some(tr) => tr,
       None => {
-        tmp_dest = self.fnc.allocate_tmp();
-        nested_registers.push(tmp_dest.clone());
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
 
-        &tmp_dest
+        tmp
       }
     };
 
-    let instr = Instruction::SubCall(
-      obj_value.clone(),
-      prop.value,
-      Value::Array(Box::new(asm_args)),
-      dest.clone(),
-    );
-
-    self.fnc.push(instr);
-
     match obj {
       TargetAccessorOrCompiledExpression::TargetAccessor(mut ta) => {
-        ta.assign_and_packup(self, &obj_value);
+        let targets_this = ta.targets_this();
+
+        let args_value = self.fnc.use_(compiled_args);
+
+        let instr = match targets_this {
+          false => Instruction::SubCall(obj_value.clone(), prop.value, args_value, dest.clone()),
+          true => Instruction::ThisSubCall(obj_value.clone(), prop.value, args_value, dest.clone()),
+        };
+
+        self.fnc.push(instr);
+        ta.assign_and_packup(self, &obj_value, targets_this);
       }
       TargetAccessorOrCompiledExpression::CompiledExpression(ce) => {
+        let args_value = self.fnc.use_(compiled_args);
+
+        let instr =
+          Instruction::ConstSubCall(obj_value.clone(), prop.value, args_value, dest.clone());
+
+        self.fnc.push(instr);
         self.fnc.use_(ce);
       }
     }
@@ -1026,8 +949,12 @@ impl<'a> ExpressionCompiler<'a> {
       None => self.fnc.allocate_defn_numbered(&"_anon".to_string()),
     };
 
-    let mut cf = CaptureFinder::new(self.scope.clone());
-    cf.fn_expr(&init_std_scope(), fn_);
+    let capture_params = self
+      .fnc
+      .scope_analysis
+      .captures
+      .get(&fn_to_owner_id(&fn_.ident, &fn_.function))
+      .cloned();
 
     self
       .fnc
@@ -1035,22 +962,23 @@ impl<'a> ExpressionCompiler<'a> {
       .add(QueuedFunction {
         definition_pointer: definition_pointer.clone(),
         fn_name: fn_name.clone(),
-        capture_params: cf.ordered_names.clone(),
-        functionish: Functionish::Fn(fn_.function.clone()),
+        functionish: Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
       })
       .expect("Failed to queue function");
 
-    if cf.ordered_names.len() == 0 {
-      return self.inline(Value::Pointer(definition_pointer), target_register);
+    match capture_params {
+      None => self.inline(Value::Pointer(definition_pointer), target_register),
+      Some(capture_params) => self.capturing_fn_ref(
+        match fn_.ident {
+          Some(ref ident) => ident.span,
+          None => fn_.function.span,
+        },
+        fn_name,
+        &Value::Pointer(definition_pointer),
+        &capture_params,
+        target_register,
+      ),
     }
-
-    return self.capturing_fn_ref(
-      fn_name,
-      fn_.ident.span(),
-      &definition_pointer,
-      &cf.ordered_names,
-      target_register,
-    );
   }
 
   pub fn arrow_expression(
@@ -1060,8 +988,12 @@ impl<'a> ExpressionCompiler<'a> {
   ) -> CompiledExpression {
     let definition_pointer = self.fnc.allocate_defn_numbered(&"_anon".to_string());
 
-    let mut cf = CaptureFinder::new(self.scope.clone());
-    cf.arrow_expr(&init_std_scope(), arrow_expr);
+    let capture_params = self
+      .fnc
+      .scope_analysis
+      .captures
+      .get(&OwnerId::Span(arrow_expr.span))
+      .cloned();
 
     self
       .fnc
@@ -1069,34 +1001,31 @@ impl<'a> ExpressionCompiler<'a> {
       .add(QueuedFunction {
         definition_pointer: definition_pointer.clone(),
         fn_name: None,
-        capture_params: cf.ordered_names.clone(),
         functionish: Functionish::Arrow(arrow_expr.clone()),
       })
       .expect("Failed to queue function");
 
-    if cf.ordered_names.len() == 0 {
-      return self.inline(Value::Pointer(definition_pointer), target_register);
+    match capture_params {
+      None => self.inline(Value::Pointer(definition_pointer), target_register),
+      Some(capture_params) => self.capturing_fn_ref(
+        arrow_expr.span,
+        None,
+        &Value::Pointer(definition_pointer),
+        &capture_params,
+        target_register,
+      ),
     }
-
-    return self.capturing_fn_ref(
-      None,
-      arrow_expr.span(),
-      &definition_pointer,
-      &cf.ordered_names,
-      target_register,
-    );
   }
 
   pub fn capturing_fn_ref(
     &mut self,
-    fn_name: Option<String>,
     span: swc_common::Span,
-    definition_pointer: &Pointer,
-    captures: &Vec<String>,
+    fn_name: Option<String>,
+    fn_value: &Value,
+    captures: &HashSet<NameId>,
     target_register: Option<Register>,
   ) -> CompiledExpression {
     let mut nested_registers = Vec::<Register>::new();
-    let mut sub_nested_registers = Vec::<Register>::new();
 
     let reg = match target_register {
       None => {
@@ -1114,91 +1043,95 @@ impl<'a> ExpressionCompiler<'a> {
 
     let mut bind_values = Array::default();
 
-    for i in 0..captures.len() {
-      let captured_name = &captures[i];
+    for cap in captures {
+      let cap_reg = match self.fnc.lookup_by_name_id(cap) {
+        Some(v) => match v {
+          Value::Register(r) => r,
+          _ => continue,
+        },
+        None => {
+          self.fnc.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::InternalError,
+            message: format!(
+              "Failed to find capture {:?} for scope {:?}",
+              cap, self.fnc.owner_id
+            ),
+            span: cap.span(),
+          });
+
+          continue;
+        }
+      };
+
+      // If the capture is a parameter, it's excluded from TDZ checking. This is because TDZ applies
+      // to let/const, and finding a parameter match means that the capture was already bound
+      // elsewhere, so it's already been TDZ checked (checking here isn't just duplication, it's can
+      // produce incorrect results, see captureShadowed.ts).
+      let mut is_param = false;
+
+      for p in &self.fnc.current.parameters {
+        if p == &cap_reg {
+          is_param = true;
+        }
+      }
+
+      if !is_param {
+        let cap_name = self
+          .fnc
+          .scope_analysis
+          .names
+          .get(cap)
+          .expect("Failed to find name");
+
+        if let Some(tdz_end) = cap_name.tdz_end {
+          if span.lo() <= tdz_end {
+            self.fnc.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::Error,
+              message: match &fn_name {
+                Some(name) => format!(
+                  "Referencing {} is invalid because it binds {} before its declaration (temporal \
+                    dead zone)",
+                  name, cap_name.sym,
+                ),
+                None => format!(
+                  "Expression is invalid because capturing {} binds its value before its \
+                    declaration (temporal dead zone)",
+                  cap_name.sym,
+                ),
+              },
+              span,
+            });
+          }
+        }
+      }
 
       bind_values
         .values
-        .push(match self.scope.get(captured_name) {
+        .push(match self.fnc.lookup_by_name_id(cap) {
+          Some(v) => match v {
+            Value::Register(_) => v,
+            _ => continue,
+          },
           None => {
             self.fnc.diagnostics.push(Diagnostic {
               level: DiagnosticLevel::InternalError,
               message: format!(
-                "Failed to resolve captured name {} (captured names should always resolve)",
-                captured_name
+                "Failed to find capture {:?} for scope {:?}",
+                cap, self.fnc.owner_id
               ),
-              span,
+              span: cap.span(),
             });
 
-            Value::Register(
-              self
-                .fnc
-                .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name)),
-            )
-          }
-          Some(MappedName::Definition(_)) => {
-            self.fnc.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: format!(
-                "Captured name {} resolved to a definition (this should never happen)",
-                captured_name
-              ),
-              span,
-            });
-
-            Value::Register(
-              self
-                .fnc
-                .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name)),
-            )
-          }
-          Some(MappedName::Register(cap_reg)) => Value::Register(cap_reg),
-          Some(MappedName::QueuedFunction(qfn)) => {
-            let mut compiled_ref = self.capturing_fn_ref(
-              qfn.fn_name.clone(),
-              match &qfn.functionish {
-                Functionish::Fn(fn_) => fn_.span,
-                Functionish::Arrow(arrow) => arrow.span,
-                Functionish::Constructor(_, constructor) => constructor.span,
-              },
-              &qfn.definition_pointer,
-              &qfn.capture_params,
-              None,
-            );
-
-            compiled_ref.release_checker.has_unreleased_registers = false;
-            sub_nested_registers.append(&mut compiled_ref.nested_registers);
-
-            compiled_ref.value
-          }
-          Some(MappedName::Builtin(_) | MappedName::Constant(_)) => {
-            self.fnc.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: format!(
-                "Captured name {} resolved to a builtin/constant (this should never happen)",
-                captured_name
-              ),
-              span,
-            });
-
-            Value::Register(
-              self
-                .fnc
-                .allocate_numbered_reg(&format!("_failed_cap_{}", captured_name).to_string()),
-            )
+            continue;
           }
         });
     }
 
     self.fnc.push(Instruction::Bind(
-      Value::Pointer(definition_pointer.clone()),
+      fn_value.clone(),
       Value::Array(Box::new(bind_values)),
       reg.clone(),
     ));
-
-    for reg in sub_nested_registers {
-      self.fnc.release_reg(&reg);
-    }
 
     return CompiledExpression::new(Value::Register(reg), nested_registers);
   }
@@ -1296,34 +1229,80 @@ impl<'a> ExpressionCompiler<'a> {
     ident: &swc_ecma_ast::Ident,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let ident_string = ident.sym.to_string();
-
-    if ident_string == "undefined" {
+    // TODO: Use constant instead?
+    if ident.sym.to_string() == "undefined" {
       return self.inline(Value::Undefined, target_register);
     }
 
-    let mapped = self
-      .scope
-      .get(&ident_string)
-      .expect(&format!("Identifier not found in scope {:?}", ident.span()));
-
-    return match mapped {
-      MappedName::Register(reg) => self.inline(Value::Register(reg), target_register),
-      MappedName::Definition(def) => self.inline(Value::Pointer(def), target_register),
-      MappedName::QueuedFunction(qfn) => self.capturing_fn_ref(
-        qfn.fn_name.clone(),
-        match &qfn.functionish {
-          Functionish::Fn(fn_) => fn_.span,
-          Functionish::Arrow(arrow) => arrow.span,
-          Functionish::Constructor(_, constructor) => constructor.span,
+    let fn_as_owner_id = match self.fnc.scope_analysis.lookup(ident) {
+      Some(name) => match name.type_ == NameType::Function {
+        true => match name.id {
+          // TODO: This is a bit of a hack, it might break...
+          // functions have an owner id, and the name id should
+          // have the same span... at least it does now
+          NameId::Span(span) => Some(OwnerId::Span(span)),
+          _ => None, // Internal error?
         },
-        &qfn.definition_pointer,
-        &qfn.capture_params,
-        target_register,
-      ),
-      MappedName::Builtin(builtin) => self.inline(Value::Builtin(builtin), target_register),
-      MappedName::Constant(value) => self.inline(value, target_register),
+        false => None,
+      },
+      _ => {
+        self.fnc.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: format!("Failed to lookup identifier `{}`", ident.sym),
+          span: ident.span,
+        });
+
+        None
+      }
     };
+
+    let name = match self.fnc.lookup(ident) {
+      Some(v) => v,
+      None => {
+        return self.inline(Value::Undefined, target_register);
+      }
+    };
+
+    let value = name.value.clone();
+
+    match fn_as_owner_id {
+      Some(owner_id) => {
+        let capture_params = self.fnc.scope_analysis.captures.get(&owner_id).cloned();
+
+        match capture_params {
+          Some(capture_params) => self.capturing_fn_ref(
+            ident.span,
+            Some(ident.sym.to_string()),
+            &value,
+            &capture_params,
+            target_register,
+          ),
+          None => self.inline(value, target_register),
+        }
+      }
+      None => match value {
+        Value::Register(reg) => {
+          if name.mutations.is_empty() {
+            // Just use the register for the variable if it's not mutated
+            return self.inline(Value::Register(reg), target_register);
+          }
+
+          // Otherwise, we need to capture the current value for the result of the expression
+          // TODO: This case can be limited further by checking *where* the mutations are
+          let new_reg = self.fnc.allocate_tmp();
+
+          self.fnc.push(Instruction::Mov(
+            Value::Register(reg.clone()),
+            new_reg.clone(),
+          ));
+
+          self.inline(Value::Register(new_reg.clone()), target_register);
+
+          CompiledExpression::new(Value::Register(new_reg), vec![])
+        }
+        _ => self.inline(value, target_register),
+      },
+    }
   }
 
   pub fn compile_literal(&mut self, lit: &swc_ecma_ast::Lit) -> Value {
@@ -1344,18 +1323,12 @@ impl<'a> ExpressionCompiler<'a> {
     return Value::Register(self.fnc.allocate_numbered_reg(todo_name));
   }
 
-  pub fn pat(
-    &mut self,
-    pat: &swc_ecma_ast::Pat,
-    register: &Register,
-    skip_release: bool,
-    scope: &Scope,
-  ) {
+  pub fn pat(&mut self, pat: &swc_ecma_ast::Pat, register: &Register, skip_release: bool) {
     use swc_ecma_ast::Pat;
 
     match pat {
       Pat::Ident(ident) => {
-        let ident_reg = self.fnc.get_pattern_register(pat, scope);
+        let ident_reg = self.fnc.get_pattern_register(pat);
 
         if register != &ident_reg {
           self.fnc.diagnostics.push(Diagnostic {
@@ -1382,10 +1355,10 @@ impl<'a> ExpressionCompiler<'a> {
         if let Pat::Expr(expr) = &*assign.left {
           let mut at = TargetAccessor::compile(self, expr, true);
           self.default_expr(&assign.right, register);
-          at.assign_and_packup(self, &Value::Register(register.clone()));
+          at.assign_and_packup(self, &Value::Register(register.clone()), false);
         } else {
           self.default_expr(&assign.right, register);
-          self.pat(&assign.left, register, false, scope);
+          self.pat(&assign.left, register, false);
         }
       }
       Pat::Array(array) => {
@@ -1395,7 +1368,7 @@ impl<'a> ExpressionCompiler<'a> {
             None => continue,
           };
 
-          let elem_reg = self.fnc.get_pattern_register(elem, scope);
+          let elem_reg = self.fnc.get_pattern_register(elem);
 
           self.fnc.push(Instruction::Sub(
             Value::Register(register.clone()),
@@ -1403,7 +1376,7 @@ impl<'a> ExpressionCompiler<'a> {
             elem_reg.clone(),
           ));
 
-          self.pat(elem, &elem_reg, false, scope);
+          self.pat(elem, &elem_reg, false);
         }
 
         if !skip_release {
@@ -1416,7 +1389,7 @@ impl<'a> ExpressionCompiler<'a> {
 
           match prop {
             ObjectPatProp::KeyValue(kv) => {
-              let param_reg = self.fnc.get_pattern_register(&kv.value, scope);
+              let param_reg = self.fnc.get_pattern_register(&kv.value);
               let compiled_key = self.prop_name(&kv.key);
 
               let sub_instr = Instruction::Sub(
@@ -1427,11 +1400,11 @@ impl<'a> ExpressionCompiler<'a> {
 
               self.fnc.push(sub_instr);
 
-              self.pat(&kv.value, &param_reg, false, scope);
+              self.pat(&kv.value, &param_reg, false);
             }
             ObjectPatProp::Assign(assign) => {
               let key = assign.key.sym.to_string();
-              let reg = self.fnc.get_variable_register(&assign.key, scope);
+              let reg = self.fnc.get_variable_register(&assign.key);
 
               self.fnc.push(Instruction::Sub(
                 Value::Register(register.clone()),
@@ -1463,7 +1436,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
       Pat::Expr(expr) => {
         let mut at = TargetAccessor::compile(self, expr, true);
-        at.assign_and_packup(self, &Value::Register(register.clone()));
+        at.assign_and_packup(self, &Value::Register(register.clone()), false);
       }
     }
   }
@@ -1502,6 +1475,93 @@ impl<'a> ExpressionCompiler<'a> {
     }
 
     self.fnc.label(initialized_label);
+  }
+
+  fn args<'b, IterT>(
+    &mut self,
+    arg_list: IterT,
+    target_register: Option<Register>,
+  ) -> CompiledExpression
+  where
+    IterT: Iterator<Item = Option<&'b swc_ecma_ast::ExprOrSpread>>,
+  {
+    let mut segments = Vec::<Value>::new();
+    let mut current = Vec::<Value>::new();
+    let mut sub_nested_registers = Vec::<Register>::new();
+
+    for arg in arg_list {
+      let arg = match arg {
+        None => {
+          current.push(Value::Void);
+          continue;
+        }
+        Some(arg) => arg,
+      };
+
+      if arg.spread.is_some() && !current.is_empty() {
+        segments.push(Value::Array(Box::new(Array {
+          values: take(&mut current),
+        })));
+      }
+
+      let mut compiled_elem = self.compile(&*arg.expr, None);
+
+      if arg.spread.is_some() {
+        segments.push(compiled_elem.value);
+      } else {
+        current.push(compiled_elem.value);
+      }
+
+      sub_nested_registers.append(&mut compiled_elem.nested_registers);
+      compiled_elem.release_checker.has_unreleased_registers = false;
+    }
+
+    if segments.is_empty() {
+      return match target_register {
+        None => CompiledExpression::new(
+          Value::Array(Box::new(Array { values: current })),
+          sub_nested_registers,
+        ),
+        Some(tr) => {
+          self.fnc.push(Instruction::Mov(
+            Value::Array(Box::new(Array { values: current })),
+            tr.clone(),
+          ));
+
+          for reg in sub_nested_registers {
+            self.fnc.release_reg(&reg);
+          }
+
+          CompiledExpression::new(Value::Register(tr), vec![])
+        }
+      };
+    }
+
+    for reg in sub_nested_registers {
+      self.fnc.release_reg(&reg);
+    }
+
+    if !current.is_empty() {
+      segments.push(Value::Array(Box::new(Array { values: current })));
+    }
+
+    let mut nested_registers = Vec::<Register>::new();
+
+    let res_reg = match target_register {
+      Some(target_register) => target_register,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
+        tmp
+      }
+    };
+
+    self.fnc.push(Instruction::Cat(
+      Value::Array(Box::new(Array { values: segments })),
+      res_reg.clone(),
+    ));
+
+    CompiledExpression::new(Value::Register(res_reg), nested_registers)
   }
 }
 
@@ -1589,219 +1649,4 @@ pub fn make_update_op(op: swc_ecma_ast::UpdateOp, register: Register) -> Instruc
     PlusPlus => Instruction::OpInc(register),
     MinusMinus => Instruction::OpDec(register),
   }
-}
-
-struct NestedTargetAccess {
-  obj: Box<TargetAccessor>,
-  subscript: CompiledExpression,
-  register: Register,
-}
-
-enum TargetAccessor {
-  Register(Register),
-  Nested(NestedTargetAccess),
-}
-
-impl TargetAccessor {
-  fn is_eligible_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> bool {
-    use swc_ecma_ast::Expr::*;
-
-    return match expr {
-      Ident(ident) => match ec.scope.get(&ident.sym.to_string()) {
-        None => false,
-        Some(MappedName::Definition(_)) => false,
-        Some(MappedName::QueuedFunction(_)) => false,
-        Some(MappedName::Register(_)) => true,
-        Some(MappedName::Builtin(_)) => false,
-        Some(MappedName::Constant(_)) => false,
-      },
-      This(_) => true,
-      Member(member) => TargetAccessor::is_eligible_expr(ec, &member.obj),
-      _ => false, // TODO: Others may be eligible but not implemented?
-    };
-  }
-
-  fn compile(
-    ec: &mut ExpressionCompiler,
-    expr: &swc_ecma_ast::Expr,
-    is_outermost: bool,
-  ) -> TargetAccessor {
-    use swc_ecma_ast::Expr::*;
-
-    return match expr {
-      Ident(ident) => TargetAccessor::compile_ident(ec, ident),
-      This(_) => TargetAccessor::Register(Register::This),
-      Member(member) => {
-        let obj = TargetAccessor::compile(ec, &member.obj, false);
-        let subscript = ec.member_prop(&member.prop, None);
-
-        let register = ec.fnc.allocate_tmp();
-
-        if !is_outermost {
-          ec.fnc.push(Instruction::Sub(
-            Value::Register(obj.register()),
-            subscript.value.clone(),
-            register.clone(),
-          ));
-        }
-
-        TargetAccessor::Nested(NestedTargetAccess {
-          obj: Box::new(obj),
-          subscript,
-          register,
-        })
-      }
-      SuperProp(super_prop) => {
-        ec.fnc.todo(super_prop.span, "SuperProp expressions");
-        TargetAccessor::make_todo(ec)
-      }
-      _ => {
-        ec.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          span: expr.span(),
-          message: format!("Invalid target {}", get_expr_type_str(expr)),
-        });
-
-        TargetAccessor::make_bad(ec)
-      }
-    };
-  }
-
-  fn compile_ident(ec: &mut ExpressionCompiler, ident: &swc_ecma_ast::Ident) -> TargetAccessor {
-    return TargetAccessor::Register(ec.get_register_for_ident_mutation(ident));
-  }
-
-  fn make_bad(ec: &mut ExpressionCompiler) -> TargetAccessor {
-    return TargetAccessor::Register(ec.fnc.allocate_numbered_reg(&"_bad_lvalue".to_string()));
-  }
-
-  fn make_todo(ec: &mut ExpressionCompiler) -> TargetAccessor {
-    return TargetAccessor::Register(ec.fnc.allocate_numbered_reg(&"_todo_lvalue".to_string()));
-  }
-
-  fn assign_and_packup(&mut self, ec: &mut ExpressionCompiler, value: &Value) {
-    use TargetAccessor::*;
-
-    match self {
-      Register(reg) => {
-        // TODO: Should value just derive from Eq?
-        if value.to_string() != reg.to_string() {
-          ec.fnc.push(Instruction::Mov(value.clone(), reg.clone()));
-        }
-      }
-      Nested(nta) => {
-        let submov_instr = Instruction::SubMov(
-          ec.fnc.use_ref(&mut nta.subscript),
-          value.clone(),
-          nta.obj.register(),
-        );
-
-        ec.fnc.push(submov_instr);
-
-        ec.fnc.release_reg(&nta.register);
-
-        nta.obj.packup(ec);
-      }
-    }
-  }
-
-  fn read(&self, ec: &mut ExpressionCompiler) -> Register {
-    use TargetAccessor::*;
-
-    return match self {
-      Register(reg) => reg.clone(),
-      Nested(nta) => {
-        ec.fnc.push(Instruction::Sub(
-          Value::Register(nta.obj.register()),
-          nta.subscript.value.clone(),
-          nta.register.clone(),
-        ));
-
-        nta.register.clone()
-      }
-    };
-  }
-
-  fn register(&self) -> Register {
-    use TargetAccessor::*;
-
-    return match self {
-      Register(reg) => reg.clone(),
-      Nested(nta) => nta.register.clone(),
-    };
-  }
-
-  fn direct_register(&self) -> Option<Register> {
-    use TargetAccessor::*;
-
-    return match self {
-      Register(reg) => Some(reg.clone()),
-      Nested(_) => None,
-    };
-  }
-
-  fn packup(&mut self, ec: &mut ExpressionCompiler) {
-    use TargetAccessor::*;
-
-    match self {
-      Register(_) => {}
-      Nested(nta) => {
-        let submov_instr = Instruction::SubMov(
-          ec.fnc.use_ref(&mut nta.subscript),
-          Value::Register(nta.register.clone()),
-          nta.obj.register(),
-        );
-
-        ec.fnc.push(submov_instr);
-
-        ec.fnc.release_reg(&nta.register);
-
-        nta.obj.packup(ec);
-      }
-    }
-  }
-}
-
-fn get_expr_type_str(expr: &swc_ecma_ast::Expr) -> &'static str {
-  use swc_ecma_ast::Expr::*;
-
-  return match expr {
-    This(_) => "This",
-    Ident(_) => "Ident",
-    Array(_) => "Array",
-    Object(_) => "Object",
-    Fn(_) => "Fn",
-    Unary(_) => "Unary",
-    Update(_) => "Update",
-    Bin(_) => "Bin",
-    Assign(_) => "Assign",
-    Seq(_) => "Seq",
-    Cond(_) => "Cond",
-    Call(_) => "Call",
-    Member(_) => "Member",
-    New(_) => "New",
-    Paren(_) => "Paren",
-    Arrow(_) => "Arrow",
-    Yield(_) => "Yield",
-    Await(_) => "Await",
-    Lit(_) => "Lit",
-    Tpl(_) => "Tpl",
-    TaggedTpl(_) => "TaggedTpl",
-    Class(_) => "Class",
-    MetaProp(_) => "MetaProp",
-    Invalid(_) => "Invalid",
-    TsTypeAssertion(_) => "TsTypeAssertion",
-    TsConstAssertion(_) => "TsConstAssertion",
-    TsNonNull(_) => "TsNonNull",
-    TsAs(_) => "TsAs",
-    OptChain(_) => "OptChain",
-    PrivateName(_) => "PrivateName",
-    SuperProp(_) => "SuperProp",
-    JSXMember(_) => "JSXMember",
-    JSXNamespacedName(_) => "JSXNamespacedName",
-    JSXEmpty(_) => "JSXEmpty",
-    JSXElement(_) => "JSXElement",
-    JSXFragment(_) => "JSXFragment",
-    TsInstantiation(_) => "TsInstantiation",
-  };
 }

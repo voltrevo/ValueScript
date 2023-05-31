@@ -11,13 +11,13 @@ use crate::asm::{
   Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Lazy, Module,
   Object, Pointer, Register, Value,
 };
-
-use super::diagnostic::{Diagnostic, DiagnosticLevel};
-use super::expression_compiler::{CompiledExpression, ExpressionCompiler};
-use super::function_compiler::{FunctionCompiler, Functionish};
-use super::name_allocator::NameAllocator;
-use super::scope::{init_std_scope, MappedName, Scope};
-use super::scope_analysis::ScopeAnalysis;
+use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
+use crate::function_compiler::{FunctionCompiler, Functionish};
+use crate::name_allocator::{ident_from_str, NameAllocator};
+use crate::scope::OwnerId;
+use crate::scope_analysis::ScopeAnalysis;
+use crate::static_eval_expr::static_eval_expr;
 
 struct DiagnosticCollector {
   diagnostics: Arc<Mutex<Vec<Diagnostic>>>,
@@ -71,8 +71,7 @@ pub struct CompilerOutput {
 }
 
 pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
-  let mut compiler = ModuleCompiler::default();
-  compiler.compile_program(&program);
+  let compiler = ModuleCompiler::compile_program(&program);
 
   return CompilerOutput {
     diagnostics: compiler.diagnostics,
@@ -98,6 +97,7 @@ pub fn compile_module(source: &str) -> CompilerOutput {
 struct ModuleCompiler {
   diagnostics: Vec<Diagnostic>,
   definition_allocator: Rc<RefCell<NameAllocator>>,
+  scope_analysis: Rc<ScopeAnalysis>,
   module: Module,
 }
 
@@ -140,184 +140,65 @@ impl ModuleCompiler {
     }
   }
 
-  fn compile_program(&mut self, program: &swc_ecma_ast::Program) {
+  fn compile_program(program: &swc_ecma_ast::Program) -> Self {
     use swc_ecma_ast::Program::*;
 
-    match program {
-      Module(module) => self.compile_module(module),
+    let module = match program {
+      Module(module) => module,
       Script(script) => {
-        self.diagnostics.push(Diagnostic {
+        let mut self_ = Self::default();
+
+        self_.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
           message: "Scripts are not supported".to_string(),
           span: script.span,
         });
+
+        return self_;
       }
-    }
+    };
+
+    let mut scope_analysis = ScopeAnalysis::run(module);
+    let mut scope_analysis_diagnostics = Vec::<Diagnostic>::new();
+    std::mem::swap(
+      &mut scope_analysis_diagnostics,
+      &mut scope_analysis.diagnostics,
+    );
+
+    let mut self_ = Self {
+      scope_analysis: Rc::new(scope_analysis),
+      diagnostics: scope_analysis_diagnostics,
+      ..Default::default()
+    };
+
+    self_.compile_module(module);
+
+    self_
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
-    let mut scope_analysis = ScopeAnalysis::run(module);
-    self.diagnostics.append(&mut scope_analysis.diagnostics);
-    let scope = init_std_scope();
-
-    self.populate_scope(module, &scope);
-
     for module_item in &module.body {
-      self.compile_module_item(module_item, &scope);
+      self.compile_module_item(module_item);
     }
   }
 
-  fn populate_scope(&mut self, module: &swc_ecma_ast::Module, scope: &Scope) {
-    use swc_ecma_ast::ModuleDecl;
-    use swc_ecma_ast::ModuleItem;
-    use swc_ecma_ast::Stmt;
-
-    for module_item in &module.body {
-      match module_item {
-        ModuleItem::ModuleDecl(module_decl) => match module_decl {
-          ModuleDecl::Import(import) => self.populate_scope_import(import, scope),
-          ModuleDecl::ExportDecl(export_decl) => self.populate_scope_decl(&export_decl.decl, scope),
-          ModuleDecl::ExportNamed(_) => {
-            // Nothing to do
-          }
-          ModuleDecl::ExportDefaultDecl(edd) => {
-            match &edd.decl {
-              swc_ecma_ast::DefaultDecl::Fn(fn_) => {
-                if let Some(id) = &fn_.ident {
-                  scope.set(
-                    id.sym.to_string(),
-                    MappedName::Definition(self.allocate_defn(&id.sym.to_string())),
-                  );
-                }
-              }
-              swc_ecma_ast::DefaultDecl::Class(class) => {
-                if let Some(id) = &class.ident {
-                  scope.set(
-                    id.sym.to_string(),
-                    MappedName::Definition(self.allocate_defn(&id.sym.to_string())),
-                  );
-                }
-              }
-              swc_ecma_ast::DefaultDecl::TsInterfaceDecl(_) => {
-                // Nothing to do
-              }
-            };
-          }
-          ModuleDecl::ExportDefaultExpr(_) => {
-            // Nothing to do
-          }
-          ModuleDecl::ExportAll(_) => {
-            // Nothing to do
-          }
-          ModuleDecl::TsImportEquals(ts_import_equals) => {
-            self.not_supported(ts_import_equals.span, "TsImportEquals module declaration")
-          }
-          ModuleDecl::TsExportAssignment(ts_export_assignment) => self.not_supported(
-            ts_export_assignment.span,
-            "TsExportAssignment module declaration",
-          ),
-          ModuleDecl::TsNamespaceExport(ts_namespace_export) => self.todo(
-            ts_namespace_export.span,
-            "TsNamespaceExport module declaration (what is this?)",
-          ),
-        },
-        ModuleItem::Stmt(stmt) => match stmt {
-          Stmt::Block(block) => self.todo(block.span, "module level Block statement"),
-          Stmt::Empty(_) => {}
-          Stmt::Debugger(debugger) => self.todo(debugger.span, "module level Debugger statement"),
-          Stmt::With(with) => self.todo(with.span, "module level With statement"),
-          Stmt::Return(return_) => self.todo(return_.span, "module level Return statement"),
-          Stmt::Labeled(labeled) => self.todo(labeled.span, "module level Labeled statement"),
-          Stmt::Break(break_) => self.todo(break_.span, "module level Break statement"),
-          Stmt::Continue(continue_) => self.todo(continue_.span, "module level Continue statement"),
-          Stmt::If(if_) => self.todo(if_.span, "module level If statement"),
-          Stmt::Switch(switch) => self.todo(switch.span, "module level Switch statement"),
-          Stmt::Throw(throw) => self.todo(throw.span, "module level Throw statement"),
-          Stmt::Try(try_) => self.todo(try_.span, "module level Try statement"),
-          Stmt::While(while_) => self.todo(while_.span, "module level While statement"),
-          Stmt::DoWhile(do_while) => self.todo(do_while.span, "module level DoWhile statement"),
-          Stmt::For(for_) => self.todo(for_.span, "module level For statement"),
-          Stmt::ForIn(for_in) => self.todo(for_in.span, "module level ForIn statement"),
-          Stmt::ForOf(for_of) => self.todo(for_of.span, "module level ForOf statement"),
-          Stmt::Decl(decl) => self.populate_scope_decl(decl, scope),
-          Stmt::Expr(expr) => self.todo(expr.span, "module level Expr statement"),
-        },
-      };
-    }
-  }
-
-  fn populate_scope_import(&mut self, import: &swc_ecma_ast::ImportDecl, scope: &Scope) {
-    use swc_ecma_ast::ImportSpecifier::*;
-
-    for specifier in &import.specifiers {
-      match specifier {
-        Named(named) => {
-          scope.set(
-            named.local.sym.to_string(),
-            MappedName::Definition(self.allocate_defn(&named.local.sym.to_string())),
-          );
-        }
-        Default(default) => {
-          scope.set(
-            default.local.sym.to_string(),
-            MappedName::Definition(self.allocate_defn(&default.local.sym.to_string())),
-          );
-        }
-        Namespace(namespace) => {
-          scope.set(
-            namespace.local.sym.to_string(),
-            MappedName::Definition(self.allocate_defn(&namespace.local.sym.to_string())),
-          );
-        }
-      }
-    }
-  }
-
-  fn populate_scope_decl(&mut self, decl: &swc_ecma_ast::Decl, scope: &Scope) {
-    use swc_ecma_ast::Decl;
-
-    match decl {
-      Decl::Class(class) => {
-        scope.set(
-          class.ident.sym.to_string(),
-          MappedName::Definition(self.allocate_defn(&class.ident.sym.to_string())),
-        );
-      }
-      Decl::Fn(fn_) => {
-        scope.set(
-          fn_.ident.sym.to_string(),
-          MappedName::Definition(self.allocate_defn(&fn_.ident.sym.to_string())),
-        );
-      }
-      Decl::Var(var_decl) => {
-        if !var_decl.declare {
-          self.todo(var_decl.span, "non-declare module level var declaration");
-        }
-      }
-      Decl::TsInterface(_) => {}
-      Decl::TsTypeAlias(_) => {}
-      Decl::TsEnum(ts_enum) => self.todo(ts_enum.span, "module level TsEnum declaration"),
-      Decl::TsModule(ts_module) => self.todo(ts_module.span, "module level TsModule declaration"),
-    };
-  }
-
-  fn compile_module_item(&mut self, module_item: &swc_ecma_ast::ModuleItem, scope: &Scope) {
+  fn compile_module_item(&mut self, module_item: &swc_ecma_ast::ModuleItem) {
     use swc_ecma_ast::ModuleItem::*;
 
     match module_item {
-      ModuleDecl(module_decl) => self.compile_module_decl(module_decl, scope),
-      Stmt(stmt) => self.compile_module_statement(stmt, scope),
+      ModuleDecl(module_decl) => self.compile_module_decl(module_decl),
+      Stmt(stmt) => self.compile_module_statement(stmt),
     }
   }
 
-  fn compile_module_decl(&mut self, module_decl: &swc_ecma_ast::ModuleDecl, scope: &Scope) {
+  fn compile_module_decl(&mut self, module_decl: &swc_ecma_ast::ModuleDecl) {
     use swc_ecma_ast::ModuleDecl::*;
 
     match module_decl {
-      Import(import) => self.compile_import(import, scope),
-      ExportDecl(ed) => self.compile_export_decl(ed, scope),
-      ExportNamed(en) => self.compile_named_export(en, scope),
-      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd, scope),
+      Import(import) => self.compile_import(import),
+      ExportDecl(ed) => self.compile_export_decl(ed),
+      ExportNamed(en) => self.compile_named_export(en),
+      ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
       ExportDefaultExpr(_) => self.todo(module_decl.span(), "ExportDefaultExpr declaration"),
       ExportAll(_) => self.todo(module_decl.span(), "ExportAll declaration"),
       TsImportEquals(_) => self.not_supported(module_decl.span(), "TsImportEquals declaration"),
@@ -328,11 +209,11 @@ impl ModuleCompiler {
     }
   }
 
-  fn compile_module_statement(&mut self, stmt: &swc_ecma_ast::Stmt, scope: &Scope) {
+  fn compile_module_statement(&mut self, stmt: &swc_ecma_ast::Stmt) {
     use swc_ecma_ast::Stmt::*;
 
     match stmt {
-      Decl(decl) => self.compile_module_level_decl(decl, scope),
+      Decl(decl) => self.compile_module_level_decl(decl),
       Block(block) => self.todo(block.span, "module level Block statement"),
       Empty(_) => {}
       Debugger(debugger) => self.todo(debugger.span, "module level Debugger statement"),
@@ -354,14 +235,14 @@ impl ModuleCompiler {
     };
   }
 
-  fn compile_module_level_decl(&mut self, decl: &swc_ecma_ast::Decl, scope: &Scope) {
+  fn compile_module_level_decl(&mut self, decl: &swc_ecma_ast::Decl) {
     use swc_ecma_ast::Decl::*;
 
     match decl {
       Class(class) => {
-        self.compile_class(None, Some(class.ident.sym.to_string()), &class.class, scope);
+        self.compile_class(None, Some(&class.ident), &class.class);
       }
-      Fn(fn_) => self.compile_fn_decl(false, fn_, scope),
+      Fn(fn_) => self.compile_fn_decl(false, fn_),
       Var(var_decl) => {
         if !var_decl.declare {
           self.todo(var_decl.span, "non-declare module level var declaration");
@@ -374,15 +255,18 @@ impl ModuleCompiler {
     };
   }
 
-  fn compile_fn_decl(&mut self, export: bool, fn_: &swc_ecma_ast::FnDecl, scope: &Scope) {
+  fn compile_fn_decl(&mut self, export: bool, fn_: &swc_ecma_ast::FnDecl) {
     let fn_name = fn_.ident.sym.to_string();
 
-    let defn = match scope.get_defn(&fn_name) {
-      Some(defn) => defn,
-      None => {
+    let pointer = match self
+      .scope_analysis
+      .lookup_value(&OwnerId::Module, &fn_.ident)
+    {
+      Some(Value::Pointer(p)) => p,
+      _ => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: format!("Definition for {} should have been in scope", fn_name),
+          message: format!("Pointer for {} should have been in scope", fn_name),
           span: fn_.ident.span,
         });
 
@@ -391,34 +275,27 @@ impl ModuleCompiler {
     };
 
     if export {
-      self
-        .module
-        .export_star
-        .properties
-        .push((Value::String(fn_name.clone()), Value::Pointer(defn.clone())));
+      self.module.export_star.properties.push((
+        Value::String(fn_name.clone()),
+        Value::Pointer(pointer.clone()),
+      ));
     }
 
     let mut fn_defns = self.compile_fn(
-      defn,
+      pointer,
       Some(fn_name),
-      Functionish::Fn(fn_.function.clone()),
-      scope,
+      Functionish::Fn(Some(fn_.ident.clone()), fn_.function.clone()),
     );
 
     self.module.definitions.append(&mut fn_defns);
   }
 
-  fn compile_export_default_decl(&mut self, edd: &swc_ecma_ast::ExportDefaultDecl, scope: &Scope) {
+  fn compile_export_default_decl(&mut self, edd: &swc_ecma_ast::ExportDefaultDecl) {
     use swc_ecma_ast::DefaultDecl;
 
     match &edd.decl {
       DefaultDecl::Class(class) => {
-        let class_name = match &class.ident {
-          Some(ident) => Some(ident.sym.to_string()),
-          None => None,
-        };
-
-        let pointer = self.compile_class(None, class_name, &class.class, scope);
+        let pointer = self.compile_class(None, class.ident.as_ref(), &class.class);
         self.module.export_default = Value::Pointer(pointer);
       }
       DefaultDecl::Fn(fn_) => {
@@ -426,9 +303,9 @@ impl ModuleCompiler {
           Some(ident) => {
             let fn_name = ident.sym.to_string();
 
-            let defn = match scope.get_defn(&fn_name) {
-              Some(defn) => defn,
-              None => {
+            let defn = match self.scope_analysis.lookup_value(&OwnerId::Module, ident) {
+              Some(Value::Pointer(p)) => p,
+              _ => {
                 self.diagnostics.push(Diagnostic {
                   level: DiagnosticLevel::InternalError,
                   message: format!("Definition for {} should have been in scope", fn_name),
@@ -446,8 +323,11 @@ impl ModuleCompiler {
 
         self.module.export_default = Value::Pointer(defn.clone());
 
-        let mut fn_defns =
-          self.compile_fn(defn, fn_name, Functionish::Fn(fn_.function.clone()), scope);
+        let mut fn_defns = self.compile_fn(
+          defn,
+          fn_name,
+          Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
+        );
 
         self.module.definitions.append(&mut fn_defns);
       }
@@ -457,21 +337,15 @@ impl ModuleCompiler {
     }
   }
 
-  fn compile_export_decl(&mut self, ed: &swc_ecma_ast::ExportDecl, scope: &Scope) {
+  fn compile_export_decl(&mut self, ed: &swc_ecma_ast::ExportDecl) {
     use swc_ecma_ast::Decl;
 
     match &ed.decl {
       Decl::Class(class) => {
         let class_name = class.ident.sym.to_string();
-
-        self.compile_class(
-          Some(class_name.clone()),
-          Some(class_name),
-          &class.class,
-          scope,
-        );
+        self.compile_class(Some(class_name.clone()), Some(&class.ident), &class.class);
       }
-      Decl::Fn(fn_) => self.compile_fn_decl(true, fn_, scope),
+      Decl::Fn(fn_) => self.compile_fn_decl(true, fn_),
       Decl::Var(var_decl) => {
         if !var_decl.declare {
           self.todo(
@@ -487,7 +361,7 @@ impl ModuleCompiler {
     };
   }
 
-  fn compile_named_export(&mut self, en: &swc_ecma_ast::NamedExport, scope: &Scope) {
+  fn compile_named_export(&mut self, en: &swc_ecma_ast::NamedExport) {
     use swc_ecma_ast::ExportSpecifier::*;
     use swc_ecma_ast::ModuleExportName;
 
@@ -495,7 +369,7 @@ impl ModuleCompiler {
       match specifier {
         Named(named) => {
           let orig_name = match &named.orig {
-            ModuleExportName::Ident(ident) => ident.sym.to_string(),
+            ModuleExportName::Ident(ident) => ident,
             ModuleExportName::Str(_) => {
               self.diagnostics.push(Diagnostic {
                 level: DiagnosticLevel::InternalError,
@@ -503,7 +377,7 @@ impl ModuleCompiler {
                 span: named.span,
               });
 
-              "_todo_export_non_ident".to_string()
+              continue;
             }
           };
 
@@ -513,7 +387,7 @@ impl ModuleCompiler {
               self.todo(str_.span, "exporting a non-identifier");
               "_todo_export_non_ident".to_string()
             }
-            None => orig_name.clone(),
+            None => orig_name.sym.to_string(),
           };
 
           let defn = match &en.src {
@@ -523,7 +397,7 @@ impl ModuleCompiler {
               self.module.definitions.push(Definition {
                 pointer: defn.clone(),
                 content: DefinitionContent::Lazy(Lazy {
-                  body: match orig_name == "default" {
+                  body: match orig_name.sym.to_string() == "default" {
                     true => vec![InstructionOrLabel::Instruction(Instruction::Import(
                       Value::String(src.value.to_string()),
                       Register::Return,
@@ -535,7 +409,7 @@ impl ModuleCompiler {
                       )),
                       InstructionOrLabel::Instruction(Instruction::Sub(
                         Value::Register(Register::Return),
-                        Value::String(orig_name.clone()),
+                        Value::String(orig_name.sym.to_string()),
                         Register::Return,
                       )),
                     ],
@@ -545,12 +419,20 @@ impl ModuleCompiler {
 
               Some(defn)
             }
-            None => match scope.get_defn(&orig_name) {
-              Some(found_defn) => Some(found_defn),
-              None => {
+            None => match self
+              .scope_analysis
+              .lookup_value(&OwnerId::Module, &orig_name)
+            {
+              Some(Value::Pointer(p)) => Some(p),
+              lookup_result => {
                 self.diagnostics.push(Diagnostic {
                   level: DiagnosticLevel::InternalError,
-                  message: format!("Definition for {} should have been in scope", orig_name),
+                  message: format!(
+                    "{} should have been a pointer, but it was {:?}, ref: {:?}",
+                    orig_name,
+                    lookup_result,
+                    self.scope_analysis.refs.get(&orig_name.span)
+                  ),
                   span: named.orig.span(),
                 });
 
@@ -630,7 +512,11 @@ impl ModuleCompiler {
     }
   }
 
-  fn compile_import(&mut self, import: &swc_ecma_ast::ImportDecl, scope: &Scope) {
+  fn compile_import(&mut self, import: &swc_ecma_ast::ImportDecl) {
+    if import.type_only {
+      return;
+    }
+
     let import_path = import.src.value.to_string();
 
     for specifier in &import.specifiers {
@@ -639,6 +525,10 @@ impl ModuleCompiler {
 
       match specifier {
         Named(named) => {
+          if named.is_type_only {
+            continue;
+          }
+
           let local_name = named.local.sym.to_string();
 
           let external_name = match &named.imported {
@@ -654,9 +544,21 @@ impl ModuleCompiler {
             None => local_name.clone(),
           };
 
-          let pointer = scope
-            .get_defn(&local_name)
-            .expect("imported name should have been in scope");
+          let pointer = match self
+            .scope_analysis
+            .lookup_value(&OwnerId::Module, &named.local)
+          {
+            Some(Value::Pointer(p)) => p,
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: format!("Imported name {} should have been a pointer", local_name),
+                span: named.span,
+              });
+
+              self.allocate_defn(local_name.as_str())
+            }
+          };
 
           self.module.definitions.push(Definition {
             pointer,
@@ -678,9 +580,21 @@ impl ModuleCompiler {
         Default(default) => {
           let local_name = default.local.sym.to_string();
 
-          let pointer = scope
-            .get_defn(&local_name)
-            .expect("imported name should have been in scope");
+          let pointer = match self
+            .scope_analysis
+            .lookup_value(&OwnerId::Module, &default.local)
+          {
+            Some(Value::Pointer(p)) => p,
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: format!("Imported name {} should have been a pointer", local_name),
+                span: default.span,
+              });
+
+              self.allocate_defn(local_name.as_str())
+            }
+          };
 
           self.module.definitions.push(Definition {
             pointer,
@@ -695,9 +609,21 @@ impl ModuleCompiler {
         Namespace(namespace) => {
           let local_name = namespace.local.sym.to_string();
 
-          let pointer = scope
-            .get_defn(&local_name)
-            .expect("imported name should have been in scope");
+          let pointer = match self
+            .scope_analysis
+            .lookup_value(&OwnerId::Module, &namespace.local)
+          {
+            Some(Value::Pointer(p)) => p,
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: format!("Imported name {} should have been a pointer", local_name),
+                span: namespace.span,
+              });
+
+              self.allocate_defn(local_name.as_str())
+            }
+          };
 
           self.module.definitions.push(Definition {
             pointer,
@@ -718,14 +644,13 @@ impl ModuleCompiler {
     defn_pointer: Pointer,
     fn_name: Option<String>,
     functionish: Functionish,
-    parent_scope: &Scope,
   ) -> Vec<Definition> {
     let (defn, mut diagnostics) = FunctionCompiler::compile(
       defn_pointer,
       fn_name,
       functionish,
+      &self.scope_analysis,
       self.definition_allocator.clone(),
-      parent_scope,
     );
 
     self.diagnostics.append(&mut diagnostics);
@@ -736,32 +661,27 @@ impl ModuleCompiler {
   fn compile_class(
     &mut self,
     export_name: Option<String>,
-    class_name: Option<String>,
+    ident: Option<&swc_ecma_ast::Ident>,
     class: &swc_ecma_ast::Class,
-    parent_scope: &Scope,
   ) -> Pointer {
     let mut constructor: Value = Value::Void;
     let mut methods: Object = Object::default();
     let mut dependent_definitions: Vec<Definition>;
 
-    let defn_name = 'block: {
-      let class_name = match class_name {
-        Some(class_name) => class_name,
-        None => break 'block self.allocate_defn_numbered("_anon"),
-      };
-
-      match parent_scope.get(&class_name) {
-        Some(MappedName::Definition(d)) => d,
+    let defn_name = match ident {
+      Some(ident) => match self.scope_analysis.lookup_value(&OwnerId::Module, ident) {
+        Some(Value::Pointer(p)) => p,
         _ => {
           self.diagnostics.push(Diagnostic {
             level: DiagnosticLevel::InternalError,
-            message: format!("Definition for {} should have been in scope", class_name),
+            message: format!("Definition for {} should have been in scope", ident.sym),
             span: class.span, // FIXME: make class_name ident and use that span
           });
 
-          return self.allocate_defn_numbered("_scope_error");
+          self.allocate_defn_numbered("_scope_error")
         }
-      }
+      },
+      None => self.allocate_defn_numbered("_anon"),
     };
 
     if let Some(export_name) = export_name {
@@ -771,7 +691,11 @@ impl ModuleCompiler {
       ));
     }
 
-    let mut member_initializers_fnc = FunctionCompiler::new(self.definition_allocator.clone());
+    let mut member_initializers_fnc = FunctionCompiler::new(
+      &self.scope_analysis,
+      OwnerId::Span(class.span),
+      self.definition_allocator.clone(),
+    );
 
     for class_member in &class.body {
       match class_member {
@@ -783,7 +707,6 @@ impl ModuleCompiler {
           }
 
           let mut ec = ExpressionCompiler {
-            scope: parent_scope,
             fnc: &mut member_initializers_fnc,
           };
 
@@ -811,7 +734,7 @@ impl ModuleCompiler {
     member_initializers_assembly.append(&mut member_initializers_fnc.current.body);
 
     // Include any other definitions that were created by the member initializers
-    member_initializers_fnc.process_queue(parent_scope);
+    member_initializers_fnc.process_queue();
     dependent_definitions = std::mem::take(&mut member_initializers_fnc.definitions);
 
     let mut has_constructor = false;
@@ -826,8 +749,11 @@ impl ModuleCompiler {
           dependent_definitions.append(&mut self.compile_fn(
             ctor_defn_name.clone(),
             None,
-            Functionish::Constructor(member_initializers_assembly.clone(), ctor.clone()),
-            parent_scope,
+            Functionish::Constructor(
+              member_initializers_assembly.clone(),
+              class.span,
+              ctor.clone(),
+            ),
           ));
 
           constructor = Value::Pointer(ctor_defn_name);
@@ -856,25 +782,38 @@ impl ModuleCompiler {
         Constructor(_) => {}
         Method(method) => {
           let name = match &method.key {
-            swc_ecma_ast::PropName::Ident(ident) => ident.sym.to_string(),
+            swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
+            swc_ecma_ast::PropName::Computed(computed) => match static_eval_expr(&computed.expr) {
+              None => {
+                self.todo(
+                  computed.span,
+                  "Couldn't statically evaluate computed prop name",
+                );
+                continue;
+              }
+              Some(value) => value,
+            },
             _ => {
               self.todo(method.span, "Non-identifier method name");
               continue;
             }
           };
 
-          let method_defn_name = self.allocate_defn(&format!("{}_{}", defn_name.name, name));
+          let method_defn_name = self.allocate_defn(&ident_from_str(&format!(
+            "{}_{}",
+            defn_name.name,
+            name.to_string()
+          )));
 
           dependent_definitions.append(&mut self.compile_fn(
             method_defn_name.clone(),
             None,
-            Functionish::Fn(method.function.clone()),
-            parent_scope,
+            Functionish::Fn(None, method.function.clone()),
           ));
 
           methods
             .properties
-            .push((Value::String(name), Value::Pointer(method_defn_name)));
+            .push((name, Value::Pointer(method_defn_name)));
         }
         PrivateMethod(private_method) => self.todo(private_method.span, "PrivateMethod"),
 

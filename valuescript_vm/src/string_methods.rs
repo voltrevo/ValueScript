@@ -1,38 +1,42 @@
 use std::{rc::Rc, str::Chars};
 
 use crate::{
-  format_err,
+  builtins::error_builtin::ToError,
   helpers::{to_wrapping_index, to_wrapping_index_clamped},
-  native_function::NativeFunction,
-  vs_array::VsArray,
-  vs_value::Val,
+  iteration::string_iterator::StringIterator,
+  native_function::{native_fn, NativeFunction},
+  vs_symbol::VsSymbol,
+  vs_value::{ToDynamicVal, ToVal, Val},
   ValTrait,
 };
 
 pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
-  let right_index = match subscript.to_index() {
-    None => {
-      let method = subscript.val_to_string();
-      let method_str = method.as_str();
+  if let Some(subscript) = subscript.to_index() {
+    let string_bytes = string_data.as_bytes();
 
-      return match method_str {
-        "length" => Val::Number(string_data.as_bytes().len() as f64),
-        _ => get_string_method(method_str),
-      };
+    if subscript >= string_bytes.len() {
+      return Val::Undefined;
     }
-    Some(i) => i,
+
+    return match unicode_at(string_bytes, string_bytes.len(), subscript) {
+      Some(char) => char.to_string().to_val(),
+      None => "".to_val(),
+    };
+  }
+
+  if let Val::Symbol(subscript) = subscript {
+    match subscript {
+      VsSymbol::ITERATOR => return VALUES.to_val(),
+    }
+  }
+
+  let method = subscript.to_string();
+  let method_str = method.as_str();
+
+  return match method_str {
+    "length" => Val::Number(string_data.as_bytes().len() as f64),
+    _ => get_string_method(method_str),
   };
-
-  let string_bytes = string_data.as_bytes();
-
-  if right_index >= string_bytes.len() {
-    return Val::Undefined;
-  }
-
-  match unicode_at(string_bytes, string_bytes.len(), right_index) {
-    Some(char) => Val::String(Rc::new(char.to_string())),
-    None => Val::String(Rc::new(String::from(""))),
-  }
 }
 
 pub fn get_string_method(method: &str) -> Val {
@@ -48,676 +52,619 @@ pub fn get_string_method(method: &str) -> Val {
   // desirable.
 
   match method {
-    "at" => Val::Static(&AT),
-    // "charAt" => Val::Static(&CHAR_AT),
-    // "charCodeAt" => Val::Static(&CHAR_CODE_AT),
-    "codePointAt" => Val::Static(&CODE_POINT_AT),
-    "concat" => Val::Static(&CONCAT),
-    "endsWith" => Val::Static(&ENDS_WITH),
-    "includes" => Val::Static(&INCLUDES),
-    "indexOf" => Val::Static(&INDEX_OF),
-    "lastIndexOf" => Val::Static(&LAST_INDEX_OF),
-    "localeCompare" => Val::Static(&TODO_LOCALE), // (TODO)
-    "match" => Val::Static(&TODO_REGEXES),        // (TODO: regex)
-    "matchAll" => Val::Static(&TODO_REGEXES),     // (TODO: regex)
-    "normalize" => Val::Static(&NORMALIZE),       // (TODO)
-    "padEnd" => Val::Static(&PAD_END),
-    "padStart" => Val::Static(&PAD_START),
-    "repeat" => Val::Static(&REPEAT),
-    "replace" => Val::Static(&TODO_REGEXES), // (TODO: regex)
-    "replaceAll" => Val::Static(&TODO_REGEXES), // (TODO: regex)
-    "search" => Val::Static(&TODO_REGEXES),  // (TODO: regex)
-    "slice" => Val::Static(&SLICE),
-    "split" => Val::Static(&SPLIT),
-    "startsWith" => Val::Static(&STARTS_WITH),
-    "substring" => Val::Static(&SUBSTRING),
-    "toLocaleLowerCase" => Val::Static(&TODO_LOCALE),
-    "toLocaleUpperCase" => Val::Static(&TODO_LOCALE),
-    "toLowerCase" => Val::Static(&TO_LOWER_CASE),
-    "toString" => Val::Static(&TO_STRING),
-    "toUpperCase" => Val::Static(&TO_UPPER_CASE),
-    "trim" => Val::Static(&TRIM),
-    "trimEnd" => Val::Static(&TRIM_END),
-    "trimStart" => Val::Static(&TRIM_START),
-    "valueOf" => Val::Static(&VALUE_OF),
-    _ => Val::Undefined,
+    "at" => &AT,
+    // "charAt" => &CHAR_AT,
+    // "charCodeAt" => &CHAR_CODE_AT,
+    "codePointAt" => &CODE_POINT_AT,
+    "concat" => &CONCAT,
+    "endsWith" => &ENDS_WITH,
+    "includes" => &INCLUDES,
+    "indexOf" => &INDEX_OF,
+    "lastIndexOf" => &LAST_INDEX_OF,
+    "localeCompare" => &TODO_LOCALE, // (TODO)
+    "match" => &TODO_REGEXES,        // (TODO: regex)
+    "matchAll" => &TODO_REGEXES,     // (TODO: regex)
+    "normalize" => &NORMALIZE,       // (TODO)
+    "padEnd" => &PAD_END,
+    "padStart" => &PAD_START,
+    "repeat" => &REPEAT,
+    "replace" => &TODO_REGEXES,    // (TODO: regex)
+    "replaceAll" => &TODO_REGEXES, // (TODO: regex)
+    "search" => &TODO_REGEXES,     // (TODO: regex)
+    "slice" => &SLICE,
+    "split" => &SPLIT,
+    "startsWith" => &STARTS_WITH,
+    "substring" => &SUBSTRING,
+    "toLocaleLowerCase" => &TODO_LOCALE,
+    "toLocaleUpperCase" => &TODO_LOCALE,
+    "toLowerCase" => &TO_LOWER_CASE,
+    "toString" => &TO_STRING,
+    "toUpperCase" => &TO_UPPER_CASE,
+    "trim" => &TRIM,
+    "trimEnd" => &TRIM_END,
+    "trimStart" => &TRIM_START,
+    "valueOf" => &VALUE_OF,
+    _ => return Val::Undefined,
   }
+  .to_val()
 }
 
-static AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
+static AT: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
 
-        let index = match to_wrapping_index(params.get(0), string_bytes.len()) {
+      let index = match to_wrapping_index(params.get(0), string_bytes.len()) {
+        None => return Ok(Val::Undefined),
+        Some(i) => i,
+      };
+
+      match unicode_at(string_bytes, string_bytes.len(), index) {
+        Some(char) => char.to_string().to_val(),
+        None => "".to_val(),
+      }
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static CODE_POINT_AT: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
+
+      let index = match params.get(0) {
+        Some(i) => match i.to_index() {
           None => return Ok(Val::Undefined),
           Some(i) => i,
-        };
+        },
+        _ => return Ok(Val::Undefined),
+      };
 
-        match unicode_at(string_bytes, string_bytes.len(), index) {
-          Some(char) => Val::String(Rc::new(char.to_string())),
-          None => Val::String(Rc::new(String::from(""))),
-        }
+      match code_point_at(string_bytes, string_bytes.len(), index) {
+        Some(code_point) => Val::Number(code_point as f64),
+        None => Val::Undefined,
       }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-static CODE_POINT_AT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
+static CONCAT: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let mut result = string_data.as_str().to_string();
 
-        let index = match params.get(0) {
-          Some(i) => match i.to_index() {
-            None => return Ok(Val::Undefined),
-            Some(i) => i,
-          },
-          _ => return Ok(Val::Undefined),
-        };
-
-        match code_point_at(string_bytes, string_bytes.len(), index) {
-          Some(code_point) => Val::Number(code_point as f64),
-          None => Val::Undefined,
-        }
+      for param in params {
+        result.push_str(param.to_string().as_str());
       }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
 
-static CONCAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let mut result = string_data.as_str().to_string();
+      result.to_val()
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-        for param in params {
-          result.push_str(param.val_to_string().as_str());
-        }
+static ENDS_WITH: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
 
-        Val::String(Rc::new(result))
+      let search_string = match params.get(0) {
+        Some(s) => s.to_string(),
+        _ => return Ok(Val::Bool(false)),
+      };
+
+      let end_pos = match params.get(1) {
+        Some(p) => match p.to_index() {
+          // FIXME: Using to_index for end_pos is not quite right (eg -1 should be 0)
+          None => return Ok(Val::Bool(false)),
+          Some(i) => std::cmp::min(i, string_bytes.len()),
+        },
+        _ => string_bytes.len(),
+      };
+
+      let search_bytes = search_string.as_bytes();
+
+      let search_length = search_bytes.len();
+
+      if search_length > end_pos {
+        return Ok(Val::Bool(false));
       }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
 
-static ENDS_WITH: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
+      let start_index = end_pos - search_length;
 
-        let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
-          _ => return Ok(Val::Bool(false)),
-        };
-
-        let end_pos = match params.get(1) {
-          Some(p) => match p.to_index() {
-            // FIXME: Using to_index for end_pos is not quite right (eg -1 should be 0)
-            None => return Ok(Val::Bool(false)),
-            Some(i) => std::cmp::min(i, string_bytes.len()),
-          },
-          _ => string_bytes.len(),
-        };
-
-        let search_bytes = search_string.as_bytes();
-
-        let search_length = search_bytes.len();
-
-        if search_length > end_pos {
+      for i in 0..search_length {
+        if string_bytes[start_index + i] != search_bytes[i] {
           return Ok(Val::Bool(false));
         }
-
-        let start_index = end_pos - search_length;
-
-        for i in 0..search_length {
-          if string_bytes[start_index + i] != search_bytes[i] {
-            return Ok(Val::Bool(false));
-          }
-        }
-
-        Val::Bool(true)
       }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
 
-static INCLUDES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
-
-        let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
-          _ => return Ok(Val::Bool(false)),
-        };
-
-        let search_bytes = search_string.as_bytes();
-
-        let start_pos = match params.get(1) {
-          Some(p) => match p.to_index() {
-            // FIXME: to_index isn't quite right here
-            Some(i) => i,
-            None => return Ok(Val::Bool(false)),
-          },
-          _ => 0,
-        };
-
-        match index_of(string_bytes, search_bytes, start_pos) {
-          Some(_) => Val::Bool(true),
-          None => Val::Bool(false),
-        }
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
-
-static INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
-
-        let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
-          _ => return Ok(Val::Number(-1.0)),
-        };
-
-        let search_bytes = search_string.as_bytes();
-
-        let start_pos = match params.get(1) {
-          Some(p) => match p.to_index() {
-            // FIXME: to_index isn't quite right here
-            Some(i) => i,
-            None => return Ok(Val::Number(-1.0)),
-          },
-          _ => 0,
-        };
-
-        match index_of(string_bytes, search_bytes, start_pos) {
-          Some(i) => Val::Number(i as f64),
-          None => Val::Number(-1.0),
-        }
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
-
-static LAST_INDEX_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
-
-        let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
-          _ => return Ok(Val::Number(-1.0)),
-        };
-
-        let search_bytes = search_string.as_bytes();
-
-        let at_least_pos = match params.get(1) {
-          Some(p) => match p.to_index() {
-            // FIXME: to_index isn't quite right here
-            Some(i) => i,
-            None => return Ok(Val::Number(-1.0)),
-          },
-          _ => 0,
-        };
-
-        match last_index_of(string_bytes, search_bytes, at_least_pos) {
-          Some(i) => Val::Number(i as f64),
-          None => Val::Number(-1.0),
-        }
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
-
-static TODO_LOCALE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    // TODO: Ok(...)
-    match this {
-      Val::String(_string_data) => {
-        return format_err!("TODO: locale");
-      }
-      _ => return format_err!("string indirection"),
+      Val::Bool(true)
     }
-  },
-};
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-static TODO_REGEXES: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    // TODO: Ok(...)
-    match this {
-      Val::String(_string_data) => {
-        return format_err!("TODO: regexes");
-      }
-      _ => return format_err!("string indirection"),
-    }
-  },
-};
+static INCLUDES: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
 
-static NORMALIZE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    // TODO: Ok(...)
-    match this {
-      Val::String(_string_data) => {
-        // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
-        return format_err!("TODO: normalize");
+      let search_string = match params.get(0) {
+        Some(s) => s.to_string(),
+        _ => return Ok(Val::Bool(false)),
+      };
+
+      let search_bytes = search_string.as_bytes();
+
+      let start_pos = match params.get(1) {
+        Some(p) => match p.to_index() {
+          // FIXME: to_index isn't quite right here
+          Some(i) => i,
+          None => return Ok(Val::Bool(false)),
+        },
+        _ => 0,
+      };
+
+      match index_of(string_bytes, search_bytes, start_pos) {
+        Some(_) => Val::Bool(true),
+        None => Val::Bool(false),
       }
-      _ => return format_err!("string indirection"),
     }
-  },
-};
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static INDEX_OF: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
+
+      let search_string = match params.get(0) {
+        Some(s) => s.to_string(),
+        _ => return Ok(Val::Number(-1.0)),
+      };
+
+      let search_bytes = search_string.as_bytes();
+
+      let start_pos = match params.get(1) {
+        Some(p) => match p.to_index() {
+          // FIXME: to_index isn't quite right here
+          Some(i) => i,
+          None => return Ok(Val::Number(-1.0)),
+        },
+        _ => 0,
+      };
+
+      match index_of(string_bytes, search_bytes, start_pos) {
+        Some(i) => Val::Number(i as f64),
+        None => Val::Number(-1.0),
+      }
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static LAST_INDEX_OF: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
+
+      let search_string = match params.get(0) {
+        Some(s) => s.to_string(),
+        _ => return Ok(Val::Number(-1.0)),
+      };
+
+      let search_bytes = search_string.as_bytes();
+
+      let at_least_pos = match params.get(1) {
+        Some(p) => match p.to_index() {
+          // FIXME: to_index isn't quite right here
+          Some(i) => i,
+          None => return Ok(Val::Number(-1.0)),
+        },
+        _ => 0,
+      };
+
+      match last_index_of(string_bytes, search_bytes, at_least_pos) {
+        Some(i) => Val::Number(i as f64),
+        None => Val::Number(-1.0),
+      }
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static TODO_LOCALE: NativeFunction = native_fn(|this, _params| {
+  // TODO: Ok(...)
+  match this.get() {
+    Val::String(_string_data) => {
+      return Err("TODO: locale".to_error());
+    }
+    _ => return Err("string indirection".to_error()),
+  }
+});
+
+static TODO_REGEXES: NativeFunction = native_fn(|this, _params| {
+  // TODO: Ok(...)
+  match this.get() {
+    Val::String(_string_data) => {
+      return Err("TODO: regexes".to_error());
+    }
+    _ => return Err("string indirection".to_error()),
+  }
+});
+
+static NORMALIZE: NativeFunction = native_fn(|this, _params| {
+  // TODO: Ok(...)
+  match this.get() {
+    Val::String(_string_data) => {
+      // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
+      return Err("TODO: normalize".to_error());
+    }
+    _ => return Err("string indirection".to_error()),
+  }
+});
 
 // TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
-static PAD_END: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let target_length = match params.get(0) {
-          Some(p) => match p.to_index() {
-            Some(i) => i,
-            None => return Ok(Val::String(string_data.clone())),
-          },
-          _ => return Ok(Val::String(string_data.clone())),
-        };
-
-        if target_length <= string_data.as_bytes().len() {
-          return Ok(Val::String(string_data.clone()));
-        }
-
-        let mut string = string_data.to_string();
-
-        let pad_string = match params.get(1) {
-          Some(s) => s.val_to_string(),
-          _ => " ".to_string(),
-        };
-
-        let mut length_deficit = target_length - string.as_bytes().len();
-
-        let whole_copies = length_deficit / pad_string.as_bytes().len();
-
-        for _ in 0..whole_copies {
-          string.push_str(&pad_string);
-        }
-
-        length_deficit -= whole_copies * pad_string.as_bytes().len();
-
-        if length_deficit > 0 {
-          for c in pad_string.chars() {
-            let c_len = c.len_utf8();
-
-            if c_len > length_deficit {
-              break;
-            }
-
-            string.push(c);
-            length_deficit -= c_len;
-          }
-        }
-
-        Val::String(Rc::new(string))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
-
-// TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
-static PAD_START: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let target_length = match params.get(0) {
-          Some(p) => match p.to_index() {
-            Some(i) => i,
-            None => return Ok(Val::String(string_data.clone())),
-          },
-          _ => return Ok(Val::String(string_data.clone())),
-        };
-
-        if target_length <= string_data.as_bytes().len() {
-          return Ok(Val::String(string_data.clone()));
-        }
-
-        let pad_string = match params.get(1) {
-          Some(s) => s.val_to_string(),
-          _ => " ".to_string(),
-        };
-
-        let mut length_deficit = target_length - string_data.as_bytes().len();
-
-        let whole_copies = length_deficit / pad_string.as_bytes().len();
-
-        let mut prefix = String::new();
-
-        for _ in 0..whole_copies {
-          prefix.push_str(&pad_string);
-        }
-
-        length_deficit -= whole_copies * pad_string.as_bytes().len();
-
-        if length_deficit > 0 {
-          for c in pad_string.chars() {
-            let c_len = c.len_utf8();
-
-            if c_len > length_deficit {
-              break;
-            }
-
-            prefix.push(c);
-            length_deficit -= c_len;
-          }
-        }
-
-        prefix.push_str(string_data);
-
-        Val::String(Rc::new(prefix))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
-
-static REPEAT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let count = match params.get(0) {
-          Some(p) => match p.to_index() {
-            Some(i) => i,
-            None => return Ok(Val::String(string_data.clone())),
-          },
-          _ => return Ok(Val::String(string_data.clone())),
-        };
-
-        let mut result = String::new();
-
-        for _ in 0..count {
-          result.push_str(string_data);
-        }
-
-        Val::String(Rc::new(result))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
-
-static SLICE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
-
-        let start = match params.get(0) {
-          None => 0,
-          Some(v) => to_wrapping_index_clamped(v, string_bytes.len()),
-        };
-
-        let end = match params.get(1) {
-          None => string_bytes.len() as isize,
-          Some(v) => to_wrapping_index_clamped(v, string_bytes.len()),
-        };
-
-        let mut new_string = String::new();
-
-        // FIXME: This is a slow way of doing it. Part of the reason is that we're using rust's
-        // string type, so we can't just find the relevant byte range and copy it in one go.
-        for i in start..end {
-          match unicode_at(string_bytes, end as usize, i as usize) {
-            Some(c) => new_string.push(c),
-            None => {}
-          }
-        }
-
-        Val::String(Rc::new(new_string))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
-
-static SPLIT: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let separator = match params.get(0) {
-          Some(s) => s.val_to_string(), // TODO: Regexes
+static PAD_END: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let target_length = match params.get(0) {
+        Some(p) => match p.to_index() {
+          Some(i) => i,
           None => return Ok(Val::String(string_data.clone())),
-        };
+        },
+        _ => return Ok(Val::String(string_data.clone())),
+      };
 
-        let limit = match params.get(1) {
-          // FIXME: to_index isn't quite right
-          Some(l) => match l.to_index() {
-            Some(i) => i,
-            None => string_data.as_bytes().len() + 1,
-          },
-          None => string_data.as_bytes().len() + 1,
-        };
-
-        let mut result = Vec::<Val>::new();
-
-        if limit == 0 {
-          return Ok(Val::Array(Rc::new(VsArray::from(result))));
-        }
-
-        if separator.is_empty() {
-          for c in string_data.chars() {
-            result.push(Val::String(Rc::new(c.to_string())));
-
-            if result.len() == limit {
-              break;
-            }
-          }
-
-          return Ok(Val::Array(Rc::new(VsArray::from(result))));
-        }
-
-        let mut part = String::new();
-        let mut str_chars = string_data.chars();
-
-        loop {
-          if match_chars(&mut str_chars, &separator) {
-            let mut new_part = String::new();
-            std::mem::swap(&mut new_part, &mut part);
-            result.push(Val::String(Rc::new(new_part)));
-
-            if result.len() == limit {
-              break;
-            }
-          } else {
-            match str_chars.next() {
-              Some(c) => part.push(c),
-              None => {
-                result.push(Val::String(Rc::new(part)));
-                break;
-              }
-            }
-          }
-        }
-
-        Val::Array(Rc::new(VsArray::from(result)))
+      if target_length <= string_data.as_bytes().len() {
+        return Ok(Val::String(string_data.clone()));
       }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
 
-static STARTS_WITH: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
+      let mut string = string_data.to_string();
 
-        let search_string = match params.get(0) {
-          Some(s) => s.val_to_string(),
-          _ => return Ok(Val::Bool(false)),
-        };
+      let pad_string = match params.get(1) {
+        Some(s) => s.to_string(),
+        _ => " ".to_string(),
+      };
 
-        let pos = match params.get(1) {
-          Some(p) => match p.to_index() {
-            // FIXME: Using to_index is not quite right
-            None => return Ok(Val::Bool(false)),
-            Some(i) => std::cmp::min(i, string_bytes.len()),
-          },
-          _ => 0,
-        };
+      let mut length_deficit = target_length - string.as_bytes().len();
 
-        let search_bytes = search_string.as_bytes();
+      let whole_copies = length_deficit / pad_string.as_bytes().len();
 
-        let search_length = search_bytes.len();
+      for _ in 0..whole_copies {
+        string.push_str(&pad_string);
+      }
 
-        if search_length > string_bytes.len() - pos {
+      length_deficit -= whole_copies * pad_string.as_bytes().len();
+
+      if length_deficit > 0 {
+        for c in pad_string.chars() {
+          let c_len = c.len_utf8();
+
+          if c_len > length_deficit {
+            break;
+          }
+
+          string.push(c);
+          length_deficit -= c_len;
+        }
+      }
+
+      string.to_val()
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+// TODO: JS has some locale-specific behavior, not sure yet how we should deal with that
+static PAD_START: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let target_length = match params.get(0) {
+        Some(p) => match p.to_index() {
+          Some(i) => i,
+          None => return Ok(Val::String(string_data.clone())),
+        },
+        _ => return Ok(Val::String(string_data.clone())),
+      };
+
+      if target_length <= string_data.as_bytes().len() {
+        return Ok(Val::String(string_data.clone()));
+      }
+
+      let pad_string = match params.get(1) {
+        Some(s) => s.to_string(),
+        _ => " ".to_string(),
+      };
+
+      let mut length_deficit = target_length - string_data.as_bytes().len();
+
+      let whole_copies = length_deficit / pad_string.as_bytes().len();
+
+      let mut prefix = String::new();
+
+      for _ in 0..whole_copies {
+        prefix.push_str(&pad_string);
+      }
+
+      length_deficit -= whole_copies * pad_string.as_bytes().len();
+
+      if length_deficit > 0 {
+        for c in pad_string.chars() {
+          let c_len = c.len_utf8();
+
+          if c_len > length_deficit {
+            break;
+          }
+
+          prefix.push(c);
+          length_deficit -= c_len;
+        }
+      }
+
+      prefix.push_str(string_data);
+
+      prefix.to_val()
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static REPEAT: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let count = match params.get(0) {
+        Some(p) => match p.to_index() {
+          Some(i) => i,
+          None => return Ok(Val::String(string_data.clone())),
+        },
+        _ => return Ok(Val::String(string_data.clone())),
+      };
+
+      let mut result = String::new();
+
+      for _ in 0..count {
+        result.push_str(string_data);
+      }
+
+      result.to_val()
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static SLICE: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
+
+      let start = match params.get(0) {
+        None => 0,
+        Some(v) => to_wrapping_index_clamped(v, string_bytes.len()),
+      };
+
+      let end = match params.get(1) {
+        None => string_bytes.len() as isize,
+        Some(v) => to_wrapping_index_clamped(v, string_bytes.len()),
+      };
+
+      let mut new_string = String::new();
+
+      // FIXME: This is a slow way of doing it. Part of the reason is that we're using rust's
+      // string type, so we can't just find the relevant byte range and copy it in one go.
+      for i in start..end {
+        match unicode_at(string_bytes, end as usize, i as usize) {
+          Some(c) => new_string.push(c),
+          None => {}
+        }
+      }
+
+      new_string.to_val()
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static SPLIT: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let separator = match params.get(0) {
+        Some(s) => s.to_string(), // TODO: Regexes
+        None => return Ok(Val::String(string_data.clone())),
+      };
+
+      let limit = match params.get(1) {
+        // FIXME: to_index isn't quite right
+        Some(l) => match l.to_index() {
+          Some(i) => i,
+          None => string_data.as_bytes().len() + 1,
+        },
+        None => string_data.as_bytes().len() + 1,
+      };
+
+      let mut result = Vec::<Val>::new();
+
+      if limit == 0 {
+        return Ok(result.to_val());
+      }
+
+      if separator.is_empty() {
+        for c in string_data.chars() {
+          result.push(c.to_val());
+
+          if result.len() == limit {
+            break;
+          }
+        }
+
+        return Ok(result.to_val());
+      }
+
+      let mut part = String::new();
+      let mut str_chars = string_data.chars();
+
+      loop {
+        if match_chars(&mut str_chars, &separator) {
+          let mut new_part = String::new();
+          std::mem::swap(&mut new_part, &mut part);
+          result.push(new_part.to_val());
+
+          if result.len() == limit {
+            break;
+          }
+        } else {
+          match str_chars.next() {
+            Some(c) => part.push(c),
+            None => {
+              result.push(part.to_val());
+              break;
+            }
+          }
+        }
+      }
+
+      result.to_val()
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static STARTS_WITH: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
+
+      let search_string = match params.get(0) {
+        Some(s) => s.to_string(),
+        _ => return Ok(Val::Bool(false)),
+      };
+
+      let pos = match params.get(1) {
+        Some(p) => match p.to_index() {
+          // FIXME: Using to_index is not quite right
+          None => return Ok(Val::Bool(false)),
+          Some(i) => std::cmp::min(i, string_bytes.len()),
+        },
+        _ => 0,
+      };
+
+      let search_bytes = search_string.as_bytes();
+
+      let search_length = search_bytes.len();
+
+      if search_length > string_bytes.len() - pos {
+        return Ok(Val::Bool(false));
+      }
+
+      for i in 0..search_length {
+        if string_bytes[pos + i] != search_bytes[i] {
           return Ok(Val::Bool(false));
         }
-
-        for i in 0..search_length {
-          if string_bytes[pos + i] != search_bytes[i] {
-            return Ok(Val::Bool(false));
-          }
-        }
-
-        Val::Bool(true)
       }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
 
-static SUBSTRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let string_bytes = string_data.as_bytes();
+      Val::Bool(true)
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-        let start = match params.get(0) {
-          Some(v) => match v.to_index() {
-            Some(i) => std::cmp::min(i, string_bytes.len()),
-            None => 0,
-          },
+static SUBSTRING: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::String(string_data) => {
+      let string_bytes = string_data.as_bytes();
+
+      let start = match params.get(0) {
+        Some(v) => match v.to_index() {
+          Some(i) => std::cmp::min(i, string_bytes.len()),
           None => 0,
-        };
+        },
+        None => 0,
+      };
 
-        let end = match params.get(1) {
-          Some(v) => match v.to_index() {
-            Some(i) => std::cmp::min(i, string_bytes.len()),
-            None => string_bytes.len(),
-          },
+      let end = match params.get(1) {
+        Some(v) => match v.to_index() {
+          Some(i) => std::cmp::min(i, string_bytes.len()),
           None => string_bytes.len(),
-        };
+        },
+        None => string_bytes.len(),
+      };
 
-        let substring_start = std::cmp::min(start, end);
-        let substring_end = std::cmp::max(start, end);
+      let substring_start = std::cmp::min(start, end);
+      let substring_end = std::cmp::max(start, end);
 
-        let mut new_string = String::new();
+      let mut new_string = String::new();
 
-        // FIXME: This is a slow way of doing it. Part of the reason is that we're using rust's
-        // string type, so we can't just find the relevant byte range and copy it in one go.
-        for i in substring_start..substring_end {
-          match unicode_at(string_bytes, substring_end, i) {
-            Some(c) => new_string.push(c),
-            None => {}
-          }
+      // FIXME: This is a slow way of doing it. Part of the reason is that we're using rust's
+      // string type, so we can't just find the relevant byte range and copy it in one go.
+      for i in substring_start..substring_end {
+        match unicode_at(string_bytes, substring_end, i) {
+          Some(c) => new_string.push(c),
+          None => {}
         }
-
-        Val::String(Rc::new(new_string))
       }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
 
-static TO_LOWER_CASE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let lowercased_string = string_data.to_lowercase();
-        Val::String(Rc::new(lowercased_string))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
+      new_string.to_val()
+    }
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-static TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => Val::String(string_data.clone()),
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
+static TO_LOWER_CASE: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::String(string_data) => string_data.to_lowercase().to_val(),
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-static TO_UPPER_CASE: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let uppercased_string = string_data.to_uppercase();
-        Val::String(Rc::new(uppercased_string))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
+static TO_STRING: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::String(string_data) => Val::String(string_data.clone()),
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-static TRIM: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let trimmed_string = string_data.trim();
-        Val::String(Rc::new(trimmed_string.to_owned()))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
+static TO_UPPER_CASE: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::String(string_data) => string_data.to_uppercase().to_val(),
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-static TRIM_END: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let trimmed_string = string_data.trim_end();
-        Val::String(Rc::new(trimmed_string.to_owned()))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
+static TRIM: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::String(string_data) => string_data.trim().to_val(),
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-static TRIM_START: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => {
-        let trimmed_string = string_data.trim_start();
-        Val::String(Rc::new(trimmed_string.to_owned()))
-      }
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
+static TRIM_END: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::String(string_data) => string_data.trim_end().to_val(),
+    _ => return Err("string indirection".to_error()),
+  })
+});
 
-static VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::String(string_data) => Val::String(string_data.clone()),
-      _ => return format_err!("string indirection"),
-    })
-  },
-};
+static TRIM_START: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::String(string_data) => string_data.trim_start().to_val(),
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static VALUE_OF: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::String(string_data) => Val::String(string_data.clone()),
+    _ => return Err("string indirection".to_error()),
+  })
+});
+
+static VALUES: NativeFunction = native_fn(|this, _params| match this.get() {
+  Val::String(string_data) => Ok(StringIterator::new(string_data.clone()).to_dynamic_val()),
+  _ => Err("string indirection".to_error()),
+});
 
 /**
  * Tries to match str_chars_param against matcher.

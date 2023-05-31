@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
-use crate::bytecode_decoder::BytecodeDecoder;
+use crate::builtins::error_builtin::ToError;
+use crate::bytecode::Bytecode;
+use crate::bytecode::DecoderMaker;
 use crate::first_stack_frame::FirstStackFrame;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::StackFrame;
@@ -12,11 +14,13 @@ pub struct VirtualMachine {
 }
 
 impl VirtualMachine {
-  pub fn run(&mut self, bytecode: &Rc<Vec<u8>>, params: &[String]) -> Result<Val, Val> {
-    let mut bd = BytecodeDecoder {
-      data: bytecode.clone(),
-      pos: 0,
-    };
+  pub fn run(
+    &mut self,
+    bytecode: Rc<Bytecode>,
+    step_limit: Option<usize>,
+    params: &[Val],
+  ) -> Result<Val, Val> {
+    let mut bd = bytecode.decoder(0);
 
     let main_fn = bd.decode_val(&Vec::new());
 
@@ -26,16 +30,34 @@ impl VirtualMachine {
     };
 
     for p in params {
-      frame.write_param(Val::String(Rc::new(p.clone())));
+      frame.write_param(p.clone());
     }
 
     self.push(frame);
 
-    while self.stack.len() > 0 {
-      self.step()?;
-    }
+    match step_limit {
+      Some(step_limit) => {
+        let mut step_count = 0;
 
-    return Ok(self.frame.get_call_result().return_);
+        while step_count < step_limit {
+          self.step()?;
+          step_count += 1;
+
+          if self.stack.len() == 0 {
+            return Ok(self.frame.get_call_result().return_);
+          }
+        }
+
+        Err("step limit reached".to_error())
+      }
+      None => {
+        while self.stack.len() > 0 {
+          self.step()?;
+        }
+
+        Ok(self.frame.get_call_result().return_)
+      }
+    }
   }
 
   pub fn new() -> VirtualMachine {
@@ -50,7 +72,12 @@ impl VirtualMachine {
   }
 
   pub fn step(&mut self) -> Result<(), Val> {
-    match self.frame.step()? {
+    let step_ok = match self.frame.step() {
+      Ok(step_ok) => step_ok,
+      Err(e) => return self.handle_exception(e),
+    };
+
+    match step_ok {
       FrameStepOk::Continue => {}
       FrameStepOk::Pop(call_result) => {
         self.pop();
@@ -73,5 +100,27 @@ impl VirtualMachine {
     // This name is accurate after the swap
     let mut old_frame = self.stack.pop().unwrap();
     std::mem::swap(&mut self.frame, &mut old_frame);
+  }
+
+  pub fn handle_exception(&mut self, exception: Val) -> Result<(), Val> {
+    while !self.stack.is_empty() {
+      let handled = self.frame.catch_exception(exception.clone());
+
+      if handled {
+        return Ok(());
+      }
+
+      if self.stack.is_empty() {
+        return Err(exception);
+      }
+
+      self.pop();
+    }
+
+    Err(exception)
+  }
+
+  pub fn read_default_export(bytecode: Rc<Bytecode>) -> Val {
+    bytecode.decoder(0).decode_val(&Vec::new())
   }
 }

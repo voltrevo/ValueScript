@@ -1,10 +1,11 @@
 use std::rc::Rc;
 
+use crate::builtins::type_error_builtin::ToTypeError;
+use crate::native_function::ThisWrapper;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
 use crate::vs_array::VsArray;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
 
 pub trait ArrayMappingState {
   fn process(&mut self, i: usize, element: &Val, mapped: Val) -> Option<Val>;
@@ -38,8 +39,9 @@ impl ArrayMappingFrame {
 }
 
 impl StackFrameTrait for ArrayMappingFrame {
-  fn write_this(&mut self, this: Val) {
+  fn write_this(&mut self, _const: bool, this: Val) -> Result<(), Val> {
     self.this = this.as_array_data();
+    Ok(())
   }
 
   fn write_param(&mut self, param: Val) {
@@ -58,7 +60,7 @@ impl StackFrameTrait for ArrayMappingFrame {
 
   fn step(&mut self) -> FrameStepResult {
     let array_data = match &self.this {
-      None => return type_error!("Array fn called on non-array"),
+      None => return Err("Array fn called on non-array".to_type_error()),
       Some(ad) => ad,
     };
 
@@ -78,15 +80,13 @@ impl StackFrameTrait for ArrayMappingFrame {
       Some(el) => match el {
         Val::Void => Ok(FrameStepOk::Continue),
         _ => match self.mapper.load_function() {
-          LoadFunctionResult::NotAFunction => {
-            type_error!("map fn is not a function")
-          }
+          LoadFunctionResult::NotAFunction => Err("map fn is not a function".to_type_error()),
           LoadFunctionResult::NativeFunction(native_fn) => {
             match self.state.process(
               array_i,
               el,
               native_fn(
-                &mut self.this_arg.clone(),
+                ThisWrapper::new(false, &mut self.this_arg.clone()),
                 vec![
                   el.clone(),
                   Val::Number(array_i as f64),
@@ -102,7 +102,7 @@ impl StackFrameTrait for ArrayMappingFrame {
             }
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
-            new_frame.write_this(self.this_arg.clone());
+            new_frame.write_this(true, self.this_arg.clone())?;
             new_frame.write_param(el.clone());
             new_frame.write_param(Val::Number(array_i as f64));
             new_frame.write_param(Val::Array(array_data.clone()));
@@ -122,7 +122,7 @@ impl StackFrameTrait for ArrayMappingFrame {
 
     let element = match &self.this {
       None => {
-        self.early_exit = Some(type_error!("Array fn called on non-array"));
+        self.early_exit = Some(Err("Array fn called on non-array".to_type_error()));
         return;
       }
       Some(ad) => &ad.elements[array_i],
@@ -136,5 +136,9 @@ impl StackFrameTrait for ArrayMappingFrame {
 
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for MapFrame")
+  }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    return false;
   }
 }

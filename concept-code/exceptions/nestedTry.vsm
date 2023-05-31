@@ -1,0 +1,37 @@
+export @_anon0 {}
+
+@_anon0 = function() {
+  mov [] %logs
+
+  // try {
+    set_catch :catch0 %error
+    subcall %logs "push" ["here"] %ignore
+
+      // try {
+        set_catch :catch1 %error_0
+        new $Error ["nested boom"] %_tmp0
+        throw %_tmp0
+        set_catch :catch0 %error
+        jmp :catch_end1
+      // } catch (error) {
+      catch1:
+        set_catch :catch0 %error
+        sub %error_0 "message" %_tmp0
+        subcall %logs "push" [%_tmp0] %ignore
+      catch_end1:
+      // }
+
+    new $Error ["boom"] %_tmp0
+    throw %_tmp0
+
+    unset_catch
+    jmp :catch_end0
+  // } catch (error) {
+  catch0:
+    sub %error "message" %_tmp0
+    subcall %logs "push" [%_tmp0] %ignore
+  catch_end0:
+  // }
+
+  mov %logs %return
+}

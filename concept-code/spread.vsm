@@ -1,0 +1,7 @@
+export @_anon0 {}
+
+@_anon0 = function() {
+  mov ["a", "b", "c"] %middle
+  cat [["."], %middle, ["."]] %_tmp0
+  mov %_tmp0 %return
+}

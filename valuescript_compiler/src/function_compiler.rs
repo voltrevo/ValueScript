@@ -1,35 +1,56 @@
 use queues::*;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use swc_common::Spanned;
 
 use crate::asm::{
-  Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Label, Pointer,
-  Register, Value,
+  Array, Builtin, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Label,
+  Pointer, Register, Value,
 };
-use crate::scope::scope_reg;
-
-use super::capture_finder::CaptureFinder;
-use super::diagnostic::{Diagnostic, DiagnosticLevel};
-use super::expression_compiler::CompiledExpression;
-use super::expression_compiler::ExpressionCompiler;
-use super::name_allocator::NameAllocator;
-use super::scope::{init_std_scope, MappedName, Scope};
+use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::expression_compiler::CompiledExpression;
+use crate::expression_compiler::ExpressionCompiler;
+use crate::instruction_mutates_this::instruction_mutates_this;
+use crate::name_allocator::{NameAllocator, RegAllocator};
+use crate::scope::{NameId, OwnerId};
+use crate::scope_analysis::{fn_to_owner_id, Name, ScopeAnalysis};
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
-  Fn(swc_ecma_ast::Function),
+  Fn(Option<swc_ecma_ast::Ident>, swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
-  Constructor(Vec<InstructionOrLabel>, swc_ecma_ast::Constructor),
+  Constructor(
+    Vec<InstructionOrLabel>,
+    swc_common::Span,
+    swc_ecma_ast::Constructor,
+  ),
+}
+
+impl Spanned for Functionish {
+  fn span(&self) -> swc_common::Span {
+    match self {
+      Functionish::Fn(_, fn_) => fn_.span,
+      Functionish::Arrow(arrow) => arrow.span,
+      Functionish::Constructor(_, class_span, _) => *class_span,
+    }
+  }
+}
+
+impl Functionish {
+  pub fn owner_id(&self) -> OwnerId {
+    match self {
+      Functionish::Fn(ident, fn_) => fn_to_owner_id(ident, fn_),
+      _ => OwnerId::Span(self.span().clone()),
+    }
+  }
 }
 
 #[derive(Clone, Debug)]
 pub struct QueuedFunction {
   pub definition_pointer: Pointer,
   pub fn_name: Option<String>,
-  pub capture_params: Vec<String>,
   pub functionish: Functionish,
 }
 
@@ -38,37 +59,67 @@ pub struct LoopLabels {
   pub break_: Label,
 }
 
+pub struct CatchSetting {
+  pub label: Label,
+  pub reg: Register,
+}
+
 pub struct FunctionCompiler {
   pub current: Function,
   pub definitions: Vec<Definition>,
+  pub owner_id: OwnerId,
+  pub scope_analysis: Rc<ScopeAnalysis>,
   pub definition_allocator: Rc<RefCell<NameAllocator>>,
-  pub reg_allocator: NameAllocator,
+  pub reg_allocator: RegAllocator,
   pub label_allocator: NameAllocator,
   pub queue: Queue<QueuedFunction>,
   pub loop_labels: Vec<LoopLabels>,
+  pub catch_settings: Vec<CatchSetting>,
+  pub end_label: Option<Label>,
+  pub is_returning_register: Option<Register>,
+  pub finally_labels: Vec<Label>,
+
   pub diagnostics: Vec<Diagnostic>,
 }
 
 impl FunctionCompiler {
-  pub fn new(definition_allocator: Rc<RefCell<NameAllocator>>) -> FunctionCompiler {
-    let mut reg_allocator = NameAllocator::default();
-    reg_allocator.allocate(&"return".to_string());
-    reg_allocator.allocate(&"this".to_string());
-    reg_allocator.allocate(&"ignore".to_string());
+  pub fn new(
+    scope_analysis: &Rc<ScopeAnalysis>,
+    owner_id: OwnerId,
+    definition_allocator: Rc<RefCell<NameAllocator>>,
+  ) -> FunctionCompiler {
+    let reg_allocator = match scope_analysis.reg_allocators.get(&owner_id) {
+      Some(reg_allocator) => reg_allocator.clone(),
+      None => RegAllocator::default(),
+    };
 
     return FunctionCompiler {
       current: Function::default(),
       definitions: vec![],
+      owner_id,
+      scope_analysis: scope_analysis.clone(),
       definition_allocator,
       reg_allocator,
       label_allocator: NameAllocator::default(),
       queue: Queue::new(),
       loop_labels: vec![],
+      catch_settings: vec![],
+      end_label: None,
+      is_returning_register: None,
+      finally_labels: vec![],
       diagnostics: vec![],
     };
   }
 
   pub fn push(&mut self, instruction: Instruction) {
+    if instruction_mutates_this(&instruction) {
+      self.push_raw(Instruction::RequireMutableThis);
+    }
+
+    self.push_raw(instruction);
+  }
+
+  pub fn push_raw(&mut self, instruction: Instruction) {
     self
       .current
       .body
@@ -77,6 +128,30 @@ impl FunctionCompiler {
 
   pub fn label(&mut self, label: Label) {
     self.current.body.push(InstructionOrLabel::Label(label));
+  }
+
+  pub fn lookup(&mut self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
+    let name = self.scope_analysis.lookup(ident);
+
+    if name.is_none() {
+      self.diagnostics.push(Diagnostic {
+        level: DiagnosticLevel::InternalError,
+        message: format!("Could not find name for ident {:?}", ident),
+        span: ident.span,
+      });
+    }
+
+    name
+  }
+
+  pub fn lookup_value(&self, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+    self.scope_analysis.lookup_value(&self.owner_id, ident)
+  }
+
+  pub fn lookup_by_name_id(&self, name_id: &NameId) -> Option<Value> {
+    self
+      .scope_analysis
+      .lookup_by_name_id(&self.owner_id, name_id)
   }
 
   pub fn todo(&mut self, span: swc_common::Span, message: &str) {
@@ -110,66 +185,59 @@ impl FunctionCompiler {
   }
 
   pub fn allocate_tmp(&mut self) -> Register {
-    return Register::Named(self.reg_allocator.allocate_numbered(&"_tmp".to_string()));
+    self.reg_allocator.allocate_numbered("_tmp")
   }
 
   pub fn allocate_reg(&mut self, based_on: &String) -> Register {
-    return Register::Named(self.reg_allocator.allocate(based_on));
+    self.reg_allocator.allocate(based_on)
+  }
+
+  pub fn allocate_reg_fresh(&mut self, based_on: &String) -> Register {
+    self.reg_allocator.allocate_fresh(based_on)
   }
 
   pub fn allocate_numbered_reg(&mut self, prefix: &str) -> Register {
-    return Register::Named(self.reg_allocator.allocate_numbered(&prefix.to_string()));
+    self.reg_allocator.allocate_numbered(prefix)
+  }
+
+  pub fn allocate_numbered_reg_fresh(&mut self, prefix: &str) -> Register {
+    self
+      .reg_allocator
+      .allocate_numbered_fresh(&prefix.to_string())
   }
 
   pub fn release_reg(&mut self, reg: &Register) {
-    match reg {
-      Register::Named(name) => {
-        self.reg_allocator.release(name);
-      }
-      _ => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!("Tried to release non-named register {:?}", reg),
-          span: swc_common::DUMMY_SP,
-        });
-      }
-    }
+    self.reg_allocator.release(reg);
   }
 
   pub fn compile(
     definition_pointer: Pointer,
     fn_name: Option<String>,
     functionish: Functionish,
+    scope_analysis: &Rc<ScopeAnalysis>,
     definition_allocator: Rc<RefCell<NameAllocator>>,
-    parent_scope: &Scope,
   ) -> (Vec<Definition>, Vec<Diagnostic>) {
-    let mut self_ = FunctionCompiler::new(definition_allocator);
+    let mut self_ =
+      FunctionCompiler::new(scope_analysis, functionish.owner_id(), definition_allocator);
 
     self_
       .queue
       .add(QueuedFunction {
         definition_pointer: definition_pointer.clone(),
         fn_name,
-        capture_params: Vec::new(),
         functionish,
       })
       .expect("Failed to queue function");
 
-    self_.process_queue(parent_scope);
+    self_.process_queue();
 
     return (self_.definitions, self_.diagnostics);
   }
 
-  pub fn process_queue(&mut self, parent_scope: &Scope) {
+  pub fn process_queue(&mut self) {
     loop {
       match self.queue.remove() {
-        Ok(qfn) => self.compile_functionish(
-          qfn.definition_pointer,
-          qfn.fn_name,
-          qfn.capture_params,
-          &qfn.functionish,
-          parent_scope,
-        ),
+        Ok(qfn) => self.compile_functionish(qfn.definition_pointer, &qfn.functionish),
         Err(_) => {
           break;
         }
@@ -177,47 +245,49 @@ impl FunctionCompiler {
     }
   }
 
-  fn compile_functionish(
-    &mut self,
-    definition_pointer: Pointer,
-    fn_name: Option<String>,
-    capture_params: Vec<String>,
-    functionish: &Functionish,
-    parent_scope: &Scope,
-  ) {
-    let scope = parent_scope.nest();
-
+  fn compile_functionish(&mut self, definition_pointer: Pointer, functionish: &Functionish) {
     // TODO: Use a new FunctionCompiler per function instead of this hack
-    self.reg_allocator = NameAllocator::default();
+    self.reg_allocator = match self
+      .scope_analysis
+      .reg_allocators
+      .get(&functionish.owner_id())
+    {
+      Some(reg_allocator) => reg_allocator.clone(),
+      None => RegAllocator::default(),
+    };
 
-    match fn_name {
-      // TODO: Capture propagation when using this name recursively
-      Some(fn_name_) => scope.set(fn_name_, MappedName::Definition(definition_pointer.clone())),
-      None => {}
-    }
+    self.owner_id = functionish.owner_id();
 
-    for cap_param in &capture_params {
-      let reg = self.allocate_reg(cap_param);
+    let capture_params = self.scope_analysis.captures.get(&functionish.owner_id());
+
+    for cap_param in capture_params.unwrap_or(&HashSet::new()) {
+      let reg = match self
+        .scope_analysis
+        .lookup_capture(&self.owner_id, cap_param)
+      {
+        Some(Value::Register(reg)) => reg,
+
+        // Technically we can capture definitions, and maybe in future variables that have been
+        // reduced to constant values. We can just ignore these here.
+        _ => continue,
+      };
 
       self.current.parameters.push(reg.clone());
-      scope.set(cap_param.clone(), MappedName::Register(reg));
     }
 
-    self.populate_fn_scope_params(functionish, &scope);
-
-    let param_registers = self.allocate_param_registers(functionish, &scope);
+    let param_registers = self.get_param_registers(functionish);
 
     for reg in &param_registers {
       self.current.parameters.push(reg.clone());
     }
 
-    self.add_param_code(functionish, &param_registers, &scope);
+    self.add_param_code(functionish, &param_registers);
 
     match functionish {
-      Functionish::Fn(fn_) => {
+      Functionish::Fn(_, fn_) => {
         match &fn_.body {
           Some(block) => {
-            self.handle_block_body(block, &scope);
+            self.handle_block_body(block);
           }
           None => self.todo(
             fn_.span(),
@@ -227,29 +297,36 @@ impl FunctionCompiler {
       }
       Functionish::Arrow(arrow) => match &arrow.body {
         swc_ecma_ast::BlockStmtOrExpr::BlockStmt(block) => {
-          self.handle_block_body(block, &scope);
+          self.handle_block_body(block);
         }
         swc_ecma_ast::BlockStmtOrExpr::Expr(expr) => {
-          let mut expression_compiler = ExpressionCompiler {
-            fnc: self,
-            scope: &scope,
-          };
+          let mut expression_compiler = ExpressionCompiler { fnc: self };
 
           expression_compiler.compile(expr, Some(Register::Return));
         }
       },
-      Functionish::Constructor(member_initializers_assembly, constructor) => {
+      Functionish::Constructor(member_initializers_assembly, _class_span, constructor) => {
         let mut mia_copy = member_initializers_assembly.clone();
         self.current.body.append(&mut mia_copy);
 
         match &constructor.body {
           Some(block) => {
-            self.handle_block_body(block, &scope);
+            self.handle_block_body(block);
           }
           None => self.todo(constructor.span(), "constructor without body"),
         };
       }
     };
+
+    if let Some(end_label) = self.end_label.as_ref() {
+      self
+        .current
+        .body
+        .push(InstructionOrLabel::Label(end_label.clone()));
+
+      self.end_label = None;
+      self.is_returning_register = None;
+    }
 
     self.definitions.push(Definition {
       pointer: definition_pointer,
@@ -257,77 +334,27 @@ impl FunctionCompiler {
     });
   }
 
-  fn handle_block_body(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
-    self.populate_fn_scope(block, scope);
-    self.populate_block_scope(block, scope);
-
+  fn handle_block_body(&mut self, block: &swc_ecma_ast::BlockStmt) {
     for i in 0..block.stmts.len() {
-      self.statement(&block.stmts[i], i == block.stmts.len() - 1, scope);
+      self.statement(&block.stmts[i], i == block.stmts.len() - 1);
     }
   }
 
-  fn populate_fn_scope_params(&mut self, functionish: &Functionish, scope: &Scope) {
-    match functionish {
-      Functionish::Fn(fn_) => {
-        for p in &fn_.params {
-          self.populate_scope_pat(&p.pat, scope);
-        }
-      }
-      Functionish::Arrow(arrow) => {
-        for p in &arrow.params {
-          self.populate_scope_pat(p, scope);
-        }
-      }
-      Functionish::Constructor(_, constructor) => {
-        for potspp in &constructor.params {
-          match potspp {
-            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
-              use swc_ecma_ast::TsParamPropParam::*;
-
-              match &ts_param_prop.param {
-                Ident(ident) => {
-                  self.populate_scope_ident(&ident.id, scope);
-                }
-                Assign(assign) => {
-                  self.populate_scope_pat(&assign.left, scope);
-                }
-              }
-            }
-            swc_ecma_ast::ParamOrTsParamProp::Param(param) => {
-              self.populate_scope_pat(&param.pat, scope);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  fn populate_scope_ident(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) {
-    scope.set(
-      ident.sym.to_string(),
-      MappedName::Register(self.allocate_reg(&ident.sym.to_string())),
-    );
-  }
-
-  fn allocate_param_registers(
-    &mut self,
-    functionish: &Functionish,
-    scope: &Scope,
-  ) -> Vec<Register> {
+  fn get_param_registers(&mut self, functionish: &Functionish) -> Vec<Register> {
     let mut param_registers = Vec::<Register>::new();
 
     match functionish {
-      Functionish::Fn(fn_) => {
+      Functionish::Fn(_, fn_) => {
         for p in &fn_.params {
-          param_registers.push(self.get_pattern_register(&p.pat, scope));
+          param_registers.push(self.get_pattern_register(&p.pat));
         }
       }
       Functionish::Arrow(arrow) => {
         for p in &arrow.params {
-          param_registers.push(self.get_pattern_register(p, scope));
+          param_registers.push(self.get_pattern_register(p));
         }
       }
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(_, _class_span, constructor) => {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
@@ -335,7 +362,7 @@ impl FunctionCompiler {
               param_registers.push(self.allocate_numbered_reg(&"_todo_ts_param_prop".to_string()));
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              param_registers.push(self.get_pattern_register(&p.pat, scope))
+              param_registers.push(self.get_pattern_register(&p.pat))
             }
           }
         }
@@ -345,12 +372,12 @@ impl FunctionCompiler {
     return param_registers;
   }
 
-  pub fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat, scope: &Scope) -> Register {
+  pub fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat) -> Register {
     use swc_ecma_ast::Pat;
 
     match param_pat {
-      Pat::Ident(ident) => self.get_variable_register(&ident.id, scope),
-      Pat::Assign(assign) => self.get_pattern_register(&assign.left, scope),
+      Pat::Ident(ident) => self.get_variable_register(&ident.id),
+      Pat::Assign(assign) => self.get_pattern_register(&assign.left),
       Pat::Array(_) => self.allocate_numbered_reg(&"_array_pat".to_string()),
       Pat::Object(_) => self.allocate_numbered_reg(&"_object_pat".to_string()),
       Pat::Invalid(_) => self.allocate_numbered_reg(&"_invalid_pat".to_string()),
@@ -359,15 +386,16 @@ impl FunctionCompiler {
     }
   }
 
-  pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident, scope: &Scope) -> Register {
-    match scope.get(&ident.sym.to_string()) {
-      Some(MappedName::Register(reg)) => reg,
-      _ => {
+  pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
+    match self.scope_analysis.lookup_value(&self.owner_id, ident) {
+      Some(Value::Register(reg)) => reg,
+      lookup_result => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
           message: format!(
-            "Register should have been allocated for variable {}",
-            ident.sym.to_string()
+            "Register should have been allocated for variable {}, instead: {:?}",
+            ident.sym.to_string(),
+            lookup_result,
           ),
           span: ident.span(),
         });
@@ -377,34 +405,29 @@ impl FunctionCompiler {
     }
   }
 
-  fn add_param_code(
-    &mut self,
-    functionish: &Functionish,
-    param_registers: &Vec<Register>,
-    scope: &Scope,
-  ) {
+  fn add_param_code(&mut self, functionish: &Functionish, param_registers: &Vec<Register>) {
     match functionish {
-      Functionish::Fn(fn_) => {
+      Functionish::Fn(_, fn_) => {
         for (i, p) in fn_.params.iter().enumerate() {
-          let mut ec = ExpressionCompiler { fnc: self, scope };
-          ec.pat(&p.pat, &param_registers[i], false, scope);
+          let mut ec = ExpressionCompiler { fnc: self };
+          ec.pat(&p.pat, &param_registers[i], false);
         }
       }
       Functionish::Arrow(arrow) => {
         for (i, p) in arrow.params.iter().enumerate() {
-          let mut ec = ExpressionCompiler { fnc: self, scope };
-          ec.pat(p, &param_registers[i], false, scope);
+          let mut ec = ExpressionCompiler { fnc: self };
+          ec.pat(p, &param_registers[i], false);
         }
       }
-      Functionish::Constructor(_, constructor) => {
+      Functionish::Constructor(_, _class_span, constructor) => {
         for (i, potspp) in constructor.params.iter().enumerate() {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
               // TODO (Diagnostic emitted elsewhere)
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              let mut ec = ExpressionCompiler { fnc: self, scope };
-              ec.pat(&p.pat, &param_registers[i], false, scope);
+              let mut ec = ExpressionCompiler { fnc: self };
+              ec.pat(&p.pat, &param_registers[i], false);
             }
           }
         }
@@ -412,316 +435,11 @@ impl FunctionCompiler {
     };
   }
 
-  fn populate_fn_scope(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
-    for statement in &block.stmts {
-      self.populate_fn_scope_statement(statement, scope);
-    }
-  }
-
-  fn populate_fn_scope_statement(&mut self, statement: &swc_ecma_ast::Stmt, scope: &Scope) {
+  fn statement(&mut self, statement: &swc_ecma_ast::Stmt, fn_last: bool) {
     use swc_ecma_ast::Stmt::*;
 
     match statement {
-      Block(nested_block) => {
-        self.populate_fn_scope(nested_block, scope);
-      }
-      Empty(_) => {}
-      Debugger(_) => {}
-      With(with) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Not supported: With statement".to_string(),
-          span: with.span(),
-        });
-      }
-      Return(_) => {}
-      Labeled(labeled) => self.todo(labeled.span, "Labeled statement"),
-      Break(_) => {}
-      Continue(_) => {}
-      If(if_) => {
-        self.populate_fn_scope_statement(&if_.cons, scope);
-
-        for stmt in &if_.alt {
-          self.populate_fn_scope_statement(stmt, scope);
-        }
-      }
-      Switch(switch) => self.todo(switch.span, "Switch statement"),
-      Throw(_) => {}
-      Try(try_) => self.todo(try_.span, "Try statement"),
-      While(while_) => {
-        self.populate_fn_scope_statement(&while_.body, scope);
-      }
-      DoWhile(do_while) => {
-        self.populate_fn_scope_statement(&do_while.body, scope);
-      }
-      For(for_) => {
-        match &for_.init {
-          Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) => {
-            self.populate_fn_scope_var_decl(var_decl, scope);
-          }
-          _ => {}
-        };
-
-        self.populate_fn_scope_statement(&for_.body, scope);
-      }
-      ForIn(for_in) => self.todo(for_in.span, "ForIn statement"),
-      ForOf(for_of) => {
-        use swc_ecma_ast::VarDeclOrPat::*;
-
-        match &for_of.left {
-          VarDecl(var_decl) => {
-            self.populate_fn_scope_var_decl(var_decl, scope);
-          }
-          Pat(_) => {}
-        };
-
-        self.populate_fn_scope_statement(&for_of.body, scope);
-      }
-      Decl(decl) => {
-        use swc_ecma_ast::Decl::*;
-
-        match decl {
-          Class(class) => self.todo(class.span(), "Class declaration"),
-          Fn(_) => {}
-          Var(var_decl) => self.populate_fn_scope_var_decl(var_decl, scope),
-          TsInterface(_) => {}
-          TsTypeAlias(_) => {}
-          TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
-          TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration"),
-        }
-      }
-      Expr(_) => {}
-    };
-  }
-
-  fn populate_fn_scope_var_decl(&mut self, var_decl: &swc_ecma_ast::VarDecl, scope: &Scope) {
-    if var_decl.kind != swc_ecma_ast::VarDeclKind::Var {
-      return;
-    }
-
-    for decl in &var_decl.decls {
-      self.populate_scope_pat(&decl.name, scope);
-    }
-  }
-
-  fn populate_scope_pat(&mut self, pat: &swc_ecma_ast::Pat, scope: &Scope) {
-    use swc_ecma_ast::Pat::*;
-
-    match pat {
-      Ident(ident) => {
-        let name = ident.id.sym.to_string();
-        scope.set(name.clone(), MappedName::Register(self.allocate_reg(&name)));
-      }
-      Array(array) => {
-        for element in &array.elems {
-          if let Some(element) = element {
-            self.populate_scope_pat(element, scope);
-          }
-        }
-      }
-      Object(object) => {
-        for prop in &object.props {
-          use swc_ecma_ast::ObjectPatProp::*;
-
-          match prop {
-            KeyValue(key_value) => {
-              self.populate_scope_pat(&key_value.value, scope);
-            }
-            Assign(assign) => {
-              self.populate_scope_ident(&assign.key, scope);
-            }
-            Rest(rest) => {
-              self.populate_scope_pat(&rest.arg, scope);
-            }
-          }
-        }
-      }
-      Rest(rest) => {
-        self.populate_scope_pat(&rest.arg, scope);
-      }
-      Assign(assign) => {
-        self.populate_scope_pat(&assign.left, scope);
-      }
-      Invalid(invalid) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid pattern".to_string(),
-          span: invalid.span(),
-        });
-      }
-      Expr(expr) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Unexpected Pat::Expr in param/decl context".to_string(),
-          span: expr.span(),
-        });
-      }
-    }
-  }
-
-  fn populate_block_scope(&mut self, block: &swc_ecma_ast::BlockStmt, scope: &Scope) {
-    let mut function_decls = Vec::<swc_ecma_ast::FnDecl>::new();
-
-    for statement in &block.stmts {
-      use swc_ecma_ast::Stmt::*;
-
-      match statement {
-        Block(_) => {}
-        Empty(_) => {}
-        Debugger(_) => {}
-        With(_) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: "Not supported: With statement".to_string(),
-            span: statement.span(),
-          });
-        }
-        Return(_) => {}
-        Labeled(labeled) => self.todo(labeled.span, "Labeled statement"),
-        Break(_) => {}
-        Continue(_) => {}
-        If(_) => {}
-        Switch(_) => {}
-        Throw(_) => {}
-        Try(_) => {}
-        While(_) => {}
-        DoWhile(_) => {}
-        For(_) => {}
-        ForIn(_) => {}
-        ForOf(_) => {}
-        Decl(decl) => {
-          use swc_ecma_ast::Decl::*;
-
-          match decl {
-            Class(class) => self.todo(class.span(), "Class declaration"),
-            Fn(fn_) => function_decls.push(fn_.clone()),
-            Var(var_decl) => self.populate_block_scope_var_decl(var_decl, scope),
-            TsInterface(_) => {}
-            TsTypeAlias(_) => {}
-            TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
-            TsModule(_) => {}
-          }
-        }
-        Expr(_) => {}
-      };
-    }
-
-    // Create a synth scope where the function decls that can co-mingle are
-    // present but don't signal any nested captures. This allows us to first
-    // construct all the direct captures and use that to find the complete
-    // captures.
-    let synth_scope = scope.nest();
-
-    for fn_ in &function_decls {
-      synth_scope.set(fn_.ident.sym.to_string(), scope_reg("".to_string()));
-    }
-
-    let mut direct_captures_map = HashMap::<String, Vec<String>>::new();
-
-    for fn_ in &function_decls {
-      let mut cf = CaptureFinder::new(synth_scope.clone());
-      cf.fn_decl(&init_std_scope(), fn_);
-
-      direct_captures_map.insert(fn_.ident.sym.to_string(), cf.ordered_names);
-    }
-
-    for fn_ in &function_decls {
-      let mut full_captures = Vec::<String>::new();
-      let mut full_captures_set = HashSet::<String>::new();
-
-      let mut cap_queue = Queue::<String>::new();
-
-      let direct_captures = direct_captures_map.get(&fn_.ident.sym.to_string());
-
-      match direct_captures {
-        Some(direct_captures) => {
-          for dc in direct_captures {
-            cap_queue.add(dc.clone()).expect("Failed to add to queue");
-          }
-        }
-        None => self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Direct captures not found".to_string(),
-          span: fn_.ident.span,
-        }),
-      }
-
-      loop {
-        let cap = match cap_queue.remove() {
-          Ok(c) => c,
-          Err(_) => {
-            break;
-          }
-        };
-
-        let is_new = full_captures_set.insert(cap.clone());
-
-        if !is_new {
-          continue;
-        }
-
-        full_captures.push(cap.clone());
-
-        if let Some(nested_caps) = direct_captures_map.get(&cap) {
-          for nested_cap in nested_caps {
-            cap_queue
-              .add(nested_cap.clone())
-              .expect("Failed to add to queue");
-          }
-        }
-      }
-
-      let fn_name = fn_.ident.sym.to_string();
-
-      let definition_pointer = self.allocate_defn(&fn_name);
-
-      let qf = QueuedFunction {
-        definition_pointer,
-        fn_name: Some(fn_name.clone()),
-        capture_params: full_captures,
-        functionish: Functionish::Fn(fn_.function.clone()),
-      };
-
-      scope.set(fn_name.clone(), MappedName::QueuedFunction(qf.clone()));
-
-      self.queue.add(qf).expect("Failed to queue function");
-    }
-  }
-
-  fn populate_block_scope_var_decl(&mut self, var_decl: &swc_ecma_ast::VarDecl, scope: &Scope) {
-    if var_decl.kind == swc_ecma_ast::VarDeclKind::Var {
-      return;
-    }
-
-    for decl in &var_decl.decls {
-      self.populate_scope_pat(&decl.name, scope);
-    }
-  }
-
-  fn statement(&mut self, statement: &swc_ecma_ast::Stmt, fn_last: bool, scope: &Scope) {
-    use swc_ecma_ast::Stmt::*;
-
-    match statement {
-      Block(block) => {
-        let block_scope = scope.nest();
-        self.populate_block_scope(block, &block_scope);
-
-        for stmt in &block.stmts {
-          self.statement(stmt, false, &block_scope);
-        }
-
-        for mapping in block_scope.rc.borrow().name_map.values() {
-          match mapping {
-            MappedName::Register(reg) => {
-              self.release_reg(reg);
-            }
-            MappedName::Definition(_)
-            | MappedName::QueuedFunction(_)
-            | MappedName::Builtin(_)
-            | MappedName::Constant(_) => {}
-          }
-        }
-      }
+      Block(block) => self.block_statement(block),
       Empty(_) => {}
       Debugger(debugger) => self.todo(debugger.span, "Debugger statement"),
       With(with) => {
@@ -732,21 +450,35 @@ impl FunctionCompiler {
         });
       }
 
-      Return(ret_stmt) => match &ret_stmt.arg {
-        None => {
-          // TODO: Skip if fn_last
-          self.push(Instruction::End);
+      Return(ret_stmt) => {
+        match &ret_stmt.arg {
+          None => {}
+          Some(expr) => {
+            let mut expression_compiler = ExpressionCompiler { fnc: self };
+
+            let compiled = expression_compiler.compile(expr, Some(Register::Return));
+            self.use_(compiled);
+          }
         }
-        Some(expr) => {
-          let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
 
-          expression_compiler.compile(expr, Some(Register::Return));
+        if !fn_last {
+          if let Some(finally_label) = self.finally_labels.last().cloned() {
+            let is_returning = match self.is_returning_register.clone() {
+              Some(is_returning) => is_returning.clone(),
+              None => {
+                let is_returning = self.allocate_reg_fresh(&"_is_returning".to_string());
+                self.is_returning_register = Some(is_returning.clone());
+                is_returning
+              }
+            };
 
-          if !fn_last {
+            self.push(Instruction::Mov(Value::Bool(true), is_returning.clone()));
+            self.push(Instruction::Jmp(finally_label.ref_()));
+          } else {
             self.push(Instruction::End);
           }
         }
-      },
+      }
 
       Labeled(labeled) => self.todo(labeled.span, "Labeled statement"),
 
@@ -793,42 +525,50 @@ impl FunctionCompiler {
         }
       }
       If(if_) => {
-        self.if_(if_, scope);
+        self.if_(if_);
       }
       Switch(switch) => self.todo(switch.span, "Switch statement"),
       Throw(throw) => {
-        let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
+        let mut expression_compiler = ExpressionCompiler { fnc: self };
 
         let arg = expression_compiler.compile(&throw.arg, None);
         let instr = Instruction::Throw(self.use_(arg));
 
         self.push(instr);
       }
-      Try(try_) => self.todo(try_.span, "Try statement"),
+      Try(try_) => {
+        self.try_(try_);
+      }
       While(while_) => {
-        self.while_(while_, scope);
+        self.while_(while_);
       }
       DoWhile(do_while) => {
-        self.do_while(do_while, scope);
+        self.do_while(do_while);
       }
       For(for_) => {
-        self.for_(for_, scope);
+        self.for_(for_);
       }
       ForIn(for_in) => self.todo(for_in.span, "ForIn statement"),
       ForOf(for_of) => {
-        self.for_of(for_of, scope);
+        self.for_of(for_of);
       }
       Decl(decl) => {
-        self.declaration(decl, scope);
+        self.declaration(decl);
       }
       Expr(expr) => {
-        self.expression(&expr.expr, scope);
+        self.expression(&expr.expr);
       }
     }
   }
 
-  fn if_(&mut self, if_: &swc_ecma_ast::IfStmt, scope: &Scope) {
-    let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
+  fn block_statement(&mut self, block: &swc_ecma_ast::BlockStmt) {
+    for stmt in &block.stmts {
+      self.statement(stmt, false);
+    }
+  }
+
+  fn if_(&mut self, if_: &swc_ecma_ast::IfStmt) {
+    let mut expression_compiler = ExpressionCompiler { fnc: self };
 
     let condition = expression_compiler.compile(&*if_.test, None);
 
@@ -853,7 +593,7 @@ impl FunctionCompiler {
 
     self.release_reg(&cond_reg);
 
-    self.statement(&*if_.cons, false, scope);
+    self.statement(&*if_.cons, false);
 
     match &if_.alt {
       None => {
@@ -869,13 +609,229 @@ impl FunctionCompiler {
         self.push(Instruction::Jmp(after_else_label.ref_()));
 
         self.label(else_label);
-        self.statement(&*alt, false, scope);
+        self.statement(&*alt, false);
         self.label(after_else_label);
       }
     }
   }
 
-  fn while_(self: &mut Self, while_: &swc_ecma_ast::WhileStmt, scope: &Scope) {
+  fn try_(&mut self, try_: &swc_ecma_ast::TryStmt) {
+    let (catch_label, after_catch_label) = match try_.handler {
+      Some(_) => (
+        Some(Label {
+          name: self.label_allocator.allocate_numbered(&"catch".to_string()),
+        }),
+        Some(Label {
+          name: self
+            .label_allocator
+            .allocate_numbered(&"after_catch".to_string()),
+        }),
+      ),
+      None => (None, None),
+    };
+
+    let finally_label = match &try_.finalizer {
+      Some(_) => Some(Label {
+        name: self
+          .label_allocator
+          .allocate_numbered(&"finally".to_string()),
+      }),
+      None => None,
+    };
+
+    let mut finally_error_reg: Option<Register> = None;
+
+    if let Some(label) = &finally_label {
+      // We use a fresh register here because if we don't put anything in it, it's meaningful. It
+      // tells finally not to re-throw.
+      let reg = self.allocate_numbered_reg_fresh("_finally_error");
+      self.finally_labels.push(label.clone());
+
+      finally_error_reg = Some(reg.clone());
+
+      self.catch_settings.push(CatchSetting {
+        label: label.clone(),
+        reg,
+      });
+    }
+
+    let mut catch_error_reg: Option<Register> = None;
+
+    if let Some(label) = &catch_label {
+      let reg = match try_
+        .handler
+        .as_ref()
+        .expect("catch label without handler")
+        .param
+      {
+        Some(_) => self.allocate_numbered_reg("_error"),
+        None => Register::Ignore,
+      };
+
+      catch_error_reg = Some(reg.clone());
+
+      self.catch_settings.push(CatchSetting {
+        label: label.clone(),
+        reg,
+      });
+    }
+
+    self.apply_catch_setting();
+
+    let mut snap_pairs = HashSet::<(Register, Register)>::new();
+
+    if try_.handler.is_some() {
+      let snap_registers: HashSet<Register> = self.get_mutated_registers(try_.block.span);
+
+      for reg in snap_registers {
+        let reg_name = match &reg {
+          Register::Named(name) => name,
+          _ => continue,
+        };
+
+        let snap_reg = self.allocate_reg_fresh(&format!("snap_{}", reg_name));
+
+        self.push(Instruction::Mov(
+          Value::Register(reg.clone()),
+          snap_reg.clone(),
+        ));
+
+        snap_pairs.insert((reg, snap_reg));
+      }
+    }
+
+    self.block_statement(&try_.block);
+    self.pop_catch_setting(); // TODO: Avoid redundant set_catch to our own finally
+
+    if let Some(label) = &after_catch_label {
+      self.push(Instruction::Jmp(label.ref_()));
+    }
+
+    if let Some(catch_clause) = &try_.handler {
+      self.label(catch_label.unwrap());
+      self.apply_catch_setting(); // TODO: Avoid redundant unset_catch
+
+      for (reg, snap_reg) in snap_pairs {
+        self.push(Instruction::Mov(Value::Register(snap_reg), reg));
+      }
+
+      if let Some(param) = &catch_clause.param {
+        let mut ec = ExpressionCompiler { fnc: self };
+
+        let pattern_reg = ec.fnc.get_pattern_register(&param);
+
+        // TODO: Set up this register through set_catch instead of copying into it
+        ec.fnc.push(Instruction::Mov(
+          Value::Register(catch_error_reg.unwrap()),
+          pattern_reg.clone(),
+        ));
+
+        ec.pat(&param, &pattern_reg, false);
+      }
+
+      self.block_statement(&catch_clause.body);
+
+      if let Some(_) = finally_label {
+        self.pop_catch_setting();
+      }
+
+      self.label(after_catch_label.unwrap());
+
+      // TODO: Shouldn't we be releasing registers from the scope when we don't need it anymore?
+    }
+
+    if let Some(finally_clause) = &try_.finalizer {
+      self.label(finally_label.unwrap());
+      self.finally_labels.pop();
+      self.apply_catch_setting();
+
+      let local_is_returning = match self.is_returning_register.clone() {
+        Some(is_returning) => {
+          let local_is_returning = self.allocate_numbered_reg_fresh("_local_is_returning");
+
+          self.push(Instruction::Mov(
+            Value::Register(is_returning.clone()),
+            local_is_returning.clone(),
+          ));
+
+          self.push(Instruction::Mov(Value::Bool(false), is_returning));
+
+          Some(local_is_returning)
+        }
+        None => None,
+      };
+
+      self.block_statement(&finally_clause);
+
+      self.push(Instruction::Throw(Value::Register(
+        finally_error_reg.unwrap(),
+      )));
+
+      if let Some(local_is_returning) = local_is_returning {
+        if self.finally_labels.is_empty() {
+          let end_label = match &self.end_label {
+            Some(end_label) => end_label.clone(),
+            None => {
+              let end_label = Label {
+                name: self.label_allocator.allocate(&"end".to_string()),
+              };
+
+              self.end_label = Some(end_label.clone());
+              end_label
+            }
+          };
+
+          self.push(Instruction::JmpIf(
+            Value::Register(local_is_returning.clone()),
+            end_label.ref_(),
+          ));
+        } else {
+          self.push(Instruction::OpNot(
+            Value::Register(local_is_returning.clone()),
+            local_is_returning.clone(),
+          ));
+
+          let after_finally_label = Label {
+            name: self
+              .label_allocator
+              .allocate_numbered(&"after_finally".to_string()),
+          };
+
+          self.push(Instruction::JmpIf(
+            Value::Register(local_is_returning.clone()),
+            after_finally_label.ref_(),
+          ));
+
+          self.push(Instruction::Mov(
+            Value::Bool(true),
+            self.is_returning_register.clone().unwrap(),
+          ));
+
+          self.push(Instruction::Jmp(self.finally_labels.last().unwrap().ref_()));
+
+          self.label(after_finally_label);
+        }
+      }
+    }
+  }
+
+  fn apply_catch_setting(&mut self) {
+    if let Some(catch_setting) = self.catch_settings.last() {
+      self.push(Instruction::SetCatch(
+        catch_setting.label.ref_(),
+        catch_setting.reg.clone(),
+      ));
+    } else {
+      self.push(Instruction::UnsetCatch);
+    }
+  }
+
+  fn pop_catch_setting(&mut self) {
+    self.catch_settings.pop().expect("no catch setting to pop");
+    self.apply_catch_setting();
+  }
+
+  fn while_(self: &mut Self, while_: &swc_ecma_ast::WhileStmt) {
     let start_label = Label {
       name: self.label_allocator.allocate_numbered(&"while".to_string()),
     };
@@ -893,10 +849,7 @@ impl FunctionCompiler {
 
     self.label(start_label.clone());
 
-    let mut expression_compiler = ExpressionCompiler {
-      fnc: self,
-      scope: scope,
-    };
+    let mut expression_compiler = ExpressionCompiler { fnc: self };
 
     let condition = expression_compiler.compile(&*while_.test, None);
 
@@ -916,14 +869,14 @@ impl FunctionCompiler {
     ));
 
     self.release_reg(&cond_reg);
-    self.statement(&*while_.body, false, scope);
+    self.statement(&*while_.body, false);
     self.push(Instruction::Jmp(start_label.ref_()));
     self.label(end_label);
 
     self.loop_labels.pop();
   }
 
-  fn do_while(self: &mut Self, do_while: &swc_ecma_ast::DoWhileStmt, scope: &Scope) {
+  fn do_while(self: &mut Self, do_while: &swc_ecma_ast::DoWhileStmt) {
     let start_label = Label {
       name: self
         .label_allocator
@@ -949,12 +902,9 @@ impl FunctionCompiler {
 
     self.label(start_label.clone());
 
-    self.statement(&*do_while.body, false, scope);
+    self.statement(&*do_while.body, false);
 
-    let mut expression_compiler = ExpressionCompiler {
-      fnc: self,
-      scope: scope,
-    };
+    let mut expression_compiler = ExpressionCompiler { fnc: self };
 
     let condition = expression_compiler.compile(&*do_while.test, None);
 
@@ -968,23 +918,14 @@ impl FunctionCompiler {
     self.loop_labels.pop();
   }
 
-  fn for_(&mut self, for_: &swc_ecma_ast::ForStmt, scope: &Scope) {
-    let for_scope = scope.nest();
-
-    match &for_.init {
-      Some(swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl)) => {
-        self.populate_block_scope_var_decl(var_decl, &for_scope);
-      }
-      _ => {}
-    }
-
+  fn for_(&mut self, for_: &swc_ecma_ast::ForStmt) {
     match &for_.init {
       Some(var_decl_or_expr) => match var_decl_or_expr {
         swc_ecma_ast::VarDeclOrExpr::VarDecl(var_decl) => {
-          self.var_declaration(var_decl, &for_scope);
+          self.var_declaration(var_decl);
         }
         swc_ecma_ast::VarDeclOrExpr::Expr(expr) => {
-          self.expression(expr, &for_scope);
+          self.expression(expr);
         }
       },
       None => {}
@@ -1017,10 +958,7 @@ impl FunctionCompiler {
 
     match &for_.test {
       Some(cond) => {
-        let mut ec = ExpressionCompiler {
-          fnc: self,
-          scope: &for_scope,
-        };
+        let mut ec = ExpressionCompiler { fnc: self };
 
         let condition = ec.compile(cond, None);
 
@@ -1044,12 +982,12 @@ impl FunctionCompiler {
       None => {}
     }
 
-    self.statement(&for_.body, false, &for_scope);
+    self.statement(&for_.body, false);
 
     self.label(for_continue_label);
 
     match &for_.update {
-      Some(update) => self.expression(update, &for_scope),
+      Some(update) => self.expression(update),
       None => {}
     }
 
@@ -1060,35 +998,36 @@ impl FunctionCompiler {
     self.loop_labels.pop();
   }
 
-  fn for_of(&mut self, for_of: &swc_ecma_ast::ForOfStmt, scope: &Scope) {
-    let for_scope = scope.nest();
+  fn for_of(&mut self, for_of: &swc_ecma_ast::ForOfStmt) {
+    let mut ec = ExpressionCompiler { fnc: self };
 
-    let index_reg = self.allocate_numbered_reg(&"_for_of_i".to_string());
-    self.push(Instruction::Mov(Value::Number(0.0), index_reg.clone()));
+    let pat = match &for_of.left {
+      swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
+        if var_decl.decls.len() != 1 {
+          panic!("Unexpected number of declarations on left side of for-of loop");
+        }
 
-    let array_reg = self.allocate_numbered_reg(&"_for_of_array".to_string());
-
-    let mut ec = ExpressionCompiler {
-      fnc: self,
-      scope: &for_scope,
+        &var_decl.decls[0].name
+      }
+      swc_ecma_ast::VarDeclOrPat::Pat(pat) => pat,
     };
 
-    ec.compile(&for_of.right, Some(array_reg.clone()));
+    let value_reg = ec.fnc.get_pattern_register(pat);
 
-    let len_reg = ec.fnc.allocate_numbered_reg(&"_for_of_len".to_string());
+    let iter_reg = ec.fnc.allocate_numbered_reg(&"_iter".to_string());
+    let iter_res_reg = ec.fnc.allocate_numbered_reg(&"_iter_res".to_string());
+    let done_reg = ec.fnc.allocate_numbered_reg(&"_done".to_string());
 
-    ec.fnc.push(Instruction::Sub(
-      Value::Register(array_reg.clone()),
-      Value::String("length".to_string()),
-      len_reg.clone(),
+    ec.compile(&for_of.right, Some(iter_reg.clone()));
+
+    ec.fnc.push(Instruction::ConstSubCall(
+      Value::Register(iter_reg.clone()),
+      Value::Builtin(Builtin {
+        name: "SymbolIterator".to_string(),
+      }),
+      Value::Array(Box::new(Array::default())),
+      iter_reg.clone(),
     ));
-
-    match &for_of.left {
-      swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
-        ec.fnc.populate_block_scope_var_decl(var_decl, &for_scope);
-      }
-      _ => {}
-    }
 
     let for_test_label = Label {
       name: ec
@@ -1111,6 +1050,8 @@ impl FunctionCompiler {
         .allocate_numbered(&"for_end".to_string()),
     };
 
+    ec.fnc.push(Instruction::Jmp(for_continue_label.ref_()));
+
     ec.fnc.label(for_test_label.clone());
 
     ec.fnc.loop_labels.push(LoopLabels {
@@ -1118,45 +1059,24 @@ impl FunctionCompiler {
       break_: for_end_label.clone(),
     });
 
-    let cond_reg = ec.fnc.allocate_numbered_reg(&"_for_of_cond".to_string());
-
-    ec.fnc.push(Instruction::OpTripleEq(
-      Value::Register(index_reg.clone()),
-      Value::Register(len_reg.clone()),
-      cond_reg.clone(),
-    ));
-
     ec.fnc.push(Instruction::JmpIf(
-      Value::Register(cond_reg.clone()),
+      Value::Register(done_reg.clone()),
       for_end_label.ref_(),
     ));
 
-    let pat = match &for_of.left {
-      swc_ecma_ast::VarDeclOrPat::VarDecl(var_decl) => {
-        if var_decl.decls.len() != 1 {
-          panic!("Unexpected number of declarations on left side of for-of loop");
-        }
+    ec.pat(pat, &value_reg, true);
 
-        &var_decl.decls[0].name
-      }
-      swc_ecma_ast::VarDeclOrPat::Pat(pat) => pat,
-    };
-
-    let element_reg = ec.fnc.get_pattern_register(pat, &for_scope);
-
-    ec.fnc.push(Instruction::Sub(
-      Value::Register(array_reg.clone()),
-      Value::Register(index_reg.clone()),
-      element_reg.clone(),
-    ));
-
-    ec.pat(pat, &element_reg, true, &for_scope);
-
-    self.statement(&for_of.body, false, &for_scope);
+    self.statement(&for_of.body, false);
 
     self.label(for_continue_label);
+    self.push(Instruction::Next(iter_reg, iter_res_reg.clone()));
 
-    self.push(Instruction::OpInc(index_reg.clone()));
+    self.push(Instruction::UnpackIterRes(
+      iter_res_reg,
+      value_reg,
+      done_reg,
+    ));
+
     self.push(Instruction::Jmp(for_test_label.ref_()));
 
     self.label(for_end_label);
@@ -1164,13 +1084,37 @@ impl FunctionCompiler {
     self.loop_labels.pop();
   }
 
-  fn declaration(&mut self, decl: &swc_ecma_ast::Decl, scope: &Scope) {
+  fn declaration(&mut self, decl: &swc_ecma_ast::Decl) {
     use swc_ecma_ast::Decl::*;
 
     match decl {
       Class(class) => self.todo(class.span(), "Class declaration"),
-      Fn(_) => {}
-      Var(var_decl) => self.var_declaration(var_decl, scope),
+      Fn(fn_decl) => {
+        self
+          .queue
+          .add(QueuedFunction {
+            definition_pointer: match self.lookup_value(&fn_decl.ident) {
+              Some(Value::Pointer(p)) => p,
+              _ => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: format!(
+                    "Lookup of function {} was not a pointer, lookup_result: {:?}",
+                    fn_decl.ident.sym,
+                    self.lookup_value(&fn_decl.ident)
+                  ),
+                  span: fn_decl.ident.span,
+                });
+
+                return;
+              }
+            },
+            fn_name: Some(fn_decl.ident.sym.to_string()),
+            functionish: Functionish::Fn(Some(fn_decl.ident.clone()), fn_decl.function.clone()),
+          })
+          .expect("Failed to add function to queue");
+      }
+      Var(var_decl) => self.var_declaration(var_decl),
       TsInterface(interface_decl) => self.todo(interface_decl.span, "TsInterface declaration"),
       TsTypeAlias(_) => {}
       TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
@@ -1178,15 +1122,15 @@ impl FunctionCompiler {
     };
   }
 
-  fn var_declaration(&mut self, var_decl: &swc_ecma_ast::VarDecl, scope: &Scope) {
+  fn var_declaration(&mut self, var_decl: &swc_ecma_ast::VarDecl) {
     for decl in &var_decl.decls {
       match &decl.init {
         Some(expr) => {
-          let target_register = self.get_pattern_register(&decl.name, scope);
+          let target_register = self.get_pattern_register(&decl.name);
 
-          let mut ec = ExpressionCompiler { fnc: self, scope };
+          let mut ec = ExpressionCompiler { fnc: self };
           ec.compile(expr, Some(target_register.clone()));
-          ec.pat(&decl.name, &target_register, false, scope);
+          ec.pat(&decl.name, &target_register, false);
         }
         None => match &decl.name {
           swc_ecma_ast::Pat::Ident(_) => {
@@ -1207,8 +1151,8 @@ impl FunctionCompiler {
     }
   }
 
-  fn expression(&mut self, expr: &swc_ecma_ast::Expr, scope: &Scope) {
-    let mut expression_compiler = ExpressionCompiler { fnc: self, scope };
+  fn expression(&mut self, expr: &swc_ecma_ast::Expr) {
+    let mut expression_compiler = ExpressionCompiler { fnc: self };
     let compiled = expression_compiler.compile_top_level(expr, None);
 
     self.use_(compiled);
@@ -1236,5 +1180,38 @@ impl FunctionCompiler {
     compiled_expr.release_checker.has_unreleased_registers = false;
 
     return asm;
+  }
+
+  fn get_mutated_registers(&self, span: swc_common::Span) -> HashSet<Register> {
+    let start = swc_common::Span {
+      lo: span.lo,
+      hi: span.lo,
+      ctxt: span.ctxt,
+    };
+
+    let end = swc_common::Span {
+      lo: span.hi,
+      hi: span.hi,
+      ctxt: span.ctxt,
+    };
+
+    let mut mutated_registers = HashSet::<Register>::new();
+
+    for (_span, mutated_name_id) in self.scope_analysis.mutations.range(start..end) {
+      if let Some(Value::Register(reg)) = self.lookup_by_name_id(mutated_name_id) {
+        mutated_registers.insert(reg);
+      }
+    }
+
+    // TODO: Avoid doing this. This is a workaround to include mutations of variables that are
+    // supposed to be const, because we don't yet protect these variables from mutation that occurs
+    // via method calls. Once that is implemented, this shouldn't be needed.
+    for (_span, mutated_name_id) in self.scope_analysis.optional_mutations.range(start..end) {
+      if let Some(Value::Register(reg)) = self.lookup_by_name_id(mutated_name_id) {
+        mutated_registers.insert(reg);
+      }
+    }
+
+    mutated_registers
   }
 }

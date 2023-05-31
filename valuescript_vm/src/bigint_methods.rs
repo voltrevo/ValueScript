@@ -1,43 +1,38 @@
-use std::rc::Rc;
-
 use num_bigint::BigInt;
 
 use crate::{
-  format_err,
-  native_function::NativeFunction,
+  builtins::error_builtin::ToError,
+  native_function::{native_fn, NativeFunction},
   todo_fn::TODO,
-  vs_value::{Val, ValTrait},
+  vs_value::{ToVal, Val},
 };
 
 pub fn op_sub_bigint(_bigint: &BigInt, subscript: &Val) -> Val {
-  match subscript.val_to_string().as_str() {
-    "toLocaleString" => Val::Static(&TODO),
-    "toString" => Val::Static(&TO_STRING),
-    "valueOf" => Val::Static(&VALUE_OF),
-    _ => Val::Undefined,
+  match subscript.to_string().as_str() {
+    "toLocaleString" => &TODO,
+    "toString" => &TO_STRING,
+    "valueOf" => &VALUE_OF,
+    _ => return Val::Undefined,
   }
+  .to_val()
 }
 
-static TO_STRING: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::BigInt(_) => match params.get(0) {
-        Some(_) => {
-          return format_err!("TODO: toString with radix");
-        }
+static TO_STRING: NativeFunction = native_fn(|this, params| {
+  Ok(match this.get() {
+    Val::BigInt(bigint) => match params.get(0) {
+      Some(_) => {
+        return Err("TODO: toString with radix".to_error());
+      }
 
-        None => Val::String(Rc::new(this.val_to_string())),
-      },
-      _ => return format_err!("TODO: bigint indirection"),
-    })
-  },
-};
+      None => bigint.clone().to_val().to_string().to_val(),
+    },
+    _ => return Err("TODO: bigint indirection".to_error()),
+  })
+});
 
-static VALUE_OF: NativeFunction = NativeFunction {
-  fn_: |this: &mut Val, _params: Vec<Val>| -> Result<Val, Val> {
-    Ok(match this {
-      Val::BigInt(bigint) => Val::BigInt(bigint.clone()),
-      _ => return format_err!("TODO: bigint indirection"),
-    })
-  },
-};
+static VALUE_OF: NativeFunction = native_fn(|this, _params| {
+  Ok(match this.get() {
+    Val::BigInt(bigint) => Val::BigInt(bigint.clone()),
+    _ => return Err("TODO: bigint indirection".to_error()),
+  })
+});

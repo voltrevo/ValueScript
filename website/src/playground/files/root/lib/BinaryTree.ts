@@ -1,0 +1,40 @@
+import type { NotNullish } from "./util.ts";
+
+export default class BinaryTree<T extends NotNullish> {
+  left?: BinaryTree<T>;
+  value?: T;
+  right?: BinaryTree<T>;
+
+  insert(newValue: T) {
+    if (this.value === undefined) {
+      this.value = newValue;
+      return;
+    }
+
+    if (newValue < this.value) {
+      this.left ??= new BinaryTree();
+      this.left.insert(newValue);
+    } else {
+      this.right ??= new BinaryTree();
+      this.right.insert(newValue);
+    }
+  }
+
+  toArray() {
+    let res: T[] = [];
+
+    if (this.left) {
+      res.push(...this.left.toArray());
+    }
+
+    if (this.value !== undefined) {
+      res.push(this.value);
+    }
+
+    if (this.right) {
+      res.push(...this.right.toArray());
+    }
+
+    return res;
+  }
+}

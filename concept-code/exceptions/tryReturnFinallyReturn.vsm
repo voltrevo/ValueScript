@@ -1,0 +1,16 @@
+export @_anon0 {}
+
+@_anon0 = function() {
+  set_catch :finally0 %_tmp0
+  mov 37 %return
+  mov true %_is_returning
+  unset_catch
+  jmp :finally0
+  unset_catch
+finally0:
+  mov 42 %return
+  end
+  throw %_tmp0
+  jmpif %_is_returning :end
+end:
+}

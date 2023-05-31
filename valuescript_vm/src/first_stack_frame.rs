@@ -17,7 +17,7 @@ impl FirstStackFrame {
 }
 
 impl StackFrameTrait for FirstStackFrame {
-  fn write_this(&mut self, _this: Val) {
+  fn write_this(&mut self, _const: bool, _this: Val) -> Result<(), Val> {
     panic!("Not appropriate for FirstStackFrame");
   }
 
@@ -35,5 +35,9 @@ impl StackFrameTrait for FirstStackFrame {
 
   fn get_call_result(&mut self) -> CallResult {
     return self.call_result.clone();
+  }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    panic!("Not appropriate for FirstStackFrame");
   }
 }

@@ -1,6 +1,0 @@
-{
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "lib": ["esnext", "dom", "deno.window"]
-  }
-}

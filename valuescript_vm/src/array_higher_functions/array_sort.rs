@@ -1,11 +1,12 @@
 use std::rc::Rc;
 
+use crate::builtins::type_error_builtin::ToTypeError;
 use crate::native_frame_function::NativeFrameFunction;
+use crate::native_function::ThisWrapper;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, FrameStepOk, StackFrameTrait};
 use crate::vs_array::VsArray;
-use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
-use crate::{builtins::type_error_builtin::to_type_error, type_error};
+use crate::vs_value::{LoadFunctionResult, ToVal, Val, ValTrait};
 
 pub static SORT: NativeFrameFunction = NativeFrameFunction {
   make_frame: || {
@@ -205,8 +206,13 @@ enum SortTreeNodeData {
 }
 
 impl StackFrameTrait for SortFrame {
-  fn write_this(&mut self, this: Val) {
+  fn write_this(&mut self, const_: bool, this: Val) -> Result<(), Val> {
+    if const_ {
+      return Err("Cannot sort const array".to_type_error());
+    }
+
     self.this = this.as_array_data();
+    Ok(())
   }
 
   fn write_param(&mut self, param: Val) {
@@ -223,7 +229,7 @@ impl StackFrameTrait for SortFrame {
   fn step(&mut self) -> FrameStepResult {
     if !self.started {
       let array_data = match &mut self.this {
-        None => return type_error!("array fn called on non-array"),
+        None => return Err("array fn called on non-array".to_type_error()),
         Some(ad) => ad,
       };
 
@@ -233,7 +239,7 @@ impl StackFrameTrait for SortFrame {
 
           array_data_mut
             .elements
-            .sort_by(|a, b| a.val_to_string().cmp(&b.val_to_string()));
+            .sort_by(|a, b| a.to_string().cmp(&b.to_string()));
 
           return Ok(FrameStepOk::Pop(CallResult {
             return_: Val::Array(array_data.clone()),
@@ -257,7 +263,7 @@ impl StackFrameTrait for SortFrame {
         SortTreeNodeData::Sorted(vals) => {
           let mut owned_vals = vec![];
           std::mem::swap(&mut owned_vals, vals);
-          let res = Val::Array(Rc::new(VsArray::from(owned_vals)));
+          let res = owned_vals.to_val();
 
           FrameStepOk::Pop(CallResult {
             return_: res.clone(),
@@ -268,10 +274,14 @@ impl StackFrameTrait for SortFrame {
       },
       Some((left, right)) => match self.comparator.load_function() {
         LoadFunctionResult::NotAFunction => {
-          return type_error!("comparator is not a function");
+          return Err("comparator is not a function".to_type_error());
         }
         LoadFunctionResult::NativeFunction(native_fn) => {
-          let res = native_fn(&mut Val::Undefined, vec![left, right])?.to_number();
+          let res = native_fn(
+            ThisWrapper::new(true, &mut Val::Undefined),
+            vec![left, right],
+          )?
+          .to_number();
 
           let should_swap = match res.is_nan() {
             true => false,
@@ -303,5 +313,9 @@ impl StackFrameTrait for SortFrame {
 
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for SortFrame")
+  }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    false
   }
 }

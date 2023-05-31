@@ -1,25 +1,32 @@
-use std::rc::Rc;
-
 use valuescript_common::InstructionByte;
 
-use crate::builtins::type_error_builtin::to_type_error;
+use crate::builtins::type_error_builtin::ToTypeError;
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
+use crate::cat_stack_frame::CatStackFrame;
+use crate::native_function::ThisWrapper;
 use crate::operations;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, StackFrame, StackFrameTrait};
-use crate::type_error;
 use crate::vs_object::VsObject;
+use crate::vs_value::ToVal;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
 pub struct BytecodeStackFrame {
   pub decoder: BytecodeDecoder,
   pub registers: Vec<Val>,
+  pub const_this: bool,
   pub param_start: usize,
   pub param_end: usize,
   pub this_target: Option<usize>,
   pub return_target: Option<usize>,
+  pub catch_setting: Option<CatchSetting>,
+}
+
+pub struct CatchSetting {
+  pub pos: usize,
+  pub register: Option<usize>,
 }
 
 impl BytecodeStackFrame {
@@ -50,42 +57,64 @@ impl BytecodeStackFrame {
   }
 
   pub fn transfer_parameters(&mut self, new_frame: &mut StackFrame) {
-    let bytecode_type = self.decoder.decode_type();
+    let bytecode_type = self.decoder.peek_type();
 
-    if bytecode_type != BytecodeType::Array {
-      panic!("Not implemented: call instruction not using inline array");
+    if bytecode_type == BytecodeType::Array {
+      self.decoder.decode_type();
+
+      while self.decoder.peek_type() != BytecodeType::End {
+        let p = self.decoder.decode_val(&self.registers);
+        new_frame.write_param(p);
+      }
+
+      self.decoder.decode_type(); // End (TODO: assert)
+
+      return;
     }
 
-    while self.decoder.peek_type() != BytecodeType::End {
-      let p = self.decoder.decode_val(&self.registers);
-      new_frame.write_param(p);
-    }
+    let params = self.decoder.decode_val(&self.registers);
 
-    self.decoder.decode_type(); // End (TODO: assert)
+    match params {
+      Val::Array(array_data) => {
+        for param in &array_data.elements {
+          new_frame.write_param(param.clone())
+        }
+      }
+      _ => panic!("Unexpected non-array params"),
+    }
   }
 
   pub fn decode_parameters(&mut self) -> Vec<Val> {
     let mut res = Vec::<Val>::new();
 
-    let bytecode_type = self.decoder.decode_type();
+    let bytecode_type = self.decoder.peek_type();
 
-    if bytecode_type != BytecodeType::Array {
-      panic!("Not implemented: call instruction not using inline array");
+    if bytecode_type == BytecodeType::Array {
+      self.decoder.decode_type();
+
+      while self.decoder.peek_type() != BytecodeType::End {
+        res.push(self.decoder.decode_val(&self.registers));
+      }
+
+      self.decoder.decode_type(); // End (TODO: assert)
+
+      return res;
     }
 
-    while self.decoder.peek_type() != BytecodeType::End {
-      res.push(self.decoder.decode_val(&self.registers));
+    let params = self.decoder.decode_val(&self.registers);
+
+    match params {
+      Val::Array(array_data) => array_data.elements.clone(),
+      _ => panic!("Unexpected non-array params"),
     }
-
-    self.decoder.decode_type(); // End (TODO: assert)
-
-    return res;
   }
 }
 
 impl StackFrameTrait for BytecodeStackFrame {
-  fn write_this(&mut self, this: Val) {
+  fn write_this(&mut self, const_: bool, this: Val) -> Result<(), Val> {
     self.registers[1] = this;
+    self.const_this = const_;
+    Ok(())
   }
 
   fn write_param(&mut self, param: Val) {
@@ -98,7 +127,9 @@ impl StackFrameTrait for BytecodeStackFrame {
   fn step(&mut self) -> FrameStepResult {
     use InstructionByte::*;
 
-    match self.decoder.decode_instruction() {
+    let instruction_byte = self.decoder.decode_instruction();
+
+    match instruction_byte {
       End => {
         return Ok(FrameStepOk::Pop(CallResult {
           return_: self.registers[0].clone(),
@@ -118,14 +149,26 @@ impl StackFrameTrait for BytecodeStackFrame {
       OpInc => {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut val = self.registers[register_index].clone();
-        val = operations::op_plus(val, Val::Number(1_f64))?; // TODO: BigInt
+
+        match &mut val {
+          Val::Number(n) => *n += 1.0,
+          Val::BigInt(bi) => *bi += 1,
+          _ => val = operations::op_plus(val, 1.0.to_val())?,
+        };
+
         self.registers[register_index] = val;
       }
 
       OpDec => {
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut val = self.registers[register_index].clone();
-        val = operations::op_minus(val, Val::Number(1_f64))?; // TODO: BigInt
+
+        match &mut val {
+          Val::Number(n) => *n -= 1.0,
+          Val::BigInt(bi) => *bi -= 1,
+          _ => val = operations::op_minus(val, 1.0.to_val())?,
+        };
+
         self.registers[register_index] = val;
       }
 
@@ -181,7 +224,10 @@ impl StackFrameTrait for BytecodeStackFrame {
             return Ok(FrameStepOk::Push(new_frame));
           }
           LoadFunctionResult::NativeFunction(native_fn) => {
-            let res = native_fn(&mut Val::Undefined, self.decode_parameters())?;
+            let res = native_fn(
+              ThisWrapper::new(true, &mut Val::Undefined),
+              self.decode_parameters(),
+            )?;
 
             match self.decoder.decode_register_index() {
               Some(return_target) => {
@@ -207,11 +253,11 @@ impl StackFrameTrait for BytecodeStackFrame {
               self.this_target = this_target;
 
               if this_target.is_some() {
-                new_frame.write_this(self.registers[this_target.unwrap()].clone());
+                new_frame.write_this(false, self.registers[this_target.unwrap()].clone())?;
               }
             } else {
               self.this_target = None;
-              new_frame.write_this(self.decoder.decode_val(&self.registers));
+              new_frame.write_this(true, self.decoder.decode_val(&self.registers))?;
             }
 
             self.transfer_parameters(&mut new_frame);
@@ -265,7 +311,10 @@ impl StackFrameTrait for BytecodeStackFrame {
         self.registers[register_index] = target;
       }
 
-      SubCall => {
+      SubCall | ConstSubCall | ThisSubCall => {
+        let const_call = instruction_byte == InstructionByte::ConstSubCall
+          || (instruction_byte == InstructionByte::ThisSubCall && self.const_this);
+
         let mut obj = match self.decoder.peek_type() {
           BytecodeType::Register => {
             self.decoder.decode_type();
@@ -277,13 +326,10 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         let subscript = self.decoder.decode_val(&self.registers);
 
-        let fn_ = operations::op_sub(
-          match &obj {
-            ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
-            ThisArg::Val(val) => val.clone(),
-          },
-          subscript,
-        )?;
+        let fn_ = match &obj {
+          ThisArg::Register(reg_i) => self.registers[reg_i.clone()].sub(subscript)?,
+          ThisArg::Val(val) => val.sub(subscript)?,
+        };
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
@@ -292,10 +338,13 @@ impl StackFrameTrait for BytecodeStackFrame {
           LoadFunctionResult::StackFrame(mut new_frame) => {
             self.transfer_parameters(&mut new_frame);
 
-            new_frame.write_this(match &obj {
-              ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
-              ThisArg::Val(val) => val.clone(),
-            });
+            new_frame.write_this(
+              const_call,
+              match &obj {
+                ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
+                ThisArg::Val(val) => val.clone(),
+              },
+            )?;
 
             self.return_target = self.decoder.decode_register_index();
 
@@ -310,10 +359,11 @@ impl StackFrameTrait for BytecodeStackFrame {
             let params = self.decode_parameters();
 
             let res = match &mut obj {
-              ThisArg::Register(reg_i) => {
-                native_fn(self.registers.get_mut(reg_i.clone()).unwrap(), params)?
-              }
-              ThisArg::Val(val) => native_fn(val, params)?,
+              ThisArg::Register(reg_i) => native_fn(
+                ThisWrapper::new(const_call, self.registers.get_mut(reg_i.clone()).unwrap()),
+                params,
+              )?,
+              ThisArg::Val(val) => native_fn(ThisWrapper::new(true, val), params)?,
             };
 
             match self.decoder.decode_register_index() {
@@ -349,14 +399,16 @@ impl StackFrameTrait for BytecodeStackFrame {
         let class = match self.decoder.decode_val(&self.registers).as_class_data() {
           Some(class) => class,
           None => {
-            return type_error!("value is not a constructor");
+            return Err("value is not a constructor".to_type_error());
           }
         };
 
-        let mut instance = Val::Object(Rc::new(VsObject {
+        let mut instance = VsObject {
           string_map: Default::default(),
+          symbol_map: Default::default(),
           prototype: Some(class.instance_prototype.clone()),
-        }));
+        }
+        .to_val();
 
         match class.constructor {
           Val::Void => {
@@ -375,7 +427,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             }
             LoadFunctionResult::StackFrame(mut new_frame) => {
               self.transfer_parameters(&mut new_frame);
-              new_frame.write_this(instance);
+              new_frame.write_this(false, instance)?;
 
               self.return_target = None;
               self.this_target = self.decoder.decode_register_index();
@@ -383,7 +435,10 @@ impl StackFrameTrait for BytecodeStackFrame {
               return Ok(FrameStepOk::Push(new_frame));
             }
             LoadFunctionResult::NativeFunction(native_fn) => {
-              native_fn(&mut instance, self.decode_parameters())?;
+              native_fn(
+                ThisWrapper::new(false, &mut instance),
+                self.decode_parameters(),
+              )?;
 
               match self.decoder.decode_register_index() {
                 Some(target) => {
@@ -397,12 +452,102 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Throw => {
-        let error = self.decoder.decode_val(&self.registers);
-        return Err(error);
+        return match self.decoder.peek_type() {
+          BytecodeType::Register => {
+            self.decoder.decode_type();
+
+            // Avoid the void->undefined conversion here
+            let error = self.registers[self.decoder.decode_register_index().unwrap()].clone();
+
+            match error {
+              Val::Void => Ok(FrameStepOk::Continue),
+              _ => Err(error),
+            }
+          }
+          _ => Err(self.decoder.decode_val(&self.registers)),
+        };
       }
 
       Import | ImportStar => {
         panic!("TODO: Dynamic imports")
+      }
+
+      SetCatch => {
+        self.catch_setting = Some(CatchSetting {
+          pos: self.decoder.decode_pos(),
+          register: self.decoder.decode_register_index(),
+        });
+      }
+
+      UnsetCatch => {
+        self.catch_setting = None;
+      }
+
+      RequireMutableThis => {
+        if self.const_this {
+          return Err("Cannot mutate this because it is const".to_type_error());
+        }
+      }
+
+      Next => {
+        let iter_i = match self.decoder.decode_register_index() {
+          Some(i) => i,
+          None => panic!("The ignore register is not iterable"),
+        };
+
+        let res_i = self.decoder.decode_register_index();
+
+        let next_fn = self.registers[iter_i].sub("next".to_val())?;
+
+        match next_fn.load_function() {
+          LoadFunctionResult::NotAFunction => {
+            return Err(".next() is not a function".to_type_error())
+          }
+          LoadFunctionResult::NativeFunction(fn_) => {
+            let res = fn_(ThisWrapper::new(false, &mut self.registers[iter_i]), vec![])?;
+
+            if let Some(res_i) = res_i {
+              self.registers[res_i] = res;
+            }
+          }
+          LoadFunctionResult::StackFrame(mut new_frame) => {
+            new_frame.write_this(false, self.registers[iter_i].clone())?;
+
+            self.return_target = res_i;
+            self.this_target = Some(iter_i);
+
+            return Ok(FrameStepOk::Push(new_frame));
+          }
+        };
+      }
+
+      UnpackIterRes => {
+        let iter_res_i = match self.decoder.decode_register_index() {
+          Some(i) => i,
+          None => panic!("Can't unpack the ignore register"),
+        };
+
+        if let Some(value_i) = self.decoder.decode_register_index() {
+          self.registers[value_i] = self.registers[iter_res_i].sub("value".to_val())?;
+        }
+
+        if let Some(done_i) = self.decoder.decode_register_index() {
+          self.registers[done_i] = self.registers[iter_res_i].sub("done".to_val())?;
+        }
+      }
+
+      Cat => {
+        assert!(
+          self.decoder.decode_type() == BytecodeType::Array,
+          "TODO: cat non-inline arrays"
+        );
+
+        let cat_frame = CatStackFrame::from_args(self.decoder.decode_vec_val(&self.registers));
+
+        self.this_target = None;
+        self.return_target = self.decoder.decode_register_index();
+
+        return Ok(FrameStepOk::Push(Box::new(cat_frame)));
       }
     };
 
@@ -427,6 +572,21 @@ impl StackFrameTrait for BytecodeStackFrame {
 
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for BytecodeStackFrame")
+  }
+
+  fn catch_exception(&mut self, exception: Val) -> bool {
+    if let Some(catch_setting) = &self.catch_setting {
+      if let Some(r) = catch_setting.register {
+        self.registers[r] = exception;
+      }
+
+      self.decoder.pos = catch_setting.pos;
+      self.catch_setting = None;
+
+      true
+    } else {
+      false
+    }
   }
 }
 

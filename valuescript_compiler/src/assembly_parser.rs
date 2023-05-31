@@ -9,9 +9,9 @@ use crate::asm::{
   Label, LabelRef, Module, Object, Pointer, Register, Value,
 };
 
-struct AssemblyParser<'a> {
-  content: &'a str,
-  pos: std::iter::Peekable<std::str::Chars<'a>>,
+pub struct AssemblyParser<'a> {
+  pub content: &'a str,
+  pub pos: std::iter::Peekable<std::str::Chars<'a>>,
 }
 
 impl<'a> AssemblyParser<'a> {
@@ -222,6 +222,14 @@ impl<'a> AssemblyParser<'a> {
       ("throw", InstructionByte::Throw),
       ("import", InstructionByte::Import),
       ("import*", InstructionByte::ImportStar),
+      ("set_catch", InstructionByte::SetCatch),
+      ("unset_catch", InstructionByte::UnsetCatch),
+      ("const_subcall", InstructionByte::ConstSubCall),
+      ("require_mutable_this", InstructionByte::RequireMutableThis),
+      ("this_subcall", InstructionByte::ThisSubCall),
+      ("next", InstructionByte::Next),
+      ("unpack_iter_res", InstructionByte::UnpackIterRes),
+      ("cat", InstructionByte::Cat),
     ]);
 
     for (word, instruction) in instruction_word_map {
@@ -425,6 +433,20 @@ impl<'a> AssemblyParser<'a> {
       if c == '}' {
         self.pos.next();
         break;
+      }
+
+      if c == '/' {
+        self.parse_exact("//");
+
+        loop {
+          let c = self.pos.next();
+
+          if c == None || c == Some('\n') {
+            break;
+          }
+        }
+
+        continue;
       }
 
       let optional_label = self.test_label();
@@ -651,10 +673,32 @@ impl<'a> AssemblyParser<'a> {
       Throw => Instruction::Throw(self.assemble_value()),
       Import => Instruction::Import(self.assemble_value(), self.assemble_register()),
       ImportStar => Instruction::ImportStar(self.assemble_value(), self.assemble_register()),
+      SetCatch => Instruction::SetCatch(self.assemble_label_read(), self.assemble_register()),
+      UnsetCatch => Instruction::UnsetCatch,
+      ConstSubCall => Instruction::ConstSubCall(
+        self.assemble_value(),
+        self.assemble_value(),
+        self.assemble_value(),
+        self.assemble_register(),
+      ),
+      RequireMutableThis => Instruction::RequireMutableThis,
+      ThisSubCall => Instruction::ThisSubCall(
+        self.assemble_value(),
+        self.assemble_value(),
+        self.assemble_value(),
+        self.assemble_register(),
+      ),
+      Next => Instruction::Next(self.assemble_register(), self.assemble_register()),
+      UnpackIterRes => Instruction::UnpackIterRes(
+        self.assemble_register(),
+        self.assemble_register(),
+        self.assemble_register(),
+      ),
+      Cat => Instruction::Cat(self.assemble_value(), self.assemble_register()),
     }
   }
 
-  fn assemble_value(&mut self) -> Value {
+  pub fn assemble_value(&mut self) -> Value {
     self.parse_optional_whitespace();
 
     match self.pos.peek() {
@@ -740,7 +784,7 @@ impl<'a> AssemblyParser<'a> {
       let next = self.parse_one_of(&[",", "]"]);
 
       if next == "," {
-        self.pos.next(); // TODO: Assert whitespace
+        self.parse_optional_whitespace();
         continue;
       }
 
@@ -769,9 +813,13 @@ impl<'a> AssemblyParser<'a> {
   fn assemble_builtin(&mut self) -> Builtin {
     self.parse_exact("$");
 
-    Builtin {
-      name: self.parse_one_of(&BUILTIN_NAMES),
+    let name = self.parse_identifier();
+
+    if !BUILTIN_NAMES.contains(&name.as_str()) {
+      panic!("Unrecognized builtin ${}", name);
     }
+
+    Builtin { name }
   }
 
   fn test_label(&self) -> Option<String> {
@@ -875,6 +923,7 @@ impl<'a> AssemblyParser<'a> {
           let name = self.parse_identifier();
           Value::Pointer(Pointer { name })
         }
+        '$' => Value::Builtin(self.assemble_builtin()),
         '}' => {
           self.pos.next();
           break object;

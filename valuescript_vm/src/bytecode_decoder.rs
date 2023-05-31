@@ -6,17 +6,17 @@ use num_bigint::Sign;
 use valuescript_common::InstructionByte;
 
 use crate::builtins::BUILTIN_VALS;
-use crate::vs_array::VsArray;
+use crate::bytecode::Bytecode;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
 use crate::vs_object::VsObject;
-use crate::vs_pointer::VsPointer;
+use crate::vs_symbol::VsSymbol;
+use crate::vs_value::ToVal;
 use crate::vs_value::Val;
-use crate::vs_value::ValTrait;
 
 pub struct BytecodeDecoder {
   // TODO: Enable borrow usage to avoid the rc overhead
-  pub data: Rc<Vec<u8>>,
+  pub bytecode: Rc<Bytecode>,
   pub pos: usize,
 }
 
@@ -74,13 +74,13 @@ impl BytecodeType {
 
 impl BytecodeDecoder {
   pub fn decode_byte(&mut self) -> u8 {
-    let byte = self.data[self.pos];
+    let byte = self.bytecode[self.pos];
     self.pos += 1;
     return byte;
   }
 
   pub fn peek_byte(&self) -> u8 {
-    return self.data[self.pos];
+    return self.bytecode[self.pos];
   }
 
   pub fn decode_type(&mut self) -> BytecodeType {
@@ -99,52 +99,65 @@ impl BytecodeDecoder {
       BytecodeType::Null => Val::Null,
       BytecodeType::False => Val::Bool(false),
       BytecodeType::True => Val::Bool(true),
-      BytecodeType::SignedByte => Val::Number(self.decode_signed_byte() as f64),
-      BytecodeType::Number => Val::Number(self.decode_number()),
-      BytecodeType::String => Val::String(Rc::new(self.decode_string())),
-      BytecodeType::Array => {
-        let mut vals: Vec<Val> = Vec::new();
-
-        while self.peek_type() != BytecodeType::End {
-          vals.push(self.decode_val(registers));
-        }
-
-        self.decode_type(); // End (TODO: assert)
-
-        Val::Array(Rc::new(VsArray::from(vals)))
-      }
+      BytecodeType::SignedByte => (self.decode_signed_byte() as f64).to_val(),
+      BytecodeType::Number => self.decode_number().to_val(),
+      BytecodeType::String => self.decode_string().to_val(),
+      BytecodeType::Array => self.decode_vec_val(registers).to_val(),
       BytecodeType::Object => {
-        let mut obj: BTreeMap<String, Val> = BTreeMap::new();
+        let mut string_map: BTreeMap<String, Val> = BTreeMap::new();
+        let mut symbol_map: BTreeMap<VsSymbol, Val> = BTreeMap::new();
 
         while self.peek_type() != BytecodeType::End {
-          obj.insert(
-            self.decode_val(registers).val_to_string(),
-            self.decode_val(registers),
-          );
+          let key = self.decode_val(registers);
+          let value = self.decode_val(registers);
+
+          match key {
+            Val::String(string) => string_map.insert(string.to_string(), value),
+            Val::Symbol(symbol) => symbol_map.insert(symbol, value),
+            key => string_map.insert(key.to_string(), value),
+          };
         }
 
         self.decode_type(); // End (TODO: assert)
 
-        Val::Object(Rc::new(VsObject {
-          string_map: obj,
+        VsObject {
+          string_map,
+          symbol_map,
           prototype: None,
-        }))
+        }
+        .to_val()
       }
       BytecodeType::Function => self.decode_function_header(),
-      BytecodeType::Pointer => self.decode_pointer(),
-      BytecodeType::Register => registers[self.decode_register_index().unwrap()].clone(),
-      BytecodeType::Builtin => Val::Static(BUILTIN_VALS[self.decode_varsize_uint()]),
-      BytecodeType::Class => Val::Class(Rc::new(VsClass {
+      BytecodeType::Pointer => self.decode_pointer(registers),
+      BytecodeType::Register => match registers[self.decode_register_index().unwrap()].clone() {
+        Val::Void => Val::Undefined,
+        val => val,
+      },
+      BytecodeType::Builtin => BUILTIN_VALS[self.decode_varsize_uint()](),
+      BytecodeType::Class => VsClass {
         constructor: self.decode_val(registers),
         instance_prototype: self.decode_val(registers),
-      })),
-      BytecodeType::BigInt => Val::BigInt(self.decode_bigint()),
+      }
+      .to_val(),
+      BytecodeType::BigInt => self.decode_bigint().to_val(),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
   }
 
+  pub fn decode_vec_val(&mut self, registers: &Vec<Val>) -> Vec<Val> {
+    let mut vals: Vec<Val> = Vec::new();
+
+    while self.peek_type() != BytecodeType::End {
+      vals.push(self.decode_val(registers));
+    }
+
+    self.decode_type(); // End (TODO: assert)
+
+    vals
+  }
+
   pub fn decode_signed_byte(&mut self) -> i8 {
-    let res = self.data[self.pos] as i8;
+    let res = self.bytecode[self.pos] as i8;
     self.pos += 1;
     return res;
   }
@@ -152,7 +165,7 @@ impl BytecodeDecoder {
   pub fn decode_number(&mut self) -> f64 {
     let mut buf = [0u8; 8];
     let next_pos = self.pos + 8;
-    buf.clone_from_slice(&self.data[self.pos..next_pos]);
+    buf.clone_from_slice(&self.bytecode[self.pos..next_pos]);
     self.pos = next_pos;
     return f64::from_le_bytes(buf);
   }
@@ -167,7 +180,7 @@ impl BytecodeDecoder {
     };
 
     let len = self.decode_varsize_uint();
-    let bytes = &self.data[self.pos..self.pos + len];
+    let bytes = &self.bytecode[self.pos..self.pos + len];
     self.pos += len;
 
     return BigInt::from_bytes_le(sign, bytes);
@@ -177,7 +190,7 @@ impl BytecodeDecoder {
     let len = self.decode_varsize_uint();
     let start = self.pos; // Start after decoding varsize
     let end = self.pos + len;
-    let res = String::from_utf8_lossy(&self.data[start..end]).into_owned();
+    let res = String::from_utf8_lossy(&self.bytecode[start..end]).into_owned();
     self.pos = end;
 
     return res;
@@ -218,12 +231,12 @@ impl BytecodeDecoder {
 
   pub fn clone_at(&self, pos: usize) -> BytecodeDecoder {
     return BytecodeDecoder {
-      data: self.data.clone(),
-      pos: pos,
+      bytecode: self.bytecode.clone(),
+      pos,
     };
   }
 
-  pub fn decode_pointer(&mut self) -> Val {
+  pub fn decode_pointer(&mut self, registers: &Vec<Val>) -> Val {
     let from_pos = self.pos;
     let pos = self.decode_pos();
 
@@ -239,7 +252,22 @@ impl BytecodeDecoder {
       }
     }
 
-    return VsPointer::new(&self.data, pos);
+    let cached_val = self
+      .bytecode
+      .cache
+      .borrow()
+      .get(&pos)
+      .map(|val| val.clone());
+
+    match cached_val {
+      Some(val) => val,
+      None => {
+        let val = self.clone_at(pos).decode_val(registers);
+        self.bytecode.cache.borrow_mut().insert(pos, val.clone());
+
+        val
+      }
+    }
   }
 
   pub fn decode_function_header(&mut self) -> Val {
@@ -247,13 +275,14 @@ impl BytecodeDecoder {
     let register_count = self.decode_byte() as usize;
     let parameter_count = self.decode_byte() as usize;
 
-    return Val::Function(Rc::new(VsFunction {
-      bytecode: self.data.clone(),
-      register_count: register_count,
-      parameter_count: parameter_count,
+    return VsFunction {
+      bytecode: self.bytecode.clone(),
+      register_count,
+      parameter_count,
       start: self.pos,
       binds: Vec::new(),
-    }));
+    }
+    .to_val();
   }
 
   pub fn decode_instruction(&mut self) -> InstructionByte {

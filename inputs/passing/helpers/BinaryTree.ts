@@ -1,4 +1,6 @@
-export default class BinaryTree<T> {
+import type NotNullish from "./NotNullish.ts";
+
+export default class BinaryTree<T extends NotNullish> {
   left?: BinaryTree<T>;
   value?: T;
   right?: BinaryTree<T>;
@@ -18,21 +20,45 @@ export default class BinaryTree<T> {
     }
   }
 
-  toArray() {
-    let res: T[] = [];
+  [Symbol.iterator]() {
+    let iter = new BinaryTreeIterator<T>();
+    iter.stack.push({ type: "tree", data: this });
 
-    if (this.left) {
-      res = res.concat(this.left.toArray());
+    return iter;
+  }
+}
+
+class BinaryTreeIterator<T extends NotNullish> {
+  stack:
+    ({ type: "tree"; data: BinaryTree<T> } | { type: "value"; data: T })[] = [];
+
+  next(): { done: true } | { value: T; done: false } {
+    const item = this.stack.pop();
+
+    if (item === undefined) {
+      return { done: true };
     }
 
-    if (this.value !== undefined) {
-      res.push(this.value);
+    if (item.type === "tree") {
+      this.pushTree(item.data.right);
+      this.pushValue(item.data.value);
+      this.pushTree(item.data.left);
+
+      return this.next();
     }
 
-    if (this.right) {
-      res = res.concat(this.right.toArray());
-    }
+    return { value: item.data, done: false };
+  }
 
-    return res;
+  pushTree(tree?: BinaryTree<T>) {
+    if (tree !== undefined) {
+      this.stack.push({ type: "tree", data: tree });
+    }
+  }
+
+  pushValue(value?: T) {
+    if (value !== undefined) {
+      this.stack.push({ type: "value", data: value });
+    }
   }
 }
