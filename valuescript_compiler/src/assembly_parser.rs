@@ -393,7 +393,14 @@ impl<'a> AssemblyParser<'a> {
   fn assemble_function(&mut self) -> Function {
     let mut function = Function::default();
 
-    self.parse_exact("function(");
+    self.parse_exact("function");
+
+    if self.test_chars("*") {
+      advance_chars(&mut self.pos, 1);
+      function.is_generator = true;
+    }
+
+    self.parse_exact("(");
 
     loop {
       self.parse_optional_whitespace();
