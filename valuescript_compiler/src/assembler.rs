@@ -68,7 +68,10 @@ impl Assembler {
   }
 
   fn function(&mut self, function: &Function) {
-    self.output.push(ValueType::Function as u8);
+    self.output.push(match function.is_generator {
+      false => ValueType::Function,
+      true => ValueType::GeneratorFunction,
+    } as u8);
 
     self.fn_data = Default::default();
 
@@ -421,6 +424,7 @@ enum ValueType {
   Class = 0x11,
   Lazy = 0x12,
   BigInt = 0x13,
+  GeneratorFunction = 0x14,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone)]
