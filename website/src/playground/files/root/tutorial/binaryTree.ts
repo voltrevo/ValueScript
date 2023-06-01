@@ -7,7 +7,7 @@
 // language itself. In JavaScript you'd need to carefully follow the functional
 // rules, but in ValueScript it's free.
 
-import BinaryTree from "../lib/BinaryTree.ts";
+import { BinaryTree } from "../lib/mod.ts";
 
 export default function main() {
   let tree = new BinaryTree<number>();
@@ -21,7 +21,7 @@ export default function main() {
   tree.insert(3);
   tree.insert(4);
 
-  return [treeSnapshot.toArray(), tree.toArray()];
+  return [[...treeSnapshot], [...tree]];
   // JavaScript:  [[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]]
   // ValueScript: [[1, 2, 5], [1, 2, 3, 4, 5]]
 }

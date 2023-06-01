@@ -15,7 +15,7 @@ export default function () {
     nums.sort(), // [1, 10, 3]
     "b" + "a" + +"a" + "a", // "baNaNa"
   ];
-  //                           JavaScript and ValueScript agree on these.
+  // JavaScript and ValueScript agree on these.
 }
 
 // We're not sure yet where exactly to draw this line. Another notable example

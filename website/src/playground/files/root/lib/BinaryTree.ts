@@ -20,21 +20,21 @@ export default class BinaryTree<T extends NotNullish> {
     }
   }
 
-  toArray() {
-    let res: T[] = [];
-
+  *[Symbol.iterator](): Generator<T> {
     if (this.left) {
-      res.push(...this.left.toArray());
+      for (const value of this.left) {
+        yield value;
+      }
     }
 
-    if (this.value !== undefined) {
-      res.push(this.value);
+    if (this.value) {
+      yield this.value;
     }
 
     if (this.right) {
-      res.push(...this.right.toArray());
+      for (const value of this.right) {
+        yield value;
+      }
     }
-
-    return res;
   }
 }

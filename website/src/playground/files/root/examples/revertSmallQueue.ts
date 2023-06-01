@@ -1,4 +1,4 @@
-import type { NotNullish } from "../lib/util.ts";
+import type { NotNullish } from "../lib/mod.ts";
 
 export default function main() {
   let a = new SmallQueue(["item1"]);

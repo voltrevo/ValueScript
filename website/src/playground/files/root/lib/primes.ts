@@ -1,159 +1,85 @@
-export function factorize(n: number): number[] {
-  let factors: number[] = [];
-  let p = 2;
+export function* factorize(n: number) {
+  for (const p of primes()) {
+    if (p * p > n) {
+      yield n;
+      return;
+    }
 
-  while (true) {
     while (n % p === 0) {
-      factors.push(p);
+      yield p;
       n /= p;
     }
 
     if (n === 1) {
-      return factors;
-    }
-
-    p = nextOddPrime(p);
-
-    if (p * p > n) {
-      factors.push(n);
-      return factors;
+      return;
     }
   }
 }
 
-export function factorizeAsPowers(n: number): [number, number][] {
+export function* factorizeAsPowers(n: number) {
   const factors = factorize(n);
 
-  if (factors.length === 0) {
-    return [];
-  }
-
-  const result: [number, number][] = [];
-  let currentFactor = factors[0];
+  let currentFactor: number | undefined;
   let currentPower = 1;
 
-  for (let i = 1; i < factors.length; i++) {
-    const factor = factors[i];
+  for (const factor of factors) {
+    currentFactor = factor;
+    break;
+  }
 
+  if (currentFactor === undefined) {
+    return;
+  }
+
+  for (const factor of factors) {
     if (factor === currentFactor) {
       currentPower += 1;
     } else {
-      result.push([currentFactor, currentPower]);
+      yield [currentFactor, currentPower];
       currentFactor = factor;
       currentPower = 1;
     }
   }
 
-  result.push([currentFactor, currentPower]);
-
-  return result;
+  yield [currentFactor, currentPower];
 }
 
-export function nextOddPrime(n: number): number {
-  n += 1 + (n % 2); // Next odd number
+export function* primes() {
+  yield 2;
+  yield 3;
+  yield 5;
+  yield 7;
+  yield 11;
+  yield 13;
+  yield 17;
+  yield 19;
+  yield 23;
+  yield 29;
 
-  while (!isOddPrime(n)) {
-    n += 2;
-  }
+  let base = 30;
+  let offsets = [1, 7, 11, 13, 17, 19, 23, 29];
 
-  return n;
-}
-
-export function isOddPrime(n: number): boolean {
-  let i = 3;
-
-  while (i * i <= n) {
-    if (n % i === 0) {
-      return false;
-    }
-
-    i += 2;
-  }
-
-  return true;
-}
-
-export class PrimeGenerator {
-  pcg: PrimeCandidatesGenerator;
-
-  constructor() {
-    this.pcg = new PrimeCandidatesGenerator();
-  }
-
-  next() {
-    while (true) {
-      const candidate = this.pcg.next();
+  while (true) {
+    for (const offset of offsets) {
+      let candidate = base + offset;
 
       if (isPrime(candidate)) {
-        return candidate;
+        yield candidate;
       }
     }
+
+    base += 30;
   }
 }
 
 export function isPrime(n: number) {
-  let pcg = new PrimeCandidatesGenerator();
-
-  while (true) {
-    const pc = pcg.next();
-
-    if (pc * pc > n) {
+  for (const p of primes()) {
+    if (p * p > n) {
       return true;
     }
 
-    if (n % pc === 0) {
+    if (n % p === 0) {
       return false;
     }
-  }
-}
-
-export class PrimeCandidatesGenerator {
-  gen: Gen235 | GenMod30;
-
-  constructor() {
-    this.gen = new Gen235();
-  }
-
-  next() {
-    let c = this.gen.next();
-
-    if (c !== undefined) {
-      return c;
-    }
-
-    this.gen = new GenMod30();
-    return this.gen.next();
-  }
-}
-
-class Gen235 {
-  nums: number[];
-  i: number;
-
-  constructor() {
-    this.nums = [2, 3, 5];
-    this.i = 0;
-  }
-
-  next() {
-    return this.nums[this.i++];
-  }
-}
-
-class GenMod30 {
-  nums: number[];
-  i: number;
-
-  constructor() {
-    this.nums = [1, 7, 11, 13, 17, 19, 23, 29];
-    this.i = 1;
-  }
-
-  next() {
-    const rem = this.i % 8;
-    const rounds = (this.i - rem) / 8;
-    this.i++;
-
-    return 30 * rounds + this.nums[rem];
   }
 }

@@ -365,9 +365,17 @@ impl ModuleCompiler {
     use swc_ecma_ast::ExportSpecifier::*;
     use swc_ecma_ast::ModuleExportName;
 
+    if en.type_only {
+      return;
+    }
+
     for specifier in &en.specifiers {
       match specifier {
         Named(named) => {
+          if named.is_type_only {
+            continue;
+          }
+
           let orig_name = match &named.orig {
             ModuleExportName::Ident(ident) => ident,
             ModuleExportName::Str(_) => {
