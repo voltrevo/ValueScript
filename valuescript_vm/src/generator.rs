@@ -172,6 +172,7 @@ impl StackFrameTrait for GeneratorFrame {
         .to_dynamic_val(),
         this: take(&mut self.generator).to_dynamic_val(),
       })),
+      Ok(FrameStepOk::YieldStar(_)) => panic!("TODO: yield* (as instruction)"),
     }
   }
 

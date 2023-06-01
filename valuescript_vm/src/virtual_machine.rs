@@ -88,6 +88,7 @@ impl VirtualMachine {
       }
       // TODO: Internal errors
       FrameStepOk::Yield(_) => return self.handle_exception("Unexpected yield".to_error()),
+      FrameStepOk::YieldStar(_) => return self.handle_exception("Unexpected yield*".to_error()),
     }
 
     Ok(())
