@@ -4,8 +4,10 @@
 // you can see `factorize` has been included, as well as the `primes` and
 // `isPrime` functions it depends on.
 //
-// However, the primes module also defines:
+// However, the lib module also defines:
 // - `factorizeAsPowers`
+// - `BinaryTree`
+// - `NotNullish`
 //
 // These definitions are not included, because the definitions exported by this
 // module do not need them. Omitting those unused definitions reduces the
