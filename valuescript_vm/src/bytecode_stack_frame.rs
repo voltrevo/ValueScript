@@ -553,7 +553,10 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Yield => {
-        panic!("TODO: yield");
+        let val = self.decoder.decode_val(&self.registers);
+        self.decoder.decode_register_index(); // TODO: Use this
+
+        return Ok(FrameStepOk::Yield(val));
       }
 
       YieldStar => {

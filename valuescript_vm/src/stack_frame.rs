@@ -12,6 +12,7 @@ pub enum FrameStepOk {
   Continue,
   Pop(CallResult),
   Push(StackFrame),
+  Yield(Val),
 }
 
 pub type FrameStepResult = Result<FrameStepOk, Val>;

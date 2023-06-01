@@ -154,12 +154,20 @@ impl StackFrameTrait for GeneratorFrame {
     let fsr = self.generator.frame.step();
 
     match fsr {
-      Err(_) => Err("TODO: exceptions inside generators".to_error()),
+      Err(_) => fsr, // TODO: Stack unwind internal stack first
       Ok(FrameStepOk::Continue) | Ok(FrameStepOk::Push(_)) => fsr,
       Ok(FrameStepOk::Pop(call_result)) => Ok(FrameStepOk::Pop(CallResult {
         return_: IterationResult {
           value: call_result.return_, // TODO: Assert call_result.this is undefined?
           done: true,
+        }
+        .to_dynamic_val(),
+        this: take(&mut self.generator).to_dynamic_val(),
+      })),
+      Ok(FrameStepOk::Yield(val)) => Ok(FrameStepOk::Pop(CallResult {
+        return_: IterationResult {
+          value: val,
+          done: false,
         }
         .to_dynamic_val(),
         this: take(&mut self.generator).to_dynamic_val(),
