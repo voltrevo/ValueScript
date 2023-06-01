@@ -5,7 +5,7 @@ use queues::*;
 
 use swc_common::Spanned;
 
-use crate::asm::{Array, Instruction, Label, Object, Register, Value};
+use crate::asm::{Array, Builtin, Instruction, Label, Object, Register, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
 use crate::scope::{NameId, OwnerId};
@@ -35,7 +35,7 @@ impl ReleaseChecker {
 impl CompiledExpression {
   pub fn empty() -> CompiledExpression {
     CompiledExpression {
-      value: Value::Void, // TODO: Allocate register instead
+      value: Value::Void, // TODO: Allocate register instead (why?)
       nested_registers: vec![],
       release_checker: ReleaseChecker::new(false),
     }
@@ -1209,6 +1209,13 @@ impl<'a> ExpressionCompiler<'a> {
     yield_expr: &swc_ecma_ast::YieldExpr,
     target_register: Option<Register>,
   ) -> CompiledExpression {
+    // TODO: Implement and use the yield* instruction instead
+    // It will use the stack within the generator which avoids reloading the generator's stack each
+    // time.
+    if yield_expr.delegate {
+      return self.yield_star_expr(yield_expr, target_register);
+    }
+
     let mut nested_registers = Vec::<Register>::new();
 
     let arg_compiled = match &yield_expr.arg {
@@ -1225,12 +1232,99 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let instr = match yield_expr.delegate {
-      false => Instruction::Yield(self.fnc.use_(arg_compiled), dst.clone()),
-      true => Instruction::YieldStar(self.fnc.use_(arg_compiled), dst.clone()),
-    };
+    let instr = Instruction::Yield(self.fnc.use_(arg_compiled), dst.clone());
 
     self.fnc.push(instr);
+
+    return CompiledExpression::new(Value::Register(dst), nested_registers);
+  }
+
+  pub fn yield_star_expr(
+    &mut self,
+    yield_expr: &swc_ecma_ast::YieldExpr,
+    target_register: Option<Register>,
+  ) -> CompiledExpression {
+    let mut nested_registers = Vec::<Register>::new();
+
+    let arg_compiled = match &yield_expr.arg {
+      Some(arg) => self.compile(arg, None),
+      None => CompiledExpression::empty(),
+    };
+
+    let dst = match target_register {
+      Some(t) => t,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
+        tmp
+      }
+    };
+
+    let iter_reg = self.fnc.allocate_numbered_reg(&"_iter".to_string());
+    let iter_res_reg = self.fnc.allocate_numbered_reg(&"_iter_res".to_string());
+    let done_reg = self.fnc.allocate_numbered_reg(&"_done".to_string());
+
+    let test_label = Label {
+      name: self
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"yield_star_test".to_string()),
+    };
+
+    let next_label = Label {
+      name: self
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"yield_star_next".to_string()),
+    };
+
+    let end_label = Label {
+      name: self
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"yield_star_end".to_string()),
+    };
+
+    let instr = Instruction::ConstSubCall(
+      self.fnc.use_(arg_compiled),
+      Value::Builtin(Builtin {
+        name: "SymbolIterator".to_string(),
+      }),
+      Value::Array(Box::new(Array::default())),
+      iter_reg.clone(),
+    );
+
+    self.fnc.push(instr);
+
+    self.fnc.push(Instruction::Jmp(next_label.ref_()));
+
+    self.fnc.label(test_label.clone());
+
+    self.fnc.push(Instruction::JmpIf(
+      Value::Register(done_reg.clone()),
+      end_label.ref_(),
+    ));
+
+    self.fnc.push(Instruction::Yield(
+      Value::Register(dst.clone()),
+      Register::Ignore,
+    ));
+
+    self.fnc.label(next_label);
+
+    self
+      .fnc
+      .push(Instruction::Next(iter_reg, iter_res_reg.clone()));
+
+    self.fnc.push(Instruction::UnpackIterRes(
+      iter_res_reg,
+      dst.clone(),
+      done_reg,
+    ));
+
+    self.fnc.push(Instruction::Jmp(test_label.ref_()));
+
+    self.fnc.label(end_label);
 
     return CompiledExpression::new(Value::Register(dst), nested_registers);
   }
