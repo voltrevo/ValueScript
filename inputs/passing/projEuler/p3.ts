@@ -3,5 +3,5 @@
 import { factorize } from "./helpers/primes.ts";
 
 export default function main() {
-  return factorize(600851475143);
+  return [...factorize(600851475143)];
 }

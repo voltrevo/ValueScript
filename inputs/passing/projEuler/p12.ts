@@ -18,15 +18,11 @@ export default function main() {
 }
 
 function countFactors(n: number): number {
-  const primeFactors = factorize(n);
-
   let count = 1;
   let power = 0;
   let prevFactor = 0;
 
-  for (let i = 0; i <= primeFactors.length; i++) {
-    const factor = primeFactors[i];
-
+  for (const factor of factorize(n)) {
     if (factor !== prevFactor) {
       count *= power + 1;
       power = 1;

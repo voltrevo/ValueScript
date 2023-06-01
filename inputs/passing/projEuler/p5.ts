@@ -10,7 +10,7 @@ export default function main() {
   let n: number[] = [];
 
   for (let i = 2; i <= 20; i++) {
-    n = lcm(n, factorize(i));
+    n = lcm(n, [...factorize(i)]);
   }
 
   return n.reduce((a, b) => a * b);

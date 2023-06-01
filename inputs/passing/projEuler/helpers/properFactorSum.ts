@@ -2,7 +2,7 @@ import { factorizeAsPowers } from "./primes.ts";
 
 export function properFactorSum(n: number) {
   const factors = factorizeAsPowers(n);
-  return 1 + factorSumMinus1(factors) - n;
+  return 1 + factorSumMinus1([...factors]) - n;
 }
 
 function factorSumMinus1(factors: [number, number][]): number {

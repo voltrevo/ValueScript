@@ -1,12 +1,9 @@
-import { PrimeGenerator } from "./helpers/primes.ts";
+import { primes } from "./helpers/primes.ts";
 
 export default function main() {
   let sum = 0;
-  let gen = new PrimeGenerator();
 
-  while (true) {
-    const p = gen.next();
-
+  for (const p of primes()) {
     if (p >= 2000000) {
       return sum;
     }
