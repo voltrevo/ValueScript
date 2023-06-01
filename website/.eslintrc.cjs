@@ -29,7 +29,15 @@ module.exports = {
     "comma-dangle": ["error", "always-multiline"],
     "react/react-in-jsx-scope": "off",
     "quote-props": ["error", "consistent-as-needed"],
-    "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+        destructuredArrayIgnorePattern: "^_",
+      },
+    ],
     "prettier/prettier": "error",
     "no-constant-condition": "off",
     "no-empty": ["error", { allowEmptyCatch: true }],
