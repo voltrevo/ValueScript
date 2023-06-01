@@ -1,8 +1,8 @@
 // ValueScript comes with built-in bundling and tree-shaking.
 //
-// In this example, we import `factorize` from the primes module. In the
-// assembly, you can see `factorize` has been included, as well as the
-// `primes` and `isPrime` functions it depends on.
+// In this example, we import `factorize` from the lib module. In the assembly
+// you can see `factorize` has been included, as well as the `primes` and
+// `isPrime` functions it depends on.
 //
 // However, the primes module also defines:
 // - `factorizeAsPowers`
