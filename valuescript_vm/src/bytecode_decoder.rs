@@ -250,7 +250,10 @@ impl BytecodeDecoder {
       let type_ = self.clone_at(pos).decode_type();
 
       match type_ {
-        BytecodeType::Function | BytecodeType::Class | BytecodeType::Unrecognized => {}
+        BytecodeType::Function
+        | BytecodeType::GeneratorFunction
+        | BytecodeType::Class
+        | BytecodeType::Unrecognized => {}
         _ => {
           panic!("Invalid: {:?} pointer that points backwards", type_);
         }

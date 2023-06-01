@@ -17,19 +17,15 @@ export function* factorize(n: number) {
 }
 
 export function* factorizeAsPowers(n: number) {
-  const factors = factorize(n);
+  let factors = factorize(n);
 
-  let currentFactor: number | undefined;
-  let currentPower = 1;
-
-  for (const factor of factors) {
-    currentFactor = factor;
-    break;
-  }
+  let currentFactor = factors.next().value;
 
   if (currentFactor === undefined) {
     return;
   }
+
+  let currentPower = 1;
 
   for (const factor of factors) {
     if (factor === currentFactor) {
