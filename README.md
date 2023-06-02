@@ -433,7 +433,7 @@ not the subset of ValueScript that has actually been implemented.
 - BigInt
 - Iterators
 - Spread operator on iterables
-- Generators (except `yield*`)
+- Generators
 - Many unusual JS things:
   - `[] + [] -> ""`
   - `[10, 1, 3].sort() -> [1, 10, 3]`
@@ -472,7 +472,6 @@ not the subset of ValueScript that has actually been implemented.
   - `{} === {} -> true`
   - JS: `-> false`
   - This is a value semantics thing - objects don't have identity
-- `yield*`
 - Object spreading
 - Rest params
 - Async functions

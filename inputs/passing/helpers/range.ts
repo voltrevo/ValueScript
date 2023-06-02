@@ -1,20 +1,62 @@
-export default function range<T = never>(iter?: Iterable<T> | Iterator<T>) {
-  return new Range<T>(iter);
+import { primes } from "../projEuler/helpers/primes.ts";
+
+export default function range<T>(iterable: Iterable<T>) {
+  return new Range(iterable);
 }
 
-class Range<T = never> implements Iterable<T> {
+// TODO: Static methods
+export function Range_from<T = never>(
+  iter?: Iterable<T> | Iterator<T> | (() => Iterable<T>),
+) {
+  if (iter === undefined) {
+    return Range_fromIterable([]);
+  }
+
+  if (typeof iter === "function") {
+    return Range_fromIterable(iter());
+  }
+
+  // TODO: `in` operator
+  if (hasKey(iter, Symbol.iterator)) {
+    return Range_fromIterable(iter);
+  }
+
+  if (hasKey(iter, "next")) {
+    return Range_fromIterator(iter);
+  }
+
+  never(iter);
+}
+
+export function Range_fromIterable<T = never>(iterable: Iterable<T> = []) {
+  return new Range<T>(iterable);
+}
+
+export function Range_fromIterator<T = never>(iterator: Iterator<T>) {
+  return new Range<T>({
+    [Symbol.iterator]: () => iterator,
+  });
+}
+
+export function Range_numbers(start: number, end: number) {
+  function* res() {
+    for (let i = start; i < end; i++) {
+      yield i;
+    }
+  }
+
+  return Range_fromIterable(res());
+}
+
+export function Range_primes() {
+  return new Range(primes());
+}
+
+export class Range<T = never> implements Iterable<T> {
   iterable: Iterable<T>;
 
-  constructor(iter?: Iterable<T> | Iterator<T>) {
-    if (iter === undefined) {
-      this.iterable = [];
-    } else if (isIterator(iter)) {
-      this.iterable = {
-        [Symbol.iterator]: () => iter,
-      };
-    } else {
-      this.iterable = iter;
-    }
+  constructor(iterable: Iterable<T>) {
+    this.iterable = iterable;
   }
 
   [Symbol.iterator]() {
@@ -37,7 +79,7 @@ class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return Range_fromIterable(res());
   }
 
   count() {
@@ -106,7 +148,7 @@ class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return Range_fromIterable(res());
   }
 
   flatMap<MappedT>(fn: (x: T) => Iterable<MappedT>) {
@@ -120,7 +162,7 @@ class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return Range_fromIterable(res());
   }
 
   filter(fn: (x: T) => boolean) {
@@ -134,7 +176,7 @@ class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return Range_fromIterable(res());
   }
 
   // TODO: Negative indexes
@@ -165,8 +207,106 @@ class Range<T = never> implements Iterable<T> {
 
     return res;
   }
+
+  indexed() {
+    const iterable = this.iterable;
+
+    function* res() {
+      let i = 0;
+
+      for (const x of iterable) {
+        yield [i, x] as [number, T];
+        i++;
+      }
+    }
+
+    return Range_fromIterable(res());
+  }
+
+  append<U>(newItems: Iterable<U>) {
+    const iterable = this.iterable;
+
+    function* res() {
+      yield* iterable;
+      yield* newItems;
+    }
+
+    return Range_fromIterable(res());
+  }
+
+  prepend<U>(newItems: Iterable<U>) {
+    const iterable = this.iterable;
+
+    function* res() {
+      yield* newItems;
+      yield* iterable;
+    }
+
+    return Range_fromIterable(res());
+  }
+
+  zip<U>(other: Iterable<U>) {
+    const iterable = this.iterable;
+
+    function* res() {
+      let iter1 = iterable[Symbol.iterator]();
+      let iter2 = other[Symbol.iterator]();
+
+      while (true) {
+        const x1 = iter1.next();
+        const x2 = iter2.next();
+
+        if (x1.done || x2.done) {
+          break;
+        }
+
+        yield [x1.value, x2.value] as [T, U];
+      }
+    }
+
+    return Range_fromIterable(res());
+  }
+
+  skip(n: number) {
+    const iterable = this.iterable;
+
+    function* res() {
+      let iter = iterable[Symbol.iterator]();
+
+      for (let i = 0; i < n; i++) {
+        iter.next();
+      }
+
+      while (true) {
+        const x = iter.next();
+
+        if (x.done) {
+          break;
+        }
+
+        yield x.value;
+      }
+    }
+
+    return Range_fromIterable(res());
+  }
+
+  reduce<S>(state: S, fn: (state: S, x: T) => S) {
+    for (const x of this.iterable) {
+      state = fn(state, x);
+    }
+
+    return state;
+  }
 }
 
-function isIterator<T>(iter: Iterable<T> | Iterator<T>): iter is Iterator<T> {
-  return (iter as unknown as Record<string, unknown>).next !== undefined;
+function hasKey<Obj, K extends string | symbol>(
+  obj: unknown,
+  key: K,
+): obj is Obj & Record<K, unknown> {
+  return (obj as Record<K, unknown>)[key] !== undefined;
+}
+
+function never(x: never): never {
+  throw new Error(`Unexpected value: ${x}`);
 }

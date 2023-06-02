@@ -5,7 +5,7 @@ import { primes } from "../projEuler/helpers/primes.ts";
 
 export default function main() {
   return [
-    range().count(),
+    range([]).count(),
     range([1, 2, 3]).limit(2).count(),
     [...range(primes()).limit(5)],
     [...range(primes()).filter((p) => p % 5 === 1).limit(5)],
