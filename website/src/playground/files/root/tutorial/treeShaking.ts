@@ -8,10 +8,11 @@
 // - `factorizeAsPowers`
 // - `BinaryTree`
 // - `NotNullish`
+// - `range`
 //
 // These definitions are not included, because the definitions exported by this
 // module do not need them. Omitting those unused definitions reduces the
-// bytecode for this module from 1,071 to 413 bytes.
+// bytecode for this module from 3,593 to 413 bytes.
 
 import { factorize } from "../lib/mod.ts";
 
