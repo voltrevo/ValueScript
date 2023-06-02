@@ -22,9 +22,7 @@ export default class BinaryTree<T extends NotNullish> {
 
   *[Symbol.iterator](): Generator<T> {
     if (this.left) {
-      for (const value of this.left) {
-        yield value;
-      }
+      yield* this.left;
     }
 
     if (this.value) {
@@ -32,9 +30,7 @@ export default class BinaryTree<T extends NotNullish> {
     }
 
     if (this.right) {
-      for (const value of this.right) {
-        yield value;
-      }
+      yield* this.right;
     }
   }
 }

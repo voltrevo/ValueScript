@@ -20,45 +20,17 @@ export default class BinaryTree<T extends NotNullish> {
     }
   }
 
-  [Symbol.iterator]() {
-    let iter = new BinaryTreeIterator<T>();
-    iter.stack.push({ type: "tree", data: this });
-
-    return iter;
-  }
-}
-
-class BinaryTreeIterator<T extends NotNullish> {
-  stack:
-    ({ type: "tree"; data: BinaryTree<T> } | { type: "value"; data: T })[] = [];
-
-  next(): { done: true } | { value: T; done: false } {
-    const item = this.stack.pop();
-
-    if (item === undefined) {
-      return { done: true };
+  *[Symbol.iterator](): Generator<T> {
+    if (this.left) {
+      yield* this.left;
     }
 
-    if (item.type === "tree") {
-      this.pushTree(item.data.right);
-      this.pushValue(item.data.value);
-      this.pushTree(item.data.left);
-
-      return this.next();
+    if (this.value) {
+      yield this.value;
     }
 
-    return { value: item.data, done: false };
-  }
-
-  pushTree(tree?: BinaryTree<T>) {
-    if (tree !== undefined) {
-      this.stack.push({ type: "tree", data: tree });
-    }
-  }
-
-  pushValue(value?: T) {
-    if (value !== undefined) {
-      this.stack.push({ type: "value", data: value });
+    if (this.right) {
+      yield* this.right;
     }
   }
 }
