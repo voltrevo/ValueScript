@@ -1,13 +1,9 @@
 //! test_output(233168)
 
+import { Range_numbers } from "../helpers/range.ts";
+
 export default function main() {
-  let sum = 0;
-
-  for (let i = 0; i < 1000; i++) {
-    if (i % 3 === 0 || i % 5 === 0) {
-      sum += i;
-    }
-  }
-
-  return sum;
+  return Range_numbers(0, 1000)
+    .filter((x) => x % 3 === 0 || x % 5 === 0)
+    .sum();
 }

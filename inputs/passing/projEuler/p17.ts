@@ -1,11 +1,10 @@
+import { Range_numbers } from "../helpers/range.ts";
+
 export default function main() {
-  let sum = 0;
-
-  for (let i = 1; i <= 1000; i++) {
-    sum += countEligibleLetters(toWords(i));
-  }
-
-  return sum;
+  return Range_numbers(1, 1001)
+    .map(toWords)
+    .map(countEligibleLetters)
+    .sum();
 }
 
 function toWords(n: number): string {
@@ -14,31 +13,31 @@ function toWords(n: number): string {
     // very beneficial. (Instead, there's a giant literal in the bytecode here
     // and it needs to be decoded every time we enter this code path.)
     return [
-      'zero',
-      'one',
-      'two',
-      'three',
-      'four',
-      'five',
-      'six',
-      'seven',
-      'eight',
-      'nine',
+      "zero",
+      "one",
+      "two",
+      "three",
+      "four",
+      "five",
+      "six",
+      "seven",
+      "eight",
+      "nine",
     ][n];
   }
 
   if (n < 20) {
     return [
-      'ten',
-      'eleven',
-      'twelve',
-      'thirteen',
-      'fourteen',
-      'fifteen',
-      'sixteen',
-      'seventeen',
-      'eighteen',
-      'nineteen',
+      "ten",
+      "eleven",
+      "twelve",
+      "thirteen",
+      "fourteen",
+      "fifteen",
+      "sixteen",
+      "seventeen",
+      "eighteen",
+      "nineteen",
     ][n - 10];
   }
 
@@ -47,14 +46,14 @@ function toWords(n: number): string {
     const tennerIndex = (n - lastDigit) / 10 - 2;
 
     const tenner = [
-      'twenty',
-      'thirty',
-      'forty',
-      'fifty',
-      'sixty',
-      'seventy',
-      'eighty',
-      'ninety',
+      "twenty",
+      "thirty",
+      "forty",
+      "fifty",
+      "sixty",
+      "seventy",
+      "eighty",
+      "ninety",
     ][tennerIndex];
 
     if (lastDigit === 0) {
@@ -68,7 +67,7 @@ function toWords(n: number): string {
     const lastTwoDigits = n % 100;
     const hundreds = (n - lastTwoDigits) / 100;
 
-    let res: string = `${toWords(hundreds)} hundred`;
+    let res = `${toWords(hundreds)} hundred`;
 
     if (lastTwoDigits !== 0) {
       res += ` and ${toWords(lastTwoDigits)}`;
@@ -78,7 +77,7 @@ function toWords(n: number): string {
   }
 
   if (n === 1000) {
-    return 'one thousand';
+    return "one thousand";
   }
 
   panic();
@@ -94,7 +93,7 @@ function countEligibleLetters(str: string) {
   for (let i = 0; i < str.length; i++) {
     const c = str[i];
 
-    if (c !== ' ' && c !== '-') {
+    if (c !== " " && c !== "-") {
       count++;
     }
   }

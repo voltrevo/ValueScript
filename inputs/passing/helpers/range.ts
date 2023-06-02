@@ -9,16 +9,16 @@ export function Range_from<T = never>(
   iter?: Iterable<T> | Iterator<T> | (() => Iterable<T>),
 ) {
   if (iter === undefined) {
-    return Range_fromIterable([]);
+    return range([]);
   }
 
   if (typeof iter === "function") {
-    return Range_fromIterable(iter());
+    return range(iter());
   }
 
   // TODO: `in` operator
   if (hasKey(iter, Symbol.iterator)) {
-    return Range_fromIterable(iter);
+    return range(iter);
   }
 
   if (hasKey(iter, "next")) {
@@ -38,14 +38,20 @@ export function Range_fromIterator<T = never>(iterator: Iterator<T>) {
   });
 }
 
-export function Range_numbers(start: number, end: number) {
-  function* res() {
+export function Range_numbers(start = 0, end?: number) {
+  if (end === undefined) {
+    return range((function* () {
+      for (let i = start;; i++) {
+        yield i;
+      }
+    })());
+  }
+
+  return range((function* () {
     for (let i = start; i < end; i++) {
       yield i;
     }
-  }
-
-  return Range_fromIterable(res());
+  })());
 }
 
 export function Range_primes() {
@@ -79,7 +85,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   count() {
@@ -119,14 +125,34 @@ export class Range<T = never> implements Iterable<T> {
     return res;
   }
 
-  sum(): T extends number ? number : never {
+  sum<T extends number>(
+    // Warning: ValueScript has a bug where typing the `this` parameter causes it to create a
+    // phantom regular parameter. This only works because there aren't any other parameters.
+    // TODO: Fix this.
+    this: Range<T>,
+  ) {
     let res = 0;
 
     for (const x of this.iterable) {
-      res += x as number;
+      res += x;
     }
 
-    return res as T extends number ? number : never;
+    return res;
+  }
+
+  bigSum<T extends bigint>(
+    // Warning: ValueScript has a bug where typing the `this` parameter causes it to create a
+    // phantom regular parameter. This only works because there aren't any other parameters.
+    // TODO: Fix this.
+    this: Range<T>,
+  ) {
+    let res = 0n;
+
+    for (const x of this.iterable) {
+      res += x as bigint;
+    }
+
+    return res as T extends bigint ? bigint : never;
   }
 
   product(): T extends number ? number : never {
@@ -148,7 +174,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   flatMap<MappedT>(fn: (x: T) => Iterable<MappedT>) {
@@ -162,7 +188,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   filter(fn: (x: T) => boolean) {
@@ -176,7 +202,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   // TODO: Negative indexes
@@ -220,7 +246,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   append<U>(newItems: Iterable<U>) {
@@ -231,7 +257,7 @@ export class Range<T = never> implements Iterable<T> {
       yield* newItems;
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   prepend<U>(newItems: Iterable<U>) {
@@ -242,7 +268,7 @@ export class Range<T = never> implements Iterable<T> {
       yield* iterable;
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   zip<U>(other: Iterable<U>) {
@@ -264,7 +290,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   skip(n: number) {
@@ -288,7 +314,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return Range_fromIterable(res());
+    return range(res());
   }
 
   reduce<S>(state: S, fn: (state: S, x: T) => S) {
@@ -297,6 +323,22 @@ export class Range<T = never> implements Iterable<T> {
     }
 
     return state;
+  }
+
+  while(fn: (x: T) => boolean) {
+    const iterable = this.iterable;
+
+    function* res() {
+      for (const x of iterable) {
+        if (fn(x)) {
+          yield x;
+        } else {
+          break;
+        }
+      }
+    }
+
+    return range(res());
   }
 }
 

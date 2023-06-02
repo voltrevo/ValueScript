@@ -1,3 +1,4 @@
+import range from "../helpers/range.ts";
 import plus from "./helpers/plus.ts";
 
 export default function main() {
@@ -15,11 +16,7 @@ function nameListScore(names: string[]) {
 }
 
 function nameScore(name: string) {
-  let sum = 0;
-
-  for (const c of name) {
-    sum += c.codePointAt(0)! - "A".codePointAt(0)! + 1;
-  }
-
-  return sum;
+  return range(name)
+    .map((c) => c.codePointAt(0)! - "A".codePointAt(0)! + 1)
+    .sum();
 }
