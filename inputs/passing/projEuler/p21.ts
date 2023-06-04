@@ -1,16 +1,10 @@
-import plus from "./helpers/plus.ts";
+import { Range_numbers } from "../helpers/range.ts";
 import { properFactorSum } from "./helpers/properFactorSum.ts";
 
 export default function main() {
-  let amicableNumbers = [];
-
-  for (let i = 2; i < 10_000; i++) {
-    if (isAmicable(i)) {
-      amicableNumbers.push(i);
-    }
-  }
-
-  return amicableNumbers.reduce(plus);
+  return Range_numbers(2, 10_000)
+    .filter(isAmicable)
+    .sum();
 }
 
 function isAmicable(n: number) {

@@ -1,36 +1,23 @@
-import { factorize } from "./helpers/primes.ts";
-
-declare const Debug: {
-  log: (...args: unknown[]) => undefined;
-};
+import range from "../helpers/range.ts";
+import { factorizeAsPowers } from "./helpers/primes.ts";
 
 export default function main() {
-  let triNum = 0;
-
-  for (let i = 1;; i++) {
-    triNum += i;
-    const factorCount = countFactors(triNum);
-
-    if (factorCount > 500) {
-      return triNum;
-    }
-  }
+  return range(triangularNumbers())
+    .filter(tri => countFactors(tri) > 500)
+    .first();
 }
 
 function countFactors(n: number): number {
-  let count = 1;
-  let power = 0;
-  let prevFactor = 0;
+  return range(factorizeAsPowers(n))
+    .map(([_, power]) => power + 1)
+    .product();
+}
 
-  for (const factor of factorize(n)) {
-    if (factor !== prevFactor) {
-      count *= power + 1;
-      power = 1;
-      prevFactor = factor;
-    } else {
-      power++;
-    }
+function* triangularNumbers() {
+  let sum = 0;
+
+  for (let i = 1;; i++) {
+    sum += i;
+    yield sum;
   }
-
-  return count;
 }

@@ -459,18 +459,14 @@ static POP: NativeFunction = native_fn(|mut this, _params| {
   })
 });
 
-static PUSH: NativeFunction = native_fn(|mut this, params| {
+static PUSH: NativeFunction = native_fn(|mut this, mut params| {
   let this = this.get_mut()?;
 
   Ok(match this {
     Val::Array(array_data) => {
       let array_data_mut = Rc::make_mut(array_data);
-
-      for p in params {
-        array_data_mut.elements.push(p);
-      }
-
-      Val::Number(array_data_mut.elements.len() as f64)
+      array_data_mut.elements.append(&mut params);
+      (array_data_mut.elements.len() as f64).to_val()
     }
     _ => return Err("array indirection".to_error()),
   })

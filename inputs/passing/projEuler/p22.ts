@@ -1,5 +1,4 @@
 import range from "../helpers/range.ts";
-import plus from "./helpers/plus.ts";
 
 export default function main() {
   return nameListScore([
@@ -10,9 +9,10 @@ export default function main() {
 function nameListScore(names: string[]) {
   names.sort();
 
-  return names
-    .map((name, i) => (i + 1) * nameScore(name))
-    .reduce(plus);
+  return range(names)
+    .indexed()
+    .map(([i, name]) => (i + 1) * nameScore(name))
+    .sum();
 }
 
 function nameScore(name: string) {

@@ -1,5 +1,7 @@
 //! test_output(23514624000)
 
+import range from "../helpers/range.ts";
+
 export default function main() {
   const digits = [
     "73167176531330624919225119674426574742355349194934",
@@ -22,20 +24,11 @@ export default function main() {
     "84580156166097919133875499200524063689912560717606",
     "05886116467109405077541002256983155200055935729725",
     "71636269561882670428252483600823257530420752963450",
-  ].join("");
+  ];
 
-  let largest = 0;
-  const lenM13 = digits.length - 13;
-
-  for (let i = 0; i < lenM13; i++) {
-    let product = 1;
-
-    for (let j = 0; j < 13; j++) {
-      product *= digits[i + j] as any;
-    }
-
-    largest = Math.max(largest, product);
-  }
-
-  return largest;
+  return range(digits)
+    .flatten()
+    .window(13)
+    .map((w) => w.map(Number).product())
+    .reduce(0, Math.max);
 }

@@ -117,7 +117,7 @@ export class Range<T = never> implements Iterable<T> {
 
     let res = String(first.value);
 
-    for (const x of this.iterable) {
+    for (const x of asIterable(iter)) {
       res += sep;
       res += x;
     }
@@ -125,11 +125,11 @@ export class Range<T = never> implements Iterable<T> {
     return res;
   }
 
-  sum<T extends number>(
+  sum(
     // Warning: ValueScript has a bug where typing the `this` parameter causes it to create a
     // phantom regular parameter. This only works because there aren't any other parameters.
     // TODO: Fix this.
-    this: Range<T>,
+    this: Range<number>,
   ) {
     let res = 0;
 
@@ -140,29 +140,29 @@ export class Range<T = never> implements Iterable<T> {
     return res;
   }
 
-  bigSum<T extends bigint>(
+  bigSum(
     // Warning: ValueScript has a bug where typing the `this` parameter causes it to create a
     // phantom regular parameter. This only works because there aren't any other parameters.
     // TODO: Fix this.
-    this: Range<T>,
+    this: Range<bigint>,
   ) {
     let res = 0n;
 
     for (const x of this.iterable) {
-      res += x as bigint;
+      res += x;
     }
 
-    return res as T extends bigint ? bigint : never;
+    return res;
   }
 
-  product(): T extends number ? number : never {
+  product(this: Range<number>) {
     let res = 1;
 
     for (const x of this.iterable) {
-      res *= x as number;
+      res *= x;
     }
 
-    return res as T extends number ? number : never;
+    return res;
   }
 
   map<MappedT>(fn: (x: T) => MappedT) {
@@ -183,6 +183,20 @@ export class Range<T = never> implements Iterable<T> {
     function* res() {
       for (const x of iterable) {
         for (const y of fn(x)) {
+          yield y;
+        }
+      }
+    }
+
+    return range(res());
+  }
+
+  flatten<U>(this: Range<Iterable<U>>) {
+    const iterable = this.iterable;
+
+    function* res() {
+      for (const x of iterable) {
+        for (const y of x) {
           yield y;
         }
       }
@@ -340,6 +354,47 @@ export class Range<T = never> implements Iterable<T> {
 
     return range(res());
   }
+
+  window(len: number) {
+    const iterable = this.iterable;
+
+    function* res() {
+      let iter = iterable[Symbol.iterator]();
+      let memory = [];
+
+      for (let i = 0; i < len; i++) {
+        const { value, done } = iter.next();
+
+        if (done) {
+          return;
+        }
+
+        memory.push(value);
+      }
+
+      yield range(memory);
+
+      let i = 0;
+
+      for (const x of asIterable(iter)) {
+        memory[i] = x;
+
+        const memoryCopy = memory;
+        const iCopy = i;
+
+        yield range((function* () {
+          for (let j = 1; j <= len; j++) {
+            yield memoryCopy[(iCopy + j) % len];
+          }
+        })());
+
+        i++;
+        i %= len;
+      }
+    }
+
+    return range(res());
+  }
 }
 
 function hasKey<Obj, K extends string | symbol>(
@@ -351,4 +406,8 @@ function hasKey<Obj, K extends string | symbol>(
 
 function never(x: never): never {
   throw new Error(`Unexpected value: ${x}`);
+}
+
+function asIterable<T>(iterator: Iterator<T>): Iterable<T> {
+  return { [Symbol.iterator]: () => iterator };
 }

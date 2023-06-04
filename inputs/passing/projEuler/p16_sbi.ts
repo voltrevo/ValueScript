@@ -1,4 +1,4 @@
-import plus from "./helpers/plus.ts";
+import range from "../helpers/range.ts";
 import SillyBigInt from "./helpers/SillyBigInt.ts";
 
 export default function main() {
@@ -8,16 +8,7 @@ export default function main() {
     sbi.add(sbi);
   }
 
-  return sbi.data.map(digitSum).reduce(plus);
-}
-
-function digitSum(n: number) {
-  const nStr = `${n}`;
-  let sum = 0;
-
-  for (let i = 0; i < nStr.length; i++) {
-    sum += +nStr[i];
-  }
-
-  return sum;
+  return range(sbi.toString())
+    .map(Number)
+    .sum();
 }

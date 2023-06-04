@@ -1,13 +1,7 @@
-import { primes } from "./helpers/primes.ts";
+import { Range_primes } from "../helpers/range.ts";
 
 export default function main() {
-  let sum = 0;
-
-  for (const p of primes()) {
-    if (p >= 2000000) {
-      return sum;
-    }
-
-    sum += p;
-  }
+  return Range_primes()
+    .while((p) => p < 2_000_000)
+    .sum();
 }

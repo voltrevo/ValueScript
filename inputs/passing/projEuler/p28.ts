@@ -13,7 +13,8 @@ export default function () {
   ];
 
   let sum = range(rayStarters)
-    .map(([a, b, c]) => range(ray(a, b, c)).limit(501).sum())
+    .map(([a, b, c]) => range(ray(a, b, c)).limit(501))
+    .flatten()
     .sum();
 
   // The central 1 has been counted 4 times, so subtract 3.

@@ -1,19 +1,14 @@
 //! test_output(232792560)
 
+import range, { Range_numbers } from "../helpers/range.ts";
 import { factorize } from "./helpers/primes.ts";
 
-declare const Debug: {
-  log: (...args: unknown[]) => undefined;
-};
-
 export default function main() {
-  let n: number[] = [];
+  const factors = Range_numbers(2, 21)
+    .map(factorize)
+    .reduce([] as number[], (n, i) => lcm(n, [...i]));
 
-  for (let i = 2; i <= 20; i++) {
-    n = lcm(n, [...factorize(i)]);
-  }
-
-  return n.reduce((a, b) => a * b);
+  return range(factors).product();
 }
 
 function lcm(leftFactors: number[], rightFactors: number[]): number[] {
@@ -29,13 +24,12 @@ function lcm(leftFactors: number[], rightFactors: number[]): number[] {
     }
 
     if (leftFactors[0] === undefined) {
-      factors = factors.concat(rightFactors);
+      factors.push(...rightFactors);
       return factors;
     }
 
     if (rightFactors[0] === undefined) {
-      factors = factors.concat(leftFactors);
-      Debug.log({ factors });
+      factors.push(...leftFactors);
       return factors;
     }
 
