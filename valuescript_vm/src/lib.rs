@@ -13,7 +13,7 @@ mod make_generator_frame;
 mod native_frame_function;
 mod native_function;
 mod number_methods;
-mod operations;
+pub mod operations;
 mod stack_frame;
 mod string_methods;
 mod todo_fn;
