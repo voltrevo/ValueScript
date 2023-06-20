@@ -1,3 +1,5 @@
+use std::mem::take;
+
 use valuescript_common::InstructionByte;
 
 use crate::builtins::type_error_builtin::ToTypeError;
@@ -135,8 +137,8 @@ impl StackFrameTrait for BytecodeStackFrame {
     match instruction_byte {
       End => {
         return Ok(FrameStepOk::Pop(CallResult {
-          return_: self.registers[0].clone(),
-          this: self.registers[1].clone(),
+          return_: take(&mut self.registers[0]),
+          this: take(&mut self.registers[1]),
         }));
       }
 
