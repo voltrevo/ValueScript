@@ -6,6 +6,14 @@ declare namespace vs {
   export function inc(x: number): void;
 }
 
+declare namespace Debug {
+  export function log(...args: unknown[]): void;
+
+  export function makeCopyCounter<T = undefined>(
+    tag?: T,
+  ): { tag: T; count: number };
+}
+
 declare module "ffi:console" {
   type Console = {
     log(...args: unknown[]): void;
