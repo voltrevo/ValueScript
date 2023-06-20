@@ -302,14 +302,18 @@ impl StackFrameTrait for BytecodeStackFrame {
       Sub => self.apply_binary_op(operations::op_sub)?,
 
       SubMov => {
-        let subscript = self.decoder.decode_vallish(&self.registers);
+        // TODO: Ideally we would use a reference for the subscript (decode_vallish), but that would
+        // be an immutable borrow and it conflicts with the mutable borrow for the target. In
+        // theory, this should still be possible because we only need a mutable borrow to an
+        // element, not the vec itself. vec.get_many_mut has been considered, but it's not yet
+        // stable.
+        let subscript = self.decoder.decode_val(&self.registers);
+
         let value = self.decoder.decode_val(&self.registers);
 
-        let register_index = self.decoder.decode_register_index().unwrap();
-        let mut target = self.registers[register_index].clone(); // TODO: Lift
+        let target_index = self.decoder.decode_register_index().unwrap();
 
-        operations::op_submov(&mut target, subscript.get_ref(), value)?;
-        self.registers[register_index] = target;
+        operations::op_submov(&mut self.registers[target_index], &subscript, value)?;
       }
 
       SubCall | ConstSubCall | ThisSubCall => {
