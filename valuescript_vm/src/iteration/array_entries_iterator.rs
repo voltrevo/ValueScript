@@ -87,7 +87,7 @@ impl ValTrait for ArrayEntriesIterator {
     Ok(Val::Undefined)
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+  fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {
     Err("Cannot assign to subscript of array iterator".to_type_error())
   }
 

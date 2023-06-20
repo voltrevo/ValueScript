@@ -150,7 +150,7 @@ impl ValTrait for ArrayPrototype {
     }))
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+  fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {
     Err("Cannot assign to subscript of Array.prototype".to_type_error())
   }
 

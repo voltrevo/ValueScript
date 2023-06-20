@@ -470,7 +470,7 @@ pub fn op_sub(left: Vallish, right: Vallish) -> Result<Val, Val> {
   }
 }
 
-pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val> {
+pub fn op_submov(target: &mut Val, subscript: &Val, value: Val) -> Result<(), Val> {
   match target {
     Val::Void => Err("Internal: Shouldn't happen".to_error()), // TODO: Internal errors
     Val::Undefined => Err("Cannot assign to subscript of undefined".to_type_error()),
@@ -510,7 +510,7 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val
 
       match subscript {
         Val::String(string) => object_data_mut.string_map.insert(string.to_string(), value),
-        Val::Symbol(symbol) => object_data_mut.symbol_map.insert(symbol, value),
+        Val::Symbol(symbol) => object_data_mut.symbol_map.insert(symbol.clone(), value),
         _ => object_data_mut
           .string_map
           .insert(subscript.to_string(), value),

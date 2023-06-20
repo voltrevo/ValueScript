@@ -302,13 +302,13 @@ impl StackFrameTrait for BytecodeStackFrame {
       Sub => self.apply_binary_op(operations::op_sub)?,
 
       SubMov => {
-        let subscript = self.decoder.decode_val(&self.registers);
+        let subscript = self.decoder.decode_vallish(&self.registers);
         let value = self.decoder.decode_val(&self.registers);
 
         let register_index = self.decoder.decode_register_index().unwrap();
         let mut target = self.registers[register_index].clone(); // TODO: Lift
 
-        operations::op_submov(&mut target, subscript, value)?;
+        operations::op_submov(&mut target, subscript.get_ref(), value)?;
         self.registers[register_index] = target;
       }
 

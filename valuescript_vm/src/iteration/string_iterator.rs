@@ -123,7 +123,7 @@ impl ValTrait for StringIterator {
     Ok(Val::Undefined)
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+  fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {
     Err("Cannot assign to subscript of string iterator".to_type_error())
   }
 

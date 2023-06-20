@@ -70,7 +70,7 @@ where
     Ok(Self::bo_sub(&key.to_string()))
   }
 
-  fn submov(&mut self, _key: Val, _value: Val) -> Result<(), Val> {
+  fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {
     Err(format!("Cannot assign to subscript of {} builtin", Self::bo_name()).to_type_error())
   }
 

@@ -81,7 +81,7 @@ pub trait ValTrait: fmt::Display {
   fn load_function(&self) -> LoadFunctionResult;
 
   fn sub(&self, key: &Val) -> Result<Val, Val>;
-  fn submov(&mut self, key: Val, value: Val) -> Result<(), Val>;
+  fn submov(&mut self, key: &Val, value: Val) -> Result<(), Val>;
 
   fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
   fn codify(&self) -> String;
@@ -356,7 +356,7 @@ impl ValTrait for Val {
     op_sub(Vallish::Ref(self), Vallish::Ref(key))
   }
 
-  fn submov(&mut self, key: Val, value: Val) -> Result<(), Val> {
+  fn submov(&mut self, key: &Val, value: Val) -> Result<(), Val> {
     op_submov(self, key, value)
   }
 

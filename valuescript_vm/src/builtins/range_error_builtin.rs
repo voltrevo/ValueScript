@@ -62,7 +62,7 @@ static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
     None => "".to_string(),
   };
 
-  op_submov(this.get_mut()?, "message".to_val(), message.to_val())?;
+  op_submov(this.get_mut()?, &"message".to_val(), message.to_val())?;
 
   Ok(Val::Undefined)
 });
