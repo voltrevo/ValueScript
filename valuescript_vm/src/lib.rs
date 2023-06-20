@@ -5,6 +5,7 @@ mod bytecode;
 mod bytecode_decoder;
 mod bytecode_stack_frame;
 mod cat_stack_frame;
+mod copy_counter;
 mod first_stack_frame;
 mod generator;
 mod helpers;

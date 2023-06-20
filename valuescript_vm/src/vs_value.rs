@@ -7,6 +7,7 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
+use crate::copy_counter::CopyCounter;
 use crate::native_function::ThisWrapper;
 use crate::operations::{op_sub, op_submov};
 use crate::stack_frame::StackFrame;
@@ -32,6 +33,7 @@ pub enum Val {
   Class(Rc<VsClass>),
   Static(&'static dyn ValTrait),
   Dynamic(Rc<dyn DynValTrait>),
+  CopyCounter(Box<CopyCounter>),
 }
 
 impl Default for Val {
@@ -167,6 +169,7 @@ impl ValTrait for Val {
       Class(_) => VsType::Class,
       Static(val) => val.typeof_(),
       Dynamic(val) => val.typeof_(),
+      CopyCounter(_) => VsType::Object,
     };
   }
 
@@ -192,6 +195,7 @@ impl ValTrait for Val {
       Class(_) => f64::NAN,
       Static(val) => val.to_number(),
       Dynamic(val) => val.to_number(),
+      CopyCounter(_) => f64::NAN,
     };
   }
 
@@ -216,6 +220,7 @@ impl ValTrait for Val {
       Class(_) => None,
       Static(val) => val.to_index(),
       Dynamic(val) => val.to_index(),
+      CopyCounter(_) => None,
     };
   }
 
@@ -237,6 +242,7 @@ impl ValTrait for Val {
       Class(_) => false,
       Static(val) => val.is_primitive(), // TODO: false?
       Dynamic(val) => val.is_primitive(),
+      CopyCounter(_) => false,
     };
   }
 
@@ -258,6 +264,7 @@ impl ValTrait for Val {
       Class(_) => true,
       Static(val) => val.is_truthy(), // TODO: true?
       Dynamic(val) => val.is_truthy(),
+      CopyCounter(_) => true,
     };
   }
 
@@ -279,6 +286,7 @@ impl ValTrait for Val {
       Class(_) => false,
       Static(_) => false,
       Dynamic(val) => val.is_nullish(),
+      CopyCounter(_) => false,
     };
   }
 
@@ -427,6 +435,11 @@ impl ValTrait for Val {
       Val::Class(_) => "class { [unavailable] }".to_string(),
       Val::Static(val) => val.codify(),
       Val::Dynamic(val) => val.codify(),
+      Val::CopyCounter(cc) => format!(
+        "CopyCounter {{ tag: {}, count: {} }}",
+        cc.tag.codify(),
+        cc.count.borrow()
+      ),
     }
   }
 }
@@ -482,6 +495,12 @@ impl fmt::Display for Val {
       Class(_) => write!(f, "[class]"),
       Static(val) => val.fmt(f),
       Dynamic(val) => val.fmt(f),
+      CopyCounter(cc) => write!(
+        f,
+        "CopyCounter {{ tag: {}, count: {} }}",
+        cc.tag,
+        (*cc.count.borrow() as f64).to_val()
+      ),
     }
   }
 }
@@ -648,6 +667,13 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
       // TODO: Improve printing these
       Val::Static(s) => s.pretty_fmt(f),
       Val::Dynamic(c) => c.pretty_fmt(f),
+
+      Val::CopyCounter(cc) => write!(
+        f,
+        "\x1b[36mCopyCounter\x1b[39m {{ tag: {}, count: {} }}",
+        cc.tag.pretty(),
+        (*cc.count.borrow() as f64).to_val().pretty()
+      ),
     }
   }
 }

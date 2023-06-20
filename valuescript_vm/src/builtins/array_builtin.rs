@@ -66,7 +66,9 @@ static FROM: NativeFunction = native_fn(|_this, params| {
   Ok(match first_param {
     Val::Array(arr) => Val::Array(arr.clone()),
     Val::String(s) => s.chars().map(|c| c.to_val()).collect::<Vec<Val>>().to_val(),
-    Val::Void | Val::Undefined | Val::Null => return Err("items is not iterable".to_type_error()),
+    Val::Void | Val::Undefined | Val::Null | Val::CopyCounter(..) => {
+      return Err("items is not iterable".to_type_error())
+    }
     Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => VsArray::new().to_val(),
     Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Dynamic(..) => {
       let len = first_param

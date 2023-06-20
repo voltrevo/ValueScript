@@ -1,6 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 
+use crate::copy_counter::CopyCounter;
 use crate::native_function::{native_fn, NativeFunction};
 use crate::vs_class::VsClass;
 use crate::vs_value::{LoadFunctionResult, Val};
@@ -17,6 +18,7 @@ impl BuiltinObject for DebugBuiltin {
   fn bo_sub(key: &str) -> Val {
     Val::Static(match key {
       "log" => &LOG,
+      "makeCopyCounter" => &MAKE_COPY_COUNTER,
       _ => return Val::Undefined,
     })
   }
@@ -46,4 +48,13 @@ static LOG: NativeFunction = native_fn(|_this, params| {
   println!();
 
   Ok(Val::Undefined)
+});
+
+static MAKE_COPY_COUNTER: NativeFunction = native_fn(|_this, params| {
+  let tag = match params.first() {
+    Some(tag) => tag.clone(),
+    None => Val::Undefined,
+  };
+
+  Ok(Val::CopyCounter(Box::new(CopyCounter::new(tag))))
 });

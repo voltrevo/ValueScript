@@ -411,6 +411,11 @@ pub fn op_sub(left: Val, right: Val) -> Result<Val, Val> {
     Val::Function(_) | Val::Class(_) => Ok(Val::Undefined),
     Val::Static(s) => s.sub(right),
     Val::Dynamic(dynamic_data) => dynamic_data.sub(right),
+    Val::CopyCounter(cc) => Ok(match right.to_string().as_str() {
+      "tag" => cc.tag,
+      "count" => (*cc.count.borrow() as f64).to_val(),
+      _ => Val::Undefined,
+    }),
   }
 }
 
@@ -466,6 +471,7 @@ pub fn op_submov(target: &mut Val, subscript: Val, value: Val) -> Result<(), Val
     Val::Class(_) => Err("Cannot assign to subscript of class".to_type_error()),
     Val::Static(_) => Err("Cannot assign to subscript of static value".to_type_error()),
     Val::Dynamic(_) => Err("TODO: Assign to subscript of dynamic value".to_type_error()),
+    Val::CopyCounter(_) => Err("Cannot assign to subscript of CopyCounter".to_type_error()),
   }
 }
 
