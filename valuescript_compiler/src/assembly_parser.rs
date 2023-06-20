@@ -415,11 +415,13 @@ impl<'a> AssemblyParser<'a> {
         panic!("Expected this to be impossible");
       }
 
+      let take = self.parse_one_of(&["!", ""]) == "!";
+
       let param_name = self.parse_identifier();
 
       function
         .parameters
-        .push(Register::Named(param_name.clone()));
+        .push(Register::named(take, param_name.clone()));
 
       next = self.parse_one_of(&[",", ")"]);
 
@@ -811,14 +813,10 @@ impl<'a> AssemblyParser<'a> {
   fn assemble_register(&mut self) -> Register {
     self.parse_optional_whitespace();
     self.parse_exact("%");
+    let take = self.parse_one_of(&["!", ""]) == "!";
     let name = self.parse_identifier();
 
-    match name.as_str() {
-      "return" => Register::Return,
-      "this" => Register::This,
-      "ignore" => Register::Ignore,
-      _ => Register::Named(name),
-    }
+    return Register { take, name };
   }
 
   fn assemble_builtin(&mut self) -> Builtin {

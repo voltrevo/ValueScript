@@ -87,7 +87,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     match expr {
       This(_) => {
-        return self.inline(Value::Register(Register::This), target_register);
+        return self.inline(Value::Register(Register::this(false)), target_register);
       }
       Array(array_exp) => {
         return self.array_expression(array_exp, target_register);
@@ -1307,7 +1307,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.push(Instruction::Yield(
       Value::Register(dst.clone()),
-      Register::Ignore,
+      Register::ignore(false),
     ));
 
     self.fnc.label(next_label);
@@ -1572,7 +1572,7 @@ impl<'a> ExpressionCompiler<'a> {
       name: self
         .fnc
         .label_allocator
-        .allocate(&format!("{}_initialized", register.as_name())),
+        .allocate(&format!("{}_initialized", register.name)),
     };
 
     self.fnc.push(Instruction::OpTripleNe(

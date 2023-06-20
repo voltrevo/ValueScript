@@ -313,7 +313,7 @@ impl FunctionCompiler {
         swc_ecma_ast::BlockStmtOrExpr::Expr(expr) => {
           let mut expression_compiler = ExpressionCompiler { fnc: self };
 
-          expression_compiler.compile(expr, Some(Register::Return));
+          expression_compiler.compile(expr, Some(Register::return_(false)));
         }
       },
       Functionish::Constructor(member_initializers_assembly, _class_span, constructor) => {
@@ -467,7 +467,7 @@ impl FunctionCompiler {
           Some(expr) => {
             let mut expression_compiler = ExpressionCompiler { fnc: self };
 
-            let compiled = expression_compiler.compile(expr, Some(Register::Return));
+            let compiled = expression_compiler.compile(expr, Some(Register::return_(false)));
             self.use_(compiled);
           }
         }
@@ -676,7 +676,7 @@ impl FunctionCompiler {
         .param
       {
         Some(_) => self.allocate_numbered_reg("_error"),
-        None => Register::Ignore,
+        None => Register::ignore(false),
       };
 
       catch_error_reg = Some(reg.clone());
@@ -695,12 +695,11 @@ impl FunctionCompiler {
       let snap_registers: HashSet<Register> = self.get_mutated_registers(try_.block.span);
 
       for reg in snap_registers {
-        let reg_name = match &reg {
-          Register::Named(name) => name,
-          _ => continue,
-        };
+        if !reg.is_named() {
+          continue;
+        }
 
-        let snap_reg = self.allocate_reg_fresh(&format!("snap_{}", reg_name));
+        let snap_reg = self.allocate_reg_fresh(&format!("snap_{}", reg.name));
 
         self.push(Instruction::Mov(
           Value::Register(reg.clone()),

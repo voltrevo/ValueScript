@@ -1,6 +1,4 @@
-use crate::asm::{
-  Definition, DefinitionContent, Instruction, InstructionOrLabel, Pointer, Register, Value,
-};
+use crate::asm::{Definition, DefinitionContent, Instruction, InstructionOrLabel, Pointer, Value};
 
 pub struct ImportPattern {
   pub pointer: Pointer,
@@ -31,8 +29,14 @@ impl ImportPattern {
     };
 
     let (path_value, is_star) = match first_instruction {
-      Instruction::Import(path, Register::Return) => (path, false),
-      Instruction::ImportStar(path, Register::Return) => (path, true),
+      Instruction::Import(path, reg) => match reg.name.as_str() {
+        "return" => (path, false),
+        _ => return None,
+      },
+      Instruction::ImportStar(path, reg) => match reg.name.as_str() {
+        "return" => (path, true),
+        _ => return None,
+      },
       _ => return None,
     };
 
@@ -67,15 +71,16 @@ impl ImportPattern {
     };
 
     match second_instruction {
-      Instruction::Sub(
-        Value::Register(Register::Return),
-        Value::String(name),
-        Register::Return,
-      ) => Some(ImportPattern {
-        pointer: definition.pointer.clone(),
-        path: path.clone(),
-        kind: ImportKind::Name(name.clone()),
-      }),
+      Instruction::Sub(Value::Register(obj), Value::String(name), target) => {
+        match obj.name == "return" && target.name == "return" {
+          true => Some(ImportPattern {
+            pointer: definition.pointer.clone(),
+            path: path.clone(),
+            kind: ImportKind::Name(name.clone()),
+          }),
+          false => None,
+        }
+      }
       _ => None,
     }
   }

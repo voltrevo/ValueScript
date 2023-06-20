@@ -408,17 +408,17 @@ impl ModuleCompiler {
                   body: match orig_name.sym.to_string() == "default" {
                     true => vec![InstructionOrLabel::Instruction(Instruction::Import(
                       Value::String(src.value.to_string()),
-                      Register::Return,
+                      Register::return_(false),
                     ))],
                     false => vec![
                       InstructionOrLabel::Instruction(Instruction::ImportStar(
                         Value::String(src.value.to_string()),
-                        Register::Return,
+                        Register::return_(false),
                       )),
                       InstructionOrLabel::Instruction(Instruction::Sub(
-                        Value::Register(Register::Return),
+                        Value::Register(Register::return_(false)),
                         Value::String(orig_name.sym.to_string()),
-                        Register::Return,
+                        Register::return_(false),
                       )),
                     ],
                   },
@@ -501,7 +501,7 @@ impl ModuleCompiler {
             content: DefinitionContent::Lazy(Lazy {
               body: vec![InstructionOrLabel::Instruction(Instruction::ImportStar(
                 Value::String(src),
-                Register::Return,
+                Register::return_(false),
               ))],
             }),
           });
@@ -574,12 +574,12 @@ impl ModuleCompiler {
               body: vec![
                 InstructionOrLabel::Instruction(Instruction::ImportStar(
                   Value::String(import_path.clone()),
-                  Register::Return,
+                  Register::return_(false),
                 )),
                 InstructionOrLabel::Instruction(Instruction::Sub(
-                  Value::Register(Register::Return),
+                  Value::Register(Register::return_(false)),
                   Value::String(external_name),
-                  Register::Return,
+                  Register::return_(false),
                 )),
               ],
             }),
@@ -609,7 +609,7 @@ impl ModuleCompiler {
             content: DefinitionContent::Lazy(Lazy {
               body: vec![InstructionOrLabel::Instruction(Instruction::Import(
                 Value::String(import_path.clone()),
-                Register::Return,
+                Register::return_(false),
               ))],
             }),
           });
@@ -638,7 +638,7 @@ impl ModuleCompiler {
             content: DefinitionContent::Lazy(Lazy {
               body: vec![InstructionOrLabel::Instruction(Instruction::ImportStar(
                 Value::String(import_path.clone()),
-                Register::Return,
+                Register::return_(false),
               ))],
             }),
           });
@@ -728,8 +728,11 @@ impl ModuleCompiler {
           let key_asm = ec.fnc.use_(compiled_key);
           let value_asm = ec.fnc.use_(compiled_value);
 
-          ec.fnc
-            .push(Instruction::SubMov(key_asm, value_asm, Register::This));
+          ec.fnc.push(Instruction::SubMov(
+            key_asm,
+            value_asm,
+            Register::this(false),
+          ));
         }
         swc_ecma_ast::ClassMember::PrivateProp(private_prop) => {
           self.todo(private_prop.span, "private props")

@@ -39,6 +39,7 @@ pub enum BytecodeType {
   Function = 0x0b,
   Pointer = 0x0d,
   Register = 0x0e,
+  TakeRegister = 0x0f,
   Builtin = 0x10,
   Class = 0x11,
   BigInt = 0x13,
@@ -139,6 +140,10 @@ impl BytecodeDecoder {
       BytecodeType::Function => Own(self.decode_function(false)),
       BytecodeType::Pointer => Own(self.decode_pointer(registers)),
       BytecodeType::Register => match registers[self.decode_register_index().unwrap()] {
+        Val::Void => Own(Val::Undefined),
+        ref val => Ref(val),
+      },
+      BytecodeType::TakeRegister => match registers[self.decode_register_index().unwrap()] {
         Val::Void => Own(Val::Undefined),
         ref val => Ref(val),
       },

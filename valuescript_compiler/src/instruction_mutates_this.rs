@@ -1,4 +1,4 @@
-use crate::asm::{Instruction, Register, Value};
+use crate::asm::{Instruction, Value};
 
 pub fn instruction_mutates_this(instruction: &Instruction) -> bool {
   use Instruction::*;
@@ -50,17 +50,15 @@ pub fn instruction_mutates_this(instruction: &Instruction) -> bool {
     | ConstSubCall(_, _, _, reg)
     | ThisSubCall(_, _, _, reg)
     | Cat(_, reg)
-    | Yield(_, reg) => reg == &Register::This,
+    | Yield(_, reg) => reg.is_this(),
 
-    Next(iter, res) => iter == &Register::This || res == &Register::This,
-    UnpackIterRes(_, value_reg, done_reg) => {
-      value_reg == &Register::This || done_reg == &Register::This
-    }
+    Next(iter, res) => iter.is_this() || res.is_this(),
+    UnpackIterRes(_, value_reg, done_reg) => value_reg.is_this() || done_reg.is_this(),
 
     Apply(_, ctx, _, reg) | SubCall(ctx, _, _, reg) | YieldStar(ctx, reg) => {
-      reg == &Register::This
+      reg.is_this()
         || match ctx {
-          Value::Register(reg) => reg == &Register::This,
+          Value::Register(reg) => reg.is_this(),
           _ => false,
         }
     }

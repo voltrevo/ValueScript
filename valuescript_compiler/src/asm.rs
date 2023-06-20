@@ -1,6 +1,8 @@
 use num_bigint::BigInt;
 use valuescript_common::InstructionByte;
 
+use crate::assembler::ValueType;
+
 #[derive(Debug, Clone)]
 pub struct Module {
   pub export_default: Value,
@@ -163,32 +165,74 @@ impl std::fmt::Display for Class {
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
-pub enum Register {
-  Return,
-  This,
-  Named(String),
-  Ignore,
+pub struct Register {
+  pub take: bool,
+  pub name: String,
 }
 
 impl Register {
-  pub fn as_name(&self) -> String {
-    match self {
-      Register::Return => "return".to_string(),
-      Register::This => "this".to_string(),
-      Register::Named(name) => name.clone(),
-      Register::Ignore => "ignore".to_string(),
+  pub fn return_(take: bool) -> Self {
+    Register {
+      take,
+      name: "return".to_string(),
+    }
+  }
+
+  pub fn this(take: bool) -> Self {
+    Register {
+      take,
+      name: "this".to_string(),
+    }
+  }
+
+  pub fn named(take: bool, name: String) -> Self {
+    Register { take, name }
+  }
+
+  pub fn ignore(take: bool) -> Self {
+    Register {
+      take,
+      name: "ignore".to_string(),
+    }
+  }
+
+  pub fn is_return(&self) -> bool {
+    return self.name == "return";
+  }
+
+  pub fn is_this(&self) -> bool {
+    return self.name == "this";
+  }
+
+  pub fn is_named(&self) -> bool {
+    match self.name.as_str() {
+      "return" | "this" | "ignore" => false,
+      _ => true,
+    }
+  }
+
+  pub fn is_ignore(&self) -> bool {
+    return self.name == "ignore";
+  }
+
+  pub fn value_type(&self) -> ValueType {
+    if self.take {
+      ValueType::TakeRegister
+    } else {
+      ValueType::Register
     }
   }
 }
 
 impl std::fmt::Display for Register {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    match self {
-      Register::Return => write!(f, "%return"),
-      Register::This => write!(f, "%this"),
-      Register::Named(name) => write!(f, "%{}", name),
-      Register::Ignore => write!(f, "%ignore"),
+    write!(f, "%")?;
+
+    if self.take {
+      write!(f, "!")?;
     }
+
+    write!(f, "{}", self.name)
   }
 }
 

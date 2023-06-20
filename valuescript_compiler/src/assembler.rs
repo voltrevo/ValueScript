@@ -261,7 +261,7 @@ impl Assembler {
   fn value(&mut self, value: &Value) {
     match value {
       Value::Register(register) => {
-        self.output.push(ValueType::Register as u8);
+        self.output.push(register.value_type() as u8);
         self.register(register);
       }
       Value::Number(number) => self.number(*number),
@@ -294,19 +294,22 @@ impl Assembler {
   }
 
   fn lookup_register(&mut self, register: &Register) -> u8 {
-    match register {
-      Register::Return => 0,
-      Register::This => 1,
-      Register::Named(_) => match self.fn_data.register_map.get(register) {
+    match register.name.as_str() {
+      "return" => 0,
+      "this" => 1,
+      "ignore" => 0xff,
+      _ => match self.fn_data.register_map.get(&register.name) {
         Some(index) => *index,
         None => {
           // TODO: Support >255 registers
           let index = (self.fn_data.register_map.len() as u8) + 2;
-          self.fn_data.register_map.insert(register.clone(), index);
+          self
+            .fn_data
+            .register_map
+            .insert(register.name.clone(), index);
           index
         }
       },
-      Register::Ignore => 0xff,
     }
   }
 
@@ -407,7 +410,7 @@ impl Assembler {
   }
 }
 
-enum ValueType {
+pub enum ValueType {
   End = 0x00,
   Void = 0x01,
   Undefined = 0x02,
@@ -423,12 +426,13 @@ enum ValueType {
   // Instance = 0x0c,
   Pointer = 0x0d,
   Register = 0x0e,
-  // External = 0x0f,
+  TakeRegister = 0x0f,
   Builtin = 0x10,
   Class = 0x11,
   Lazy = 0x12,
   BigInt = 0x13,
   GeneratorFunction = 0x14,
+  // External = TBD,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone)]
@@ -480,7 +484,7 @@ impl LocationMap {
 
 #[derive(Default)]
 struct AssemblerFnData {
-  register_map: HashMap<Register, u8>,
+  register_map: HashMap<String, u8>,
   register_count_pos: usize,
   labels_map: LocationMap,
 }
