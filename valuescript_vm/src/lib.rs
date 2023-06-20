@@ -18,6 +18,7 @@ pub mod operations;
 mod stack_frame;
 mod string_methods;
 mod todo_fn;
+mod vallish;
 mod virtual_machine;
 pub mod vs_array;
 mod vs_class;
@@ -27,6 +28,6 @@ mod vs_symbol;
 pub mod vs_value;
 
 pub use bytecode::Bytecode;
-pub use bytecode_decoder::Vallish;
+pub use vallish::Vallish;
 pub use virtual_machine::VirtualMachine;
 pub use vs_value::{LoadFunctionResult, ValTrait};

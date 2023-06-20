@@ -7,11 +7,11 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
-use crate::bytecode_decoder::Vallish;
 use crate::copy_counter::CopyCounter;
 use crate::native_function::ThisWrapper;
 use crate::operations::{op_sub, op_submov};
 use crate::stack_frame::StackFrame;
+use crate::vallish::Vallish;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;

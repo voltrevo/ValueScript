@@ -11,13 +11,13 @@ use crate::array_higher_functions::{
 };
 use crate::builtins::error_builtin::ToError;
 use crate::builtins::type_error_builtin::ToTypeError;
-use crate::bytecode_decoder::Vallish;
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
 use crate::iteration::array_entries_iterator::ArrayEntriesIterator;
 use crate::iteration::array_iterator::ArrayIterator;
 use crate::native_function::{native_fn, NativeFunction};
 use crate::operations::op_triple_eq_impl;
 use crate::todo_fn::TODO;
+use crate::vallish::Vallish;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
 use crate::vs_symbol::VsSymbol;

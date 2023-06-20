@@ -2,10 +2,10 @@ use std::{mem::take, rc::Rc};
 
 use crate::{
   builtins::type_error_builtin::ToTypeError,
-  bytecode_decoder::Vallish,
   native_function::ThisWrapper,
   operations::op_sub,
   stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrame, StackFrameTrait},
+  vallish::Vallish,
   vs_symbol::VsSymbol,
   vs_value::{ToVal, Val},
   LoadFunctionResult, ValTrait,

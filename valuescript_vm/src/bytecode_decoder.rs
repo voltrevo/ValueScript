@@ -13,6 +13,7 @@ use crate::vs_object::VsObject;
 use crate::vs_symbol::VsSymbol;
 use crate::vs_value::ToVal;
 use crate::vs_value::Val;
+use crate::Vallish;
 
 #[derive(Clone)]
 pub struct BytecodeDecoder {
@@ -306,26 +307,5 @@ impl BytecodeDecoder {
 
   pub fn decode_instruction(&mut self) -> InstructionByte {
     return InstructionByte::from_byte(self.decode_byte());
-  }
-}
-
-pub enum Vallish<'a> {
-  Own(Val),
-  Ref(&'a Val),
-}
-
-impl<'a> Vallish<'a> {
-  pub fn get_own(self) -> Val {
-    match self {
-      Vallish::Own(val) => val,
-      Vallish::Ref(val) => val.clone(),
-    }
-  }
-
-  pub fn get_ref(&self) -> &Val {
-    match self {
-      Vallish::Own(val) => val,
-      Vallish::Ref(val) => val,
-    }
   }
 }
