@@ -72,7 +72,7 @@ static FROM: NativeFunction = native_fn(|_this, params| {
     Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => VsArray::new().to_val(),
     Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Dynamic(..) => {
       let len = first_param
-        .sub("length".to_val())
+        .sub(&"length".to_val())
         .map_err(|e| e.to_string())
         .unwrap() // TODO: Exception
         .to_number();
@@ -93,7 +93,7 @@ static FROM: NativeFunction = native_fn(|_this, params| {
       for i in 0..len {
         arr.push(
           first_param
-            .sub((i as f64).to_val())
+            .sub(&(i as f64).to_val())
             .map_err(|e| e.to_string())
             .unwrap(), // TODO: Exception
         );

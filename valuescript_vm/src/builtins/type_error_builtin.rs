@@ -76,7 +76,7 @@ static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
 });
 
 static TYPE_ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
-  let message = this.get().sub("message".to_val())?;
+  let message = this.get().sub(&"message".to_val())?;
   Ok(format!("TypeError({})", message).to_val())
 });
 

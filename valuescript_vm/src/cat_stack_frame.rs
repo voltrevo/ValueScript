@@ -2,6 +2,7 @@ use std::{mem::take, rc::Rc};
 
 use crate::{
   builtins::type_error_builtin::ToTypeError,
+  bytecode_decoder::Vallish,
   native_function::ThisWrapper,
   operations::op_sub,
   stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrame, StackFrameTrait},
@@ -63,7 +64,10 @@ impl CatStackFrame {
       return Ok(FrameStepOk::Continue);
     }
 
-    let make_iter = op_sub(arg.clone(), VsSymbol::ITERATOR.to_val())?;
+    let make_iter = op_sub(
+      Vallish::Ref(&arg),
+      Vallish::Own(VsSymbol::ITERATOR.to_val()),
+    )?;
 
     match make_iter.load_function() {
       LoadFunctionResult::NotAFunction => Err("Non-iterable cat argument".to_type_error()),
@@ -84,12 +88,12 @@ impl CatStackFrame {
     res: &mut Vec<Val>,
     iter_result: Val,
   ) -> Result<(), Val> {
-    let done = iter_result.sub("done".to_val())?.is_truthy();
+    let done = iter_result.sub(&"done".to_val())?.is_truthy();
 
     if done {
       *state = CatFrameState::ReadNext;
     } else {
-      res.push(iter_result.sub("value".to_val())?);
+      res.push(iter_result.sub(&"value".to_val())?);
     }
 
     Ok(())
@@ -113,7 +117,7 @@ impl StackFrameTrait for CatStackFrame {
     match &mut self.state {
       CatFrameState::ReadNext => self.read_next(),
       CatFrameState::MakingIterator => panic!("Unexpected step during MakingIterator"),
-      CatFrameState::Iterating(iter) => match iter.sub("next".to_val())?.load_function() {
+      CatFrameState::Iterating(iter) => match iter.sub(&"next".to_val())?.load_function() {
         LoadFunctionResult::NotAFunction => Err(".next was not a function".to_type_error()),
         LoadFunctionResult::NativeFunction(fn_) => {
           let iter_result = fn_(ThisWrapper::new(false, iter), vec![])?;

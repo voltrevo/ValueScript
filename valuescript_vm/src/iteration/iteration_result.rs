@@ -61,7 +61,7 @@ impl ValTrait for IterationResult {
     LoadFunctionResult::NotAFunction
   }
 
-  fn sub(&self, key: Val) -> Result<Val, Val> {
+  fn sub(&self, key: &Val) -> Result<Val, Val> {
     Ok(match key.to_string().as_str() {
       "value" => self.value.clone(),
       "done" => self.done.to_val(),

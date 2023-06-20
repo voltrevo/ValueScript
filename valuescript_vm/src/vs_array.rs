@@ -11,6 +11,7 @@ use crate::array_higher_functions::{
 };
 use crate::builtins::error_builtin::ToError;
 use crate::builtins::type_error_builtin::ToTypeError;
+use crate::bytecode_decoder::Vallish;
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
 use crate::iteration::array_entries_iterator::ArrayEntriesIterator;
 use crate::iteration::array_iterator::ArrayIterator;
@@ -101,7 +102,7 @@ impl ValTrait for ArrayPrototype {
     LoadFunctionResult::NotAFunction
   }
 
-  fn sub(&self, key: Val) -> Result<Val, Val> {
+  fn sub(&self, key: &Val) -> Result<Val, Val> {
     if let Val::Symbol(symbol) = key {
       return Ok(
         match symbol {
@@ -339,10 +340,10 @@ static FLAT: NativeFunction = native_fn(|this, params| {
 static INCLUDES: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(array_data) => {
-      let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
+      let search_param = params.get(0).unwrap_or(&Val::Undefined);
 
       for elem in &array_data.elements {
-        let is_eq = op_triple_eq_impl(elem.clone(), search_param.clone())
+        let is_eq = op_triple_eq_impl(Vallish::Ref(elem), Vallish::Ref(search_param))
           .map_err(|e| e.to_string())
           .unwrap(); // TODO: Exception
 
@@ -360,12 +361,15 @@ static INCLUDES: NativeFunction = native_fn(|this, params| {
 static INDEX_OF: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(array_data) => {
-      let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
+      let search_param = params.get(0).unwrap_or(&Val::Undefined);
 
       for i in 0..array_data.elements.len() {
-        let is_eq = op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone())
-          .map_err(|e| e.to_string())
-          .unwrap(); // TODO: Exception
+        let is_eq = op_triple_eq_impl(
+          Vallish::Ref(&array_data.elements[i]),
+          Vallish::Ref(search_param),
+        )
+        .map_err(|e| e.to_string())
+        .unwrap(); // TODO: Exception
 
         if is_eq {
           return Ok(Val::Number(i as f64));
@@ -417,12 +421,15 @@ static JOIN: NativeFunction = native_fn(|this, params| {
 static LAST_INDEX_OF: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(array_data) => {
-      let search_param = params.get(0).unwrap_or(&Val::Undefined).clone();
+      let search_param = params.get(0).unwrap_or(&Val::Undefined);
 
       for i in (0..array_data.elements.len()).rev() {
-        let is_eq = op_triple_eq_impl(array_data.elements[i].clone(), search_param.clone())
-          .map_err(|e| e.to_string())
-          .unwrap(); // TODO: Exception
+        let is_eq = op_triple_eq_impl(
+          Vallish::Ref(&array_data.elements[i]),
+          Vallish::Ref(search_param),
+        )
+        .map_err(|e| e.to_string())
+        .unwrap(); // TODO: Exception
 
         if is_eq {
           return Ok(Val::Number(i as f64));

@@ -104,6 +104,6 @@ static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
 });
 
 static ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
-  let message = this.get().sub("message".to_val())?;
+  let message = this.get().sub(&"message".to_val())?;
   Ok(format!("Error({})", message).to_val()) // TODO: Fixes needed here (and other errors)
 });

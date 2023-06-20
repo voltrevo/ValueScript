@@ -3,6 +3,7 @@ use valuescript_common::InstructionByte;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
+use crate::bytecode_decoder::Vallish;
 use crate::cat_stack_frame::CatStackFrame;
 use crate::native_function::ThisWrapper;
 use crate::operations;
@@ -44,10 +45,10 @@ impl BytecodeStackFrame {
 
   pub fn apply_binary_op(
     &mut self,
-    op: fn(left: Val, right: Val) -> Result<Val, Val>,
+    op: fn(left: Vallish, right: Vallish) -> Result<Val, Val>,
   ) -> Result<(), Val> {
-    let left = self.decoder.decode_val(&self.registers);
-    let right = self.decoder.decode_val(&self.registers);
+    let left = self.decoder.decode_vallish(&self.registers);
+    let right = self.decoder.decode_vallish(&self.registers);
 
     let register_index = self.decoder.decode_register_index();
 
@@ -150,28 +151,24 @@ impl StackFrameTrait for BytecodeStackFrame {
 
       OpInc => {
         let register_index = self.decoder.decode_register_index().unwrap();
-        let mut val = self.registers[register_index].clone();
+        let val = &mut self.registers[register_index];
 
-        match &mut val {
+        match val {
           Val::Number(n) => *n += 1.0,
           Val::BigInt(bi) => *bi += 1,
-          _ => val = operations::op_plus(val, 1.0.to_val())?,
+          _ => *val = operations::op_plus(Vallish::Ref(val), Vallish::Own(1.0.to_val()))?,
         };
-
-        self.registers[register_index] = val;
       }
 
       OpDec => {
         let register_index = self.decoder.decode_register_index().unwrap();
-        let mut val = self.registers[register_index].clone();
+        let val = &mut self.registers[register_index];
 
-        match &mut val {
+        match val {
           Val::Number(n) => *n -= 1.0,
           Val::BigInt(bi) => *bi -= 1,
-          _ => val = operations::op_minus(val, 1.0.to_val())?,
+          _ => *val = operations::op_minus(Vallish::Ref(val), Vallish::Own(1.0.to_val()))?,
         };
-
-        self.registers[register_index] = val;
       }
 
       OpPlus => self.apply_binary_op(operations::op_plus)?,
@@ -326,11 +323,11 @@ impl StackFrameTrait for BytecodeStackFrame {
           _ => ThisArg::Val(self.decoder.decode_val(&self.registers)),
         };
 
-        let subscript = self.decoder.decode_val(&self.registers);
+        let subscript = self.decoder.decode_vallish(&self.registers);
 
         let fn_ = match &obj {
-          ThisArg::Register(reg_i) => self.registers[reg_i.clone()].sub(subscript)?,
-          ThisArg::Val(val) => val.sub(subscript)?,
+          ThisArg::Register(reg_i) => self.registers[reg_i.clone()].sub(subscript.get_ref())?,
+          ThisArg::Val(val) => val.sub(subscript.get_ref())?,
         };
 
         match fn_.load_function() {
@@ -499,7 +496,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         let res_i = self.decoder.decode_register_index();
 
-        let next_fn = self.registers[iter_i].sub("next".to_val())?;
+        let next_fn = self.registers[iter_i].sub(&"next".to_val())?;
 
         match next_fn.load_function() {
           LoadFunctionResult::NotAFunction => {
@@ -530,11 +527,11 @@ impl StackFrameTrait for BytecodeStackFrame {
         };
 
         if let Some(value_i) = self.decoder.decode_register_index() {
-          self.registers[value_i] = self.registers[iter_res_i].sub("value".to_val())?;
+          self.registers[value_i] = self.registers[iter_res_i].sub(&"value".to_val())?;
         }
 
         if let Some(done_i) = self.decoder.decode_register_index() {
-          self.registers[done_i] = self.registers[iter_res_i].sub("done".to_val())?;
+          self.registers[done_i] = self.registers[iter_res_i].sub(&"done".to_val())?;
         }
       }
 

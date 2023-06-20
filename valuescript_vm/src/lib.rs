@@ -27,5 +27,6 @@ mod vs_symbol;
 pub mod vs_value;
 
 pub use bytecode::Bytecode;
+pub use bytecode_decoder::Vallish;
 pub use virtual_machine::VirtualMachine;
 pub use vs_value::{LoadFunctionResult, ValTrait};

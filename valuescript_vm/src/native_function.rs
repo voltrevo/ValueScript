@@ -80,7 +80,7 @@ impl ValTrait for NativeFunction {
     LoadFunctionResult::NativeFunction(self.fn_)
   }
 
-  fn sub(&self, _key: Val) -> Result<Val, Val> {
+  fn sub(&self, _key: &Val) -> Result<Val, Val> {
     Err("TODO: Subscript native function".to_error())
   }
 

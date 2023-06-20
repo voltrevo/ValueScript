@@ -15,7 +15,7 @@ pub struct VsObject {
 }
 
 impl VsObject {
-  pub fn sub(&self, key: Val) -> Val {
+  pub fn sub(&self, key: &Val) -> Val {
     let val = match &key {
       Val::String(string) => self.string_map.get(&**string),
       Val::Symbol(symbol) => self.symbol_map.get(symbol),

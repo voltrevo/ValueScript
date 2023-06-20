@@ -156,7 +156,7 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
-    return self.decode_vallish(registers).get_val();
+    return self.decode_vallish(registers).get_own();
   }
 
   pub fn decode_vec_val(&mut self, registers: &Vec<Val>) -> Vec<Val> {
@@ -315,7 +315,7 @@ pub enum Vallish<'a> {
 }
 
 impl<'a> Vallish<'a> {
-  pub fn get_val(self) -> Val {
+  pub fn get_own(self) -> Val {
     match self {
       Vallish::Own(val) => val,
       Vallish::Ref(val) => val.clone(),

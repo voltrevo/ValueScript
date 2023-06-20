@@ -76,7 +76,7 @@ impl ValTrait for Generator {
     LoadFunctionResult::NotAFunction
   }
 
-  fn sub(&self, key: Val) -> Result<Val, Val> {
+  fn sub(&self, key: &Val) -> Result<Val, Val> {
     // TODO: Add symbol for next for performance? (Still needs this fallback)
     if key.to_string() == "next" {
       return Ok(NEXT.to_val());

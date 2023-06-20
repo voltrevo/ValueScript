@@ -59,7 +59,7 @@ impl ValTrait for NativeFrameFunction {
     LoadFunctionResult::StackFrame((self.make_frame)())
   }
 
-  fn sub(&self, _key: Val) -> Result<Val, Val> {
+  fn sub(&self, _key: &Val) -> Result<Val, Val> {
     Err("TODO: Subscript native function".to_error())
   }
 

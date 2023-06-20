@@ -7,6 +7,7 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
+use crate::bytecode_decoder::Vallish;
 use crate::copy_counter::CopyCounter;
 use crate::native_function::ThisWrapper;
 use crate::operations::{op_sub, op_submov};
@@ -79,7 +80,7 @@ pub trait ValTrait: fmt::Display {
 
   fn load_function(&self) -> LoadFunctionResult;
 
-  fn sub(&self, key: Val) -> Result<Val, Val>;
+  fn sub(&self, key: &Val) -> Result<Val, Val>;
   fn submov(&mut self, key: Val, value: Val) -> Result<(), Val>;
 
   fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
@@ -302,6 +303,7 @@ impl ValTrait for Val {
     };
   }
 
+  // TODO: &BigInt ?
   fn as_bigint_data(&self) -> Option<BigInt> {
     use Val::*;
 
@@ -349,9 +351,9 @@ impl ValTrait for Val {
     };
   }
 
-  fn sub(&self, key: Val) -> Result<Val, Val> {
-    // TODO: Avoid cloning?
-    op_sub(self.clone(), key)
+  fn sub(&self, key: &Val) -> Result<Val, Val> {
+    // TODO: Avoid indirection?
+    op_sub(Vallish::Ref(self), Vallish::Ref(key))
   }
 
   fn submov(&mut self, key: Val, value: Val) -> Result<(), Val> {
@@ -396,7 +398,7 @@ impl ValTrait for Val {
         let mut res = String::new();
 
         if let Some(proto) = &object.prototype {
-          match proto.sub("name".to_val()) {
+          match proto.sub(&"name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
                 res += &name.to_string();
@@ -626,7 +628,7 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
       }
       Val::Object(object) => {
         if let Some(proto) = &object.prototype {
-          match proto.sub("name".to_val()) {
+          match proto.sub(&"name".to_val()) {
             Ok(name) => {
               if name.typeof_() == VsType::String {
                 write!(f, "{} ", name)?;

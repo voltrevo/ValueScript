@@ -71,7 +71,7 @@ impl ValTrait for ArrayEntriesIterator {
     LoadFunctionResult::NotAFunction
   }
 
-  fn sub(&self, key: Val) -> Result<Val, Val> {
+  fn sub(&self, key: &Val) -> Result<Val, Val> {
     if key.to_string() == "next" {
       return Ok(NEXT.to_val());
     }

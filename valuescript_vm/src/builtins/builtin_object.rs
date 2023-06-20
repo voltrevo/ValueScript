@@ -66,7 +66,7 @@ where
     Self::bo_load_function()
   }
 
-  fn sub(&self, key: Val) -> Result<Val, Val> {
+  fn sub(&self, key: &Val) -> Result<Val, Val> {
     Ok(Self::bo_sub(&key.to_string()))
   }
 

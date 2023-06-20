@@ -85,7 +85,7 @@ pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
 }
 
 static RANGE_ERROR_TO_STRING: NativeFunction = native_fn(|this, _params| {
-  let message = this.get().sub("message".to_val())?;
+  let message = this.get().sub(&"message".to_val())?;
   Ok(format!("RangeError({})", message).to_val())
 });
 
