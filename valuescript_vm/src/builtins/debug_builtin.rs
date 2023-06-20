@@ -37,9 +37,13 @@ impl fmt::Display for DebugBuiltin {
 }
 
 static LOG: NativeFunction = native_fn(|_this, params| {
+  print!("Debug.log:");
+
   for p in params {
-    println!("Debug.log: {}", p.pretty());
+    print!(" {}", p.pretty());
   }
+
+  println!();
 
   Ok(Val::Undefined)
 });
