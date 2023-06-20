@@ -32,13 +32,13 @@ pub struct CatchSetting {
 }
 
 impl BytecodeStackFrame {
-  pub fn apply_unary_op(&mut self, op: fn(input: Val) -> Val) {
-    let input = self.decoder.decode_val(&self.registers);
+  pub fn apply_unary_op(&mut self, op: fn(input: &Val) -> Val) {
+    let input = self.decoder.decode_vallish(&self.registers);
 
     let register_index = self.decoder.decode_register_index();
 
     if register_index.is_some() {
-      self.registers[register_index.unwrap()] = op(input);
+      self.registers[register_index.unwrap()] = op(input.get_ref());
     }
   }
 

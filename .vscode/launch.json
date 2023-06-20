@@ -7,12 +7,12 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'value_script'",
+      "name": "Debug executable 'vstc'",
       "cargo": {
         "args": [
           "build",
-          "--bin=vstc",
-          "--package=value_script"
+          "-p",
+          "vstc"
         ],
         "filter": {
           "name": "vstc",

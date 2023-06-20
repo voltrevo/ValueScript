@@ -43,7 +43,7 @@ pub fn op_plus(left: Val, right: Val) -> Result<Val, Val> {
   return Ok(Val::Number(left_prim.to_number() + right_prim.to_number()));
 }
 
-pub fn op_unary_plus(input: Val) -> Val {
+pub fn op_unary_plus(input: &Val) -> Val {
   match input.as_bigint_data() {
     Some(bigint) => Val::BigInt(bigint),
     _ => Val::Number(input.to_number()),
@@ -60,7 +60,7 @@ pub fn op_minus(left: Val, right: Val) -> Result<Val, Val> {
   }
 }
 
-pub fn op_unary_minus(input: Val) -> Val {
+pub fn op_unary_minus(input: &Val) -> Val {
   match input.as_bigint_data() {
     Some(bigint) => Val::BigInt(-bigint),
     _ => Val::Number(-input.to_number()),
@@ -170,7 +170,7 @@ pub fn op_or(left: Val, right: Val) -> Result<Val, Val> {
   Ok(if left.is_truthy() { left } else { right })
 }
 
-pub fn op_not(input: Val) -> Val {
+pub fn op_not(input: &Val) -> Val {
   return Val::Bool(!input.is_truthy());
 }
 
@@ -282,7 +282,7 @@ pub fn op_bit_or(left: Val, right: Val) -> Result<Val, Val> {
   }
 }
 
-pub fn op_bit_not(input: Val) -> Val {
+pub fn op_bit_not(input: &Val) -> Val {
   match input.as_bigint_data() {
     Some(bigint) => Val::BigInt(!bigint),
     None => {
@@ -341,7 +341,7 @@ pub fn op_right_shift_unsigned(left: Val, right: Val) -> Result<Val, Val> {
   }
 }
 
-pub fn op_typeof(input: Val) -> Val {
+pub fn op_typeof(input: &Val) -> Val {
   use VsType::*;
 
   match input.typeof_() {

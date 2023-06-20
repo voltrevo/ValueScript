@@ -95,58 +95,68 @@ impl BytecodeDecoder {
     return BytecodeType::from_byte(self.peek_byte());
   }
 
-  pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
+  pub fn decode_vallish<'a>(&mut self, registers: &'a Vec<Val>) -> Vallish<'a> {
+    use Vallish::*;
+
     return match self.decode_type() {
       BytecodeType::End => panic!("Cannot decode end"),
-      BytecodeType::Void => Val::Void,
-      BytecodeType::Undefined => Val::Undefined,
-      BytecodeType::Null => Val::Null,
-      BytecodeType::False => Val::Bool(false),
-      BytecodeType::True => Val::Bool(true),
-      BytecodeType::SignedByte => (self.decode_signed_byte() as f64).to_val(),
-      BytecodeType::Number => self.decode_number().to_val(),
-      BytecodeType::String => self.decode_string().to_val(),
-      BytecodeType::Array => self.decode_vec_val(registers).to_val(),
+      BytecodeType::Void => Own(Val::Void),
+      BytecodeType::Undefined => Own(Val::Undefined),
+      BytecodeType::Null => Own(Val::Null),
+      BytecodeType::False => Own(Val::Bool(false)),
+      BytecodeType::True => Own(Val::Bool(true)),
+      BytecodeType::SignedByte => Own((self.decode_signed_byte() as f64).to_val()),
+      BytecodeType::Number => Own(self.decode_number().to_val()),
+      BytecodeType::String => Own(self.decode_string().to_val()),
+      BytecodeType::Array => Own(self.decode_vec_val(registers).to_val()),
       BytecodeType::Object => {
         let mut string_map: BTreeMap<String, Val> = BTreeMap::new();
         let mut symbol_map: BTreeMap<VsSymbol, Val> = BTreeMap::new();
 
         while self.peek_type() != BytecodeType::End {
-          let key = self.decode_val(registers);
+          let key = self.decode_vallish(registers);
           let value = self.decode_val(registers);
 
-          match key {
+          match key.get_ref() {
             Val::String(string) => string_map.insert(string.to_string(), value),
-            Val::Symbol(symbol) => symbol_map.insert(symbol, value),
+            Val::Symbol(symbol) => symbol_map.insert(symbol.clone(), value),
             key => string_map.insert(key.to_string(), value),
           };
         }
 
         self.decode_type(); // End (TODO: assert)
 
-        VsObject {
-          string_map,
-          symbol_map,
-          prototype: None,
-        }
-        .to_val()
+        Own(
+          VsObject {
+            string_map,
+            symbol_map,
+            prototype: None,
+          }
+          .to_val(),
+        )
       }
-      BytecodeType::Function => self.decode_function(false),
-      BytecodeType::Pointer => self.decode_pointer(registers),
-      BytecodeType::Register => match registers[self.decode_register_index().unwrap()].clone() {
-        Val::Void => Val::Undefined,
-        val => val,
+      BytecodeType::Function => Own(self.decode_function(false)),
+      BytecodeType::Pointer => Own(self.decode_pointer(registers)),
+      BytecodeType::Register => match registers[self.decode_register_index().unwrap()] {
+        Val::Void => Own(Val::Undefined),
+        ref val => Ref(val),
       },
-      BytecodeType::Builtin => BUILTIN_VALS[self.decode_varsize_uint()](),
-      BytecodeType::Class => VsClass {
-        constructor: self.decode_val(registers),
-        instance_prototype: self.decode_val(registers),
-      }
-      .to_val(),
-      BytecodeType::BigInt => self.decode_bigint().to_val(),
-      BytecodeType::GeneratorFunction => self.decode_function(true),
+      BytecodeType::Builtin => Own(BUILTIN_VALS[self.decode_varsize_uint()]()),
+      BytecodeType::Class => Own(
+        VsClass {
+          constructor: self.decode_val(registers),
+          instance_prototype: self.decode_val(registers),
+        }
+        .to_val(),
+      ),
+      BytecodeType::BigInt => Own(self.decode_bigint().to_val()),
+      BytecodeType::GeneratorFunction => Own(self.decode_function(true)),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     };
+  }
+
+  pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
+    return self.decode_vallish(registers).get_val();
   }
 
   pub fn decode_vec_val(&mut self, registers: &Vec<Val>) -> Vec<Val> {
@@ -296,5 +306,26 @@ impl BytecodeDecoder {
 
   pub fn decode_instruction(&mut self) -> InstructionByte {
     return InstructionByte::from_byte(self.decode_byte());
+  }
+}
+
+pub enum Vallish<'a> {
+  Own(Val),
+  Ref(&'a Val),
+}
+
+impl<'a> Vallish<'a> {
+  pub fn get_val(self) -> Val {
+    match self {
+      Vallish::Own(val) => val,
+      Vallish::Ref(val) => val.clone(),
+    }
+  }
+
+  pub fn get_ref(&self) -> &Val {
+    match self {
+      Vallish::Own(val) => val,
+      Vallish::Ref(val) => val,
+    }
   }
 }
