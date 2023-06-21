@@ -41,7 +41,7 @@
  * The Richards benchmark simulates the task dispatcher of an
  * operating system.
  */
-function runRichards() {
+export default function runRichards() {
   var scheduler = new Scheduler();
   scheduler.addIdleTask(0, /* ID_IDLE */ 0, null, 1000 /* COUNT */);
 
@@ -95,7 +95,10 @@ function runRichards() {
 class Scheduler {
   queueCount = 0;
   holdCount = 0;
-  blocks = new Array(6 /* NUMBER_OF_IDS */);
+
+  // new Array(6 /* NUMBER_OF_IDS */);
+  blocks: (TaskControlBlock | null)[] = [null, null, null, null, null, null];
+
   list: TaskControlBlock | null = null;
   currentTcb: TaskControlBlock | null = null;
   currentId: number | null = null;
@@ -260,7 +263,7 @@ class Scheduler {
     this.queueCount++;
     packet.link = null;
     packet.id = this.currentId;
-    return t.checkPriorityAdd(this.currentTcb, packet);
+    return t.checkPriorityAdd(this.currentTcb!, packet);
   }
 }
 
@@ -547,7 +550,7 @@ class HandlerTask {
         if (this.v2 != null) {
           v = this.v2;
           this.v2 = this.v2.link;
-          v.a1 = this.v1.a2[count];
+          v.a1 = this.v1.a2[count]!;
           this.v1.a1 = count + 1;
           return this.scheduler.queue(v);
         }
@@ -588,14 +591,14 @@ class Packet {
   id: number | null;
   kind: number;
   a1: number;
-  a2: number[];
+  a2: (number | null)[];
 
   constructor(link: Packet | null, id: number, kind: number) {
     this.link = link;
     this.id = id;
     this.kind = kind;
     this.a1 = 0;
-    this.a2 = new Array(4 /* DATA_SIZE */);
+    this.a2 = [null, null, null, null]; // new Array(4 /* DATA_SIZE */);
   }
 
   /**
@@ -617,5 +620,3 @@ class Packet {
     return "Packet";
   }
 }
-
-runRichards();
