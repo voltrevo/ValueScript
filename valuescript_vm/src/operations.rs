@@ -128,8 +128,8 @@ pub fn op_exp(left: Vallish, right: Vallish) -> Result<Val, Val> {
   }
 }
 
-pub fn op_eq(left: Vallish, right: Vallish) -> Result<Val, Val> {
-  Ok(Val::Bool(match (left.get_ref(), right.get_ref()) {
+pub fn op_eq_impl(left: Vallish, right: Vallish) -> Result<bool, Val> {
+  Ok(match (left.get_ref(), right.get_ref()) {
     (left_ref, Val::Undefined | Val::Null) => match left_ref {
       Val::Undefined | Val::Null => true,
       _ => false,
@@ -139,19 +139,15 @@ pub fn op_eq(left: Vallish, right: Vallish) -> Result<Val, Val> {
     (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
     _ => return Err("TODO".to_error()),
-  }))
+  })
+}
+
+pub fn op_eq(left: Vallish, right: Vallish) -> Result<Val, Val> {
+  Ok(Val::Bool(op_eq_impl(left, right)?))
 }
 
 pub fn op_ne(left: Vallish, right: Vallish) -> Result<Val, Val> {
-  Ok(Val::Bool(match (left.get_ref(), right.get_ref()) {
-    (Val::Undefined, Val::Undefined) => false,
-    (Val::Null, Val::Null) => false,
-    (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool != right_bool,
-    (Val::Number(left_number), Val::Number(right_number)) => left_number != right_number,
-    (Val::String(left_string), Val::String(right_string)) => left_string != right_string,
-    (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint != right_bigint,
-    _ => return Err("TODO".to_error()),
-  }))
+  Ok(Val::Bool(!op_eq_impl(left, right)?))
 }
 
 pub fn op_triple_eq_impl(left: Vallish, right: Vallish) -> Result<bool, Val> {
