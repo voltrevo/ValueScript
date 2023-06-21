@@ -11,7 +11,6 @@ use crate::operations;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, StackFrame, StackFrameTrait};
-use crate::vallish::Vallish;
 use crate::vs_object::VsObject;
 use crate::vs_value::ToVal;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
@@ -36,26 +35,24 @@ pub struct CatchSetting {
 
 impl BytecodeStackFrame {
   pub fn apply_unary_op(&mut self, op: fn(input: &Val) -> Val) {
-    let input = self.decoder.decode_vallish(&self.registers);
+    let input = self.decoder.decode_val(&self.registers);
 
     let register_index = self.decoder.decode_register_index();
 
     if register_index.is_some() {
-      self.registers[register_index.unwrap()] = op(input.get_ref());
+      self.registers[register_index.unwrap()] = op(&input);
     }
   }
 
   pub fn apply_binary_op(
     &mut self,
-    op: fn(left: Vallish, right: Vallish) -> Result<Val, Val>,
+    op: fn(left: &Val, right: &Val) -> Result<Val, Val>,
   ) -> Result<(), Val> {
-    let left = self.decoder.decode_vallish(&self.registers);
-    let right = self.decoder.decode_vallish(&self.registers);
+    let left = self.decoder.decode_val(&self.registers);
+    let right = self.decoder.decode_val(&self.registers);
 
-    let register_index = self.decoder.decode_register_index();
-
-    if register_index.is_some() {
-      self.registers[register_index.unwrap()] = op(left, right)?;
+    if let Some(register_index) = self.decoder.decode_register_index() {
+      self.registers[register_index] = op(&left, &right)?;
     }
 
     Ok(())
@@ -158,7 +155,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         match val {
           Val::Number(n) => *n += 1.0,
           Val::BigInt(bi) => *bi += 1,
-          _ => *val = operations::op_plus(Vallish::Ref(val), Vallish::Own(1.0.to_val()))?,
+          _ => *val = operations::op_plus(val, &1.0.to_val())?,
         };
       }
 
@@ -169,7 +166,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         match val {
           Val::Number(n) => *n -= 1.0,
           Val::BigInt(bi) => *bi -= 1,
-          _ => *val = operations::op_minus(Vallish::Ref(val), Vallish::Own(1.0.to_val()))?,
+          _ => *val = operations::op_minus(val, &1.0.to_val())?,
         };
       }
 
@@ -193,7 +190,14 @@ impl StackFrameTrait for BytecodeStackFrame {
       OpGreater => self.apply_binary_op(operations::op_greater)?,
       OpGreaterEq => self.apply_binary_op(operations::op_greater_eq)?,
       OpNullishCoalesce => self.apply_binary_op(operations::op_nullish_coalesce)?,
-      OpOptionalChain => self.apply_binary_op(operations::op_optional_chain)?,
+      OpOptionalChain => {
+        let mut left = self.decoder.decode_val(&self.registers);
+        let right = self.decoder.decode_val(&self.registers);
+
+        if let Some(register_index) = self.decoder.decode_register_index() {
+          self.registers[register_index] = operations::op_optional_chain(&mut left, &right)?;
+        }
+      }
       OpBitAnd => self.apply_binary_op(operations::op_bit_and)?,
       OpBitOr => self.apply_binary_op(operations::op_bit_or)?,
 
@@ -299,7 +303,14 @@ impl StackFrameTrait for BytecodeStackFrame {
         }
       }
 
-      Sub => self.apply_binary_op(operations::op_sub)?,
+      Sub => {
+        let mut left = self.decoder.decode_val(&self.registers);
+        let right = self.decoder.decode_val(&self.registers);
+
+        if let Some(register_index) = self.decoder.decode_register_index() {
+          self.registers[register_index] = operations::op_sub(&mut left, &right)?;
+        }
+      }
 
       SubMov => {
         // TODO: Ideally we would use a reference for the subscript (decode_vallish), but that would
@@ -329,11 +340,11 @@ impl StackFrameTrait for BytecodeStackFrame {
           _ => ThisArg::Val(self.decoder.decode_val(&self.registers)),
         };
 
-        let subscript = self.decoder.decode_vallish(&self.registers);
+        let subscript = self.decoder.decode_val(&self.registers);
 
         let fn_ = match &obj {
-          ThisArg::Register(reg_i) => self.registers[reg_i.clone()].sub(subscript.get_ref())?,
-          ThisArg::Val(val) => val.sub(subscript.get_ref())?,
+          ThisArg::Register(reg_i) => self.registers[*reg_i].sub(&subscript)?,
+          ThisArg::Val(val) => val.sub(&subscript)?,
         };
 
         match fn_.load_function() {

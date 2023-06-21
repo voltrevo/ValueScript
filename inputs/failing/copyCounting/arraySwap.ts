@@ -1,4 +1,4 @@
-//! test_output(2)
+//! test_output(3)
 // Should be: 1
 
 export default function main() {

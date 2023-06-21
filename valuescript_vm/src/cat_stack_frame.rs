@@ -5,7 +5,6 @@ use crate::{
   native_function::ThisWrapper,
   operations::op_sub,
   stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrame, StackFrameTrait},
-  vallish::Vallish,
   vs_symbol::VsSymbol,
   vs_value::{ToVal, Val},
   LoadFunctionResult, ValTrait,
@@ -64,10 +63,7 @@ impl CatStackFrame {
       return Ok(FrameStepOk::Continue);
     }
 
-    let make_iter = op_sub(
-      Vallish::Ref(&arg),
-      Vallish::Own(VsSymbol::ITERATOR.to_val()),
-    )?;
+    let make_iter = op_sub(&mut arg, &VsSymbol::ITERATOR.to_val())?;
 
     match make_iter.load_function() {
       LoadFunctionResult::NotAFunction => Err("Non-iterable cat argument".to_type_error()),

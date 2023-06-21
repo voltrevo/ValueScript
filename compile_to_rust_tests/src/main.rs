@@ -3,7 +3,7 @@ use std::process::exit;
 use valuescript_vm::{
   operations::{op_less, op_minus, op_plus},
   vs_value::{ToVal, Val},
-  ValTrait, Vallish,
+  ValTrait,
 };
 
 pub fn main() {
@@ -65,21 +65,22 @@ pub fn main() {
 
 // 1.09s
 // Update: 1.06s
+// Update: 0.99s
 pub fn fib(n: Val) -> Result<Val, Val> {
   let mut _return = Val::Undefined;
 
-  let mut _tmp0 = op_less(Vallish::Ref(&n), Vallish::Own(2.0.to_val()))?;
+  let mut _tmp0 = op_less(&n, &2.0.to_val())?;
 
   if _tmp0.is_truthy() {
     _return = n;
     return Ok(_return);
   }
 
-  let mut _tmp1 = op_minus(Vallish::Ref(&n), Vallish::Own(1.0.to_val()))?;
+  let mut _tmp1 = op_minus(&n, &1.0.to_val())?;
   let mut _tmp2 = fib(_tmp1)?;
-  _tmp1 = op_minus(Vallish::Own(n), Vallish::Own(2.0.to_val()))?;
+  _tmp1 = op_minus(&n, &2.0.to_val())?;
   let mut _tmp3 = fib(_tmp1)?;
-  _return = op_plus(Vallish::Own(_tmp2), Vallish::Own(_tmp3))?;
+  _return = op_plus(&_tmp2, &_tmp3)?;
 
   return Ok(_return);
 }

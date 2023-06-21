@@ -1,4 +1,5 @@
-//! test_output(2)
+//! test_output(3)
+// Should be: 2
 
 /// <reference path="../../../concept-code/vs.d.ts" />
 

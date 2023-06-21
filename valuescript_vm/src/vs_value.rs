@@ -11,7 +11,6 @@ use crate::copy_counter::CopyCounter;
 use crate::native_function::ThisWrapper;
 use crate::operations::{op_sub, op_submov};
 use crate::stack_frame::StackFrame;
-use crate::vallish::Vallish;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
@@ -352,8 +351,8 @@ impl ValTrait for Val {
   }
 
   fn sub(&self, key: &Val) -> Result<Val, Val> {
-    // TODO: Avoid indirection?
-    op_sub(Vallish::Ref(self), Vallish::Ref(key))
+    // TODO: mut version?
+    op_sub(&mut self.clone(), key)
   }
 
   fn submov(&mut self, key: &Val, value: Val) -> Result<(), Val> {

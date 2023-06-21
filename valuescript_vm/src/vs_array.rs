@@ -17,7 +17,6 @@ use crate::iteration::array_iterator::ArrayIterator;
 use crate::native_function::{native_fn, NativeFunction};
 use crate::operations::op_triple_eq_impl;
 use crate::todo_fn::TODO;
-use crate::vallish::Vallish;
 use crate::vs_class::VsClass;
 use crate::vs_object::VsObject;
 use crate::vs_symbol::VsSymbol;
@@ -343,7 +342,7 @@ static INCLUDES: NativeFunction = native_fn(|this, params| {
       let search_param = params.get(0).unwrap_or(&Val::Undefined);
 
       for elem in &array_data.elements {
-        let is_eq = op_triple_eq_impl(Vallish::Ref(elem), Vallish::Ref(search_param))
+        let is_eq = op_triple_eq_impl(elem, search_param)
           .map_err(|e| e.to_string())
           .unwrap(); // TODO: Exception
 
@@ -364,12 +363,9 @@ static INDEX_OF: NativeFunction = native_fn(|this, params| {
       let search_param = params.get(0).unwrap_or(&Val::Undefined);
 
       for i in 0..array_data.elements.len() {
-        let is_eq = op_triple_eq_impl(
-          Vallish::Ref(&array_data.elements[i]),
-          Vallish::Ref(search_param),
-        )
-        .map_err(|e| e.to_string())
-        .unwrap(); // TODO: Exception
+        let is_eq = op_triple_eq_impl(&array_data.elements[i], search_param)
+          .map_err(|e| e.to_string())
+          .unwrap(); // TODO: Exception
 
         if is_eq {
           return Ok(Val::Number(i as f64));
@@ -424,12 +420,9 @@ static LAST_INDEX_OF: NativeFunction = native_fn(|this, params| {
       let search_param = params.get(0).unwrap_or(&Val::Undefined);
 
       for i in (0..array_data.elements.len()).rev() {
-        let is_eq = op_triple_eq_impl(
-          Vallish::Ref(&array_data.elements[i]),
-          Vallish::Ref(search_param),
-        )
-        .map_err(|e| e.to_string())
-        .unwrap(); // TODO: Exception
+        let is_eq = op_triple_eq_impl(&array_data.elements[i], search_param)
+          .map_err(|e| e.to_string())
+          .unwrap(); // TODO: Exception
 
         if is_eq {
           return Ok(Val::Number(i as f64));
