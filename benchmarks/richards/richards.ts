@@ -113,9 +113,6 @@ class Scheduler {
   blocks: (number | null)[] = [null, null, null, null, null, null];
 
   list: number | null = null;
-
-  // TODO: These are the same?
-  currentTcb: number | null = null;
   currentId: number | null = null;
 
   // var ID_IDLE = 0;
@@ -194,7 +191,7 @@ class Scheduler {
     task: Task,
   ) {
     this.addTask(id, priority, queue, task);
-    this.tcbStore[this.currentTcb!].setRunning();
+    this.tcbStore[this.currentId!].setRunning();
   }
 
   /**
@@ -213,23 +210,22 @@ class Scheduler {
       task,
     );
     this.tcbStore[id] = tcb;
-    this.currentTcb = tcb.id;
-    this.list = this.currentTcb;
-    this.blocks[id] = this.currentTcb;
+    this.currentId = tcb.id;
+    this.list = this.currentId;
+    this.blocks[id] = this.currentId;
   }
 
   /**
    * Execute the tasks managed by this scheduler.
    */
   schedule() {
-    this.currentTcb = this.list;
-    while (this.currentTcb != null) {
-      if (this.tcbStore[this.currentTcb].isHeldOrSuspended()) {
-        this.currentTcb = this.tcbStore[this.currentTcb].link;
+    this.currentId = this.list;
+    while (this.currentId != null) {
+      if (this.tcbStore[this.currentId].isHeldOrSuspended()) {
+        this.currentId = this.tcbStore[this.currentId].link;
       } else {
-        this.currentId = this.currentTcb;
         const action = this.tcbStore[this.currentId].run();
-        this.currentTcb = this.processAction(action);
+        this.currentId = this.processAction(action);
       }
     }
   }
@@ -285,19 +281,19 @@ class Scheduler {
       if (tcbId == null) return tcbId;
       this.tcbStore[tcbId].markAsNotHeld();
       if (
-        this.tcbStore[tcbId].priority > this.tcbStore[this.currentTcb!].priority
+        this.tcbStore[tcbId].priority > this.tcbStore[this.currentId!].priority
       ) {
         return tcbId;
       } else {
-        return this.currentTcb;
+        return this.currentId;
       }
     } else if (action[0] === 1) { // holdCurrent
       this.holdCount++;
-      this.tcbStore[this.currentTcb!].markAsHeld();
-      return this.tcbStore[this.currentTcb!].link;
+      this.tcbStore[this.currentId!].markAsHeld();
+      return this.tcbStore[this.currentId!].link;
     } else if (action[0] === 2) { // suspendCurrent
-      this.tcbStore[this.currentTcb!].markAsSuspended();
-      return this.currentTcb;
+      this.tcbStore[this.currentId!].markAsSuspended();
+      return this.currentId;
     } else if (action[0] === 3) { // queue
       let packet = action[1];
 
@@ -307,7 +303,7 @@ class Scheduler {
       packet.link = null;
       packet.id = this.currentId;
       return this.tcbStore[t].checkPriorityAdd(
-        this.tcbStore[this.currentTcb!],
+        this.tcbStore[this.currentId!],
         packet,
       );
     }
