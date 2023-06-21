@@ -27,6 +27,21 @@ impl TargetAccessor {
       },
       This(_) => true,
       Member(member) => TargetAccessor::is_eligible_expr(ec, &member.obj),
+
+      Paren(e) => TargetAccessor::is_eligible_expr(ec, &e.expr),
+      TsTypeAssertion(e) => TargetAccessor::is_eligible_expr(ec, &e.expr),
+      //
+      // Deliberately excluding this so you can get a const_subcall using (x as const).foo().
+      // This is TypeScript syntax which is actually affecting the program behavior though.
+      // TsConstAssertion(e) => TargetAccessor::is_eligible_expr(ec, &e.expr),
+      // TODO: TypeScript often doesn't allow (x as const). Maybe this should be included after all?
+      // (You can always do echo(x).foo() to get a const_subcall.)
+      //
+      TsNonNull(e) => TargetAccessor::is_eligible_expr(ec, &e.expr),
+      TsAs(e) => TargetAccessor::is_eligible_expr(ec, &e.expr),
+      //
+      // TODO: OptChain
+      //
       _ => false, // TODO: Others may be eligible but not implemented?
     };
   }
@@ -61,6 +76,12 @@ impl TargetAccessor {
           register,
         })
       }
+
+      Paren(e) => TargetAccessor::compile(ec, &e.expr, false),
+      TsTypeAssertion(e) => TargetAccessor::compile(ec, &e.expr, false),
+      TsNonNull(e) => TargetAccessor::compile(ec, &e.expr, false),
+      TsAs(e) => TargetAccessor::compile(ec, &e.expr, false),
+
       SuperProp(super_prop) => {
         ec.fnc.todo(super_prop.span, "SuperProp expressions");
         TargetAccessor::make_todo(ec)
