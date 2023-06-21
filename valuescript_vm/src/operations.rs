@@ -130,8 +130,10 @@ pub fn op_exp(left: Vallish, right: Vallish) -> Result<Val, Val> {
 
 pub fn op_eq(left: Vallish, right: Vallish) -> Result<Val, Val> {
   Ok(Val::Bool(match (left.get_ref(), right.get_ref()) {
-    (Val::Undefined, Val::Undefined) => true,
-    (Val::Null, Val::Null) => true,
+    (left_ref, Val::Undefined | Val::Null) => match left_ref {
+      Val::Undefined | Val::Null => true,
+      _ => false,
+    },
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool == right_bool,
     (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
