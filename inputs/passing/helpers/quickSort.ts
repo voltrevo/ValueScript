@@ -1,16 +1,8 @@
-export default function main() {
-  const x = [7, 18, 9, 11, 16, 3, 8, 2, 5, 4, 6, 14, 15, 17, 10, 12, 1, 13];
-
-  return quickSort(x, (a, b) => a - b);
-}
-
-function quickSort<T>(vals: T[], cmp: (a: T, b: T) => number) {
+export default function quickSort<T>(vals: T[], cmp: (a: T, b: T) => number) {
   // Demonstrates the ability to do in-place updates in ValueScript.
   //
   // There's only one reference to `vals`, so we can mutate it in-place
-  // without violating value semantics. (Disclaimer: ValueScript doesn't
-  // yet know that it can drop the reference to `x` from the call site,
-  // so there is one copy.)
+  // without violating value semantics.
   //
   // More on quickSort:
   // https://www.youtube.com/watch?v=Hoixgm4-P4M
