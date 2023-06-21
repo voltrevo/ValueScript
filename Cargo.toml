@@ -10,4 +10,5 @@ members = [
   "swc_demo",
   "measure_bytecode_size",
   "compile_to_rust_tests",
+  "bench",
 ]

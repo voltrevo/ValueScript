@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(serde::Serialize, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(serde::Serialize, PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum DiagnosticLevel {
   Lint,
   Error,
@@ -19,7 +19,7 @@ impl fmt::Display for DiagnosticLevel {
   }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Debug)]
 pub struct Diagnostic {
   pub level: DiagnosticLevel,
   pub message: String,
