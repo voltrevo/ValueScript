@@ -1169,27 +1169,38 @@ impl FunctionCompiler {
   }
 
   pub fn use_(&mut self, mut compiled_expr: CompiledExpression) -> Value {
-    let asm = compiled_expr.value;
-
     for reg in &compiled_expr.nested_registers {
       self.release_reg(reg);
     }
 
     compiled_expr.release_checker.has_unreleased_registers = false;
 
-    return asm;
+    return Self::optimized_value(&compiled_expr);
   }
 
   pub fn use_ref(&mut self, compiled_expr: &mut CompiledExpression) -> Value {
-    let asm = compiled_expr.value.clone();
-
     for reg in &compiled_expr.nested_registers {
       self.release_reg(reg);
     }
 
     compiled_expr.release_checker.has_unreleased_registers = false;
 
-    return asm;
+    return Self::optimized_value(compiled_expr);
+  }
+
+  fn optimized_value(compiled_expr: &CompiledExpression) -> Value {
+    if let Value::Register(asm) = &compiled_expr.value {
+      if compiled_expr.nested_registers.first() == Some(asm) {
+        // Specialized optimization of common use case:
+        // - The value is a register and it's the only nested register.
+        // We can safely take this register when inserting it because it exists only for the
+        // purpose of supporting this value. A more generalized version is possible but it's
+        // duplicating the work of a proper optimizer anyway.
+        return Value::Register(asm.take());
+      }
+    }
+
+    compiled_expr.value.clone()
   }
 
   fn get_mutated_registers(&self, span: swc_common::Span) -> HashSet<Register> {
