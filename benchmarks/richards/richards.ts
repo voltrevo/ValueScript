@@ -87,6 +87,17 @@ export default function runRichards() {
 // var EXPECTED_QUEUE_COUNT = 2322;
 // var EXPECTED_HOLD_COUNT = 928;
 
+type SCHEDULER_RELEASE = 0;
+type SCHEDULER_HOLD_CURRENT = 1;
+type SCHEDULER_SUSPEND_CURRENT = 2;
+type SCHEDULER_QUEUE = 3;
+
+type SchedulerAction =
+  | [type: SCHEDULER_RELEASE, id: number]
+  | [type: SCHEDULER_HOLD_CURRENT]
+  | [type: SCHEDULER_SUSPEND_CURRENT]
+  | [type: SCHEDULER_QUEUE, packet: Packet];
+
 /**
  * A scheduler can be used to schedule a set of tasks based on their relative
  * priorities.  Scheduling is done by maintaining a list of task control blocks
@@ -211,7 +222,8 @@ class Scheduler {
         this.currentTcb = this.currentTcb.link;
       } else {
         this.currentId = this.currentTcb.id;
-        this.currentTcb = this.currentTcb.run();
+        const action = this.currentTcb.run();
+        this.currentTcb = this.processAction(action);
       }
     }
   }
@@ -219,36 +231,32 @@ class Scheduler {
   /**
    * Release a task that is currently blocked and return the next block to run.
    * @param {int} id the id of the task to suspend
+   *
+   * TODO: static
    */
-  release(id: number) {
-    var tcb = this.blocks[id];
-    if (tcb == null) return tcb;
-    tcb.markAsNotHeld();
-    if (tcb.priority > this.currentTcb!.priority) {
-      return tcb;
-    } else {
-      return this.currentTcb;
-    }
+  release(id: number): SchedulerAction {
+    return [0, id];
   }
 
   /**
    * Block the currently executing task and return the next task control block
    * to run.  The blocked task will not be made runnable until it is explicitly
    * released, even if new work is added to it.
+   *
+   * TODO: static
    */
-  holdCurrent() {
-    this.holdCount++;
-    this.currentTcb!.markAsHeld();
-    return this.currentTcb!.link;
+  holdCurrent(): SchedulerAction {
+    return [1];
   }
 
   /**
    * Suspend the currently executing task and return the next task control block
    * to run.  If new work is added to the suspended task it will be made runnable.
+   *
+   * TODO: static
    */
-  suspendCurrent() {
-    this.currentTcb!.markAsSuspended();
-    return this.currentTcb;
+  suspendCurrent(): SchedulerAction {
+    return [2];
   }
 
   /**
@@ -256,14 +264,44 @@ class Scheduler {
    * associated with the packet and make the task runnable if it is currently
    * suspended.
    * @param {Packet} packet the packet to add
+   *
+   * TODO: static
    */
-  queue(packet: Packet) {
-    var t = this.blocks[packet.id!];
-    if (t == null) return t;
-    this.queueCount++;
-    packet.link = null;
-    packet.id = this.currentId;
-    return t.checkPriorityAdd(this.currentTcb!, packet);
+  queue(packet: Packet): SchedulerAction {
+    return [3, packet];
+  }
+
+  processAction(action: SchedulerAction): TaskControlBlock | null {
+    if (action[0] === 0) { // release
+      const id = action[1];
+
+      var tcb = this.blocks[id];
+      if (tcb == null) return tcb;
+      tcb.markAsNotHeld();
+      if (tcb.priority > this.currentTcb!.priority) {
+        return tcb;
+      } else {
+        return this.currentTcb;
+      }
+    } else if (action[0] === 1) { // holdCurrent
+      this.holdCount++;
+      this.currentTcb!.markAsHeld();
+      return this.currentTcb!.link;
+    } else if (action[0] === 2) { // suspendCurrent
+      this.currentTcb!.markAsSuspended();
+      return this.currentTcb;
+    } else if (action[0] === 3) { // queue
+      let packet = action[1];
+
+      var t = this.blocks[packet.id!];
+      if (t == null) return t;
+      this.queueCount++;
+      packet.link = null;
+      packet.id = this.currentId;
+      return t.checkPriorityAdd(this.currentTcb!, packet);
+    }
+
+    never(action);
   }
 }
 
@@ -397,7 +435,7 @@ class TaskControlBlock {
 }
 
 type Task = {
-  run(packet: Packet | null): TaskControlBlock | null;
+  run(packet: Packet | null): SchedulerAction;
   toString(): string;
 };
 
@@ -619,4 +657,8 @@ class Packet {
   toString() {
     return "Packet";
   }
+}
+
+function never(never: never): never {
+  throw new Error(`Unexpected value: ${never}`);
 }
