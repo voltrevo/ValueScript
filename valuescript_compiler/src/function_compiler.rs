@@ -313,7 +313,7 @@ impl FunctionCompiler {
         swc_ecma_ast::BlockStmtOrExpr::Expr(expr) => {
           let mut expression_compiler = ExpressionCompiler { fnc: self };
 
-          expression_compiler.compile(expr, Some(Register::return_(false)));
+          expression_compiler.compile(expr, Some(Register::return_()));
         }
       },
       Functionish::Constructor(member_initializers_assembly, _class_span, constructor) => {
@@ -467,7 +467,7 @@ impl FunctionCompiler {
           Some(expr) => {
             let mut expression_compiler = ExpressionCompiler { fnc: self };
 
-            let compiled = expression_compiler.compile(expr, Some(Register::return_(false)));
+            let compiled = expression_compiler.compile(expr, Some(Register::return_()));
             self.use_(compiled);
           }
         }
@@ -676,7 +676,7 @@ impl FunctionCompiler {
         .param
       {
         Some(_) => self.allocate_numbered_reg("_error"),
-        None => Register::ignore(false),
+        None => Register::ignore(),
       };
 
       catch_error_reg = Some(reg.clone());

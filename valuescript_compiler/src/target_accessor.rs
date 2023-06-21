@@ -55,7 +55,7 @@ impl TargetAccessor {
 
     return match expr {
       Ident(ident) => TargetAccessor::compile_ident(ec, ident),
-      This(_) => TargetAccessor::Register(Register::this(false)),
+      This(_) => TargetAccessor::Register(Register::this()),
       Member(member) => {
         let obj = TargetAccessor::compile(ec, &member.obj, false);
         let subscript = ec.member_prop(&member.prop, None);
@@ -210,7 +210,7 @@ impl TargetAccessor {
 
   pub fn targets_this(&self) -> bool {
     return match self {
-      TargetAccessor::Register(reg) => reg == &Register::this(false),
+      TargetAccessor::Register(reg) => reg == &Register::this(),
       TargetAccessor::Nested(nta) => nta.obj.targets_this(),
     };
   }

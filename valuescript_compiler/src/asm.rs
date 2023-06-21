@@ -171,28 +171,35 @@ pub struct Register {
 }
 
 impl Register {
-  pub fn return_(take: bool) -> Self {
+  pub fn return_() -> Self {
     Register {
-      take,
+      take: false,
       name: "return".to_string(),
     }
   }
 
-  pub fn this(take: bool) -> Self {
+  pub fn this() -> Self {
     Register {
-      take,
+      take: false,
       name: "this".to_string(),
     }
   }
 
-  pub fn named(take: bool, name: String) -> Self {
-    Register { take, name }
+  pub fn named(name: String) -> Self {
+    Register { take: false, name }
   }
 
-  pub fn ignore(take: bool) -> Self {
+  pub fn ignore() -> Self {
     Register {
-      take,
+      take: false,
       name: "ignore".to_string(),
+    }
+  }
+
+  pub fn take(&self) -> Self {
+    Register {
+      take: true,
+      name: self.name.clone(),
     }
   }
 

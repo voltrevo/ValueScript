@@ -125,22 +125,22 @@ pub struct RegAllocator {
 impl RegAllocator {
   pub fn allocate(&mut self, based_on_name: &str) -> Register {
     let name = self.alloc.allocate(&based_on_name.to_string());
-    Register::named(false, name)
+    Register::named(name)
   }
 
   pub fn allocate_fresh(&mut self, based_on_name: &str) -> Register {
     let name = self.alloc.allocate_fresh(&based_on_name.to_string());
-    Register::named(false, name)
+    Register::named(name)
   }
 
   pub fn allocate_numbered(&mut self, prefix: &str) -> Register {
     let name = self.alloc.allocate_numbered(&prefix.to_string());
-    Register::named(false, name)
+    Register::named(name)
   }
 
   pub fn allocate_numbered_fresh(&mut self, prefix: &str) -> Register {
     let name = self.alloc.allocate_numbered_fresh(&prefix.to_string());
-    Register::named(false, name)
+    Register::named(name)
   }
 
   pub fn release(&mut self, reg: &Register) {

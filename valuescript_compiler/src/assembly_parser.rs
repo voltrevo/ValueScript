@@ -419,9 +419,10 @@ impl<'a> AssemblyParser<'a> {
 
       let param_name = self.parse_identifier();
 
-      function
-        .parameters
-        .push(Register::named(take, param_name.clone()));
+      function.parameters.push(Register {
+        take,
+        name: param_name.clone(),
+      });
 
       next = self.parse_one_of(&[",", ")"]);
 
