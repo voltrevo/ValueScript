@@ -12,6 +12,7 @@ use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, NameType};
 use crate::target_accessor::TargetAccessor;
 
+#[derive(Debug)]
 pub struct CompiledExpression {
   /** It is usually better to access this via functionCompiler.use_ */
   pub value: Value,
@@ -20,6 +21,7 @@ pub struct CompiledExpression {
   pub release_checker: ReleaseChecker,
 }
 
+#[derive(Debug)]
 pub struct ReleaseChecker {
   pub has_unreleased_registers: bool,
 }
@@ -54,9 +56,10 @@ impl CompiledExpression {
 
 impl Drop for ReleaseChecker {
   fn drop(&mut self) {
-    if self.has_unreleased_registers {
-      panic!("CompiledExpression dropped with unreleased registers");
-    }
+    assert!(
+      !self.has_unreleased_registers,
+      "CompiledExpression dropped with unreleased registers"
+    );
   }
 }
 
@@ -614,8 +617,9 @@ impl<'a> ExpressionCompiler<'a> {
         // At the least, the assembly supports definitions and should
         // maybe support any value here
         let reg = self.fnc.allocate_numbered_reg("_computed_key");
-        let compiled = self.compile(&comp.expr, Some(reg.clone()));
-        assert_eq!(compiled.nested_registers.len(), 0);
+        let mut compiled = self.compile(&comp.expr, Some(reg.clone()));
+        nested_registers.append(&mut compiled.nested_registers);
+        compiled.release_checker.has_unreleased_registers = false;
         nested_registers.push(reg.clone());
 
         Value::Register(reg)
@@ -1422,7 +1426,7 @@ impl<'a> ExpressionCompiler<'a> {
 
           self.inline(Value::Register(new_reg.clone()), target_register);
 
-          CompiledExpression::new(Value::Register(new_reg), vec![])
+          CompiledExpression::new(Value::Register(new_reg.clone()), vec![new_reg])
         }
         _ => self.inline(value, target_register),
       },

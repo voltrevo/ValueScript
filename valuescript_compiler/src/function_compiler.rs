@@ -1028,7 +1028,8 @@ impl FunctionCompiler {
     let iter_res_reg = ec.fnc.allocate_numbered_reg(&"_iter_res".to_string());
     let done_reg = ec.fnc.allocate_numbered_reg(&"_done".to_string());
 
-    ec.compile(&for_of.right, Some(iter_reg.clone()));
+    let ce = ec.compile(&for_of.right, Some(iter_reg.clone()));
+    ec.fnc.use_(ce);
 
     ec.fnc.push(Instruction::ConstSubCall(
       Value::Register(iter_reg.clone()),
@@ -1139,7 +1140,8 @@ impl FunctionCompiler {
           let target_register = self.get_pattern_register(&decl.name);
 
           let mut ec = ExpressionCompiler { fnc: self };
-          ec.compile(expr, Some(target_register.clone()));
+          let ce = ec.compile(expr, Some(target_register.clone()));
+          ec.fnc.use_(ce);
           ec.pat(&decl.name, &target_register, false);
         }
         None => match &decl.name {
