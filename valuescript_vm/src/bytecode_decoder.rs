@@ -66,7 +66,7 @@ impl BytecodeType {
       0x0b => Function,
       0x0d => Pointer,
       0x0e => Register,
-
+      0x0f => TakeRegister,
       0x10 => Builtin,
       0x11 => Class,
 
