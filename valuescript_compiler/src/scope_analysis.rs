@@ -611,7 +611,48 @@ impl ScopeAnalysis {
           }
         }
       }
-      _ => {}
+      Stmt::Empty(_) => {}
+      Stmt::Debugger(_) => {}
+      Stmt::With(_) => {}
+      Stmt::Return(_) => {}
+      Stmt::Labeled(labeled_stmt) => {
+        self.function_level_hoists_stmt(&scope, &labeled_stmt.body);
+      }
+      Stmt::Break(_) => {}
+      Stmt::Continue(_) => {}
+      Stmt::If(if_) => {
+        self.function_level_hoists_stmt(&scope, &if_.cons);
+
+        for alt in &if_.alt {
+          self.function_level_hoists_stmt(&scope, alt);
+        }
+      }
+      Stmt::Switch(switch_) => {
+        for case in &switch_.cases {
+          for stmt in &case.cons {
+            self.function_level_hoists_stmt(&scope, stmt);
+          }
+        }
+      }
+      Stmt::Throw(_) => {}
+      Stmt::Try(try_) => {
+        self.function_level_hoists(&scope, &try_.block);
+
+        for catch in &try_.handler {
+          self.function_level_hoists(&scope, &catch.body);
+        }
+
+        for finally in &try_.finalizer {
+          self.function_level_hoists(&scope, finally);
+        }
+      }
+      Stmt::While(while_) => {
+        self.function_level_hoists_stmt(&scope, &while_.body);
+      }
+      Stmt::DoWhile(do_while_) => {
+        self.function_level_hoists_stmt(&scope, &do_while_.body);
+      }
+      Stmt::Expr(_) => {}
     }
   }
 
