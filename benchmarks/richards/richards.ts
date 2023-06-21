@@ -107,11 +107,15 @@ class Scheduler {
   queueCount = 0;
   holdCount = 0;
 
-  // new Array(6 /* NUMBER_OF_IDS */);
-  blocks: (TaskControlBlock | null)[] = [null, null, null, null, null, null];
+  tcbStore: Record<number, TaskControlBlock> = {};
 
-  list: TaskControlBlock | null = null;
-  currentTcb: TaskControlBlock | null = null;
+  // new Array(6 /* NUMBER_OF_IDS */);
+  blocks: (number | null)[] = [null, null, null, null, null, null];
+
+  list: number | null = null;
+
+  // TODO: These are the same?
+  currentTcb: number | null = null;
   currentId: number | null = null;
 
   // var ID_IDLE = 0;
@@ -190,7 +194,7 @@ class Scheduler {
     task: Task,
   ) {
     this.addTask(id, priority, queue, task);
-    this.currentTcb!.setRunning();
+    this.tcbStore[this.currentTcb!].setRunning();
   }
 
   /**
@@ -201,13 +205,15 @@ class Scheduler {
    * @param {Task} task the task to add
    */
   addTask(id: number, priority: number, queue: Packet | null, task: Task) {
-    this.currentTcb = new TaskControlBlock(
+    const tcb = new TaskControlBlock(
       this.list,
       id,
       priority,
       queue,
       task,
     );
+    this.tcbStore[id] = tcb;
+    this.currentTcb = tcb.id;
     this.list = this.currentTcb;
     this.blocks[id] = this.currentTcb;
   }
@@ -218,11 +224,11 @@ class Scheduler {
   schedule() {
     this.currentTcb = this.list;
     while (this.currentTcb != null) {
-      if (this.currentTcb.isHeldOrSuspended()) {
-        this.currentTcb = this.currentTcb.link;
+      if (this.tcbStore[this.currentTcb].isHeldOrSuspended()) {
+        this.currentTcb = this.tcbStore[this.currentTcb].link;
       } else {
-        this.currentId = this.currentTcb.id;
-        const action = this.currentTcb.run();
+        this.currentId = this.currentTcb;
+        const action = this.tcbStore[this.currentId].run();
         this.currentTcb = this.processAction(action);
       }
     }
@@ -271,24 +277,26 @@ class Scheduler {
     return [3, packet];
   }
 
-  processAction(action: SchedulerAction): TaskControlBlock | null {
+  processAction(action: SchedulerAction): number | null {
     if (action[0] === 0) { // release
       const id = action[1];
 
-      var tcb = this.blocks[id];
-      if (tcb == null) return tcb;
-      tcb.markAsNotHeld();
-      if (tcb.priority > this.currentTcb!.priority) {
-        return tcb;
+      var tcbId = this.blocks[id];
+      if (tcbId == null) return tcbId;
+      this.tcbStore[tcbId].markAsNotHeld();
+      if (
+        this.tcbStore[tcbId].priority > this.tcbStore[this.currentTcb!].priority
+      ) {
+        return tcbId;
       } else {
         return this.currentTcb;
       }
     } else if (action[0] === 1) { // holdCurrent
       this.holdCount++;
-      this.currentTcb!.markAsHeld();
-      return this.currentTcb!.link;
+      this.tcbStore[this.currentTcb!].markAsHeld();
+      return this.tcbStore[this.currentTcb!].link;
     } else if (action[0] === 2) { // suspendCurrent
-      this.currentTcb!.markAsSuspended();
+      this.tcbStore[this.currentTcb!].markAsSuspended();
       return this.currentTcb;
     } else if (action[0] === 3) { // queue
       let packet = action[1];
@@ -298,7 +306,10 @@ class Scheduler {
       this.queueCount++;
       packet.link = null;
       packet.id = this.currentId;
-      return t.checkPriorityAdd(this.currentTcb!, packet);
+      return this.tcbStore[t].checkPriorityAdd(
+        this.tcbStore[this.currentTcb!],
+        packet,
+      );
     }
 
     never(action);
@@ -310,7 +321,7 @@ class Scheduler {
  * with it.
  */
 class TaskControlBlock {
-  link: TaskControlBlock | null;
+  link: number | null;
   id: number;
   priority: number;
   queue: Packet | null;
@@ -326,7 +337,7 @@ class TaskControlBlock {
    * @constructor
    */
   constructor(
-    link: TaskControlBlock | null,
+    link: number | null,
     id: number,
     priority: number,
     queue: Packet | null,
@@ -422,11 +433,11 @@ class TaskControlBlock {
     if (this.queue == null) {
       this.queue = packet;
       this.markAsRunnable();
-      if (this.priority > task.priority) return this;
+      if (this.priority > task.priority) return this.id;
     } else {
       this.queue = packet.addTo(this.queue);
     }
-    return task;
+    return task.id;
   }
 
   toString() {
@@ -646,11 +657,7 @@ class Packet {
   addTo(queue: Packet | null) {
     this.link = null;
     if (queue == null) return this;
-    var peek, next = queue;
-    while ((peek = next.link) != null) {
-      next = peek;
-    }
-    next.link = this;
+    queue.link = this.addTo(queue.link);
     return queue;
   }
 
