@@ -35,7 +35,7 @@ pub struct CatchSetting {
 
 impl BytecodeStackFrame {
   pub fn apply_unary_op(&mut self, op: fn(input: &Val) -> Val) {
-    let input = self.decoder.decode_val(&self.registers);
+    let input = self.decoder.decode_val(&mut self.registers);
 
     let register_index = self.decoder.decode_register_index();
 
@@ -48,8 +48,8 @@ impl BytecodeStackFrame {
     &mut self,
     op: fn(left: &Val, right: &Val) -> Result<Val, Val>,
   ) -> Result<(), Val> {
-    let left = self.decoder.decode_val(&self.registers);
-    let right = self.decoder.decode_val(&self.registers);
+    let left = self.decoder.decode_val(&mut self.registers);
+    let right = self.decoder.decode_val(&mut self.registers);
 
     if let Some(register_index) = self.decoder.decode_register_index() {
       self.registers[register_index] = op(&left, &right)?;
@@ -65,7 +65,7 @@ impl BytecodeStackFrame {
       self.decoder.decode_type();
 
       while self.decoder.peek_type() != BytecodeType::End {
-        let p = self.decoder.decode_val(&self.registers);
+        let p = self.decoder.decode_val(&mut self.registers);
         new_frame.write_param(p);
       }
 
@@ -74,7 +74,7 @@ impl BytecodeStackFrame {
       return;
     }
 
-    let params = self.decoder.decode_val(&self.registers);
+    let params = self.decoder.decode_val(&mut self.registers);
 
     match params {
       Val::Array(array_data) => {
@@ -95,7 +95,7 @@ impl BytecodeStackFrame {
       self.decoder.decode_type();
 
       while self.decoder.peek_type() != BytecodeType::End {
-        res.push(self.decoder.decode_val(&self.registers));
+        res.push(self.decoder.decode_val(&mut self.registers));
       }
 
       self.decoder.decode_type(); // End (TODO: assert)
@@ -103,7 +103,7 @@ impl BytecodeStackFrame {
       return res;
     }
 
-    let params = self.decoder.decode_val(&self.registers);
+    let params = self.decoder.decode_val(&mut self.registers);
 
     match params {
       Val::Array(array_data) => array_data.elements.clone(),
@@ -140,7 +140,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Mov => {
-        let val = self.decoder.decode_val(&self.registers);
+        let val = self.decoder.decode_val(&mut self.registers);
         let register_index = self.decoder.decode_register_index();
 
         if register_index.is_some() {
@@ -191,8 +191,8 @@ impl StackFrameTrait for BytecodeStackFrame {
       OpGreaterEq => self.apply_binary_op(operations::op_greater_eq)?,
       OpNullishCoalesce => self.apply_binary_op(operations::op_nullish_coalesce)?,
       OpOptionalChain => {
-        let mut left = self.decoder.decode_val(&self.registers);
-        let right = self.decoder.decode_val(&self.registers);
+        let mut left = self.decoder.decode_val(&mut self.registers);
+        let right = self.decoder.decode_val(&mut self.registers);
 
         if let Some(register_index) = self.decoder.decode_register_index() {
           self.registers[register_index] = operations::op_optional_chain(&mut left, &right)?;
@@ -214,7 +214,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       In => self.apply_binary_op(operations::op_in)?,
 
       Call => {
-        let fn_ = self.decoder.decode_val(&self.registers);
+        let fn_ = self.decoder.decode_val(&mut self.registers);
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
@@ -245,7 +245,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Apply => {
-        let fn_ = self.decoder.decode_val(&self.registers);
+        let fn_ = self.decoder.decode_val(&mut self.registers);
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
@@ -262,7 +262,7 @@ impl StackFrameTrait for BytecodeStackFrame {
               }
             } else {
               self.this_target = None;
-              new_frame.write_this(true, self.decoder.decode_val(&self.registers))?;
+              new_frame.write_this(true, self.decoder.decode_val(&mut self.registers))?;
             }
 
             self.transfer_parameters(&mut new_frame);
@@ -278,8 +278,8 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Bind => {
-        let fn_val = self.decoder.decode_val(&self.registers);
-        let params = self.decoder.decode_val(&self.registers);
+        let fn_val = self.decoder.decode_val(&mut self.registers);
+        let params = self.decoder.decode_val(&mut self.registers);
         let register_index = self.decoder.decode_register_index();
 
         let params_array = params.as_array_data();
@@ -304,8 +304,8 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Sub => {
-        let mut left = self.decoder.decode_val(&self.registers);
-        let right = self.decoder.decode_val(&self.registers);
+        let mut left = self.decoder.decode_val(&mut self.registers);
+        let right = self.decoder.decode_val(&mut self.registers);
 
         if let Some(register_index) = self.decoder.decode_register_index() {
           self.registers[register_index] = operations::op_sub(&mut left, &right)?;
@@ -318,9 +318,9 @@ impl StackFrameTrait for BytecodeStackFrame {
         // theory, this should still be possible because we only need a mutable borrow to an
         // element, not the vec itself. vec.get_many_mut has been considered, but it's not yet
         // stable.
-        let subscript = self.decoder.decode_val(&self.registers);
+        let subscript = self.decoder.decode_val(&mut self.registers);
 
-        let value = self.decoder.decode_val(&self.registers);
+        let value = self.decoder.decode_val(&mut self.registers);
 
         let target_index = self.decoder.decode_register_index().unwrap();
 
@@ -337,10 +337,10 @@ impl StackFrameTrait for BytecodeStackFrame {
 
             ThisArg::Register(self.decoder.decode_register_index().unwrap())
           }
-          _ => ThisArg::Val(self.decoder.decode_val(&self.registers)),
+          _ => ThisArg::Val(self.decoder.decode_val(&mut self.registers)),
         };
 
-        let subscript = self.decoder.decode_val(&self.registers);
+        let subscript = self.decoder.decode_val(&mut self.registers);
 
         let fn_ = match &obj {
           ThisArg::Register(reg_i) => self.registers[*reg_i].sub(&subscript)?,
@@ -398,7 +398,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       JmpIf => {
-        let cond = self.decoder.decode_val(&self.registers);
+        let cond = self.decoder.decode_val(&mut self.registers);
         let dst = self.decoder.decode_pos();
 
         if cond.is_truthy() {
@@ -412,7 +412,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       New => {
         // TODO: new Array
 
-        let class = match self.decoder.decode_val(&self.registers).as_class_data() {
+        let class = match self.decoder.decode_val(&mut self.registers).as_class_data() {
           Some(class) => class,
           None => {
             return Err("value is not a constructor".to_type_error());
@@ -429,7 +429,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         match class.constructor {
           Val::Void => {
             // Ignore parameters
-            self.decoder.decode_val(&self.registers);
+            self.decoder.decode_val(&mut self.registers);
             let target_register = self.decoder.decode_register_index();
 
             match target_register {
@@ -480,7 +480,7 @@ impl StackFrameTrait for BytecodeStackFrame {
               _ => Err(error),
             }
           }
-          _ => Err(self.decoder.decode_val(&self.registers)),
+          _ => Err(self.decoder.decode_val(&mut self.registers)),
         };
       }
 
@@ -558,7 +558,7 @@ impl StackFrameTrait for BytecodeStackFrame {
           "TODO: cat non-inline arrays"
         );
 
-        let cat_frame = CatStackFrame::from_args(self.decoder.decode_vec_val(&self.registers));
+        let cat_frame = CatStackFrame::from_args(self.decoder.decode_vec_val(&mut self.registers));
 
         self.this_target = None;
         self.return_target = self.decoder.decode_register_index();
@@ -567,14 +567,14 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Yield => {
-        let val = self.decoder.decode_val(&self.registers);
+        let val = self.decoder.decode_val(&mut self.registers);
         self.decoder.decode_register_index(); // TODO: Use this
 
         return Ok(FrameStepOk::Yield(val));
       }
 
       YieldStar => {
-        let val = self.decoder.decode_val(&self.registers);
+        let val = self.decoder.decode_val(&mut self.registers);
         self.decoder.decode_register_index(); // TODO: Use this
 
         return Ok(FrameStepOk::YieldStar(val));

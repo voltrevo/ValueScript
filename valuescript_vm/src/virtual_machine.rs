@@ -22,7 +22,7 @@ impl VirtualMachine {
   ) -> Result<Val, Val> {
     let mut bd = bytecode.decoder(0);
 
-    let main_fn = bd.decode_val(&Vec::new());
+    let main_fn = bd.decode_val(&mut Vec::new());
 
     let mut frame = match main_fn.load_function() {
       LoadFunctionResult::StackFrame(f) => f,
@@ -124,6 +124,6 @@ impl VirtualMachine {
   }
 
   pub fn read_default_export(bytecode: Rc<Bytecode>) -> Val {
-    bytecode.decoder(0).decode_val(&Vec::new())
+    bytecode.decoder(0).decode_val(&mut Vec::new())
   }
 }

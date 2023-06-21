@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::mem::take;
 use std::rc::Rc;
 
 use num_bigint::BigInt;
@@ -96,7 +97,7 @@ impl BytecodeDecoder {
     return BytecodeType::from_byte(self.peek_byte());
   }
 
-  pub fn decode_val(&mut self, registers: &Vec<Val>) -> Val {
+  pub fn decode_val(&mut self, registers: &mut Vec<Val>) -> Val {
     return match self.decode_type() {
       BytecodeType::End => panic!("Cannot decode end"),
       BytecodeType::Void => Val::Void,
@@ -138,12 +139,10 @@ impl BytecodeDecoder {
         Val::Void => Val::Undefined,
         val => val,
       },
-      BytecodeType::TakeRegister => {
-        match registers[self.decode_register_index().unwrap()].clone() {
-          Val::Void => Val::Undefined,
-          val => val,
-        }
-      }
+      BytecodeType::TakeRegister => match &mut registers[self.decode_register_index().unwrap()] {
+        Val::Void => Val::Undefined,
+        val => take(val),
+      },
       BytecodeType::Builtin => BUILTIN_VALS[self.decode_varsize_uint()](),
       BytecodeType::Class => VsClass {
         constructor: self.decode_val(registers),
@@ -156,7 +155,7 @@ impl BytecodeDecoder {
     };
   }
 
-  pub fn decode_vec_val(&mut self, registers: &Vec<Val>) -> Vec<Val> {
+  pub fn decode_vec_val(&mut self, registers: &mut Vec<Val>) -> Vec<Val> {
     let mut vals: Vec<Val> = Vec::new();
 
     while self.peek_type() != BytecodeType::End {
@@ -248,7 +247,7 @@ impl BytecodeDecoder {
     };
   }
 
-  pub fn decode_pointer(&mut self, registers: &Vec<Val>) -> Val {
+  pub fn decode_pointer(&mut self, registers: &mut Vec<Val>) -> Val {
     let from_pos = self.pos;
     let pos = self.decode_pos();
 
