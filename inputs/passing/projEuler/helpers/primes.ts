@@ -52,19 +52,52 @@ export function* primes() {
   yield 23;
   yield 29;
 
-  let base = 30;
-  let offsets = [1, 7, 11, 13, 17, 19, 23, 29];
-
-  while (true) {
-    for (const offset of offsets) {
-      let candidate = base + offset;
-
-      if (isPrime(candidate)) {
-        yield candidate;
-      }
+  for (const candidate of primeCandidates()) {
+    if (
+      (candidate % 7) *
+          (candidate % 11) *
+          (candidate % 13) *
+          (candidate % 17) *
+          (candidate % 19) *
+          (candidate % 23) *
+          (candidate % 29) === 0
+    ) {
+      continue;
     }
 
-    base += 30;
+    for (const candidateDiv of primeCandidates()) {
+      if (candidateDiv * candidateDiv > candidate) {
+        yield candidate;
+        break;
+      }
+
+      if (candidate % candidateDiv === 0) {
+        break;
+      }
+    }
+  }
+}
+
+export function* primeCandidates() {
+  let candidate = 31;
+
+  while (true) {
+    yield candidate;
+    candidate += 6;
+    yield candidate;
+    candidate += 4;
+    yield candidate;
+    candidate += 2;
+    yield candidate;
+    candidate += 4;
+    yield candidate;
+    candidate += 2;
+    yield candidate;
+    candidate += 4;
+    yield candidate;
+    candidate += 6;
+    yield candidate;
+    candidate += 2;
   }
 }
 
