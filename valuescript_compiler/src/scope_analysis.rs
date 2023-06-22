@@ -2127,6 +2127,34 @@ impl ScopeAnalysis {
 
     self.diagnostics.append(&mut diagnostics);
   }
+
+  pub fn get_register_captures(&self, captor_id: &OwnerId) -> Vec<NameId> {
+    // It's important to return NameId and not the registers here. The register that is needed
+    // depends on the scope.
+    //
+    // Remember: A NameId usually maps to the same register everywhere, but that's not always true.
+    // Resolving to a register must always depend on scope so that conflicting names can be
+    // disambiguated. Eg `inputs/passing/captureShadowed.ts`.
+
+    let mut seen = HashSet::<NameId>::new();
+    let mut res = Vec::<NameId>::new();
+
+    if let Some(caps) = self.captures.get(captor_id) {
+      for cap in caps {
+        if let Value::Register(_) = self.names.get(cap).expect("Failed to get name").value {
+          if seen.insert(cap.clone()) {
+            res.push(cap.clone());
+          }
+        }
+      }
+    }
+
+    // Ensure a consistent ordering. It's also nice to include the captures in the order that they
+    // appear in the source code.
+    res.sort();
+
+    res
+  }
 }
 
 fn is_declare(decl: &swc_ecma_ast::Decl) -> bool {

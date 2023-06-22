@@ -677,7 +677,7 @@ impl std::fmt::Display for Lazy {
   }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Builtin {
   pub name: String,
 }

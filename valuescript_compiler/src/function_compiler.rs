@@ -162,6 +162,14 @@ impl FunctionCompiler {
     });
   }
 
+  pub fn internal_error(&mut self, span: swc_common::Span, message: &str) {
+    self.diagnostics.push(Diagnostic {
+      level: DiagnosticLevel::InternalError,
+      message: format!("{}", message),
+      span,
+    });
+  }
+
   pub fn allocate_defn(&mut self, name: &str) -> Pointer {
     let allocated_name = self
       .definition_allocator
@@ -268,18 +276,23 @@ impl FunctionCompiler {
 
     self.owner_id = functionish.owner_id();
 
-    let capture_params = self.scope_analysis.captures.get(&functionish.owner_id());
+    let capture_params = self
+      .scope_analysis
+      .get_register_captures(&functionish.owner_id());
 
-    for cap_param in capture_params.unwrap_or(&HashSet::new()) {
+    for cap_param in capture_params {
       let reg = match self
         .scope_analysis
-        .lookup_capture(&self.owner_id, cap_param)
+        .lookup_capture(&self.owner_id, &cap_param)
       {
         Some(Value::Register(reg)) => reg,
-
-        // Technically we can capture definitions, and maybe in future variables that have been
-        // reduced to constant values. We can just ignore these here.
-        _ => continue,
+        _ => {
+          self.internal_error(
+            cap_param.span(),
+            "Unexpected non-register in captured_registers",
+          );
+          continue;
+        }
       };
 
       self.current.parameters.push(reg.clone());

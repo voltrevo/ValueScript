@@ -1,8 +1,6 @@
-use std::collections::HashSet;
 use std::mem::take;
 
 use queues::*;
-
 use swc_common::Spanned;
 
 use crate::asm::{Array, Builtin, Instruction, Label, Object, Register, Value};
@@ -942,9 +940,7 @@ impl<'a> ExpressionCompiler<'a> {
     let capture_params = self
       .fnc
       .scope_analysis
-      .captures
-      .get(&fn_to_owner_id(&fn_.ident, &fn_.function))
-      .cloned();
+      .get_register_captures(&fn_to_owner_id(&fn_.ident, &fn_.function));
 
     self
       .fnc
@@ -956,9 +952,9 @@ impl<'a> ExpressionCompiler<'a> {
       })
       .expect("Failed to queue function");
 
-    match capture_params {
-      None => Value::Pointer(definition_pointer).to_ce(),
-      Some(capture_params) => self.capturing_fn_ref(
+    match capture_params.len() {
+      0 => Value::Pointer(definition_pointer).to_ce(),
+      _ => self.capturing_fn_ref(
         match fn_.ident {
           Some(ref ident) => ident.span,
           None => fn_.function.span,
@@ -981,9 +977,7 @@ impl<'a> ExpressionCompiler<'a> {
     let capture_params = self
       .fnc
       .scope_analysis
-      .captures
-      .get(&OwnerId::Span(arrow_expr.span))
-      .cloned();
+      .get_register_captures(&OwnerId::Span(arrow_expr.span));
 
     self
       .fnc
@@ -995,9 +989,9 @@ impl<'a> ExpressionCompiler<'a> {
       })
       .expect("Failed to queue function");
 
-    match capture_params {
-      None => Value::Pointer(definition_pointer).to_ce(),
-      Some(capture_params) => self.capturing_fn_ref(
+    match capture_params.len() {
+      0 => Value::Pointer(definition_pointer).to_ce(),
+      _ => self.capturing_fn_ref(
         arrow_expr.span,
         None,
         &Value::Pointer(definition_pointer),
@@ -1012,7 +1006,7 @@ impl<'a> ExpressionCompiler<'a> {
     span: swc_common::Span,
     fn_name: Option<String>,
     fn_value: &Value,
-    captures: &HashSet<NameId>,
+    captures: &Vec<NameId>,
     target_register: Option<Register>,
   ) -> CompiledExpression {
     let mut nested_registers = Vec::<Register>::new();
@@ -1360,17 +1354,17 @@ impl<'a> ExpressionCompiler<'a> {
 
     match fn_as_owner_id {
       Some(owner_id) => {
-        let capture_params = self.fnc.scope_analysis.captures.get(&owner_id).cloned();
+        let capture_params = self.fnc.scope_analysis.get_register_captures(&owner_id);
 
-        match capture_params {
-          Some(capture_params) => self.capturing_fn_ref(
+        match capture_params.len() {
+          0 => value.to_ce(),
+          _ => self.capturing_fn_ref(
             ident.span,
             Some(ident.sym.to_string()),
             &value,
             &capture_params,
             target_register,
           ),
-          None => value.to_ce(),
         }
       }
       None => match value {

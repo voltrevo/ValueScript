@@ -7,7 +7,7 @@ use valuescript_common::BUILTIN_NAMES;
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::{asm::Builtin, constants::CONSTANTS};
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub enum NameId {
   Span(swc_common::Span),
   Builtin(Builtin),
