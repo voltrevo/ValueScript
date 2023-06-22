@@ -1,3 +1,5 @@
+//! test_output_slow(21124)
+
 import { Range_numbers } from "../helpers/range.ts";
 
 export default function main() {

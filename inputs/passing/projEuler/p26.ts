@@ -1,3 +1,5 @@
+//! test_output_slow(983)
+
 export default function () {
   let longestCycle = 0;
   let longestCycleN = 0;

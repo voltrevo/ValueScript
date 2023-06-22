@@ -1,3 +1,5 @@
+//! test_output(669171001)
+
 import range from "../helpers/range.ts";
 
 // There's an analytic solution for this, but that kinda eliminates the need to

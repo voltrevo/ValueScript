@@ -1,9 +1,11 @@
+//! test_output_slow(76576500)
+
 import range from "../helpers/range.ts";
 import { factorizeAsPowers } from "./helpers/primes.ts";
 
 export default function main() {
   return range(triangularNumbers())
-    .filter(tri => countFactors(tri) > 500)
+    .filter((tri) => countFactors(tri) > 500)
     .first();
 }
 

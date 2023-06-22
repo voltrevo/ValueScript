@@ -1,8 +1,19 @@
+//! test_output(2970)
+
 import range from "../helpers/range.ts";
 
 export default function main() {
   return nameListScore([
-    /* insert names here */
+    "MARY",
+    "PATRICIA",
+    "LINDA",
+    "BARBARA",
+    "ELIZABETH",
+    "JENNIFER",
+    "MARIA",
+    "SUSAN",
+    "MARGARET",
+    // Truncated. Expected output is 871198282 for the full list.
   ]);
 }
 

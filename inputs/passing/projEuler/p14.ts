@@ -1,6 +1,4 @@
-declare const Debug: {
-  log: (...args: unknown[]) => undefined;
-};
+//! test_output_slow({len:525,n:837799})
 
 export default function main() {
   let longest = {

@@ -1,3 +1,5 @@
+//! test_output_slow(4179871)
+
 import { Range_numbers } from "../helpers/range.ts";
 import { properFactorSum } from "./helpers/properFactorSum.ts";
 
