@@ -8,8 +8,8 @@ use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
 use crate::asm::{
-  Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Lazy, Module,
-  Object, Pointer, Register, Value,
+  Class, Definition, DefinitionContent, FnLine, Function, Instruction, Lazy, Module, Object,
+  Pointer, Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
@@ -406,16 +406,16 @@ impl ModuleCompiler {
                 pointer: defn.clone(),
                 content: DefinitionContent::Lazy(Lazy {
                   body: match orig_name.sym.to_string() == "default" {
-                    true => vec![InstructionOrLabel::Instruction(Instruction::Import(
+                    true => vec![FnLine::Instruction(Instruction::Import(
                       Value::String(src.value.to_string()),
                       Register::return_(),
                     ))],
                     false => vec![
-                      InstructionOrLabel::Instruction(Instruction::ImportStar(
+                      FnLine::Instruction(Instruction::ImportStar(
                         Value::String(src.value.to_string()),
                         Register::return_(),
                       )),
-                      InstructionOrLabel::Instruction(Instruction::Sub(
+                      FnLine::Instruction(Instruction::Sub(
                         Value::Register(Register::return_()),
                         Value::String(orig_name.sym.to_string()),
                         Register::return_(),
@@ -499,7 +499,7 @@ impl ModuleCompiler {
           self.module.definitions.push(Definition {
             pointer: defn.clone(),
             content: DefinitionContent::Lazy(Lazy {
-              body: vec![InstructionOrLabel::Instruction(Instruction::ImportStar(
+              body: vec![FnLine::Instruction(Instruction::ImportStar(
                 Value::String(src),
                 Register::return_(),
               ))],
@@ -572,11 +572,11 @@ impl ModuleCompiler {
             pointer,
             content: DefinitionContent::Lazy(Lazy {
               body: vec![
-                InstructionOrLabel::Instruction(Instruction::ImportStar(
+                FnLine::Instruction(Instruction::ImportStar(
                   Value::String(import_path.clone()),
                   Register::return_(),
                 )),
-                InstructionOrLabel::Instruction(Instruction::Sub(
+                FnLine::Instruction(Instruction::Sub(
                   Value::Register(Register::return_()),
                   Value::String(external_name),
                   Register::return_(),
@@ -607,7 +607,7 @@ impl ModuleCompiler {
           self.module.definitions.push(Definition {
             pointer,
             content: DefinitionContent::Lazy(Lazy {
-              body: vec![InstructionOrLabel::Instruction(Instruction::Import(
+              body: vec![FnLine::Instruction(Instruction::Import(
                 Value::String(import_path.clone()),
                 Register::return_(),
               ))],
@@ -636,7 +636,7 @@ impl ModuleCompiler {
           self.module.definitions.push(Definition {
             pointer,
             content: DefinitionContent::Lazy(Lazy {
-              body: vec![InstructionOrLabel::Instruction(Instruction::ImportStar(
+              body: vec![FnLine::Instruction(Instruction::ImportStar(
                 Value::String(import_path.clone()),
                 Register::return_(),
               ))],
@@ -738,7 +738,7 @@ impl ModuleCompiler {
       }
     }
 
-    let mut member_initializers_assembly = Vec::<InstructionOrLabel>::new();
+    let mut member_initializers_assembly = Vec::<FnLine>::new();
     member_initializers_assembly.append(&mut member_initializers_fnc.current.body);
 
     // Include any other definitions that were created by the member initializers

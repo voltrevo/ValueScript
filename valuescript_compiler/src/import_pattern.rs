@@ -1,4 +1,4 @@
-use crate::asm::{Definition, DefinitionContent, Instruction, InstructionOrLabel, Pointer, Value};
+use crate::asm::{Definition, DefinitionContent, FnLine, Instruction, Pointer, Value};
 
 pub struct ImportPattern {
   pub pointer: Pointer,
@@ -24,7 +24,7 @@ impl ImportPattern {
     }
 
     let first_instruction = match lazy.body.first() {
-      Some(InstructionOrLabel::Instruction(instruction)) => instruction,
+      Some(FnLine::Instruction(instruction)) => instruction,
       _ => return None,
     };
 
@@ -59,7 +59,7 @@ impl ImportPattern {
     }
 
     let second_instruction = match second_instruction_opt {
-      Some(InstructionOrLabel::Instruction(instruction)) => instruction,
+      Some(FnLine::Instruction(instruction)) => instruction,
       Some(_) => return None,
       _ => {
         return Some(ImportPattern {

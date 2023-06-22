@@ -5,8 +5,8 @@ use num_bigint::BigInt;
 use valuescript_common::{InstructionByte, BUILTIN_NAMES};
 
 use crate::asm::{
-  Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
-  Label, LabelRef, Module, Object, Pointer, Register, Value,
+  Array, Builtin, Class, Definition, DefinitionContent, FnLine, Function, Instruction, Label,
+  LabelRef, Module, Object, Pointer, Register, Value,
 };
 
 pub struct AssemblyParser<'a> {
@@ -152,6 +152,28 @@ impl<'a> AssemblyParser<'a> {
     }
   }
 
+  fn parse_line(&mut self) {
+    loop {
+      match self.pos.next() {
+        Some('\n') => return,
+        _ => {}
+      }
+    }
+  }
+
+  fn parse_optional_spaces(&mut self) {
+    loop {
+      match self.pos.peek() {
+        Some(' ') => {}
+        _ => {
+          return;
+        }
+      }
+
+      self.pos.next();
+    }
+  }
+
   fn assemble_definition(&mut self) -> Definition {
     self.parse_exact("@");
     let def_name = self.parse_identifier();
@@ -236,8 +258,12 @@ impl<'a> AssemblyParser<'a> {
 
     for (word, instruction) in instruction_word_map {
       if self.test_instruction_word(word) {
-        advance_chars(&mut self.pos, word.len() + 1);
-        self.parse_optional_whitespace();
+        advance_chars(&mut self.pos, word.len());
+        match self.pos.peek() {
+          Some('\n') | None | Some(' ') => {}
+          _ => panic!("Unexpected non-whitespace character after instruction word"),
+        }
+        self.parse_optional_spaces();
         return instruction;
       }
     }
@@ -433,14 +459,21 @@ impl<'a> AssemblyParser<'a> {
 
     self.parse_optional_whitespace();
     self.parse_exact("{");
+    self.parse_line();
 
     loop {
-      self.parse_optional_whitespace();
+      self.parse_optional_spaces();
 
       let c = *self
         .pos
         .peek()
         .expect("Expected instruction, label, or end of function");
+
+      if c == '\n' {
+        self.pos.next();
+        function.body.push(FnLine::Empty);
+        continue;
+      }
 
       if c == '}' {
         self.pos.next();
@@ -450,13 +483,16 @@ impl<'a> AssemblyParser<'a> {
       if c == '/' {
         self.parse_exact("//");
 
-        loop {
-          let c = self.pos.next();
+        let mut msg = String::new();
 
-          if c == None || c == Some('\n') {
-            break;
+        loop {
+          match self.pos.next() {
+            Some('\n') | None => break,
+            Some(c) => msg.push(c),
           }
         }
+
+        function.body.push(FnLine::Comment(msg.trim().to_string()));
 
         continue;
       }
@@ -464,13 +500,13 @@ impl<'a> AssemblyParser<'a> {
       let optional_label = self.test_label();
 
       if optional_label.is_some() {
-        function.body.push(InstructionOrLabel::Label(
-          self.assemble_label(optional_label.unwrap()),
-        ));
+        function
+          .body
+          .push(FnLine::Label(self.assemble_label(optional_label.unwrap())));
       } else {
         function
           .body
-          .push(InstructionOrLabel::Instruction(self.assemble_instruction()));
+          .push(FnLine::Instruction(self.assemble_instruction()));
       }
     }
 
@@ -503,7 +539,7 @@ impl<'a> AssemblyParser<'a> {
 
     let instr = self.parse_instruction_word();
 
-    match instr {
+    let res = match instr {
       End => Instruction::End,
       Mov => Instruction::Mov(self.assemble_value(), self.assemble_register()),
       OpInc => Instruction::OpInc(self.assemble_register()),
@@ -709,7 +745,11 @@ impl<'a> AssemblyParser<'a> {
       Cat => Instruction::Cat(self.assemble_value(), self.assemble_register()),
       Yield => Instruction::Yield(self.assemble_value(), self.assemble_register()),
       YieldStar => Instruction::Yield(self.assemble_value(), self.assemble_register()),
-    }
+    };
+
+    self.parse_line();
+
+    res
   }
 
   pub fn assemble_value(&mut self) -> Value {
@@ -803,7 +843,6 @@ impl<'a> AssemblyParser<'a> {
       }
 
       if next == "]" {
-        self.parse_optional_whitespace();
         break array;
       }
 
@@ -852,9 +891,7 @@ impl<'a> AssemblyParser<'a> {
   }
 
   fn assemble_label(&mut self, name: String) -> Label {
-    self.parse_optional_whitespace();
-    advance_chars(&mut self.pos, name.len() + 1);
-
+    self.parse_line();
     Label { name }
   }
 

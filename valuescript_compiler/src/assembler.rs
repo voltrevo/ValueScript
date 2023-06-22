@@ -8,8 +8,8 @@ use num_bigint::{BigInt, Sign};
 use valuescript_common::BuiltinName;
 
 use crate::asm::{
-  Array, Builtin, Class, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel,
-  Label, LabelRef, Lazy, Module, Object, Pointer, Register, Value,
+  Array, Builtin, Class, Definition, DefinitionContent, FnLine, Function, Instruction, Label,
+  LabelRef, Lazy, Module, Object, Pointer, Register, Value,
 };
 
 pub fn assemble(module: &Module) -> Vec<u8> {
@@ -94,14 +94,15 @@ impl Assembler {
       self.lookup_register(parameter);
     }
 
-    for instruction_or_label in &function.body {
-      match instruction_or_label {
-        InstructionOrLabel::Instruction(instruction) => {
+    for fn_line in &function.body {
+      match fn_line {
+        FnLine::Instruction(instruction) => {
           self.instruction(instruction);
         }
-        InstructionOrLabel::Label(label) => {
+        FnLine::Label(label) => {
           self.label(label);
         }
+        FnLine::Empty | FnLine::Comment(..) => {}
       }
     }
 
@@ -121,14 +122,15 @@ impl Assembler {
     self.fn_data.register_count_pos = self.output.len();
     self.output.push(0xff); // Placeholder for register count
 
-    for instruction_or_label in &lazy.body {
-      match instruction_or_label {
-        InstructionOrLabel::Instruction(instruction) => {
+    for fn_line in &lazy.body {
+      match fn_line {
+        FnLine::Instruction(instruction) => {
           self.instruction(instruction);
         }
-        InstructionOrLabel::Label(label) => {
+        FnLine::Label(label) => {
           self.label(label);
         }
+        FnLine::Empty | FnLine::Comment(..) => {}
       }
     }
 

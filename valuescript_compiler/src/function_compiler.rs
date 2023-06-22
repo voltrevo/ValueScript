@@ -7,8 +7,8 @@ use std::rc::Rc;
 use swc_common::Spanned;
 
 use crate::asm::{
-  Array, Builtin, Definition, DefinitionContent, Function, Instruction, InstructionOrLabel, Label,
-  Pointer, Register, Value,
+  Array, Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Pointer,
+  Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
@@ -22,11 +22,7 @@ use crate::scope_analysis::{fn_to_owner_id, Name, ScopeAnalysis};
 pub enum Functionish {
   Fn(Option<swc_ecma_ast::Ident>, swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
-  Constructor(
-    Vec<InstructionOrLabel>,
-    swc_common::Span,
-    swc_ecma_ast::Constructor,
-  ),
+  Constructor(Vec<FnLine>, swc_common::Span, swc_ecma_ast::Constructor),
 }
 
 impl Spanned for Functionish {
@@ -121,14 +117,12 @@ impl FunctionCompiler {
   }
 
   pub fn push_raw(&mut self, instruction: Instruction) {
-    self
-      .current
-      .body
-      .push(InstructionOrLabel::Instruction(instruction));
+    self.current.body.push(FnLine::Instruction(instruction));
   }
 
   pub fn label(&mut self, label: Label) {
-    self.current.body.push(InstructionOrLabel::Label(label));
+    self.current.body.push(FnLine::Empty);
+    self.current.body.push(FnLine::Label(label));
   }
 
   pub fn lookup(&mut self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
@@ -330,10 +324,7 @@ impl FunctionCompiler {
     };
 
     if let Some(end_label) = self.end_label.as_ref() {
-      self
-        .current
-        .body
-        .push(InstructionOrLabel::Label(end_label.clone()));
+      self.current.body.push(FnLine::Label(end_label.clone()));
 
       self.end_label = None;
       self.is_returning_register = None;

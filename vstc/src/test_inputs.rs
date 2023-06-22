@@ -99,6 +99,13 @@ mod tests {
           }
 
           let parsed_assembly = parse_module(&assembly);
+          let assembly_from_parse = parsed_assembly.to_string();
+
+          if assembly_from_parse != assembly {
+            println!("  Parsed assembly doesn't match assembly");
+            failed_paths.insert(rel_file_path.clone());
+          }
+
           let bytecode_via_assembly = assemble(&parsed_assembly);
 
           if bytecode.code != bytecode_via_assembly {

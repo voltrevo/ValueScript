@@ -106,7 +106,7 @@ impl std::fmt::Display for Pointer {
 pub struct Function {
   pub is_generator: bool,
   pub parameters: Vec<Register>,
-  pub body: Vec<InstructionOrLabel>,
+  pub body: Vec<FnLine>,
 }
 
 impl std::fmt::Display for Function {
@@ -123,14 +123,12 @@ impl std::fmt::Display for Function {
       write!(f, "{}", parameter)?;
     }
     write!(f, ") {{\n")?;
-    for instruction_or_label in &self.body {
-      match instruction_or_label {
-        InstructionOrLabel::Instruction(instruction) => {
-          write!(f, "  {}\n", instruction)?;
-        }
-        InstructionOrLabel::Label(label) => {
-          write!(f, "{}\n", label)?;
-        }
+    for fn_line in &self.body {
+      match fn_line {
+        FnLine::Instruction(instruction) => write!(f, "  {}\n", instruction)?,
+        FnLine::Label(label) => write!(f, "{}\n", label)?,
+        FnLine::Empty => write!(f, "\n")?,
+        FnLine::Comment(message) => write!(f, "  // {}\n", message)?,
       }
     }
     write!(f, "}}")
@@ -244,19 +242,25 @@ impl std::fmt::Display for Register {
 }
 
 #[derive(Debug, Clone)]
-pub enum InstructionOrLabel {
+pub enum FnLine {
   Instruction(Instruction),
   Label(Label),
+  Empty,
+  Comment(String),
 }
 
-impl std::fmt::Display for InstructionOrLabel {
+impl std::fmt::Display for FnLine {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     match self {
-      InstructionOrLabel::Instruction(instruction) => {
+      FnLine::Instruction(instruction) => {
         write!(f, "{}", instruction)
       }
-      InstructionOrLabel::Label(label) => {
+      FnLine::Label(label) => {
         write!(f, "{}", label)
+      }
+      FnLine::Empty => Ok(()),
+      FnLine::Comment(message) => {
+        write!(f, "// {}", message)
       }
     }
   }
@@ -653,21 +657,19 @@ impl std::fmt::Display for Value {
 
 #[derive(Debug, Clone)]
 pub struct Lazy {
-  pub body: Vec<InstructionOrLabel>,
+  pub body: Vec<FnLine>,
 }
 
 impl std::fmt::Display for Lazy {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "lazy {{\n")?;
 
-    for instruction_or_label in &self.body {
-      match instruction_or_label {
-        InstructionOrLabel::Instruction(instruction) => {
-          write!(f, "  {}\n", instruction)?;
-        }
-        InstructionOrLabel::Label(label) => {
-          write!(f, "{}\n", label)?;
-        }
+    for fn_line in &self.body {
+      match fn_line {
+        FnLine::Instruction(instruction) => write!(f, "  {}\n", instruction)?,
+        FnLine::Label(label) => write!(f, "{}\n", label)?,
+        FnLine::Empty => write!(f, "\n")?,
+        FnLine::Comment(message) => write!(f, "  // {}\n", message)?,
       }
     }
 

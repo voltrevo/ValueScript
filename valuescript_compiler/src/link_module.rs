@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::asm::{
-  Array, Definition, DefinitionContent, Instruction, InstructionOrLabel, Object, Pointer, Value,
+  Array, Definition, DefinitionContent, FnLine, Instruction, Object, Pointer, Value,
 };
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
@@ -298,13 +298,13 @@ where
     };
   }
 
-  fn body(&mut self, owner: &Pointer, body: &mut Vec<InstructionOrLabel>) {
-    for instruction_or_label in body {
-      match instruction_or_label {
-        InstructionOrLabel::Instruction(instruction) => {
+  fn body(&mut self, owner: &Pointer, body: &mut Vec<FnLine>) {
+    for fn_line in body {
+      match fn_line {
+        FnLine::Instruction(instruction) => {
           self.instruction(owner, instruction);
         }
-        InstructionOrLabel::Label(_) => {}
+        FnLine::Label(..) | FnLine::Empty | FnLine::Comment(..) => {}
       }
     }
   }
@@ -325,7 +325,7 @@ fn resolve_and_rewrite_import_patterns(path_and_module: &mut PathAndModule) -> V
     };
 
     let first_instruction = match lazy.body.first_mut() {
-      Some(InstructionOrLabel::Instruction(instruction)) => instruction,
+      Some(FnLine::Instruction(instruction)) => instruction,
       _ => panic!("Inconsistent with import pattern"),
     };
 
