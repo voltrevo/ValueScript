@@ -530,7 +530,7 @@ impl<'a> AssemblyParser<'a> {
 
     Class {
       constructor,
-      methods,
+      prototype: methods,
     }
   }
 

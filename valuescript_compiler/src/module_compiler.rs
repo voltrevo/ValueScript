@@ -847,7 +847,7 @@ impl ModuleCompiler {
       pointer: defn_name.clone(),
       content: DefinitionContent::Class(Class {
         constructor,
-        methods: Value::Object(Box::new(methods)),
+        prototype: Value::Object(Box::new(methods)),
       }),
     });
 

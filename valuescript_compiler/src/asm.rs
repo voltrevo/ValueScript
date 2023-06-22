@@ -138,14 +138,14 @@ impl std::fmt::Display for Function {
 #[derive(Debug, Clone)]
 pub struct Class {
   pub constructor: Value,
-  pub methods: Value,
+  pub prototype: Value,
 }
 
 impl std::fmt::Display for Class {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     write!(f, "class({}, ", self.constructor)?;
 
-    match &self.methods {
+    match &self.prototype {
       Value::Object(object) => {
         write!(f, "{{\n")?;
         for (name, method) in &object.properties {
@@ -154,7 +154,7 @@ impl std::fmt::Display for Class {
         write!(f, "}})")?;
       }
       _ => {
-        write!(f, "{})", self.methods)?;
+        write!(f, "{})", self.prototype)?;
       }
     }
 
