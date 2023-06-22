@@ -2,7 +2,7 @@
 mod tests {
   use std::collections::HashSet;
   use std::fs;
-  use std::path::{Path, PathBuf};
+  use std::path::PathBuf;
   use std::rc::Rc;
 
   use valuescript_compiler::compile;
@@ -26,15 +26,18 @@ mod tests {
 
     let mut failed_paths = HashSet::<PathBuf>::new();
 
-    let mut files = get_files_recursively(input_dir_path).expect("Failed to get files");
+    let mut files =
+      get_files_recursively(&input_dir_path.to_path_buf()).expect("Failed to get files");
+
     files.sort();
 
     for file_path in files {
       let file_contents = fs::read_to_string(&file_path).expect("Failed to read file contents");
+      let rel_file_path = file_path.strip_prefix(project_dir).unwrap().to_path_buf();
 
       if let Some(first_line) = file_contents.lines().next() {
         if first_line.starts_with("//! test_output(") {
-          println!("\nTesting {} ...", file_path.to_str().unwrap());
+          println!("\n{} ...", rel_file_path.to_str().unwrap());
 
           let mut output_string = first_line
             .split_once("//! test_output(")
@@ -44,7 +47,7 @@ mod tests {
 
           if output_string.pop() != Some(')') {
             println!("  Bad test_output format");
-            failed_paths.insert(file_path.clone());
+            failed_paths.insert(rel_file_path.clone());
           }
 
           let resolved_path = resolve_entry_path(
@@ -66,7 +69,7 @@ mod tests {
 
               match diagnostic.level {
                 DiagnosticLevel::Error | DiagnosticLevel::InternalError => {
-                  failed_paths.insert(file_path.clone());
+                  failed_paths.insert(rel_file_path.clone());
                 }
                 DiagnosticLevel::Lint | DiagnosticLevel::CompilerDebug => {}
               }
@@ -85,7 +88,7 @@ mod tests {
 
           if bytecode.code != bytecode_via_assembly {
             println!("  Bytecode mismatch between original and parsed assembly");
-            failed_paths.insert(file_path.clone());
+            failed_paths.insert(rel_file_path.clone());
           }
 
           let mut vm = VirtualMachine::new();
@@ -103,28 +106,31 @@ mod tests {
               output_string, result_string,
             );
 
-            failed_paths.insert(file_path.clone());
+            failed_paths.insert(rel_file_path.clone());
           }
         }
       }
     }
 
     if !failed_paths.is_empty() {
-      assert!(false, "See failures above");
+      panic!("Failed: {:?}", failed_paths);
     }
   }
 
-  fn get_files_recursively(dir_path: impl AsRef<Path>) -> Result<Vec<PathBuf>, std::io::Error> {
+  fn get_files_recursively(dir_path: &PathBuf) -> Result<Vec<PathBuf>, std::io::Error> {
     let mut files = vec![];
+
     for entry in fs::read_dir(dir_path)? {
       let entry = entry?;
       let path = entry.path();
+
       if path.is_file() {
         files.push(path);
       } else if path.is_dir() {
-        files.extend(get_files_recursively(path)?);
+        files.extend(get_files_recursively(&path)?);
       }
     }
+
     Ok(files)
   }
 }
