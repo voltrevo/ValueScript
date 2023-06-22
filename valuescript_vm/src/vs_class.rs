@@ -8,6 +8,7 @@ use super::vs_value::Val;
 pub struct VsClass {
   pub constructor: Val,
   pub prototype: Val,
+  pub static_: Val,
 }
 
 impl VsClass {}

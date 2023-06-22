@@ -42,6 +42,7 @@ impl BuiltinObject for ErrorBuiltin {
     Some(Rc::new(VsClass {
       constructor: SET_MESSAGE.to_val(),
       prototype: make_error_prototype(),
+      static_: VsObject::default().to_val(),
     }))
   }
 }

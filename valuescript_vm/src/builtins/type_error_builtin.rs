@@ -41,6 +41,7 @@ impl BuiltinObject for TypeErrorBuiltin {
     Some(Rc::new(VsClass {
       constructor: Val::Static(&SET_MESSAGE),
       prototype: make_type_error_prototype(),
+      static_: VsObject::default().to_val(),
     }))
   }
 }
