@@ -465,9 +465,9 @@ impl FunctionCompiler {
         match &ret_stmt.arg {
           None => {}
           Some(expr) => {
-            let mut expression_compiler = ExpressionCompiler { fnc: self };
+            let mut ec = ExpressionCompiler { fnc: self };
 
-            let compiled = expression_compiler.compile(expr, Some(Register::return_()));
+            let compiled = ec.compile(expr, Some(Register::return_()));
             self.use_(compiled);
           }
         }
