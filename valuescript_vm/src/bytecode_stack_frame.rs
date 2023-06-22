@@ -543,12 +543,14 @@ impl StackFrameTrait for BytecodeStackFrame {
           None => panic!("Can't unpack the ignore register"),
         };
 
+        let iter_res = take(&mut self.registers[iter_res_i]);
+
         if let Some(value_i) = self.decoder.decode_register_index() {
-          self.registers[value_i] = self.registers[iter_res_i].sub(&"value".to_val())?;
+          self.registers[value_i] = iter_res.sub(&"value".to_val())?;
         }
 
         if let Some(done_i) = self.decoder.decode_register_index() {
-          self.registers[done_i] = self.registers[iter_res_i].sub(&"done".to_val())?;
+          self.registers[done_i] = iter_res.sub(&"done".to_val())?;
         }
       }
 

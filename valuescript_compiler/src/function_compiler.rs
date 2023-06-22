@@ -1089,7 +1089,7 @@ impl FunctionCompiler {
     self.push(Instruction::Next(iter_reg, iter_res_reg.clone()));
 
     self.push(Instruction::UnpackIterRes(
-      iter_res_reg,
+      iter_res_reg.take(),
       value_reg,
       done_reg,
     ));
