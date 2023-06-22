@@ -1,7 +1,7 @@
 use num_bigint::BigInt;
 use valuescript_common::InstructionByte;
 
-use crate::assembler::ValueType;
+use crate::{assembler::ValueType, expression_compiler::CompiledExpression};
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -610,6 +610,12 @@ pub enum Value {
   Register(Register),
   Pointer(Pointer),
   Builtin(Builtin),
+}
+
+impl Value {
+  pub fn to_ce(self) -> CompiledExpression {
+    CompiledExpression::new(self, vec![])
+  }
 }
 
 impl std::fmt::Display for Value {

@@ -313,7 +313,7 @@ impl FunctionCompiler {
         swc_ecma_ast::BlockStmtOrExpr::Expr(expr) => {
           let mut expression_compiler = ExpressionCompiler { fnc: self };
 
-          expression_compiler.compile(expr, Some(Register::return_()));
+          expression_compiler.compile_into(expr, Register::return_());
         }
       },
       Functionish::Constructor(member_initializers_assembly, _class_span, constructor) => {
@@ -467,8 +467,7 @@ impl FunctionCompiler {
           Some(expr) => {
             let mut ec = ExpressionCompiler { fnc: self };
 
-            let compiled = ec.compile(expr, Some(Register::return_()));
-            self.use_(compiled);
+            ec.compile_into(expr, Register::return_());
           }
         }
 
@@ -1028,8 +1027,7 @@ impl FunctionCompiler {
     let iter_res_reg = ec.fnc.allocate_numbered_reg(&"_iter_res".to_string());
     let done_reg = ec.fnc.allocate_numbered_reg(&"_done".to_string());
 
-    let ce = ec.compile(&for_of.right, Some(iter_reg.clone()));
-    ec.fnc.use_(ce);
+    ec.compile_into(&for_of.right, iter_reg.clone());
 
     ec.fnc.push(Instruction::ConstSubCall(
       Value::Register(iter_reg.clone()),
@@ -1140,8 +1138,7 @@ impl FunctionCompiler {
           let target_register = self.get_pattern_register(&decl.name);
 
           let mut ec = ExpressionCompiler { fnc: self };
-          let ce = ec.compile(expr, Some(target_register.clone()));
-          ec.fnc.use_(ce);
+          ec.compile_into(expr, target_register.clone());
           ec.pat(&decl.name, &target_register, false);
         }
         None => match &decl.name {

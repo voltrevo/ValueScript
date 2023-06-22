@@ -218,7 +218,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
-            panic!("Not implemented: throw exception (fn_ is not a function)")
+            return Err("fn_ is not a function".to_type_error());
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             self.transfer_parameters(&mut new_frame);
@@ -249,7 +249,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
-            panic!("Not implemented: throw exception (fn_ is not a function)")
+            return Err("fn_ is not a function".to_type_error());
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             if self.decoder.peek_type() == BytecodeType::Register {
@@ -349,7 +349,7 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         match fn_.load_function() {
           LoadFunctionResult::NotAFunction => {
-            panic!("Not implemented: throw exception (fn_ is not a function)")
+            return Err("fn_ is not a function".to_type_error());
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
             self.transfer_parameters(&mut new_frame);
@@ -439,7 +439,7 @@ impl StackFrameTrait for BytecodeStackFrame {
           }
           _ => match class.constructor.load_function() {
             LoadFunctionResult::NotAFunction => {
-              panic!("Not implemented: throw exception (class.constructor is not a function)")
+              return Err("fn_ is not a function".to_type_error());
             }
             LoadFunctionResult::StackFrame(mut new_frame) => {
               self.transfer_parameters(&mut new_frame);

@@ -90,7 +90,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     match expr {
       This(_) => {
-        return self.inline(Value::Register(Register::this()), target_register);
+        return Value::Register(Register::this()).to_ce();
       }
       Array(array_exp) => {
         return self.array_expression(array_exp, target_register);
@@ -152,7 +152,7 @@ impl<'a> ExpressionCompiler<'a> {
         return self.identifier(ident, target_register);
       }
       Lit(lit) => {
-        return self.literal(lit, target_register);
+        return self.compile_literal(lit).to_ce();
       }
       Tpl(tpl) => {
         return self.template_literal(tpl, target_register);
@@ -248,6 +248,25 @@ impl<'a> ExpressionCompiler<'a> {
         return CompiledExpression::empty();
       }
     };
+  }
+
+  pub fn compile_into(&mut self, expr: &swc_ecma_ast::Expr, target_register: Register) {
+    let mut ce = self.compile(expr, Some(target_register.clone()));
+    let mut in_target = false;
+
+    if let Value::Register(ce_reg) = &ce.value {
+      if ce_reg == &target_register {
+        in_target = true;
+        self.fnc.use_ref(&mut ce);
+        // Result is already in the target register, no mov needed
+      }
+    }
+
+    if !in_target {
+      // Put the value into the target
+      let value = self.fnc.use_(ce);
+      self.fnc.push(Instruction::Mov(value, target_register));
+    }
   }
 
   pub fn unary_expression(
@@ -378,7 +397,13 @@ impl<'a> ExpressionCompiler<'a> {
     };
 
     let rhs = match is_top_level {
-      true => self.compile(&assign_expr.right, at.direct_register()),
+      true => match at.direct_register() {
+        Some(at) => {
+          self.compile_into(&assign_expr.right, at.clone());
+          Value::Register(at).to_ce()
+        }
+        None => self.compile(&assign_expr.right, None),
+      },
       false => self.compile(&assign_expr.right, None),
     };
 
@@ -409,19 +434,22 @@ impl<'a> ExpressionCompiler<'a> {
     assign_expr_right: &swc_ecma_ast::Expr,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let rhs_reg = self.fnc.allocate_tmp();
+    let mut nested_registers = vec![];
 
-    let rhs = self.compile(assign_expr_right, Some(rhs_reg.clone()));
+    let rhs_reg = match target_register {
+      Some(reg) => reg,
+      None => {
+        let reg = self.fnc.allocate_tmp();
+        nested_registers.push(reg.clone());
+        reg
+      }
+    };
+
+    self.compile_into(assign_expr_right, rhs_reg.clone());
 
     self.pat(pat, &rhs_reg, true);
 
-    if let Some(target_reg) = target_register {
-      self
-        .fnc
-        .push(Instruction::Mov(rhs.value.clone(), target_reg));
-    }
-
-    rhs
+    CompiledExpression::new(Value::Register(rhs_reg), nested_registers)
   }
 
   pub fn assign_expr_compound(
@@ -454,72 +482,42 @@ impl<'a> ExpressionCompiler<'a> {
       },
     };
 
-    let tmp_reg = self.fnc.allocate_tmp();
+    let mut nested_registers = vec![];
 
-    let mut nested_registers = Vec::<Register>::new();
-    let mut pre_rhs = self.compile(&assign_expr.right, Some(tmp_reg.clone()));
-    nested_registers.append(&mut pre_rhs.nested_registers);
-    pre_rhs.release_checker.has_unreleased_registers = false;
+    let rhs_reg = match &target_register {
+      Some(reg) => reg.clone(),
+      None => {
+        let reg = self.fnc.allocate_tmp();
+        nested_registers.push(reg.clone());
+        reg
+      }
+    };
 
+    self.compile_into(&assign_expr.right, rhs_reg.clone());
+
+    // TODO: Does target_read need to be released?
     let target_read = target.read(self);
 
     self.fnc.push(make_binary_op(
       binary_op,
       Value::Register(target_read.clone()),
-      Value::Register(tmp_reg.clone()),
+      Value::Register(rhs_reg.clone()),
       target_read.clone(),
     ));
 
-    self.fnc.release_reg(&tmp_reg);
+    if !is_top_level {
+      // Technically we should do this unconditionally. When is_top_level is true, we're lying about
+      // rhs_reg being the result, but the idea is that we don't use the result when is_top_level is
+      // true. There's probably a better way to handle this.
+      self.fnc.push(Instruction::Mov(
+        Value::Register(target_read.clone()),
+        rhs_reg.clone(),
+      ));
+    }
 
-    let result_reg = match &target {
-      TargetAccessor::Register(treg) => {
-        match target_register {
-          None => {}
-          Some(tr) => {
-            self
-              .fnc
-              .push(Instruction::Mov(Value::Register(treg.clone()), tr));
-          }
-        }
+    target.assign_and_packup(self, &Value::Register(target_read.clone()), false);
 
-        if is_top_level {
-          treg.clone()
-        } else {
-          let result_reg = self.fnc.allocate_tmp();
-
-          self.fnc.push(Instruction::Mov(
-            Value::Register(treg.clone()),
-            result_reg.clone(),
-          ));
-
-          nested_registers.push(result_reg.clone());
-          result_reg
-        }
-      }
-      TargetAccessor::Nested(nta) => {
-        let res_reg = match target_register {
-          None => {
-            let reg = self.fnc.allocate_tmp();
-            nested_registers.push(reg.clone());
-
-            reg
-          }
-          Some(tr) => tr,
-        };
-
-        self.fnc.push(Instruction::Mov(
-          Value::Register(nta.register.clone()),
-          res_reg.clone(),
-        ));
-
-        res_reg
-      }
-    };
-
-    target.assign_and_packup(self, &Value::Register(target_read), false);
-
-    CompiledExpression::new(Value::Register(result_reg), nested_registers)
+    CompiledExpression::new(Value::Register(rhs_reg), nested_registers)
   }
 
   pub fn array_expression(
@@ -617,9 +615,7 @@ impl<'a> ExpressionCompiler<'a> {
         // At the least, the assembly supports definitions and should
         // maybe support any value here
         let reg = self.fnc.allocate_numbered_reg("_computed_key");
-        let mut compiled = self.compile(&comp.expr, Some(reg.clone()));
-        nested_registers.append(&mut compiled.nested_registers);
-        compiled.release_checker.has_unreleased_registers = false;
+        self.compile_into(&comp.expr, reg.clone());
         nested_registers.push(reg.clone());
 
         Value::Register(reg)
@@ -636,9 +632,7 @@ impl<'a> ExpressionCompiler<'a> {
     target_register: Option<Register>,
   ) -> CompiledExpression {
     return match member_prop {
-      swc_ecma_ast::MemberProp::Ident(ident) => {
-        self.inline(Value::String(ident.sym.to_string()), target_register)
-      }
+      swc_ecma_ast::MemberProp::Ident(ident) => Value::String(ident.sym.to_string()).to_ce(),
       swc_ecma_ast::MemberProp::Computed(computed) => self.compile(&computed.expr, target_register),
       swc_ecma_ast::MemberProp::PrivateName(private_name) => {
         self
@@ -970,7 +964,7 @@ impl<'a> ExpressionCompiler<'a> {
       .expect("Failed to queue function");
 
     match capture_params {
-      None => self.inline(Value::Pointer(definition_pointer), target_register),
+      None => Value::Pointer(definition_pointer).to_ce(),
       Some(capture_params) => self.capturing_fn_ref(
         match fn_.ident {
           Some(ref ident) => ident.span,
@@ -1009,7 +1003,7 @@ impl<'a> ExpressionCompiler<'a> {
       .expect("Failed to queue function");
 
     match capture_params {
-      None => self.inline(Value::Pointer(definition_pointer), target_register),
+      None => Value::Pointer(definition_pointer).to_ce(),
       Some(capture_params) => self.capturing_fn_ref(
         arrow_expr.span,
         None,
@@ -1149,10 +1143,7 @@ impl<'a> ExpressionCompiler<'a> {
     assert_eq!(tpl.quasis.len(), len + 1);
 
     if len == 0 {
-      return self.inline(
-        Value::String(tpl.quasis[0].raw.to_string()),
-        target_register,
-      );
+      return Value::String(tpl.quasis[0].raw.to_string()).to_ce();
     }
 
     let mut nested_registers = Vec::<Register>::new();
@@ -1333,25 +1324,6 @@ impl<'a> ExpressionCompiler<'a> {
     return CompiledExpression::new(Value::Register(dst), nested_registers);
   }
 
-  pub fn literal(
-    &mut self,
-    lit: &swc_ecma_ast::Lit,
-    target_register: Option<Register>,
-  ) -> CompiledExpression {
-    let compiled_literal = self.compile_literal(lit);
-    return self.inline(compiled_literal, target_register);
-  }
-
-  pub fn inline(&mut self, value: Value, target_register: Option<Register>) -> CompiledExpression {
-    return match target_register {
-      None => CompiledExpression::new(value, vec![]),
-      Some(t) => {
-        self.fnc.push(Instruction::Mov(value, t.clone()));
-        CompiledExpression::new(Value::Register(t), vec![])
-      }
-    };
-  }
-
   pub fn identifier(
     &mut self,
     ident: &swc_ecma_ast::Ident,
@@ -1359,7 +1331,7 @@ impl<'a> ExpressionCompiler<'a> {
   ) -> CompiledExpression {
     // TODO: Use constant instead?
     if ident.sym.to_string() == "undefined" {
-      return self.inline(Value::Undefined, target_register);
+      return Value::Undefined.to_ce();
     }
 
     let fn_as_owner_id = match self.fnc.scope_analysis.lookup(ident) {
@@ -1387,7 +1359,7 @@ impl<'a> ExpressionCompiler<'a> {
     let name = match self.fnc.lookup(ident) {
       Some(v) => v,
       None => {
-        return self.inline(Value::Undefined, target_register);
+        return Value::Undefined.to_ce();
       }
     };
 
@@ -1405,14 +1377,14 @@ impl<'a> ExpressionCompiler<'a> {
             &capture_params,
             target_register,
           ),
-          None => self.inline(value, target_register),
+          None => value.to_ce(),
         }
       }
       None => match value {
         Value::Register(reg) => {
           if name.mutations.is_empty() {
             // Just use the register for the variable if it's not mutated
-            return self.inline(Value::Register(reg), target_register);
+            return Value::Register(reg).to_ce();
           }
 
           // Otherwise, we need to capture the current value for the result of the expression
@@ -1424,11 +1396,9 @@ impl<'a> ExpressionCompiler<'a> {
             new_reg.clone(),
           ));
 
-          self.inline(Value::Register(new_reg.clone()), target_register);
-
           CompiledExpression::new(Value::Register(new_reg.clone()), vec![new_reg])
         }
-        _ => self.inline(value, target_register),
+        _ => value.to_ce(),
       },
     }
   }
@@ -1592,15 +1562,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.release_reg(&provided_reg);
 
-    let compiled = self.compile(expr, Some(register.clone()));
-
-    if self.fnc.use_(compiled).to_string() != register.to_string() {
-      self.fnc.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: "Default expression not compiled into target register (not sure whether this is possible in this case)".to_string(),
-        span: expr.span(),
-      });
-    }
+    self.compile_into(expr, register.clone());
 
     self.fnc.label(initialized_label);
   }
