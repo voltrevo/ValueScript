@@ -407,12 +407,6 @@ impl<'a> ExpressionCompiler<'a> {
       false => self.compile(&assign_expr.right, None),
     };
 
-    if let Some(target_reg) = target_register {
-      self
-        .fnc
-        .push(Instruction::Mov(rhs.value.clone(), target_reg));
-    }
-
     let at_is_register = match &at {
       TargetAccessor::Register(_) => true,
       _ => false,
