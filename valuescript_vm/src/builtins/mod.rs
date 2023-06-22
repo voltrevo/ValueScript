@@ -1,4 +1,5 @@
 mod array_builtin;
+mod bigint_builtin;
 mod boolean_builtin;
 mod builtin_object;
 mod debug_builtin;
@@ -18,10 +19,11 @@ use crate::{
 };
 
 use self::{
-  array_builtin::ArrayBuiltin, boolean_builtin::BooleanBuiltin, debug_builtin::DebugBuiltin,
-  error_builtin::ErrorBuiltin, math_builtin::MathBuiltin, number_builtin::NumberBuiltin,
-  range_error_builtin::RangeErrorBuiltin, string_builtin::StringBuiltin,
-  symbol_builtin::SymbolBuiltin, type_error_builtin::TypeErrorBuiltin,
+  array_builtin::ArrayBuiltin, bigint_builtin::BigIntBuiltin, boolean_builtin::BooleanBuiltin,
+  debug_builtin::DebugBuiltin, error_builtin::ErrorBuiltin, math_builtin::MathBuiltin,
+  number_builtin::NumberBuiltin, range_error_builtin::RangeErrorBuiltin,
+  string_builtin::StringBuiltin, symbol_builtin::SymbolBuiltin,
+  type_error_builtin::TypeErrorBuiltin,
 };
 
 pub static BUILTIN_VALS: [fn() -> Val; BUILTIN_COUNT] = [
@@ -40,4 +42,5 @@ pub static BUILTIN_VALS: [fn() -> Val; BUILTIN_COUNT] = [
   || RangeErrorBuiltin {}.to_val(),
   || SymbolBuiltin {}.to_val(),
   || VsSymbol::ITERATOR.to_val(),
+  || BigIntBuiltin {}.to_val(),
 ];

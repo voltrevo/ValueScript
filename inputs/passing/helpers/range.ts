@@ -165,6 +165,21 @@ export class Range<T = never> implements Iterable<T> {
     return res;
   }
 
+  bigProduct(
+    // Warning: ValueScript has a bug where typing the `this` parameter causes it to create a
+    // phantom regular parameter. This only works because there aren't any other parameters.
+    // TODO: Fix this.
+    this: Range<bigint>,
+  ) {
+    let res = 1n;
+
+    for (const x of this.iterable) {
+      res *= x;
+    }
+
+    return res;
+  }
+
   map<MappedT>(fn: (x: T) => MappedT) {
     const iterable = this.iterable;
 

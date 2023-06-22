@@ -28,6 +28,8 @@ pub enum BuiltinName {
 
   Symbol,
   SymbolIterator,
+
+  BigInt,
 }
 
 pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
@@ -46,6 +48,7 @@ pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
   "RangeError",
   "Symbol",
   "SymbolIterator",
+  "BigInt",
 ];
 
 pub const BUILTIN_COUNT: usize = BuiltinName::COUNT;
