@@ -514,23 +514,30 @@ impl<'a> AssemblyParser<'a> {
   }
 
   fn assemble_class(&mut self) -> Class {
-    self.parse_exact("class(");
+    self.parse_exact("class {");
     self.parse_optional_whitespace();
 
+    self.parse_exact("constructor: ");
     let constructor = self.assemble_value();
-    self.parse_optional_whitespace();
-
     self.parse_exact(",");
     self.parse_optional_whitespace();
 
-    let methods = self.assemble_value();
+    self.parse_exact("prototype: ");
+    let prototype = self.assemble_value();
+    self.parse_exact(",");
     self.parse_optional_whitespace();
 
-    self.parse_exact(")");
+    self.parse_exact("static: ");
+    let static_ = self.assemble_value();
+    self.parse_exact(",");
+    self.parse_optional_whitespace();
+
+    self.parse_exact("}");
 
     Class {
       constructor,
-      prototype: methods,
+      prototype,
+      static_,
     }
   }
 

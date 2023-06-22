@@ -147,7 +147,7 @@ impl BytecodeDecoder {
       BytecodeType::Class => VsClass {
         constructor: self.decode_val(registers),
         prototype: self.decode_val(registers),
-        static_: VsObject::default().to_val(),
+        static_: self.decode_val(registers),
       }
       .to_val(),
       BytecodeType::BigInt => self.decode_bigint().to_val(),

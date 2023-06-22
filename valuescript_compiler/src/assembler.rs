@@ -147,6 +147,7 @@ impl Assembler {
     self.output.push(ValueType::Class as u8);
     self.value(&class.constructor);
     self.value(&class.prototype);
+    self.value(&class.static_);
   }
 
   fn label(&mut self, label: &Label) {

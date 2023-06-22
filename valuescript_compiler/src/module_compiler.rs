@@ -673,7 +673,7 @@ impl ModuleCompiler {
     class: &swc_ecma_ast::Class,
   ) -> Pointer {
     let mut constructor: Value = Value::Void;
-    let mut methods: Object = Object::default();
+    let mut prototype: Object = Object::default();
     let mut dependent_definitions: Vec<Definition>;
 
     let defn_name = match ident {
@@ -820,7 +820,7 @@ impl ModuleCompiler {
             Functionish::Fn(None, method.function.clone()),
           ));
 
-          methods
+          prototype
             .properties
             .push((name, Value::Pointer(method_defn_name)));
         }
@@ -847,7 +847,8 @@ impl ModuleCompiler {
       pointer: defn_name.clone(),
       content: DefinitionContent::Class(Class {
         constructor,
-        prototype: Value::Object(Box::new(methods)),
+        prototype: Value::Object(Box::new(prototype)),
+        static_: Value::Object(Box::new(Object::default())),
       }),
     });
 

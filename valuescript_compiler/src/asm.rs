@@ -139,24 +139,54 @@ impl std::fmt::Display for Function {
 pub struct Class {
   pub constructor: Value,
   pub prototype: Value,
+  pub static_: Value,
 }
 
 impl std::fmt::Display for Class {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "class({}, ", self.constructor)?;
+    writeln!(f, "class {{")?;
+
+    writeln!(f, "  constructor: {},", self.constructor)?;
+
+    write!(f, "  prototype: ")?;
 
     match &self.prototype {
       Value::Object(object) => {
-        write!(f, "{{\n")?;
-        for (name, method) in &object.properties {
-          write!(f, "  {}: {},\n", name, method)?;
+        if object.properties.len() == 0 {
+          writeln!(f, "{{}},")?;
+        } else {
+          write!(f, "{{\n")?;
+          for (name, method) in &object.properties {
+            write!(f, "    {}: {},\n", name, method)?;
+          }
+          writeln!(f, "  }},")?;
         }
-        write!(f, "}})")?;
       }
       _ => {
-        write!(f, "{})", self.prototype)?;
+        writeln!(f, "{},", self.prototype)?;
       }
     }
+
+    write!(f, "  static: ")?;
+
+    match &self.static_ {
+      Value::Object(object) => {
+        if object.properties.len() == 0 {
+          writeln!(f, "{{}},")?;
+        } else {
+          write!(f, "{{\n")?;
+          for (name, method) in &object.properties {
+            write!(f, "    {}: {},\n", name, method)?;
+          }
+          writeln!(f, "  }},")?;
+        }
+      }
+      _ => {
+        writeln!(f, "{},", self.prototype)?;
+      }
+    }
+
+    write!(f, "}}")?;
 
     return Ok(());
   }
