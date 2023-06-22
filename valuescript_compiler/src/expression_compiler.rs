@@ -691,18 +691,17 @@ impl<'a> ExpressionCompiler<'a> {
 
         let result_reg = match &target {
           TargetAccessor::Register(reg) => {
-            for tr in &target_register {
-              if tr != reg {
-                self
-                  .fnc
-                  .push(Instruction::Mov(Value::Register(reg.clone()), tr.clone()));
+            let res = match &target_register {
+              Some(tr) => tr.clone(),
+              None => {
+                let res = self.fnc.allocate_tmp();
+                nested_registers.push(res.clone());
+
+                res
               }
-            }
+            };
 
-            let res = self.fnc.allocate_tmp();
-            nested_registers.push(res.clone());
-
-            // Always copy pre-increment value into a new register.
+            // Always copy pre-increment value into a register.
             // This is a bit heavy-handed (FIXME), but it's consistent with the current policy of
             // doing this whenever the variable is mutated, which it clearly is. Really though, the
             // issue is when *other* mutations to this variable occur between now and when it's

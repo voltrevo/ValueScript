@@ -125,6 +125,11 @@ impl FunctionCompiler {
     self.current.body.push(FnLine::Label(label));
   }
 
+  #[allow(dead_code)]
+  pub fn comment(&mut self, message: String) {
+    self.current.body.push(FnLine::Comment(message));
+  }
+
   pub fn lookup(&mut self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
     let name = self.scope_analysis.lookup(ident);
 
@@ -457,7 +462,6 @@ impl FunctionCompiler {
           None => {}
           Some(expr) => {
             let mut ec = ExpressionCompiler { fnc: self };
-
             ec.compile_into(expr, Register::return_());
           }
         }
