@@ -527,7 +527,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             }
           }
           LoadFunctionResult::StackFrame(mut new_frame) => {
-            new_frame.write_this(false, self.registers[iter_i].clone())?;
+            new_frame.write_this(false, take(&mut self.registers[iter_i]))?;
 
             self.return_target = res_i;
             self.this_target = Some(iter_i);

@@ -1,8 +1,7 @@
-//! test_output(1)
-// Should be: 0
+//! test_output(0)
 
 export default function () {
-  return measure(1) - measure(0);
+  return measure(10) - measure(0);
 }
 
 function measure(n: number) {
