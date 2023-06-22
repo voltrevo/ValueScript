@@ -2,6 +2,7 @@
 mod tests {
   use std::collections::HashSet;
   use std::fs;
+  use std::io::Error;
   use std::path::PathBuf;
   use std::rc::Rc;
 
@@ -14,7 +15,7 @@ mod tests {
   use crate::resolve_entry_path::resolve_entry_path;
 
   #[test]
-  fn test_inputs() {
+  fn test_inputs() -> Result<(), Error> {
     let exe_path = std::env::current_exe().unwrap();
     let mut current_dir = exe_path.parent().unwrap();
     while current_dir.file_name().unwrap() != "target" {
@@ -23,6 +24,11 @@ mod tests {
     let project_dir = current_dir.parent().unwrap(); // Go up one more level to get the project directory
 
     let input_dir_path = project_dir.join("inputs");
+    let output_dir_path = project_dir.join("test_output");
+
+    fs::remove_dir_all(&output_dir_path)?;
+    fs::create_dir(&output_dir_path)?;
+    fs::write(output_dir_path.join(".gitignore"), "*")?;
 
     let mut failed_paths = HashSet::<PathBuf>::new();
 
@@ -83,6 +89,17 @@ mod tests {
           let bytecode = Rc::new(Bytecode::new(assemble(&module)));
 
           let assembly = module.to_string();
+
+          {
+            // Write the assembly to test_output
+            let mut dir = output_dir_path.join(&rel_file_path);
+            dir.pop();
+            fs::create_dir_all(dir)?;
+            let mut file = output_dir_path.join(&rel_file_path);
+            file.set_extension("vsm");
+            fs::write(file, &assembly)?;
+          }
+
           let parsed_assembly = parse_module(&assembly);
           let bytecode_via_assembly = assemble(&parsed_assembly);
 
@@ -115,6 +132,8 @@ mod tests {
     if !failed_paths.is_empty() {
       panic!("Failed: {:?}", failed_paths);
     }
+
+    Ok(())
   }
 
   fn get_files_recursively(dir_path: &PathBuf) -> Result<Vec<PathBuf>, std::io::Error> {
