@@ -26,9 +26,7 @@ mod tests {
     let input_dir_path = project_dir.join("inputs");
     let output_dir_path = project_dir.join("test_output");
 
-    fs::remove_dir_all(&output_dir_path)?;
-    fs::create_dir(&output_dir_path)?;
-    fs::write(output_dir_path.join(".gitignore"), "*")?;
+    reset_test_output(&output_dir_path)?;
 
     let mut failed_paths = HashSet::<PathBuf>::new();
 
@@ -151,5 +149,16 @@ mod tests {
     }
 
     Ok(files)
+  }
+
+  fn reset_test_output(output_dir_path: &PathBuf) -> Result<(), Error> {
+    if output_dir_path.exists() {
+      fs::remove_dir_all(output_dir_path)?;
+    }
+
+    fs::create_dir(output_dir_path)?;
+    fs::write(output_dir_path.join(".gitignore"), "*")?;
+
+    Ok(())
   }
 }
