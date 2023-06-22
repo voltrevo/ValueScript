@@ -357,7 +357,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             new_frame.write_this(
               const_call,
               match &obj {
-                ThisArg::Register(reg_i) => self.registers[reg_i.clone()].clone(),
+                ThisArg::Register(reg_i) => take(&mut self.registers[reg_i.clone()]),
                 ThisArg::Val(val) => val.clone(),
               },
             )?;
