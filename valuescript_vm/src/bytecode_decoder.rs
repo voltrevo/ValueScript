@@ -146,7 +146,7 @@ impl BytecodeDecoder {
       BytecodeType::Builtin => BUILTIN_VALS[self.decode_varsize_uint()](),
       BytecodeType::Class => VsClass {
         constructor: self.decode_val(registers),
-        instance_prototype: self.decode_val(registers),
+        prototype: self.decode_val(registers),
       }
       .to_val(),
       BytecodeType::BigInt => self.decode_bigint().to_val(),

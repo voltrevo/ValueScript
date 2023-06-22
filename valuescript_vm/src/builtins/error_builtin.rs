@@ -41,7 +41,7 @@ impl BuiltinObject for ErrorBuiltin {
   fn bo_as_class_data() -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
       constructor: SET_MESSAGE.to_val(),
-      instance_prototype: make_error_prototype(),
+      prototype: make_error_prototype(),
     }))
   }
 }

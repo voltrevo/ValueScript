@@ -32,7 +32,7 @@ impl BuiltinObject for RangeErrorBuiltin {
   fn bo_as_class_data() -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
       constructor: Val::Static(&SET_MESSAGE),
-      instance_prototype: make_range_error_prototype(),
+      prototype: make_range_error_prototype(),
     }))
   }
 }

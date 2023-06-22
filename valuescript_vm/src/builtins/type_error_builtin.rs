@@ -40,7 +40,7 @@ impl BuiltinObject for TypeErrorBuiltin {
   fn bo_as_class_data() -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
       constructor: Val::Static(&SET_MESSAGE),
-      instance_prototype: make_type_error_prototype(),
+      prototype: make_type_error_prototype(),
     }))
   }
 }

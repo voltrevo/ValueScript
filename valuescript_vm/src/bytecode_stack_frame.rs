@@ -422,7 +422,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         let mut instance = VsObject {
           string_map: Default::default(),
           symbol_map: Default::default(),
-          prototype: Some(class.instance_prototype.clone()),
+          prototype: Some(class.prototype.clone()),
         }
         .to_val();
 
