@@ -1,7 +1,7 @@
 //! bench()
 
 export default function main() {
-  return fib(25);
+  return fib(26);
 }
 
 function fib(n: number): number {

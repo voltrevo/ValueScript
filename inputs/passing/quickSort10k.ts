@@ -7,8 +7,8 @@ import { Range_from } from "./helpers/range.ts";
 export default function main() {
   let nums = [
     ...Range_from(randish())
-      .map((x) => Math.floor(5_000 * x))
-      .limit(5_000),
+      .map((x) => Math.floor(8_000 * x))
+      .limit(10_000),
   ];
 
   nums = quickSort(nums, (a, b) => a - b);
