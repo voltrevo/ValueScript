@@ -416,7 +416,8 @@ pub fn op_sub(left: &mut Val, right: &Val) -> Result<Val, Val> {
       });
     }
     Val::Object(object_data) => Ok(object_data.sub(right)), // TODO: move on single ref
-    Val::Function(_) | Val::Class(_) => Ok(Val::Undefined),
+    Val::Function(_) => Ok(Val::Undefined),
+    Val::Class(class) => op_sub(&mut class.static_.clone(), right),
     Val::Static(s) => s.sub(right),
     Val::Dynamic(dynamic_data) => dynamic_data.sub(right),
     Val::CopyCounter(cc) => Ok(match right.to_string().as_str() {
