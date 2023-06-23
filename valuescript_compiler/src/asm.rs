@@ -60,6 +60,17 @@ pub struct Definition {
   pub content: DefinitionContent,
 }
 
+impl Default for Definition {
+  fn default() -> Self {
+    Definition {
+      pointer: Pointer {
+        name: "".to_string(),
+      },
+      content: DefinitionContent::Value(Value::Void),
+    }
+  }
+}
+
 impl std::fmt::Display for Definition {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     write!(f, "{} = {}", self.pointer, self.content)

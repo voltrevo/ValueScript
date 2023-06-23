@@ -453,6 +453,7 @@ fn shake_tree(module: &mut Module) {
     pointers_included.insert(pointer.clone());
 
     if let Some(dependencies) = dependency_graph.get(pointer) {
+      // TODO: Avoid randomness caused by HashSet iteration
       for dependency in dependencies {
         if !pointers_included.contains(dependency) {
           pointers_to_include.push(dependency.clone());
@@ -462,11 +463,21 @@ fn shake_tree(module: &mut Module) {
   }
 
   let previous_definitions = std::mem::take(&mut module.definitions);
-  let mut new_definitions = Vec::<Definition>::new();
+  let mut new_definitions_map = HashMap::<Pointer, Definition>::new();
 
   for definition in previous_definitions {
     if pointers_included.contains(&definition.pointer) {
-      new_definitions.push(definition);
+      new_definitions_map.insert(definition.pointer.clone(), definition);
+    }
+  }
+
+  let mut new_definitions = Vec::<Definition>::new();
+
+  for pointer in pointers_to_include {
+    let defn = take(new_definitions_map.get_mut(&pointer).unwrap());
+
+    if defn.pointer.name != "" {
+      new_definitions.push(defn);
     }
   }
 

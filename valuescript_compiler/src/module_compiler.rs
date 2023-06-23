@@ -231,7 +231,7 @@ impl ModuleCompiler {
       For(for_) => self.not_supported(for_.span, "module level For statement"),
       ForIn(for_in) => self.not_supported(for_in.span, "module level ForIn statement"),
       ForOf(for_of) => self.not_supported(for_of.span, "module level ForOf statement"),
-      Expr(expr) => self.todo(expr.span, "module level Expr statement"),
+      Expr(expr) => self.not_supported(expr.span, "module level Expr statement"),
     };
   }
 
@@ -244,8 +244,84 @@ impl ModuleCompiler {
       }
       Fn(fn_) => self.compile_fn_decl(false, fn_),
       Var(var_decl) => {
-        if !var_decl.declare {
-          self.todo(var_decl.span, "non-declare module level var declaration");
+        if var_decl.declare {
+          // Uses the `declare` typescript keyword. Nothing needed to support this.
+          return;
+        }
+
+        if var_decl.kind != swc_ecma_ast::VarDeclKind::Const {
+          // Only `const` variables in the global area. They cannot be mutated, so might as well
+          // insist they are `const` for clarity.
+          self.not_supported(var_decl.span, "non-const module level variable");
+        }
+
+        for decl in &var_decl.decls {
+          let ident = match &decl.name {
+            swc_ecma_ast::Pat::Ident(bi) => Some(&bi.id),
+            _ => {
+              self.todo(decl.name.span(), "Module level destructuring");
+              None
+            }
+          };
+
+          let init = match &decl.init {
+            Some(_) => &decl.init,
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::Error,
+                message: format!("const variable without initializer"),
+                span: decl.init.span(),
+              });
+
+              &None
+            }
+          };
+
+          match (ident, init) {
+            (Some(ident), Some(init)) => {
+              let value = match static_eval_expr(init) {
+                Some(value) => value,
+                None => {
+                  self.todo(
+                    init.span(),
+                    "Determine whether initializer can be statically evaluated",
+                  );
+
+                  continue;
+                }
+              };
+
+              let pointer = match self.scope_analysis.lookup(ident) {
+                Some(name) => match &name.value {
+                  Value::Pointer(p) => p.clone(),
+                  _ => {
+                    self.diagnostics.push(Diagnostic {
+                      level: DiagnosticLevel::InternalError,
+                      message: "Expected pointer for module constant".to_string(),
+                      span: ident.span(),
+                    });
+
+                    continue;
+                  }
+                },
+                None => {
+                  self.diagnostics.push(Diagnostic {
+                    level: DiagnosticLevel::InternalError,
+                    message: "Failed to lookup name".to_string(),
+                    span: ident.span(),
+                  });
+
+                  continue;
+                }
+              };
+
+              self.module.definitions.push(Definition {
+                pointer,
+                content: DefinitionContent::Value(value),
+              });
+            }
+            _ => {}
+          }
         }
       }
       TsInterface(_) => {}

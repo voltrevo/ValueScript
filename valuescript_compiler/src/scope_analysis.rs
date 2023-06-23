@@ -705,7 +705,12 @@ impl ScopeAnalysis {
 
     for decl in &var_decl.decls {
       for ident in self.get_pat_idents(&decl.name) {
-        self.insert_reg_name(scope, name_type, &ident, Some(decl.span.hi));
+        let owner_id = scope.borrow().owner_id.clone();
+
+        match owner_id {
+          OwnerId::Span(..) => self.insert_reg_name(scope, name_type, &ident, Some(decl.span.hi)),
+          OwnerId::Module => self.insert_pointer_name(scope, name_type, &ident),
+        }
       }
     }
   }
