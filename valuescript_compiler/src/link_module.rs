@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
+use std::mem::take;
 
 use crate::asm::{
-  Array, Definition, DefinitionContent, FnLine, Instruction, Object, Pointer, Value,
+  Array, Definition, DefinitionContent, FnLine, Instruction, InstructionFieldMut, Object, Pointer,
+  Value,
 };
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
@@ -108,6 +110,7 @@ pub fn link_module(
 
   collapse_pointers_of_pointers(&mut path_and_module.module);
   shake_tree(&mut path_and_module.module);
+  extract_constants(&mut path_and_module.module, &mut pointer_allocator);
 
   result.module = Some(path_and_module.module);
   result
@@ -468,4 +471,69 @@ fn shake_tree(module: &mut Module) {
   }
 
   module.definitions = new_definitions;
+}
+
+fn extract_constants(module: &mut Module, pointer_allocator: &mut NameAllocator) {
+  let mut constants = HashMap::<Value, Pointer>::new();
+
+  for defn in &mut module.definitions {
+    if let DefinitionContent::Function(f) = &mut defn.content {
+      for line in &mut f.body {
+        if let FnLine::Instruction(instr) = line {
+          instr.visit_fields_mut(&mut |field| match field {
+            InstructionFieldMut::Value(value) => {
+              value.visit_values_mut(&mut |sub_value| {
+                if let Some(p) = constants.get(&sub_value) {
+                  *sub_value = Value::Pointer(p.clone());
+                  return;
+                }
+
+                if let Some(name) = should_extract_value_as_constant(&sub_value) {
+                  let p = Pointer {
+                    name: pointer_allocator.allocate(&name),
+                  };
+
+                  let existing_p = constants.insert(take(sub_value), p.clone());
+                  assert!(existing_p.is_none());
+                  *sub_value = Value::Pointer(p);
+                }
+              });
+            }
+            InstructionFieldMut::Register(_) | InstructionFieldMut::LabelRef(_) => {}
+          });
+        }
+      }
+    }
+  }
+
+  for (value, pointer) in constants {
+    module.definitions.push(Definition {
+      pointer,
+      content: DefinitionContent::Value(value),
+    });
+  }
+}
+
+fn should_extract_value_as_constant(value: &Value) -> Option<String> {
+  if let Value::String(s) = value {
+    if s.len() >= 4 {
+      return Some(mangle_string(s));
+    }
+  }
+
+  None
+}
+
+fn mangle_string(s: &String) -> String {
+  let mut res = "s_".to_string();
+
+  for c in s.chars() {
+    if c.is_ascii_alphanumeric() {
+      res.push(c);
+    } else {
+      res.push('_');
+    }
+  }
+
+  res
 }

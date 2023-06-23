@@ -1,3 +1,5 @@
+use std::hash::{Hash as HashTrait, Hasher};
+
 use num_bigint::BigInt;
 use valuescript_common::InstructionByte;
 
@@ -387,6 +389,120 @@ pub enum Instruction {
   YieldStar(Value, Register),
 }
 
+pub enum InstructionFieldMut<'a> {
+  Value(&'a mut Value),
+  Register(&'a mut Register),
+  LabelRef(&'a mut LabelRef),
+}
+
+impl Instruction {
+  pub fn visit_fields_mut<F>(&mut self, visit: &mut F)
+  where
+    F: FnMut(InstructionFieldMut) -> (),
+  {
+    use Instruction::*;
+
+    match self {
+      End => {}
+      Mov(arg, dst)
+      | OpNot(arg, dst)
+      | OpBitNot(arg, dst)
+      | TypeOf(arg, dst)
+      | UnaryPlus(arg, dst)
+      | UnaryMinus(arg, dst)
+      | Import(arg, dst)
+      | ImportStar(arg, dst)
+      | Cat(arg, dst)
+      | Yield(arg, dst)
+      | YieldStar(arg, dst) => {
+        visit(InstructionFieldMut::Value(arg));
+        visit(InstructionFieldMut::Register(dst));
+      }
+
+      OpInc(arg) | OpDec(arg) => {
+        visit(InstructionFieldMut::Register(arg));
+      }
+
+      OpPlus(left, right, dst)
+      | OpMinus(left, right, dst)
+      | OpMul(left, right, dst)
+      | OpDiv(left, right, dst)
+      | OpMod(left, right, dst)
+      | OpExp(left, right, dst)
+      | OpEq(left, right, dst)
+      | OpNe(left, right, dst)
+      | OpTripleEq(left, right, dst)
+      | OpTripleNe(left, right, dst)
+      | OpAnd(left, right, dst)
+      | OpOr(left, right, dst)
+      | OpLess(left, right, dst)
+      | OpLessEq(left, right, dst)
+      | OpGreater(left, right, dst)
+      | OpGreaterEq(left, right, dst)
+      | OpNullishCoalesce(left, right, dst)
+      | OpOptionalChain(left, right, dst)
+      | OpBitAnd(left, right, dst)
+      | OpBitOr(left, right, dst)
+      | OpBitXor(left, right, dst)
+      | OpLeftShift(left, right, dst)
+      | OpRightShift(left, right, dst)
+      | OpRightShiftUnsigned(left, right, dst)
+      | InstanceOf(left, right, dst)
+      | In(left, right, dst)
+      | Call(left, right, dst)
+      | Bind(left, right, dst)
+      | Sub(left, right, dst)
+      | SubMov(left, right, dst)
+      | New(left, right, dst) => {
+        visit(InstructionFieldMut::Value(left));
+        visit(InstructionFieldMut::Value(right));
+        visit(InstructionFieldMut::Register(dst));
+      }
+
+      Apply(a1, a2, a3, dst)
+      | SubCall(a1, a2, a3, dst)
+      | ConstSubCall(a1, a2, a3, dst)
+      | ThisSubCall(a1, a2, a3, dst) => {
+        visit(InstructionFieldMut::Value(a1));
+        visit(InstructionFieldMut::Value(a2));
+        visit(InstructionFieldMut::Value(a3));
+        visit(InstructionFieldMut::Register(dst));
+      }
+
+      Jmp(label_ref) => {
+        visit(InstructionFieldMut::LabelRef(label_ref));
+      }
+
+      JmpIf(cond, label_ref) => {
+        visit(InstructionFieldMut::Value(cond));
+        visit(InstructionFieldMut::LabelRef(label_ref));
+      }
+
+      Throw(ex) => {
+        visit(InstructionFieldMut::Value(ex));
+      }
+
+      SetCatch(label_ref, dst) => {
+        visit(InstructionFieldMut::LabelRef(label_ref));
+        visit(InstructionFieldMut::Register(dst));
+      }
+
+      Next(iterable, dst) => {
+        visit(InstructionFieldMut::Register(iterable));
+        visit(InstructionFieldMut::Register(dst));
+      }
+
+      UnpackIterRes(iter_res, value_dst, done_dst) => {
+        visit(InstructionFieldMut::Register(iter_res));
+        visit(InstructionFieldMut::Register(value_dst));
+        visit(InstructionFieldMut::Register(done_dst));
+      }
+
+      UnsetCatch | RequireMutableThis => {}
+    }
+  }
+}
+
 impl std::fmt::Display for Instruction {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     match self {
@@ -630,13 +746,13 @@ impl Instruction {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
   Void,
   Undefined,
   Null,
   Bool(bool),
-  Number(f64),
+  Number(Number),
   BigInt(BigInt),
   String(String),
   Array(Box<Array>),
@@ -646,9 +762,65 @@ pub enum Value {
   Builtin(Builtin),
 }
 
+impl Default for Value {
+  fn default() -> Self {
+    Value::Void
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct Number(pub f64);
+
+impl PartialEq for Number {
+  fn eq(&self, other: &Self) -> bool {
+    self.0 == other.0
+  }
+}
+
+impl Eq for Number {
+  fn assert_receiver_is_total_eq(&self) {}
+}
+
+impl HashTrait for Number {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    state.write_u64(self.0.to_bits());
+  }
+}
+
 impl Value {
   pub fn to_ce(self) -> CompiledExpression {
     CompiledExpression::new(self, vec![])
+  }
+
+  pub fn visit_values_mut<F>(&mut self, visit: &mut F)
+  where
+    F: FnMut(&mut Value) -> (),
+  {
+    visit(self);
+
+    match self {
+      Value::Array(array) => {
+        for item in &mut array.values {
+          item.visit_values_mut(visit);
+        }
+      }
+      Value::Object(object) => {
+        for (k, v) in &mut object.properties {
+          k.visit_values_mut(visit);
+          v.visit_values_mut(visit);
+        }
+      }
+      Value::Void => {}
+      Value::Undefined => {}
+      Value::Null => {}
+      Value::Bool(..) => {}
+      Value::Number(..) => {}
+      Value::BigInt(..) => {}
+      Value::String(..) => {}
+      Value::Register(..) => {}
+      Value::Pointer(..) => {}
+      Value::Builtin(..) => {}
+    }
   }
 }
 
@@ -659,7 +831,7 @@ impl std::fmt::Display for Value {
       Value::Undefined => write!(f, "undefined"),
       Value::Null => write!(f, "null"),
       Value::Bool(value) => write!(f, "{}", value),
-      Value::Number(value) => {
+      Value::Number(Number(value)) => {
         if value.is_infinite() {
           if value.is_sign_positive() {
             write!(f, "Infinity")
@@ -718,7 +890,7 @@ impl std::fmt::Display for Builtin {
   }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Array {
   pub values: Vec<Value>,
 }
@@ -736,7 +908,7 @@ impl std::fmt::Display for Array {
   }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Object {
   pub properties: Vec<(Value, Value)>,
 }

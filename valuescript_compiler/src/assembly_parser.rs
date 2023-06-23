@@ -6,7 +6,7 @@ use valuescript_common::{InstructionByte, BUILTIN_NAMES};
 
 use crate::asm::{
   Array, Builtin, Class, Definition, DefinitionContent, FnLine, Function, Instruction, Label,
-  LabelRef, Module, Object, Pointer, Register, Value,
+  LabelRef, Module, Number, Object, Pointer, Register, Value,
 };
 
 pub struct AssemblyParser<'a> {
@@ -797,8 +797,8 @@ impl<'a> AssemblyParser<'a> {
           "null" => Value::Null,
           "false" => Value::Bool(false),
           "true" => Value::Bool(true),
-          "Infinity" => Value::Number(f64::INFINITY),
-          "NaN" => Value::Number(f64::NAN),
+          "Infinity" => Value::Number(Number(f64::INFINITY)),
+          "NaN" => Value::Number(Number(f64::NAN)),
 
           // TODO: Finish implementing the different values
           _ => {
@@ -912,7 +912,7 @@ impl<'a> AssemblyParser<'a> {
 
   fn assemble_number(&mut self) -> Value {
     if self.parse_one_of(&["-Infinity", ""]) == "-Infinity" {
-      return Value::Number(f64::NEG_INFINITY);
+      return Value::Number(Number(f64::NEG_INFINITY));
     }
 
     let mut num_string = "".to_string();
@@ -957,7 +957,7 @@ impl<'a> AssemblyParser<'a> {
       );
     }
 
-    Value::Number(value_result.unwrap())
+    Value::Number(Number(value_result.unwrap()))
   }
 
   fn assemble_object(&mut self) -> Object {

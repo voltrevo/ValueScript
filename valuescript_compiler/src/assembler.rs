@@ -9,7 +9,7 @@ use valuescript_common::BuiltinName;
 
 use crate::asm::{
   Array, Builtin, Class, Definition, DefinitionContent, FnLine, Function, Instruction, Label,
-  LabelRef, Lazy, Module, Object, Pointer, Register, Value,
+  LabelRef, Lazy, Module, Number, Object, Pointer, Register, Value,
 };
 
 pub fn assemble(module: &Module) -> Vec<u8> {
@@ -267,7 +267,7 @@ impl Assembler {
         self.output.push(register.value_type() as u8);
         self.register(register);
       }
-      Value::Number(number) => self.number(*number),
+      Value::Number(Number(number)) => self.number(*number),
       Value::BigInt(bigint) => self.bigint(bigint),
       Value::String(string) => self.string(string),
       Value::Bool(boolean) => match boolean {

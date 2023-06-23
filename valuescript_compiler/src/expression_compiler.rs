@@ -3,7 +3,7 @@ use std::mem::take;
 use queues::*;
 use swc_common::Spanned;
 
-use crate::asm::{Array, Builtin, Instruction, Label, Object, Register, Value};
+use crate::asm::{Array, Builtin, Instruction, Label, Number, Object, Register, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
 use crate::scope::{NameId, OwnerId};
@@ -1397,7 +1397,7 @@ impl<'a> ExpressionCompiler<'a> {
       Str(str_) => return Value::String(str_.value.to_string()),
       Bool(bool_) => return Value::Bool(bool_.value),
       Null(_) => return Value::Null,
-      Num(num) => return Value::Number(num.value),
+      Num(num) => return Value::Number(Number(num.value)),
       BigInt(bigint) => return Value::BigInt(bigint.value.clone()),
       Regex(_) => ("_todo_regex_literal", "Regex literals"),
       JSXText(_) => ("_todo_jsxtext_literal", "JSXText literals"),
@@ -1457,7 +1457,7 @@ impl<'a> ExpressionCompiler<'a> {
 
           self.fnc.push(Instruction::Sub(
             Value::Register(register.clone()),
-            Value::Number(i as f64),
+            Value::Number(Number(i as f64)),
             elem_reg.clone(),
           ));
 
