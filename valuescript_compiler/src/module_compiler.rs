@@ -674,6 +674,7 @@ impl ModuleCompiler {
   ) -> Pointer {
     let mut constructor: Value = Value::Void;
     let mut prototype: Object = Object::default();
+    let mut static_: Object = Object::default();
     let mut dependent_definitions: Vec<Definition>;
 
     let defn_name = match ident {
@@ -820,7 +821,12 @@ impl ModuleCompiler {
             Functionish::Fn(None, method.function.clone()),
           ));
 
-          prototype
+          let dst = match method.is_static {
+            false => &mut prototype,
+            true => &mut static_,
+          };
+
+          dst
             .properties
             .push((name, Value::Pointer(method_defn_name)));
         }
@@ -848,7 +854,7 @@ impl ModuleCompiler {
       content: DefinitionContent::Class(Class {
         constructor,
         prototype: Value::Object(Box::new(prototype)),
-        static_: Value::Object(Box::new(Object::default())),
+        static_: Value::Object(Box::new(static_)),
       }),
     });
 

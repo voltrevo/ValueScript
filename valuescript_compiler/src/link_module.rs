@@ -186,6 +186,7 @@ where
       DefinitionContent::Class(class) => {
         self.value(Some(&definition.pointer), &mut class.constructor);
         self.value(Some(&definition.pointer), &mut class.prototype);
+        self.value(Some(&definition.pointer), &mut class.static_);
       }
       DefinitionContent::Value(value) => {
         self.value(Some(&definition.pointer), value);
