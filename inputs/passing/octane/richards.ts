@@ -141,7 +141,7 @@ class Scheduler {
     queue: Packet | null,
     count: number,
   ) {
-    this.addRunningTask(id, priority, queue, new IdleTask(this, 1, count));
+    this.addRunningTask(id, priority, queue, new IdleTask(1, count));
   }
 
   /**
@@ -155,7 +155,7 @@ class Scheduler {
       id,
       priority,
       queue,
-      new WorkerTask(this, 2, /* ID_HANDLER_A */ 0),
+      new WorkerTask(2, /* ID_HANDLER_A */ 0),
     );
   }
 
@@ -166,7 +166,7 @@ class Scheduler {
    * @param {Packet} queue the queue of work to be processed by the task
    */
   addHandlerTask(id: number, priority: number, queue: Packet) {
-    this.addTask(id, priority, queue, new HandlerTask(this));
+    this.addTask(id, priority, queue, new HandlerTask());
   }
 
   /**
@@ -176,7 +176,7 @@ class Scheduler {
    * @param {Packet} queue the queue of work to be processed by the task
    */
   addDeviceTask(id: number, priority: number, queue: Packet | null) {
-    this.addTask(id, priority, queue, new DeviceTask(this));
+    this.addTask(id, priority, queue, new DeviceTask());
   }
 
   /**
@@ -235,10 +235,8 @@ class Scheduler {
   /**
    * Release a task that is currently blocked and return the next block to run.
    * @param {int} id the id of the task to suspend
-   *
-   * TODO: static
    */
-  release(id: number): SchedulerAction {
+  static release(id: number): SchedulerAction {
     return [0, id];
   }
 
@@ -246,20 +244,16 @@ class Scheduler {
    * Block the currently executing task and return the next task control block
    * to run.  The blocked task will not be made runnable until it is explicitly
    * released, even if new work is added to it.
-   *
-   * TODO: static
    */
-  holdCurrent(): SchedulerAction {
+  static holdCurrent(): SchedulerAction {
     return [1];
   }
 
   /**
    * Suspend the currently executing task and return the next task control block
    * to run.  If new work is added to the suspended task it will be made runnable.
-   *
-   * TODO: static
    */
-  suspendCurrent(): SchedulerAction {
+  static suspendCurrent(): SchedulerAction {
     return [2];
   }
 
@@ -268,10 +262,8 @@ class Scheduler {
    * associated with the packet and make the task runnable if it is currently
    * suspended.
    * @param {Packet} packet the packet to add
-   *
-   * TODO: static
    */
-  queue(packet: Packet): SchedulerAction {
+  static queue(packet: Packet): SchedulerAction {
     return [3, packet];
   }
 
@@ -453,30 +445,27 @@ type Task = {
  * device tasks.
  */
 class IdleTask implements Task {
-  scheduler: Scheduler;
   v1: number;
   count: number;
 
   /**
-   * @param {Scheduler} scheduler the scheduler that manages this task
    * @param {int} v1 a seed value that controls how the device tasks are scheduled
    * @param {int} count the number of times this task should be scheduled
    */
-  constructor(scheduler: Scheduler, v1: number, count: number) {
-    this.scheduler = scheduler;
+  constructor(v1: number, count: number) {
     this.v1 = v1;
     this.count = count;
   }
 
   run(_packet: Packet | null) {
     this.count--;
-    if (this.count == 0) return this.scheduler.holdCurrent();
+    if (this.count == 0) return Scheduler.holdCurrent();
     if ((this.v1 & 1) == 0) {
       this.v1 = this.v1 >> 1;
-      return this.scheduler.release(4 /* ID_DEVICE_A */);
+      return Scheduler.release(4 /* ID_DEVICE_A */);
     } else {
       this.v1 = (this.v1 >> 1) ^ 0xD008;
-      return this.scheduler.release(5 /* ID_DEVICE_B */);
+      return Scheduler.release(5 /* ID_DEVICE_B */);
     }
   }
 
@@ -490,27 +479,24 @@ class IdleTask implements Task {
  * waiting for data from an external device.
  */
 class DeviceTask implements Task {
-  scheduler: Scheduler;
   v1: Packet | null;
 
   /**
-   * @param {Scheduler} scheduler the scheduler that manages this task
    * @constructor
    */
-  constructor(scheduler: Scheduler) {
-    this.scheduler = scheduler;
+  constructor() {
     this.v1 = null;
   }
 
   run(packet: Packet | null) {
     if (packet == null) {
-      if (this.v1 == null) return this.scheduler.suspendCurrent();
+      if (this.v1 == null) return Scheduler.suspendCurrent();
       var v = this.v1;
       this.v1 = null;
-      return this.scheduler.queue(v);
+      return Scheduler.queue(v);
     } else {
       this.v1 = packet;
-      return this.scheduler.holdCurrent();
+      return Scheduler.holdCurrent();
     }
   }
 
@@ -523,25 +509,22 @@ class DeviceTask implements Task {
  * A task that manipulates work packets.
  */
 class WorkerTask implements Task {
-  scheduler: Scheduler;
   v1: number;
   v2: number;
 
   /**
-   * @param {Scheduler} scheduler the scheduler that manages this task
    * @param {int} v1 a seed used to specify how work packets are manipulated
    * @param {int} v2 another seed used to specify how work packets are manipulated
    * @constructor
    */
-  constructor(scheduler: Scheduler, v1: number, v2: number) {
-    this.scheduler = scheduler;
+  constructor(v1: number, v2: number) {
     this.v1 = v1;
     this.v2 = v2;
   }
 
   run(packet: Packet | null) {
     if (packet == null) {
-      return this.scheduler.suspendCurrent();
+      return Scheduler.suspendCurrent();
     } else {
       if (this.v1 == 2 /* ID_HANDLER_A */) {
         this.v1 = 3 /* ID_HANDLER_B */;
@@ -555,7 +538,7 @@ class WorkerTask implements Task {
         if (this.v2 > 26) this.v2 = 1;
         packet.a2[i] = this.v2;
       }
-      return this.scheduler.queue(packet);
+      return Scheduler.queue(packet);
     }
   }
 
@@ -568,16 +551,13 @@ class WorkerTask implements Task {
  * A task that manipulates work packets and then suspends itself.
  */
 class HandlerTask {
-  scheduler: Scheduler;
   v1: Packet | null;
   v2: Packet | null;
 
   /**
-   * @param {Scheduler} scheduler the scheduler that manages this task
    * @constructor
    */
-  constructor(scheduler: Scheduler) {
-    this.scheduler = scheduler;
+  constructor() {
     this.v1 = null;
     this.v2 = null;
   }
@@ -599,15 +579,15 @@ class HandlerTask {
           this.v2 = this.v2.link;
           v.a1 = this.v1.a2[count]!;
           this.v1.a1 = count + 1;
-          return this.scheduler.queue(v);
+          return Scheduler.queue(v);
         }
       } else {
         v = this.v1;
         this.v1 = this.v1.link;
-        return this.scheduler.queue(v);
+        return Scheduler.queue(v);
       }
     }
-    return this.scheduler.suspendCurrent();
+    return Scheduler.suspendCurrent();
   }
 
   toString() {
