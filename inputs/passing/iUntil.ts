@@ -1,7 +1,7 @@
 //! test_output({"iter":[4,5,6,7,8,9],"iterSnapshot":[2,3,4,5,6,7,8,9]})
 
 export default function main() {
-  let iter = range(10);
+  let iter = iUntil(10);
   iter.next();
   iter.next();
 
@@ -16,7 +16,7 @@ export default function main() {
   };
 }
 
-function* range(n: number) {
+function* iUntil(n: number) {
   for (let i = 0; i < n; i++) {
     yield i;
   }
