@@ -1391,21 +1391,13 @@ impl<'a> ExpressionCompiler<'a> {
   }
 
   pub fn compile_literal(&mut self, lit: &swc_ecma_ast::Lit) -> Value {
-    use swc_ecma_ast::Lit::*;
-
-    let (todo_name, message) = match lit {
-      Str(str_) => return Value::String(str_.value.to_string()),
-      Bool(bool_) => return Value::Bool(bool_.value),
-      Null(_) => return Value::Null,
-      Num(num) => return Value::Number(Number(num.value)),
-      BigInt(bigint) => return Value::BigInt(bigint.value.clone()),
-      Regex(_) => ("_todo_regex_literal", "Regex literals"),
-      JSXText(_) => ("_todo_jsxtext_literal", "JSXText literals"),
-    };
-
-    self.fnc.todo(lit.span(), message);
-
-    return Value::Register(self.fnc.allocate_numbered_reg(todo_name));
+    match value_from_literal(lit) {
+      Ok(value) => value,
+      Err(err) => {
+        self.fnc.todo(lit.span(), err);
+        return Value::Register(self.fnc.allocate_numbered_reg("_todo_unsupported_literal"));
+      }
+    }
   }
 
   pub fn pat(&mut self, pat: &swc_ecma_ast::Pat, register: &Register, skip_release: bool) {
@@ -1726,4 +1718,18 @@ pub fn make_update_op(op: swc_ecma_ast::UpdateOp, register: Register) -> Instruc
     PlusPlus => Instruction::OpInc(register),
     MinusMinus => Instruction::OpDec(register),
   }
+}
+
+pub fn value_from_literal(lit: &swc_ecma_ast::Lit) -> Result<Value, &'static str> {
+  use swc_ecma_ast::Lit::*;
+
+  Ok(match lit {
+    Str(str_) => Value::String(str_.value.to_string()),
+    Bool(bool_) => Value::Bool(bool_.value),
+    Null(_) => Value::Null,
+    Num(num) => Value::Number(Number(num.value)),
+    BigInt(bigint) => Value::BigInt(bigint.value.clone()),
+    Regex(_) => return Err("Regex literals"),
+    JSXText(_) => return Err("JSXText literals"),
+  })
 }
