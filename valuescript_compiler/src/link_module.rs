@@ -473,11 +473,25 @@ fn shake_tree(module: &mut Module) {
 
   let mut new_definitions = Vec::<Definition>::new();
 
-  for pointer in pointers_to_include {
-    let defn = take(new_definitions_map.get_mut(&pointer).unwrap());
+  for pointer in &pointers_to_include {
+    let defn = new_definitions_map.get_mut(pointer).unwrap();
+
+    if let DefinitionContent::Value(_) = defn.content {
+      // Exclude values on the first pass. TODO: Proper depth-first search (+reverse) to ensure
+      // correct ordering.
+      continue;
+    }
 
     if defn.pointer.name != "" {
-      new_definitions.push(defn);
+      new_definitions.push(take(defn));
+    }
+  }
+
+  for pointer in pointers_to_include {
+    let defn = new_definitions_map.get_mut(&pointer).unwrap();
+
+    if defn.pointer.name != "" {
+      new_definitions.push(take(defn));
     }
   }
 

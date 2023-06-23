@@ -39,37 +39,48 @@
 //   new Benchmark("Richards", true, false, 8200, runRichards),
 // ]);
 
+const ID_IDLE = 0;
+const ID_WORKER = 1;
+const ID_HANDLER_A = 2;
+const ID_HANDLER_B = 3;
+const ID_DEVICE_A = 4;
+const ID_DEVICE_B = 5;
+// const NUMBER_OF_IDS = 6;
+
+const KIND_DEVICE = 0;
+const KIND_WORK = 1;
+
 /**
  * The Richards benchmark simulates the task dispatcher of an
  * operating system.
  */
 export default function runRichards() {
   var scheduler = new Scheduler();
-  scheduler.addIdleTask(0, /* ID_IDLE */ 0, null, 1000 /* COUNT */);
+  scheduler.addIdleTask(0, ID_IDLE, null, COUNT);
 
-  var queue = new Packet(null, 1, /* ID_WORKER */ 1 /* KIND_WORK */);
-  queue = new Packet(queue, 1, /* ID_WORKER */ 1 /* KIND_WORK */);
-  scheduler.addWorkerTask(1, /* ID_WORKER */ 1000, queue);
+  var queue = new Packet(null, ID_WORKER, KIND_WORK);
+  queue = new Packet(queue, ID_WORKER, KIND_WORK);
+  scheduler.addWorkerTask(ID_WORKER, 1000, queue);
 
-  queue = new Packet(null, 4, /* ID_DEVICE_A */ 0 /* KIND_DEVICE */);
-  queue = new Packet(queue, 4, /* ID_DEVICE_A */ 0 /* KIND_DEVICE */);
-  queue = new Packet(queue, 4, /* ID_DEVICE_A */ 0 /* KIND_DEVICE */);
-  scheduler.addHandlerTask(2, /* ID_HANDLER_A */ 2000, queue);
+  queue = new Packet(null, ID_DEVICE_A, KIND_DEVICE);
+  queue = new Packet(queue, ID_DEVICE_A, KIND_DEVICE);
+  queue = new Packet(queue, ID_DEVICE_A, KIND_DEVICE);
+  scheduler.addHandlerTask(ID_HANDLER_A, 2000, queue);
 
-  queue = new Packet(null, 5, /* ID_DEVICE_B */ 0 /* KIND_DEVICE */);
-  queue = new Packet(queue, 5, /* ID_DEVICE_B */ 0 /* KIND_DEVICE */);
-  queue = new Packet(queue, 5, /* ID_DEVICE_B */ 0 /* KIND_DEVICE */);
-  scheduler.addHandlerTask(3, /* ID_HANDLER_B */ 3000, queue);
+  queue = new Packet(null, ID_DEVICE_B, KIND_DEVICE);
+  queue = new Packet(queue, ID_DEVICE_B, KIND_DEVICE);
+  queue = new Packet(queue, ID_DEVICE_B, KIND_DEVICE);
+  scheduler.addHandlerTask(ID_HANDLER_B, 3000, queue);
 
-  scheduler.addDeviceTask(4, /* ID_DEVICE_A */ 4000, null);
+  scheduler.addDeviceTask(ID_DEVICE_A, 4000, null);
 
-  scheduler.addDeviceTask(5, /* ID_DEVICE_B */ 5000, null);
+  scheduler.addDeviceTask(ID_DEVICE_B, 5000, null);
 
   scheduler.schedule();
 
   if (
-    scheduler.queueCount != 2322 /* EXPECTED_QUEUE_COUNT */ ||
-    scheduler.holdCount != 928 /* EXPECTED_HOLD_COUNT */
+    scheduler.queueCount != EXPECTED_QUEUE_COUNT ||
+    scheduler.holdCount != EXPECTED_HOLD_COUNT
   ) {
     var msg = "Error during execution: queueCount = " + scheduler.queueCount +
       ", holdCount = " + scheduler.holdCount + ".";
@@ -77,7 +88,7 @@ export default function runRichards() {
   }
 }
 
-// var COUNT = 1000;
+const COUNT = 1000;
 
 /**
  * These two constants specify how many times a packet is queued and
@@ -86,8 +97,8 @@ export default function runRichards() {
  * correct run so if the actual queue or hold count is different from
  * the expected there must be a bug in the implementation.
  */
-// var EXPECTED_QUEUE_COUNT = 2322;
-// var EXPECTED_HOLD_COUNT = 928;
+const EXPECTED_QUEUE_COUNT = 2322;
+const EXPECTED_HOLD_COUNT = 928;
 
 type SCHEDULER_RELEASE = 0;
 type SCHEDULER_HOLD_CURRENT = 1;
@@ -111,22 +122,11 @@ class Scheduler {
 
   tcbStore: Record<number, TaskControlBlock> = {};
 
-  // new Array(6 /* NUMBER_OF_IDS */);
+  // new Array(NUMBER_OF_IDS);
   blocks: (number | null)[] = [null, null, null, null, null, null];
 
   list: number | null = null;
   currentId: number | null = null;
-
-  // var ID_IDLE = 0;
-  // var ID_WORKER = 1;
-  // var ID_HANDLER_A = 2;
-  // var ID_HANDLER_B = 3;
-  // var ID_DEVICE_A = 4;
-  // var ID_DEVICE_B = 5;
-  // var NUMBER_OF_IDS = 6;
-
-  // var KIND_DEVICE = 0;
-  // var KIND_WORK = 1;
 
   /**
    * Add an idle task to this scheduler.
@@ -155,7 +155,7 @@ class Scheduler {
       id,
       priority,
       queue,
-      new WorkerTask(2, /* ID_HANDLER_A */ 0),
+      new WorkerTask(ID_HANDLER_A, 0),
     );
   }
 
@@ -307,6 +307,30 @@ class Scheduler {
 }
 
 /**
+ * The task is running and is currently scheduled.
+ */
+const STATE_RUNNING = 0;
+
+/**
+ * The task has packets left to process.
+ */
+const STATE_RUNNABLE = 1;
+
+/**
+ * The task is not currently running.  The task is not blocked as such and may
+ * be started by the scheduler.
+ */
+const STATE_SUSPENDED = 2;
+
+/**
+ * The task is blocked and cannot be run until it is explicitly released.
+ */
+const STATE_HELD = 4;
+
+const STATE_SUSPENDED_RUNNABLE = 3 /* STATE_SUSPENDED | STATE_RUNNABLE */;
+// const STATE_NOT_HELD = ~STATE_HELD /* Equal: [-5, ~4, STATE_NOT_HELD] */;
+
+/**
  * A task control block manages a task and the queue of work packages associated
  * with it.
  */
@@ -340,59 +364,35 @@ class TaskControlBlock {
     this.task = task;
 
     if (queue == null) {
-      this.state = 2 /* STATE_SUSPENDED */;
+      this.state = STATE_SUSPENDED;
     } else {
-      this.state = 3 /* STATE_SUSPENDED_RUNNABLE */;
+      this.state = STATE_SUSPENDED_RUNNABLE;
     }
   }
 
-  /**
-   * The task is running and is currently scheduled.
-   */
-  // var STATE_RUNNING = 0;
-
-  /**
-   * The task has packets left to process.
-   */
-  // var STATE_RUNNABLE = 1;
-
-  /**
-   * The task is not currently running.  The task is not blocked as such and may
-   * be started by the scheduler.
-   */
-  // var STATE_SUSPENDED = 2;
-
-  /**
-   * The task is blocked and cannot be run until it is explicitly released.
-   */
-  // var STATE_HELD = 4;
-
-  // var STATE_SUSPENDED_RUNNABLE = 2 /* STATE_SUSPENDED */ | 1 /* STATE_RUNNABLE */;
-  // var STATE_NOT_HELD = ~4 /* STATE_HELD */;
-
   setRunning() {
-    this.state = 0 /* STATE_RUNNING */;
+    this.state = STATE_RUNNING;
   }
 
   markAsNotHeld() {
-    this.state = this.state & (-5) /* STATE_NOT_HELD */;
+    this.state = this.state & (~STATE_HELD) /* STATE_NOT_HELD */;
   }
 
   markAsHeld() {
-    this.state = this.state | 4 /* STATE_HELD */;
+    this.state = this.state | STATE_HELD;
   }
 
   isHeldOrSuspended() {
-    return (this.state & 4 /* STATE_HELD */) != 0 ||
-      (this.state == 2 /* STATE_SUSPENDED */);
+    return (this.state & STATE_HELD) != 0 ||
+      (this.state == STATE_SUSPENDED);
   }
 
   markAsSuspended() {
-    this.state = this.state | 2 /* STATE_SUSPENDED */;
+    this.state = this.state | STATE_SUSPENDED;
   }
 
   markAsRunnable() {
-    this.state = this.state | 1 /* STATE_RUNNABLE */;
+    this.state = this.state | STATE_RUNNABLE;
   }
 
   /**
@@ -400,13 +400,13 @@ class TaskControlBlock {
    */
   run() {
     var packet;
-    if (this.state == 3 /* STATE_SUSPENDED_RUNNABLE */) {
+    if (this.state == STATE_SUSPENDED_RUNNABLE) {
       packet = this.queue;
       this.queue = packet!.link;
       if (this.queue == null) {
-        this.state = 0 /* STATE_RUNNING */;
+        this.state = STATE_RUNNING;
       } else {
-        this.state = 1 /* STATE_RUNNABLE */;
+        this.state = STATE_RUNNABLE;
       }
     } else {
       packet = null;
@@ -462,10 +462,10 @@ class IdleTask implements Task {
     if (this.count == 0) return Scheduler.holdCurrent();
     if ((this.v1 & 1) == 0) {
       this.v1 = this.v1 >> 1;
-      return Scheduler.release(4 /* ID_DEVICE_A */);
+      return Scheduler.release(ID_DEVICE_A);
     } else {
       this.v1 = (this.v1 >> 1) ^ 0xD008;
-      return Scheduler.release(5 /* ID_DEVICE_B */);
+      return Scheduler.release(ID_DEVICE_B);
     }
   }
 
@@ -526,14 +526,14 @@ class WorkerTask implements Task {
     if (packet == null) {
       return Scheduler.suspendCurrent();
     } else {
-      if (this.v1 == 2 /* ID_HANDLER_A */) {
-        this.v1 = 3 /* ID_HANDLER_B */;
+      if (this.v1 == ID_HANDLER_A) {
+        this.v1 = ID_HANDLER_B;
       } else {
-        this.v1 = 2 /* ID_HANDLER_A */;
+        this.v1 = ID_HANDLER_A;
       }
       packet.id = this.v1;
       packet.a1 = 0;
-      for (var i = 0; i < 4 /* DATA_SIZE */; i++) {
+      for (var i = 0; i < DATA_SIZE; i++) {
         this.v2++;
         if (this.v2 > 26) this.v2 = 1;
         packet.a2[i] = this.v2;
@@ -564,7 +564,7 @@ class HandlerTask {
 
   run(packet: Packet | null) {
     if (packet != null) {
-      if (packet.kind == 1 /* KIND_WORK */) {
+      if (packet.kind == KIND_WORK) {
         this.v1 = packet.addTo(this.v1);
       } else {
         this.v2 = packet.addTo(this.v2);
@@ -573,7 +573,7 @@ class HandlerTask {
     if (this.v1 != null) {
       var count = this.v1.a1;
       var v;
-      if (count < 4 /* DATA_SIZE */) {
+      if (count < DATA_SIZE) {
         if (this.v2 != null) {
           v = this.v2;
           this.v2 = this.v2.link;
@@ -595,12 +595,12 @@ class HandlerTask {
   }
 }
 
+const DATA_SIZE = 4;
+
 /* --- *
  * P a c k e t
  * --- */
 class Packet {
-  // var DATA_SIZE = 4;
-
   /**
    * A simple package of data that is manipulated by the tasks.  The exact layout
    * of the payload data carried by a packet is not importaint, and neither is the
@@ -625,7 +625,7 @@ class Packet {
     this.id = id;
     this.kind = kind;
     this.a1 = 0;
-    this.a2 = [null, null, null, null]; // new Array(4 /* DATA_SIZE */);
+    this.a2 = [null, null, null, null]; // new Array(DATA_SIZE);
   }
 
   /**
