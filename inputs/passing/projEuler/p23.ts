@@ -1,15 +1,15 @@
 //! test_output_slow(4179871)
 
-import { Range_numbers } from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 import { properFactorSum } from "./helpers/properFactorSum.ts";
 
 export default function main() {
   const abundantNumbers = [
-    ...Range_numbers(1, 28123)
+    ...Range.numbers(1, 28123)
       .filter(isAbundant),
   ];
 
-  return Range_numbers(1, 28123)
+  return Range.numbers(1, 28123)
     .indexed()
     .flatMap(function* ([_i, n]) {
       // Uncomment to see progress (program takes ~50s with a release build)

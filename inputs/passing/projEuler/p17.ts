@@ -1,9 +1,9 @@
 //! test_output_slow(21124)
 
-import { Range_numbers } from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 export default function main() {
-  return Range_numbers(1, 1001)
+  return Range.numbers(1, 1001)
     .map(toWords)
     .map(countEligibleLetters)
     .sum();

@@ -1,64 +1,6 @@
 import { primes } from "../projEuler/helpers/primes.ts";
 
-export default function range<T>(iterable: Iterable<T>) {
-  return new Range(iterable);
-}
-
-// TODO: Static methods
-export function Range_from<T = never>(
-  iter?: Iterable<T> | Iterator<T> | (() => Iterable<T>),
-) {
-  if (iter === undefined) {
-    return range([]);
-  }
-
-  if (typeof iter === "function") {
-    return range(iter());
-  }
-
-  // TODO: `in` operator
-  if (hasKey(iter, Symbol.iterator)) {
-    return range(iter);
-  }
-
-  if (hasKey(iter, "next")) {
-    return Range_fromIterator(iter);
-  }
-
-  never(iter);
-}
-
-export function Range_fromIterable<T = never>(iterable: Iterable<T> = []) {
-  return new Range<T>(iterable);
-}
-
-export function Range_fromIterator<T = never>(iterator: Iterator<T>) {
-  return new Range<T>({
-    [Symbol.iterator]: () => iterator,
-  });
-}
-
-export function Range_numbers(start = 0, end?: number) {
-  if (end === undefined) {
-    return range((function* () {
-      for (let i = start;; i++) {
-        yield i;
-      }
-    })());
-  }
-
-  return range((function* () {
-    for (let i = start; i < end; i++) {
-      yield i;
-    }
-  })());
-}
-
-export function Range_primes() {
-  return new Range(primes());
-}
-
-export class Range<T = never> implements Iterable<T> {
+export default class Range<T = never> implements Iterable<T> {
   iterable: Iterable<T>;
 
   constructor(iterable: Iterable<T>) {
@@ -85,7 +27,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   count() {
@@ -189,7 +131,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   flatMap<MappedT>(fn: (x: T) => Iterable<MappedT>) {
@@ -203,7 +145,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   flatten<U>(this: Range<Iterable<U>>) {
@@ -217,7 +159,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   filter(fn: (x: T) => boolean) {
@@ -231,7 +173,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   // TODO: Negative indexes
@@ -275,7 +217,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   append<U>(newItems: Iterable<U>) {
@@ -286,7 +228,7 @@ export class Range<T = never> implements Iterable<T> {
       yield* newItems;
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   prepend<U>(newItems: Iterable<U>) {
@@ -297,7 +239,7 @@ export class Range<T = never> implements Iterable<T> {
       yield* iterable;
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   zip<U>(other: Iterable<U>) {
@@ -319,7 +261,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   skip(n: number) {
@@ -343,7 +285,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   reduce<S>(state: S, fn: (state: S, x: T) => S) {
@@ -367,7 +309,7 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
   }
 
   window(len: number) {
@@ -387,7 +329,7 @@ export class Range<T = never> implements Iterable<T> {
         memory.push(value);
       }
 
-      yield range(memory);
+      yield new Range(memory);
 
       let i = 0;
 
@@ -397,7 +339,7 @@ export class Range<T = never> implements Iterable<T> {
         const memoryCopy = memory;
         const iCopy = i;
 
-        yield range((function* () {
+        yield new Range((function* () {
           for (let j = 1; j <= len; j++) {
             yield memoryCopy[(iCopy + j) % len];
           }
@@ -408,7 +350,60 @@ export class Range<T = never> implements Iterable<T> {
       }
     }
 
-    return range(res());
+    return new Range(res());
+  }
+
+  static fromConversion<T = never>(
+    iter?: Iterable<T> | Iterator<T> | (() => Iterable<T>),
+  ) {
+    if (iter === undefined) {
+      return new Range([]);
+    }
+
+    if (typeof iter === "function") {
+      return new Range(iter());
+    }
+
+    // TODO: `in` operator
+    if (hasKey(iter, Symbol.iterator)) {
+      return new Range(iter);
+    }
+
+    if (hasKey(iter, "next")) {
+      return Range.fromIterator(iter);
+    }
+
+    never(iter);
+  }
+
+  static from<T = never>(iterable: Iterable<T> = []) {
+    return new Range<T>(iterable);
+  }
+
+  static fromIterator<T = never>(iterator: Iterator<T>) {
+    return new Range<T>({
+      [Symbol.iterator]: () => iterator,
+    });
+  }
+
+  static numbers(start = 0, end?: number) {
+    if (end === undefined) {
+      return new Range((function* () {
+        for (let i = start;; i++) {
+          yield i;
+        }
+      })());
+    }
+
+    return new Range((function* () {
+      for (let i = start; i < end; i++) {
+        yield i;
+      }
+    })());
+  }
+
+  static primes() {
+    return new Range(primes());
   }
 }
 

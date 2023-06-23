@@ -2,11 +2,11 @@
 
 import quickSort from "./helpers/quickSort.ts";
 import randish from "./helpers/randish.ts";
-import { Range_from } from "./helpers/range.ts";
+import Range from "./helpers/Range.ts";
 
 export default function main() {
   let nums = [
-    ...Range_from(randish())
+    ...Range.from(randish())
       .map((x) => Math.floor(8_000 * x))
       .limit(10_000),
   ];

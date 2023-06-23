@@ -1,6 +1,6 @@
 //! test_output(669171001)
 
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 // There's an analytic solution for this, but that kinda eliminates the need to
 // write code altogether. We're showcasing programming techniques here, not
@@ -14,8 +14,8 @@ export default function () {
     [1, 7, 21],
   ];
 
-  let sum = range(rayStarters)
-    .map(([a, b, c]) => range(ray(a, b, c)).limit(501))
+  let sum = Range.from(rayStarters)
+    .map(([a, b, c]) => Range.from(ray(a, b, c)).limit(501))
     .flatten()
     .sum();
 

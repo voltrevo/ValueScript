@@ -1,7 +1,7 @@
 //! test_output(1366)
 
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 export default function main() {
-  return range(`${2n ** 1000n}`).map(Number).sum();
+  return Range.from(`${2n ** 1000n}`).map(Number).sum();
 }

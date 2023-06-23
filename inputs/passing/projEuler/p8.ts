@@ -1,6 +1,6 @@
 //! test_output(23514624000)
 
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 export default function main() {
   const digits = [
@@ -26,7 +26,7 @@ export default function main() {
     "71636269561882670428252483600823257530420752963450",
   ];
 
-  return range(digits)
+  return Range.from(digits)
     .flatten()
     .window(13)
     .map((w) => w.map(Number).product())

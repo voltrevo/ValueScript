@@ -1,6 +1,6 @@
 //! test_output("5537376230")
 
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 export default function main() {
   const nums = [
@@ -106,7 +106,7 @@ export default function main() {
     53503534226472524250874054075591789781264330331690n,
   ];
 
-  return range(nums)
+  return Range.from(nums)
     .bigSum()
     .toString()
     .slice(0, 10);

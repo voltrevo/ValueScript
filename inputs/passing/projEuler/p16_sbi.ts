@@ -1,4 +1,4 @@
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 import SillyBigInt from "./helpers/SillyBigInt.ts";
 
 export default function main() {
@@ -8,7 +8,7 @@ export default function main() {
     sbi.add(sbi);
   }
 
-  return range(sbi.toString())
+  return Range.from(sbi.toString())
     .map(Number)
     .sum();
 }

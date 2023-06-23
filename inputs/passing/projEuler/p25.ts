@@ -1,14 +1,14 @@
 //! test_output(4782)
 
 import assert from "../helpers/assert.ts";
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 export default function main() {
   // TODO: Remove the temptation pull out this constant (optimization to eval
   // known expressions).
   const threshold = 10n ** 999n;
 
-  const result = range(fibonacci())
+  const result = Range.from(fibonacci())
     .indexed()
     .filter(([_, x]) => x > threshold)
     .first();

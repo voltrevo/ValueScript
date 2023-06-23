@@ -1,10 +1,10 @@
 //! test_output_slow(31626)
 
-import { Range_numbers } from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 import { properFactorSum } from "./helpers/properFactorSum.ts";
 
 export default function main() {
-  return Range_numbers(2, 10_000)
+  return Range.numbers(2, 10_000)
     .filter(isAmicable)
     .sum();
 }

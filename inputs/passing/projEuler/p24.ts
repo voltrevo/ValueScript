@@ -1,11 +1,11 @@
 //! test_output_slow([2,7,8,3,9,1,5,4,6,0])
 
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 // TODO: Faster algorithm (it's not necessary to enumerate the permutations).
 
 export default function main() {
-  return range(permsOf([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])).at(999_999);
+  return Range.from(permsOf([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])).at(999_999);
 }
 
 function* permsOf(nums: number[]) {

@@ -1,16 +1,16 @@
 //! test_output_slow(76576500)
 
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 import { factorizeAsPowers } from "./helpers/primes.ts";
 
 export default function main() {
-  return range(triangularNumbers())
+  return Range.from(triangularNumbers())
     .filter((tri) => countFactors(tri) > 500)
     .first();
 }
 
 function countFactors(n: number): number {
-  return range(factorizeAsPowers(n))
+  return Range.from(factorizeAsPowers(n))
     .map(([_, power]) => power + 1)
     .product();
 }

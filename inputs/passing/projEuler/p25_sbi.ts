@@ -1,13 +1,13 @@
 import assert from "../helpers/assert.ts";
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 import SillyBigInt from "./helpers/SillyBigInt.ts";
 
 export default function main() {
-  const res = range(fibonacci())
+  const res = Range.from(fibonacci())
     .indexed()
     .filter(([_, fib]) => fib.toString().length >= 1000)
     .first();
-  
+
   assert(res !== undefined);
 
   return res[0];

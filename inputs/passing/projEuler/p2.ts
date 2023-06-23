@@ -1,9 +1,9 @@
 //! test_output(4613732)
 
-import range from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 export default function main() {
-  return range(fibonacci())
+  return Range.from(fibonacci())
     .while((x) => x < 4_000_000)
     .filter((x) => x % 2 === 0)
     .sum();

@@ -1,12 +1,12 @@
 //! test_output_slow(9183)
 
-import { Range_numbers } from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 export default function main() {
   let nums = [];
 
-  for (const a of Range_numbers(2, 101)) {
-    for (const b of Range_numbers(2, 101)) {
+  for (const a of Range.numbers(2, 101)) {
+    for (const b of Range.numbers(2, 101)) {
       nums.push(BigInt(a) ** BigInt(b));
     }
   }

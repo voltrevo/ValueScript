@@ -1,14 +1,14 @@
 //! test_output(232792560)
 
-import range, { Range_numbers } from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 import { factorize } from "./helpers/primes.ts";
 
 export default function main() {
-  const factors = Range_numbers(2, 21)
+  const factors = Range.numbers(2, 21)
     .map(factorize)
     .reduce([] as number[], (n, i) => lcm(n, [...i]));
 
-  return range(factors).product();
+  return Range.from(factors).product();
 }
 
 function lcm(leftFactors: number[], rightFactors: number[]): number[] {

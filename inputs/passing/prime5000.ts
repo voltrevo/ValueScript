@@ -1,7 +1,7 @@
 //! bench()
 
-import { Range_primes } from "./helpers/range.ts";
+import Range from "./helpers/Range.ts";
 
 export default function main() {
-  return Range_primes().at(4999);
+  return Range.primes().at(4999);
 }

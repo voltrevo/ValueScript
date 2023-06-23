@@ -1,11 +1,11 @@
 //! test_output_slow(443839)
 
-import range, { Range_numbers } from "../helpers/range.ts";
+import Range from "../helpers/Range.ts";
 
 export default function main() {
-  return Range_numbers(10, 1_000_000)
+  return Range.numbers(10, 1_000_000)
     .flatMap(function* (i) {
-      const digitsPowSum = range(`${i}`)
+      const digitsPowSum = Range.from(`${i}`)
         .map((d) => Number(d) ** 5)
         .sum();
 
