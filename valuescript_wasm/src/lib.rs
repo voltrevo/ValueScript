@@ -6,8 +6,10 @@ use std::{
 use wasm_bindgen::prelude::*;
 
 use valuescript_compiler::{
-  asm::Value, assemble, assembly_parser::AssemblyParser, compile as compile_internal,
-  CompileResult, Diagnostic, ResolvedPath,
+  asm::{Number, Value},
+  assemble,
+  assembly_parser::AssemblyParser,
+  compile as compile_internal, CompileResult, Diagnostic, ResolvedPath,
 };
 use valuescript_vm::{
   vs_object::VsObject,
@@ -184,7 +186,7 @@ impl TryToVal for Value {
       Value::Undefined => Val::Undefined,
       Value::Null => Val::Null,
       Value::Bool(b) => b.to_val(),
-      Value::Number(n) => n.to_val(),
+      Value::Number(Number(n)) => n.to_val(),
       Value::BigInt(n) => n.to_val(),
       Value::String(s) => s.to_val(),
       Value::Array(arr) => {
