@@ -751,7 +751,7 @@ impl<'a> AssemblyParser<'a> {
       ),
       Cat => Instruction::Cat(self.assemble_value(), self.assemble_register()),
       Yield => Instruction::Yield(self.assemble_value(), self.assemble_register()),
-      YieldStar => Instruction::Yield(self.assemble_value(), self.assemble_register()),
+      YieldStar => Instruction::YieldStar(self.assemble_value(), self.assemble_register()),
     };
 
     self.parse_line();

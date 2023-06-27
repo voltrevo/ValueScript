@@ -1,4 +1,8 @@
-use std::{fmt, mem::take, rc::Rc};
+use std::{
+  fmt,
+  mem::{swap, take},
+  rc::Rc,
+};
 
 use num_bigint::BigInt;
 
@@ -6,6 +10,7 @@ use crate::{
   builtins::{error_builtin::ToError, type_error_builtin::ToTypeError},
   iteration::{iteration_result::IterationResult, return_this::RETURN_THIS},
   native_frame_function::NativeFrameFunction,
+  native_function::ThisWrapper,
   stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrame, StackFrameTrait},
   vs_array::VsArray,
   vs_class::VsClass,
@@ -17,8 +22,6 @@ use crate::{
 #[derive(Clone, Default)]
 pub struct Generator {
   frame: StackFrame,
-
-  #[allow(dead_code)] // TODO
   stack: Vec<StackFrame>,
 }
 
@@ -156,14 +159,22 @@ impl StackFrameTrait for GeneratorFrame {
     match fsr {
       Err(_) => fsr, // TODO: Stack unwind internal stack first
       Ok(FrameStepOk::Continue) | Ok(FrameStepOk::Push(_)) => fsr,
-      Ok(FrameStepOk::Pop(call_result)) => Ok(FrameStepOk::Pop(CallResult {
-        return_: IterationResult {
-          value: call_result.return_, // TODO: Assert call_result.this is undefined?
-          done: true,
+      Ok(FrameStepOk::Pop(call_result)) => match self.generator.stack.pop() {
+        Some(mut frame) => {
+          frame.apply_call_result(call_result);
+          swap(&mut frame, &mut self.generator.frame);
+
+          Ok(FrameStepOk::Continue)
         }
-        .to_dynamic_val(),
-        this: take(&mut self.generator).to_dynamic_val(),
-      })),
+        None => Ok(FrameStepOk::Pop(CallResult {
+          return_: IterationResult {
+            value: call_result.return_, // TODO: Assert call_result.this is undefined?
+            done: true,
+          }
+          .to_dynamic_val(),
+          this: take(&mut self.generator).to_dynamic_val(),
+        })),
+      },
       Ok(FrameStepOk::Yield(val)) => Ok(FrameStepOk::Pop(CallResult {
         return_: IterationResult {
           value: val,
@@ -172,7 +183,30 @@ impl StackFrameTrait for GeneratorFrame {
         .to_dynamic_val(),
         this: take(&mut self.generator).to_dynamic_val(),
       })),
-      Ok(FrameStepOk::YieldStar(_)) => panic!("TODO: yield* (as instruction)"),
+      Ok(FrameStepOk::YieldStar(iterable)) => {
+        let make_iter = iterable.sub(&VsSymbol::ITERATOR.to_val())?;
+
+        let mut frame = 'f: {
+          if let Val::Function(make_iter) = &make_iter {
+            if make_iter.is_generator {
+              let mut frame: StackFrame = Box::new(make_iter.make_bytecode_frame());
+              frame.write_this(true, iterable)?;
+
+              break 'f frame;
+            }
+          }
+
+          Box::new(YieldStarFrame {
+            iter: YieldStarIter::MakeIterator(iterable, make_iter),
+            iter_result: None,
+          })
+        };
+
+        swap(&mut frame, &mut self.generator.frame);
+        self.generator.stack.push(frame);
+
+        return Ok(FrameStepOk::Continue);
+      }
     }
   }
 
@@ -186,6 +220,119 @@ impl StackFrameTrait for GeneratorFrame {
 
   fn catch_exception(&mut self, exception: Val) -> bool {
     self.generator.frame.catch_exception(exception)
+  }
+
+  fn clone_to_stack_frame(&self) -> StackFrame {
+    Box::new(self.clone())
+  }
+}
+
+#[derive(Clone, Default)]
+struct YieldStarFrame {
+  iter: YieldStarIter,
+  iter_result: Option<Val>,
+}
+
+#[derive(Clone)]
+enum YieldStarIter {
+  MakeIterator(Val, Val),
+  Iterator(Val),
+}
+
+impl Default for YieldStarIter {
+  fn default() -> Self {
+    YieldStarIter::MakeIterator(Val::default(), Val::default())
+  }
+}
+
+impl StackFrameTrait for YieldStarFrame {
+  fn write_this(&mut self, _const: bool, _this: Val) -> Result<(), Val> {
+    panic!("Not appropriate for YieldStarFrame")
+  }
+
+  fn write_param(&mut self, _param: Val) {
+    panic!("Not appropriate for YieldStarFrame")
+  }
+
+  fn step(&mut self) -> FrameStepResult {
+    let iter_result = take(&mut self.iter_result);
+
+    if let Some(iter_result) = iter_result {
+      let value = iter_result.sub(&"value".to_val())?; // TODO: mutable subscript to avoid cloning
+
+      return match iter_result.sub(&"done".to_val())?.is_truthy() {
+        false => Ok(FrameStepOk::Yield(value)),
+        true => Ok(FrameStepOk::Pop(CallResult {
+          return_: value,
+          this: Val::Undefined,
+        })),
+      };
+    }
+
+    match &mut self.iter {
+      YieldStarIter::MakeIterator(this, make_iter) => match make_iter.load_function() {
+        LoadFunctionResult::NotAFunction => Err("yield* argument is not iterable".to_type_error()),
+        LoadFunctionResult::NativeFunction(native_fn) => {
+          let iterator = native_fn(ThisWrapper::new(true, this), vec![])?;
+
+          self.iter = YieldStarIter::Iterator(iterator);
+
+          Ok(FrameStepOk::Continue)
+        }
+        LoadFunctionResult::StackFrame(frame) => Ok(FrameStepOk::Push(frame)),
+      },
+      YieldStarIter::Iterator(iterator) => {
+        let next_fn = iterator.sub(&"next".to_val())?;
+
+        match next_fn.load_function() {
+          LoadFunctionResult::NotAFunction => {
+            Err("iterator.next is not a function".to_type_error())
+          }
+          LoadFunctionResult::NativeFunction(native_fn) => {
+            let iter_result = native_fn(ThisWrapper::new(false, iterator), vec![])?;
+            let value = iter_result.sub(&"value".to_val())?;
+
+            match iter_result.sub(&"done".to_val())?.is_truthy() {
+              false => Ok(FrameStepOk::Yield(value)),
+              true => Ok(FrameStepOk::Pop(CallResult {
+                return_: value,
+                this: Val::Undefined,
+              })),
+            }
+          }
+          LoadFunctionResult::StackFrame(mut frame) => {
+            frame.write_this(false, take(iterator))?;
+
+            Ok(FrameStepOk::Push(frame))
+          }
+        }
+      }
+    }
+  }
+
+  fn apply_call_result(&mut self, call_result: CallResult) {
+    let iter = &mut self.iter;
+    let mut iter_result = None;
+
+    match iter {
+      YieldStarIter::MakeIterator(..) => {
+        *iter = YieldStarIter::Iterator(call_result.return_);
+      }
+      YieldStarIter::Iterator(iterator) => {
+        iter_result = Some(call_result.return_);
+        *iterator = call_result.this;
+      }
+    }
+
+    self.iter_result = iter_result;
+  }
+
+  fn get_call_result(&mut self) -> CallResult {
+    panic!("Not appropriate for YieldStarFrame")
+  }
+
+  fn catch_exception(&mut self, _exception: Val) -> bool {
+    false
   }
 
   fn clone_to_stack_frame(&self) -> StackFrame {
