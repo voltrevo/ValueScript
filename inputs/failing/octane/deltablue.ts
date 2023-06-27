@@ -188,7 +188,7 @@ abstract class Constraint {
     this.chooseMethod(mark);
     if (!this.isSatisfied()) {
       if (this.strength == Strength.REQUIRED) {
-        alert("Could not satisfy a required constraint!");
+        throw new Error("Could not satisfy a required constraint!");
       }
       return null;
     }
@@ -198,7 +198,7 @@ abstract class Constraint {
     if (overridden != null) overridden.markUnsatisfied();
     out.determinedBy = this;
     if (!planner!.addPropagate(this, mark)) {
-      alert("Cycle encountered");
+      throw new Error("Cycle encountered");
     }
     out.mark = mark;
     return overridden;
@@ -882,7 +882,7 @@ function chainTest(n: number) {
     first!.value = i;
     plan.execute();
     if (last!.value != i) {
-      alert("Chain test failed.");
+      throw new Error("Chain test failed.");
     }
   }
 }
@@ -909,19 +909,19 @@ function projectionTest(n: number) {
   }
 
   change(src!, 17);
-  if (dst!.value != 1170) alert("Projection 1 failed");
+  if (dst!.value != 1170) throw new Error("Projection 1 failed");
   change(dst!, 1050);
-  if (src!.value != 5) alert("Projection 2 failed");
+  if (src!.value != 5) throw new Error("Projection 2 failed");
   change(scale, 5);
   for (let i = 0; i < n - 1; i++) {
     if (dests.at(i).value != i * 5 + 1000) {
-      alert("Projection 3 failed");
+      throw new Error("Projection 3 failed");
     }
   }
   change(offset, 2000);
   for (let i = 0; i < n - 1; i++) {
     if (dests.at(i).value != i * 5 + 2000) {
-      alert("Projection 4 failed");
+      throw new Error("Projection 4 failed");
     }
   }
 }
