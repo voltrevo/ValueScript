@@ -235,7 +235,6 @@ abstract class UnaryConstraint extends Constraint {
     super(strength);
     this.myOutput = v;
     this.satisfied = false;
-    this.addConstraint();
   }
 
   /**
@@ -314,6 +313,7 @@ abstract class UnaryConstraint extends Constraint {
 class StayConstraint extends UnaryConstraint {
   constructor(v: Variable, str: Strength) {
     super(v, str);
+    this.addConstraint();
   }
 
   execute() {
@@ -332,6 +332,7 @@ class StayConstraint extends UnaryConstraint {
 class EditConstraint extends UnaryConstraint {
   constructor(v: Variable, str: Strength) {
     super(v, str);
+    this.addConstraint();
   }
 
   /**
@@ -371,7 +372,6 @@ abstract class BinaryConstraint extends Constraint {
     this.v1 = var1;
     this.v2 = var2;
     this.direction = Direction.NONE;
-    this.addConstraint();
   }
 
   /**
@@ -497,6 +497,7 @@ class ScaleConstraint extends BinaryConstraint {
     this.direction = Direction.NONE;
     this.scale = scale;
     this.offset = offset;
+    this.addConstraint();
   }
 
   /**
@@ -553,6 +554,7 @@ class ScaleConstraint extends BinaryConstraint {
 class EqualityConstraint extends BinaryConstraint {
   constructor(var1: Variable, var2: Variable, strength: Strength) {
     super(var1, var2, strength);
+    this.addConstraint();
   }
 
   /**
