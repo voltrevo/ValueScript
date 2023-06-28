@@ -7,12 +7,14 @@
 // benchmark, but the all the computational code remains
 // untouched. This file also contains a copy of parts of the Prototype
 // JavaScript framework which is used by the ray tracer.
+//
+// It has been further modified by Andrew Morris for use as a benchmark
+// in the ValueScript project.
 
 // ------------------------------------------------------------------------
 // ------------------------------------------------------------------------
 
-// The rest of this file is the actual ray tracer written by Adam
-// Burmister. It's a concatenation of the following files:
+// The code below is based on a concatenation of the following files:
 //
 //   flog/color.js
 //   flog/light.js
@@ -849,5 +851,3 @@ export default function renderScene() {
 
   raytracer.renderScene(scene, null /* , 0 */);
 }
-
-renderScene();
