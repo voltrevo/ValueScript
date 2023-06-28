@@ -1,7 +1,7 @@
 use std::{mem::take, rc::Rc};
 
 use crate::{
-  builtins::type_error_builtin::ToTypeError,
+  builtins::{internal_error_builtin::ToInternalError, type_error_builtin::ToTypeError},
   native_function::ThisWrapper,
   operations::op_sub,
   stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrame, StackFrameTrait},
@@ -112,7 +112,9 @@ impl StackFrameTrait for CatStackFrame {
 
     match &mut self.state {
       CatFrameState::ReadNext => self.read_next(),
-      CatFrameState::MakingIterator => panic!("Unexpected step during MakingIterator"),
+      CatFrameState::MakingIterator => {
+        Err("Unexpected step during MakingIterator".to_internal_error())
+      }
       CatFrameState::Iterating(iter) => match iter.sub(&"next".to_val())?.load_function() {
         LoadFunctionResult::NotAFunction => Err(".next was not a function".to_type_error()),
         LoadFunctionResult::NativeFunction(fn_) => {

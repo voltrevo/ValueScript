@@ -26,7 +26,7 @@ impl VirtualMachine {
 
     let mut frame = match main_fn.load_function() {
       LoadFunctionResult::StackFrame(f) => f,
-      _ => panic!("bytecode does start with function"),
+      _ => return Err("bytecode does start with function".to_internal_error()),
     };
 
     for p in params {

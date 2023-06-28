@@ -2,6 +2,7 @@ use std::mem::take;
 
 use valuescript_common::InstructionByte;
 
+use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
@@ -272,7 +273,7 @@ impl StackFrameTrait for BytecodeStackFrame {
             return Ok(FrameStepOk::Push(new_frame));
           }
           LoadFunctionResult::NativeFunction(_native_fn) => {
-            panic!("Not implemented");
+            return Err("TODO: apply native functions".to_internal_error());
           }
         }
       }
@@ -287,7 +288,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         if params_array.is_none() {
           // Not sure this needs to be an exception in future since compiled
           // code should never violate this
-          panic!("bind params should always be array")
+          return Err("bind params should always be array".to_internal_error());
         }
 
         let bound_fn = fn_val.bind((*params_array.unwrap()).elements.clone());
@@ -295,7 +296,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         if bound_fn.is_none() {
           // Not sure this needs to be an exception in future since compiled
           // code should never violate this
-          panic!("fn parameter of bind should always be bindable");
+          return Err("fn parameter of bind should always be bindable".to_internal_error());
         }
 
         if register_index.is_some() {
@@ -485,7 +486,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Import | ImportStar => {
-        panic!("TODO: Dynamic imports")
+        return Err("TODO: Dynamic imports".to_internal_error());
       }
 
       SetCatch => {
@@ -508,7 +509,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       Next => {
         let iter_i = match self.decoder.decode_register_index() {
           Some(i) => i,
-          None => panic!("The ignore register is not iterable"),
+          None => return Err("The ignore register is not iterable".to_internal_error()),
         };
 
         let res_i = self.decoder.decode_register_index();
@@ -540,7 +541,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       UnpackIterRes => {
         let iter_res_i = match self.decoder.decode_register_index() {
           Some(i) => i,
-          None => panic!("Can't unpack the ignore register"),
+          None => return Err("Can't unpack the ignore register".to_internal_error()),
         };
 
         let iter_res = take(&mut self.registers[iter_res_i]);
