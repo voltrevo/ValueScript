@@ -124,7 +124,16 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
     (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
-    _ => return Err("TODO: op== with other types".to_error()),
+    _ => {
+      return Err(
+        format!(
+          "TODO: op== with other types ({}, {})",
+          left.codify(),
+          right.codify()
+        )
+        .to_error(),
+      )
+    }
   })
 }
 
