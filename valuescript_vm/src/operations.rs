@@ -37,7 +37,7 @@ pub fn op_plus(left: &Val, right: &Val) -> Result<Val, Val> {
       (Some(left_bigint), Some(right_bigint)) => {
         return Ok(Val::BigInt(left_bigint + right_bigint));
       }
-      _ => return Err("TODO".to_error()),
+      _ => return Err("TODO: plus with bigint and non-bigint".to_error()),
     }
   }
 
@@ -121,7 +121,7 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
     (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
-    _ => return Err("TODO".to_error()),
+    _ => return Err("TODO: op== with other types".to_error()),
   })
 }
 
@@ -145,7 +145,7 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
       if left.typeof_() != right.typeof_() {
         false
       } else {
-        return Err("TODO".to_error());
+        return Err("TODO: op=== with other types".to_error());
       }
     }
   })
@@ -189,7 +189,7 @@ pub fn op_less(left: &Val, right: &Val) -> Result<Val, Val> {
       if left.typeof_() == VsType::Undefined || right.typeof_() == VsType::Undefined {
         false
       } else {
-        return Err("TODO".to_error());
+        return Err("TODO: op< with other types".to_error());
       }
     }
   }))
@@ -203,7 +203,7 @@ pub fn op_less_eq(left: &Val, right: &Val) -> Result<Val, Val> {
     (Val::Number(left_number), Val::Number(right_number)) => left_number <= right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string <= right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint <= right_bigint,
-    _ => return Err("TODO".to_type_error()),
+    _ => return Err("TODO: op<= with other types".to_type_error()),
   }))
 }
 
@@ -215,7 +215,7 @@ pub fn op_greater(left: &Val, right: &Val) -> Result<Val, Val> {
     (Val::Number(left_number), Val::Number(right_number)) => left_number > right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string > right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint > right_bigint,
-    _ => return Err("TODO".to_error()),
+    _ => return Err("TODO: op> with other types".to_error()),
   }))
 }
 
@@ -227,7 +227,7 @@ pub fn op_greater_eq(left: &Val, right: &Val) -> Result<Val, Val> {
     (Val::Number(left_number), Val::Number(right_number)) => left_number >= right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string >= right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint >= right_bigint,
-    _ => return Err("TODO".to_type_error()),
+    _ => return Err("TODO: op>= with other types".to_type_error()),
   }))
 }
 
@@ -324,7 +324,7 @@ pub fn op_left_shift(left: &Val, right: &Val) -> Result<Val, Val> {
 pub fn op_right_shift(left: &Val, right: &Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => {
-      let right_i64 = right_bigint.to_i64().ok_or("TODO".to_val())?;
+      let right_i64 = right_bigint.to_i64().ok_or("TODO: handle i64 conversion failure".to_val())?;
       Ok(Val::BigInt(left_bigint >> right_i64))
     }
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),

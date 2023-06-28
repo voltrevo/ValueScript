@@ -1099,21 +1099,21 @@ impl ScopeAnalysis {
       Expr::SuperProp(super_prop) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: super_prop".to_string(),
           span: super_prop.span,
         });
       }
       Expr::JSXMember(_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: jsx_member".to_string(),
           span: expr.span(),
         });
       }
       Expr::JSXNamespacedName(_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: jsx_namespaced_name".to_string(),
           span: expr.span(),
         });
       }
@@ -1121,28 +1121,28 @@ impl ScopeAnalysis {
       Expr::JSXElement(jsx_element) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: jsx_element".to_string(),
           span: jsx_element.span,
         });
       }
       Expr::JSXFragment(jsx_fragment) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: jsx_fragment".to_string(),
           span: jsx_fragment.span,
         });
       }
       Expr::TsInstantiation(ts_instantiation) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: ts_instantiation".to_string(),
           span: ts_instantiation.span,
         });
       }
       Expr::PrivateName(private_name) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: private_name".to_string(),
           span: private_name.span,
         });
       }
@@ -1348,91 +1348,91 @@ impl ScopeAnalysis {
       Expr::Fn(fn_) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate fn".to_string(),
           span: fn_.function.span,
         });
       }
       Expr::Unary(unary) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate unary".to_string(),
           span: unary.span,
         });
       }
       Expr::Update(update) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate update".to_string(),
           span: update.span,
         });
       }
       Expr::Bin(bin) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate binary exp".to_string(),
           span: bin.span,
         });
       }
       Expr::Assign(assign) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate assignment".to_string(),
           span: assign.span,
         });
       }
       Expr::SuperProp(super_prop) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate super_prop".to_string(),
           span: super_prop.span,
         });
       }
       Expr::Cond(cond) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate cond".to_string(),
           span: cond.span,
         });
       }
       Expr::Seq(seq) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate seq".to_string(),
           span: seq.span,
         });
       }
       Expr::Lit(_) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate lit".to_string(),
           span: expr.span(),
         });
       }
       Expr::Yield(yield_) => {
         diagnostic = Some(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate yield".to_string(),
           span: yield_.span,
         });
       }
       Expr::Await(await_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::Error,
-          message: "TODO".to_string(),
+          message: "TODO: mutate await".to_string(),
           span: await_.span,
         });
       }
       Expr::JSXMember(_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate jsx_member".to_string(),
           span: expr.span(),
         });
       }
       Expr::JSXNamespacedName(_) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate jsx_namespaced_name".to_string(),
           span: expr.span(),
         });
       }
@@ -1440,28 +1440,28 @@ impl ScopeAnalysis {
       Expr::JSXElement(jsx_element) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate jsx_element".to_string(),
           span: jsx_element.span,
         });
       }
       Expr::JSXFragment(jsx_fragment) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate jsx_fragment".to_string(),
           span: jsx_fragment.span,
         });
       }
       Expr::TsInstantiation(ts_instantiation) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate ts_instantiation".to_string(),
           span: ts_instantiation.span,
         });
       }
       Expr::PrivateName(private_name) => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
-          message: "TODO".to_string(),
+          message: "TODO: mutate private_name".to_string(),
           span: private_name.span,
         });
       }
