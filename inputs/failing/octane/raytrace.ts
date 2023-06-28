@@ -15,32 +15,6 @@ let checkNumber;
 // ------------------------------------------------------------------------
 // ------------------------------------------------------------------------
 
-// The following is a copy of parts of the Prototype JavaScript library:
-
-// Prototype JavaScript framework, version 1.5.0
-// (c) 2005-2007 Sam Stephenson
-//
-// Prototype is freely distributable under the terms of an MIT-style license.
-// For details, see the Prototype web site: http://prototype.conio.net/
-
-let Class = {
-  create: function () {
-    return function () {
-      this.initialize.apply(this, arguments);
-    };
-  },
-};
-
-Object.extend = function (destination, source) {
-  for (let property in source) {
-    destination[property] = source[property];
-  }
-  return destination;
-};
-
-// ------------------------------------------------------------------------
-// ------------------------------------------------------------------------
-
 // The rest of this file is the actual ray tracer written by Adam
 // Burmister. It's a concatenation of the following files:
 //
@@ -60,376 +34,330 @@ Object.extend = function (destination, source) {
 //   flog/background.js
 //   flog/engine.js
 
-/* Fake a Flog.* namespace */
-let Flog = {};
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
+class Color {
+  red;
+  green;
+  blue;
 
-Flog.RayTracer.Color = Class.create();
-
-Flog.RayTracer.Color.prototype = {
-  red: 0.0,
-  green: 0.0,
-  blue: 0.0,
-
-  initialize: function (r, g, b) {
-    if (!r) r = 0.0;
-    if (!g) g = 0.0;
-    if (!b) b = 0.0;
-
+  constructor(r = 0, g = 0, b = 0) {
     this.red = r;
     this.green = g;
     this.blue = b;
-  },
+  }
 
-  add: function (c1, c2) {
-    let result = new Flog.RayTracer.Color(0, 0, 0);
+  static add(c1: Color, c2: Color) {
+    return new Color(
+      c1.red + c2.red,
+      c1.green + c2.green,
+      c1.blue + c2.blue,
+    );
+  }
 
-    result.red = c1.red + c2.red;
-    result.green = c1.green + c2.green;
-    result.blue = c1.blue + c2.blue;
-
-    return result;
-  },
-
-  addScalar: function (c1, s) {
-    let result = new Flog.RayTracer.Color(0, 0, 0);
-
-    result.red = c1.red + s;
-    result.green = c1.green + s;
-    result.blue = c1.blue + s;
+  static addScalar(c1: Color, s: number) {
+    let result = new Color(
+      c1.red + s,
+      c1.green + s,
+      c1.blue + s,
+    );
 
     result.limit();
 
     return result;
-  },
+  }
 
-  subtract: function (c1, c2) {
-    let result = new Flog.RayTracer.Color(0, 0, 0);
+  static subtract(c1: Color, c2: Color) {
+    return new Color(
+      c1.red - c2.red,
+      c1.green - c2.green,
+      c1.blue - c2.blue,
+    );
+  }
 
-    result.red = c1.red - c2.red;
-    result.green = c1.green - c2.green;
-    result.blue = c1.blue - c2.blue;
+  static multiply(c1: Color, c2: Color) {
+    return new Color(
+      c1.red * c2.red,
+      c1.green * c2.green,
+      c1.blue * c2.blue,
+    );
+  }
 
-    return result;
-  },
+  static multiplyScalar(c1: Color, f: number) {
+    return new Color(
+      c1.red * f,
+      c1.green * f,
+      c1.blue * f,
+    );
+  }
 
-  multiply: function (c1, c2) {
-    let result = new Flog.RayTracer.Color(0, 0, 0);
+  static divideFactor(c1: Color, f: number) {
+    return new Color(
+      c1.red / f,
+      c1.green / f,
+      c1.blue / f,
+    );
+  }
 
-    result.red = c1.red * c2.red;
-    result.green = c1.green * c2.green;
-    result.blue = c1.blue * c2.blue;
-
-    return result;
-  },
-
-  multiplyScalar: function (c1, f) {
-    let result = new Flog.RayTracer.Color(0, 0, 0);
-
-    result.red = c1.red * f;
-    result.green = c1.green * f;
-    result.blue = c1.blue * f;
-
-    return result;
-  },
-
-  divideFactor: function (c1, f) {
-    let result = new Flog.RayTracer.Color(0, 0, 0);
-
-    result.red = c1.red / f;
-    result.green = c1.green / f;
-    result.blue = c1.blue / f;
-
-    return result;
-  },
-
-  limit: function () {
+  limit() {
     this.red = (this.red > 0.0) ? ((this.red > 1.0) ? 1.0 : this.red) : 0.0;
     this.green = (this.green > 0.0)
       ? ((this.green > 1.0) ? 1.0 : this.green)
       : 0.0;
     this.blue = (this.blue > 0.0) ? ((this.blue > 1.0) ? 1.0 : this.blue) : 0.0;
-  },
+  }
 
-  distance: function (color) {
+  distance(color: Color) {
     let d = Math.abs(this.red - color.red) +
       Math.abs(this.green - color.green) + Math.abs(this.blue - color.blue);
     return d;
-  },
+  }
 
-  blend: function (c1, c2, w) {
-    let result = new Flog.RayTracer.Color(0, 0, 0);
-    result = Flog.RayTracer.Color.prototype.add(
-      Flog.RayTracer.Color.prototype.multiplyScalar(c1, 1 - w),
-      Flog.RayTracer.Color.prototype.multiplyScalar(c2, w),
+  static blend(c1: Color, c2: Color, w: number) {
+    return Color.add(
+      Color.multiplyScalar(c1, 1 - w),
+      Color.multiplyScalar(c2, w),
     );
-    return result;
-  },
+  }
 
-  brightness: function () {
+  brightness() {
     let r = Math.floor(this.red * 255);
     let g = Math.floor(this.green * 255);
     let b = Math.floor(this.blue * 255);
     return (r * 77 + g * 150 + b * 29) >> 8;
-  },
+  }
 
-  toString: function () {
+  toString() {
     let r = Math.floor(this.red * 255);
     let g = Math.floor(this.green * 255);
     let b = Math.floor(this.blue * 255);
 
     return "rgb(" + r + "," + g + "," + b + ")";
-  },
-};
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
+  }
+}
 
-Flog.RayTracer.Light = Class.create();
+class Light {
+  position;
+  color;
+  intensity;
 
-Flog.RayTracer.Light.prototype = {
-  position: null,
-  color: null,
-  intensity: 10.0,
-
-  initialize: function (pos, color, intensity) {
+  constructor(pos: Vector, color: Color, intensity: number) {
     this.position = pos;
     this.color = color;
     this.intensity = intensity ? intensity : 10.0;
-  },
+  }
 
-  toString: function () {
+  toString() {
     return "Light [" + this.position.x + "," + this.position.y + "," +
       this.position.z + "]";
-  },
-};
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
+  }
+}
 
-Flog.RayTracer.Vector = Class.create();
+class Vector {
+  x;
+  y;
+  z;
 
-Flog.RayTracer.Vector.prototype = {
-  x: 0.0,
-  y: 0.0,
-  z: 0.0,
+  constructor(x = 0, y = 0, z = 0) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
 
-  initialize: function (x, y, z) {
-    this.x = x ? x : 0;
-    this.y = y ? y : 0;
-    this.z = z ? z : 0;
-  },
-
-  copy: function (vector) {
+  copy(vector: Vector) {
     this.x = vector.x;
     this.y = vector.y;
     this.z = vector.z;
-  },
+  }
 
-  normalize: function () {
+  normalize() {
     let m = this.magnitude();
-    return new Flog.RayTracer.Vector(this.x / m, this.y / m, this.z / m);
-  },
+    return new Vector(this.x / m, this.y / m, this.z / m);
+  }
 
-  magnitude: function () {
+  magnitude() {
     return Math.sqrt((this.x * this.x) + (this.y * this.y) + (this.z * this.z));
-  },
+  }
 
-  cross: function (w) {
-    return new Flog.RayTracer.Vector(
+  cross(w: Vector) {
+    return new Vector(
       -this.z * w.y + this.y * w.z,
       this.z * w.x - this.x * w.z,
       -this.y * w.x + this.x * w.y,
     );
-  },
+  }
 
-  dot: function (w) {
+  dot(w: Vector) {
     return this.x * w.x + this.y * w.y + this.z * w.z;
-  },
+  }
 
-  add: function (v, w) {
-    return new Flog.RayTracer.Vector(w.x + v.x, w.y + v.y, w.z + v.z);
-  },
+  static add(v: Vector, w: Vector) {
+    return new Vector(w.x + v.x, w.y + v.y, w.z + v.z);
+  }
 
-  subtract: function (v, w) {
+  static subtract(v: Vector, w: Vector) {
     if (!w || !v) throw "Vectors must be defined [" + v + "," + w + "]";
-    return new Flog.RayTracer.Vector(v.x - w.x, v.y - w.y, v.z - w.z);
-  },
+    return new Vector(v.x - w.x, v.y - w.y, v.z - w.z);
+  }
 
-  multiplyVector: function (v, w) {
-    return new Flog.RayTracer.Vector(v.x * w.x, v.y * w.y, v.z * w.z);
-  },
+  static multiplyVector(v: Vector, w: Vector) {
+    return new Vector(v.x * w.x, v.y * w.y, v.z * w.z);
+  }
 
-  multiplyScalar: function (v, w) {
-    return new Flog.RayTracer.Vector(v.x * w, v.y * w, v.z * w);
-  },
+  static multiplyScalar(v: Vector, w: number) {
+    return new Vector(v.x * w, v.y * w, v.z * w);
+  }
 
-  toString: function () {
+  toString() {
     return "Vector [" + this.x + "," + this.y + "," + this.z + "]";
-  },
-};
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
-
-Flog.RayTracer.Ray = Class.create();
-
-Flog.RayTracer.Ray.prototype = {
-  position: null,
-  direction: null,
-  initialize: function (pos, dir) {
-    this.position = pos;
-    this.direction = dir;
-  },
-
-  toString: function () {
-    return "Ray [" + this.position + "," + this.direction + "]";
-  },
-};
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
-
-Flog.RayTracer.Scene = Class.create();
-
-Flog.RayTracer.Scene.prototype = {
-  camera: null,
-  shapes: [],
-  lights: [],
-  background: null,
-
-  initialize: function () {
-    this.camera = new Flog.RayTracer.Camera(
-      new Flog.RayTracer.Vector(0, 0, -5),
-      new Flog.RayTracer.Vector(0, 0, 1),
-      new Flog.RayTracer.Vector(0, 1, 0),
-    );
-    this.shapes = new Array();
-    this.lights = new Array();
-    this.background = new Flog.RayTracer.Background(
-      new Flog.RayTracer.Color(0, 0, 0.5),
-      0.2,
-    );
-  },
-};
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
-if (typeof (Flog.RayTracer.Material) == "undefined") {
-  Flog.RayTracer.Material = {};
+  }
 }
 
-Flog.RayTracer.Material.BaseMaterial = Class.create();
+class Ray {
+  position;
+  direction;
 
-Flog.RayTracer.Material.BaseMaterial.prototype = {
-  gloss: 2.0, // [0...infinity] 0 = matt
-  transparency: 0.0, // 0=opaque
-  reflection: 0.0, // [0...infinity] 0 = no reflection
-  refraction: 0.50,
-  hasTexture: false,
+  constructor(pos: Vector, dir: Vector) {
+    this.position = pos;
+    this.direction = dir;
+  }
 
-  initialize: function () {
-  },
+  toString() {
+    return "Ray [" + this.position + "," + this.direction + "]";
+  }
+}
 
-  getColor: function (u, v) {
-  },
+class Scene {
+  camera;
+  shapes;
+  lights;
+  background;
 
-  wrapUp: function (t) {
-    t = t % 2.0;
-    if (t < -1) t += 2.0;
-    if (t >= 1) t -= 2.0;
-    return t;
-  },
+  constructor() {
+    this.camera = new Camera(
+      new Vector(0, 0, -5),
+      new Vector(0, 0, 1),
+      new Vector(0, 1, 0),
+    );
+    this.shapes = [];
+    this.lights = [];
+    this.background = new Background(
+      new Color(0, 0, 0.5),
+      0.2,
+    );
+  }
+}
 
-  toString: function () {
-    return "Material [gloss=" + this.gloss + ", transparency=" +
-      this.transparency + ", hasTexture=" + this.hasTexture + "]";
-  },
+type Material = {
+  gloss: number;
+  transparency: number;
+  reflection: number;
+  refraction: number;
+  hasTexture: boolean;
+
+  getColor(u: number, v: number): Color;
 };
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
 
-Flog.RayTracer.Material.Solid = Class.create();
+function wrapUpMaterial(t: number) {
+  t = t % 2.0;
+  if (t < -1) t += 2.0;
+  if (t >= 1) t -= 2.0;
+  return t;
+}
 
-Flog.RayTracer.Material.Solid.prototype = Object.extend(
-  new Flog.RayTracer.Material.BaseMaterial(),
-  {
-    initialize: function (color, reflection, refraction, transparency, gloss) {
-      this.color = color;
-      this.reflection = reflection;
-      this.transparency = transparency;
-      this.gloss = gloss;
-      this.hasTexture = false;
-    },
+class SolidMaterial implements Material {
+  reflection: number;
+  refraction: number;
+  transparency: number;
+  gloss: number;
+  hasTexture: boolean;
 
-    getColor: function (u, v) {
-      return this.color;
-    },
+  color;
 
-    toString: function () {
-      return "SolidMaterial [gloss=" + this.gloss + ", transparency=" +
-        this.transparency + ", hasTexture=" + this.hasTexture + "]";
-    },
-  },
-);
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
+  constructor(
+    color: Color,
+    reflection: number,
+    _refraction: number,
+    transparency: number,
+    gloss: number,
+  ) {
+    this.color = color;
+    this.reflection = reflection;
+    this.refraction = 0.5; // TODO: Why not use parameter?
+    this.transparency = transparency;
+    this.gloss = gloss;
+    this.hasTexture = false;
+  }
 
-Flog.RayTracer.Material.Chessboard = Class.create();
+  getColor(_u: number, _v: number) {
+    return this.color;
+  }
 
-Flog.RayTracer.Material.Chessboard.prototype = Object.extend(
-  new Flog.RayTracer.Material.BaseMaterial(),
-  {
-    colorEven: null,
-    colorOdd: null,
-    density: 0.5,
+  toString() {
+    return "SolidMaterial [gloss=" + this.gloss + ", transparency=" +
+      this.transparency + ", hasTexture=" + this.hasTexture + "]";
+  }
+}
 
-    initialize: function (
-      colorEven,
-      colorOdd,
-      reflection,
-      transparency,
-      gloss,
-      density,
-    ) {
-      this.colorEven = colorEven;
-      this.colorOdd = colorOdd;
-      this.reflection = reflection;
-      this.transparency = transparency;
-      this.gloss = gloss;
-      this.density = density;
-      this.hasTexture = true;
-    },
+class ChessboardMaterial implements Material {
+  reflection: number;
+  refraction: number;
+  transparency: number;
+  gloss: number;
+  hasTexture: boolean;
 
-    getColor: function (u, v) {
-      let t = this.wrapUp(u * this.density) * this.wrapUp(v * this.density);
+  colorEven;
+  colorOdd;
+  density;
 
-      if (t < 0.0) {
-        return this.colorEven;
-      } else {
-        return this.colorOdd;
-      }
-    },
+  constructor(
+    colorEven: Color,
+    colorOdd: Color,
+    reflection: number,
+    transparency: number,
+    gloss: number,
+    density: number,
+  ) {
+    this.colorEven = colorEven;
+    this.colorOdd = colorOdd;
+    this.reflection = reflection;
+    this.refraction = 0.5;
+    this.transparency = transparency;
+    this.gloss = gloss;
+    this.density = density;
+    this.hasTexture = true;
+  }
 
-    toString: function () {
-      return "ChessMaterial [gloss=" + this.gloss + ", transparency=" +
-        this.transparency + ", hasTexture=" + this.hasTexture + "]";
-    },
-  },
-);
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
-if (typeof (Flog.RayTracer.Shape) == "undefined") Flog.RayTracer.Shape = {};
+  getColor(u: number, v: number) {
+    let t = wrapUpMaterial(u * this.density) * wrapUpMaterial(v * this.density);
 
-Flog.RayTracer.Shape.Sphere = Class.create();
+    if (t < 0.0) {
+      return this.colorEven;
+    } else {
+      return this.colorOdd;
+    }
+  }
 
-Flog.RayTracer.Shape.Sphere.prototype = {
-  initialize: function (pos, radius, material) {
+  toString() {
+    return "ChessMaterial [gloss=" + this.gloss + ", transparency=" +
+      this.transparency + ", hasTexture=" + this.hasTexture + "]";
+  }
+}
+
+class Shape {
+  radius;
+  position;
+  material;
+
+  constructor(pos: Vector, radius: number, material: Material) {
     this.radius = radius;
     this.position = pos;
     this.material = material;
-  },
+  }
 
-  intersect: function (ray) {
-    let info = new Flog.RayTracer.IntersectionInfo();
+  intersect(ray: Ray) {
+    let info = new IntersectionInfo();
     info.shape = this;
 
-    let dst = Flog.RayTracer.Vector.prototype.subtract(
+    let dst = Vector.subtract(
       ray.position,
       this.position,
     );
@@ -441,14 +369,14 @@ Flog.RayTracer.Shape.Sphere.prototype = {
     if (D > 0) { // intersection!
       info.isHit = true;
       info.distance = (-B) - Math.sqrt(D);
-      info.position = Flog.RayTracer.Vector.prototype.add(
+      info.position = Vector.add(
         ray.position,
-        Flog.RayTracer.Vector.prototype.multiplyScalar(
+        Vector.multiplyScalar(
           ray.direction,
           info.distance,
         ),
       );
-      info.normal = Flog.RayTracer.Vector.prototype.subtract(
+      info.normal = Vector.subtract(
         info.position,
         this.position,
       ).normalize();
@@ -458,13 +386,66 @@ Flog.RayTracer.Shape.Sphere.prototype = {
       info.isHit = false;
     }
     return info;
-  },
+  }
 
-  toString: function () {
+  toString() {
     return "Sphere [position=" + this.position + ", radius=" + this.radius +
       "]";
-  },
-};
+  }
+}
+
+class Sphere {
+  radius;
+  position;
+  material;
+
+  constructor(pos: Vector, radius: number, material: Material) {
+    this.radius = radius;
+    this.position = pos;
+    this.material = material;
+  }
+
+  intersect(ray: Ray) {
+    let info = new IntersectionInfo();
+    info.shape = this;
+
+    let dst = Vector.subtract(
+      ray.position,
+      this.position,
+    );
+
+    let B = dst.dot(ray.direction);
+    let C = dst.dot(dst) - (this.radius * this.radius);
+    let D = (B * B) - C;
+
+    if (D > 0) { // intersection!
+      info.isHit = true;
+      info.distance = (-B) - Math.sqrt(D);
+      info.position = Vector.add(
+        ray.position,
+        Vector.multiplyScalar(
+          ray.direction,
+          info.distance,
+        ),
+      );
+      info.normal = Vector.subtract(
+        info.position,
+        this.position,
+      ).normalize();
+
+      info.color = this.material.getColor(0, 0);
+    } else {
+      info.isHit = false;
+    }
+    return info;
+  }
+
+  toString() {
+    return "Sphere [position=" + this.position + ", radius=" + this.radius +
+      "]";
+  }
+}
+
 /* Fake a Flog.* namespace */
 if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
 if (typeof (Flog.RayTracer.Shape) == "undefined") Flog.RayTracer.Shape = {};
