@@ -10,7 +10,7 @@
 
 // Variable used to hold a number that can be used to verify that
 // the scene was ray traced correctly.
-let checkNumber;
+let checkNumber: number;
 
 // ------------------------------------------------------------------------
 // ------------------------------------------------------------------------
@@ -139,10 +139,10 @@ class Light {
   color;
   intensity;
 
-  constructor(pos: Vector, color: Color, intensity: number) {
+  constructor(pos: Vector, color: Color, intensity = 10) {
     this.position = pos;
     this.color = color;
-    this.intensity = intensity ? intensity : 10.0;
+    this.intensity = intensity;
   }
 
   toString() {
@@ -227,8 +227,8 @@ class Ray {
 
 class Scene {
   camera;
-  shapes;
-  lights;
+  shapes: Shape[];
+  lights: Light[];
   background;
 
   constructor() {
@@ -342,7 +342,14 @@ class ChessboardMaterial implements Material {
   }
 }
 
-class Shape {
+type Shape = {
+  material: Material;
+  position: Vector;
+  intersect(ray: Ray): IntersectionInfo;
+  toString(): string;
+};
+
+class Sphere implements Shape {
   radius;
   position;
   material;
@@ -394,75 +401,19 @@ class Shape {
   }
 }
 
-class Sphere {
-  radius;
+class Plane implements Shape {
   position;
+  d;
   material;
 
-  constructor(pos: Vector, radius: number, material: Material) {
-    this.radius = radius;
-    this.position = pos;
-    this.material = material;
-  }
-
-  intersect(ray: Ray) {
-    let info = new IntersectionInfo();
-    info.shape = this;
-
-    let dst = Vector.subtract(
-      ray.position,
-      this.position,
-    );
-
-    let B = dst.dot(ray.direction);
-    let C = dst.dot(dst) - (this.radius * this.radius);
-    let D = (B * B) - C;
-
-    if (D > 0) { // intersection!
-      info.isHit = true;
-      info.distance = (-B) - Math.sqrt(D);
-      info.position = Vector.add(
-        ray.position,
-        Vector.multiplyScalar(
-          ray.direction,
-          info.distance,
-        ),
-      );
-      info.normal = Vector.subtract(
-        info.position,
-        this.position,
-      ).normalize();
-
-      info.color = this.material.getColor(0, 0);
-    } else {
-      info.isHit = false;
-    }
-    return info;
-  }
-
-  toString() {
-    return "Sphere [position=" + this.position + ", radius=" + this.radius +
-      "]";
-  }
-}
-
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
-if (typeof (Flog.RayTracer.Shape) == "undefined") Flog.RayTracer.Shape = {};
-
-Flog.RayTracer.Shape.Plane = Class.create();
-
-Flog.RayTracer.Shape.Plane.prototype = {
-  d: 0.0,
-
-  initialize: function (pos, d, material) {
+  constructor(pos: Vector, d: number, material: Material) {
     this.position = pos;
     this.d = d;
     this.material = material;
-  },
+  }
 
-  intersect: function (ray) {
-    let info = new Flog.RayTracer.IntersectionInfo();
+  intersect(ray: Ray) {
+    let info = new IntersectionInfo();
 
     let Vd = this.position.dot(ray.direction);
     if (Vd == 0) return info; // no intersection
@@ -472,9 +423,9 @@ Flog.RayTracer.Shape.Plane.prototype = {
 
     info.shape = this;
     info.isHit = true;
-    info.position = Flog.RayTracer.Vector.prototype.add(
+    info.position = Vector.add(
       ray.position,
-      Flog.RayTracer.Vector.prototype.multiplyScalar(
+      Vector.multiplyScalar(
         ray.direction,
         t,
       ),
@@ -483,7 +434,7 @@ Flog.RayTracer.Shape.Plane.prototype = {
     info.distance = t;
 
     if (this.material.hasTexture) {
-      let vU = new Flog.RayTracer.Vector(
+      let vU = new Vector(
         this.position.y,
         this.position.z,
         -this.position.x,
@@ -497,142 +448,131 @@ Flog.RayTracer.Shape.Plane.prototype = {
     }
 
     return info;
-  },
+  }
 
-  toString: function () {
+  toString() {
     return "Plane [" + this.position + ", d=" + this.d + "]";
-  },
-};
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
+  }
+}
 
-Flog.RayTracer.IntersectionInfo = Class.create();
+class IntersectionInfo {
+  isHit = false;
+  hitCount = 0;
+  shape: Shape | null = null;
+  position: Vector | null = null;
+  normal: Vector | null = null;
+  color;
+  distance: number | null = null;
 
-Flog.RayTracer.IntersectionInfo.prototype = {
-  isHit: false,
-  hitCount: 0,
-  shape: null,
-  position: null,
-  normal: null,
-  color: null,
-  distance: null,
+  constructor() {
+    this.color = new Color(0, 0, 0);
+  }
 
-  initialize: function () {
-    this.color = new Flog.RayTracer.Color(0, 0, 0);
-  },
-
-  toString: function () {
+  toString() {
     return "Intersection [" + this.position + "]";
-  },
-};
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
+  }
+}
 
-Flog.RayTracer.Camera = Class.create();
+class Camera {
+  position;
+  lookAt;
+  equator;
+  up;
+  screen;
 
-Flog.RayTracer.Camera.prototype = {
-  position: null,
-  lookAt: null,
-  equator: null,
-  up: null,
-  screen: null,
-
-  initialize: function (pos, lookAt, up) {
+  constructor(pos: Vector, lookAt: Vector, up: Vector) {
     this.position = pos;
     this.lookAt = lookAt;
     this.up = up;
     this.equator = lookAt.normalize().cross(this.up);
-    this.screen = Flog.RayTracer.Vector.prototype.add(
+    this.screen = Vector.add(
       this.position,
       this.lookAt,
     );
-  },
+  }
 
-  getRay: function (vx, vy) {
-    let pos = Flog.RayTracer.Vector.prototype.subtract(
+  getRay(vx: number, vy: number) {
+    let pos = Vector.subtract(
       this.screen,
-      Flog.RayTracer.Vector.prototype.subtract(
-        Flog.RayTracer.Vector.prototype.multiplyScalar(this.equator, vx),
-        Flog.RayTracer.Vector.prototype.multiplyScalar(this.up, vy),
+      Vector.subtract(
+        Vector.multiplyScalar(this.equator, vx),
+        Vector.multiplyScalar(this.up, vy),
       ),
     );
     pos.y = pos.y * -1;
-    let dir = Flog.RayTracer.Vector.prototype.subtract(
+    let dir = Vector.subtract(
       pos,
       this.position,
     );
 
-    let ray = new Flog.RayTracer.Ray(pos, dir.normalize());
+    let ray = new Ray(pos, dir.normalize());
 
     return ray;
-  },
+  }
 
-  toString: function () {
+  toString() {
     return "Ray []";
-  },
-};
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
+  }
+}
 
-Flog.RayTracer.Background = Class.create();
+class Background {
+  color;
+  ambience;
 
-Flog.RayTracer.Background.prototype = {
-  color: null,
-  ambience: 0.0,
-
-  initialize: function (color, ambience) {
+  constructor(color: Color, ambience: number) {
     this.color = color;
     this.ambience = ambience;
-  },
+  }
+}
+
+type EngineOptions = {
+  canvasWidth: number;
+  canvasHeight: number;
+  pixelWidth: number;
+  pixelHeight: number;
+  renderDiffuse: boolean;
+  renderHighlights: boolean;
+  renderShadows: boolean;
+  renderReflections: boolean;
+  rayDepth: number;
 };
-/* Fake a Flog.* namespace */
-if (typeof (Flog.RayTracer) == "undefined") Flog.RayTracer = {};
 
-Flog.RayTracer.Engine = Class.create();
+class Engine {
+  canvas: unknown = null; /* 2d context we can render to */
+  options;
 
-Flog.RayTracer.Engine.prototype = {
-  canvas: null, /* 2d context we can render to */
-
-  initialize: function (options) {
-    this.options = Object.extend({
-      canvasHeight: 100,
-      canvasWidth: 100,
-      pixelWidth: 2,
-      pixelHeight: 2,
-      renderDiffuse: false,
-      renderShadows: false,
-      renderHighlights: false,
-      renderReflections: false,
-      rayDepth: 2,
-    }, options || {});
+  constructor(options: EngineOptions) {
+    this.options = options;
 
     this.options.canvasHeight /= this.options.pixelHeight;
     this.options.canvasWidth /= this.options.pixelWidth;
 
     /* TODO: dynamically include other scripts */
-  },
+  }
 
-  setPixel: function (x, y, color) {
-    let pxW, pxH;
-    pxW = this.options.pixelWidth;
-    pxH = this.options.pixelHeight;
+  setPixel(x: number, y: number, color: Color) {
+    let _pxW, _pxH;
+    _pxW = this.options.pixelWidth;
+    _pxH = this.options.pixelHeight;
 
     if (this.canvas) {
-      this.canvas.fillStyle = color.toString();
-      this.canvas.fillRect(x * pxW, y * pxH, pxW, pxH);
+      throw new Error("Not implemented: canvas");
+      // this.canvas.fillStyle = color.toString();
+      // this.canvas.fillRect(x * pxW, y * pxH, pxW, pxH);
     } else {
       if (x === y) {
         checkNumber += color.brightness();
       }
       // print(x * pxW, y * pxH, pxW, pxH);
     }
-  },
+  }
 
-  renderScene: function (scene, canvas) {
+  renderScene(scene: Scene, canvas: unknown) {
     checkNumber = 0;
     /* Get canvas */
     if (canvas) {
-      this.canvas = canvas.getContext("2d");
+      throw new Error("Not implemented: canvas");
+      // this.canvas = canvas.getContext("2d");
     } else {
       this.canvas = null;
     }
@@ -655,20 +595,20 @@ Flog.RayTracer.Engine.prototype = {
     if (checkNumber !== 2321) {
       throw new Error("Scene rendered incorrectly");
     }
-  },
+  }
 
-  getPixelColor: function (ray, scene) {
+  getPixelColor(ray: Ray, scene: Scene) {
     let info = this.testIntersection(ray, scene, null);
     if (info.isHit) {
       let color = this.rayTrace(info, ray, scene, 0);
       return color;
     }
     return scene.background.color;
-  },
+  }
 
-  testIntersection: function (ray, scene, exclude) {
+  testIntersection(ray: Ray, scene: Scene, exclude: Shape | null) {
     let hits = 0;
-    let best = new Flog.RayTracer.IntersectionInfo();
+    let best = new IntersectionInfo();
     best.distance = 2000;
 
     for (let i = 0; i < scene.shapes.length; i++) {
@@ -676,7 +616,9 @@ Flog.RayTracer.Engine.prototype = {
 
       if (shape != exclude) {
         let info = shape.intersect(ray);
-        if (info.isHit && info.distance >= 0 && info.distance < best.distance) {
+        if (
+          info.isHit && info.distance! >= 0 && info.distance! < best.distance!
+        ) {
           best = info;
           hits++;
         }
@@ -684,43 +626,43 @@ Flog.RayTracer.Engine.prototype = {
     }
     best.hitCount = hits;
     return best;
-  },
+  }
 
-  getReflectionRay: function (P, N, V) {
+  getReflectionRay(P: Vector, N: Vector, V: Vector) {
     let c1 = -N.dot(V);
-    let R1 = Flog.RayTracer.Vector.prototype.add(
-      Flog.RayTracer.Vector.prototype.multiplyScalar(N, 2 * c1),
+    let R1 = Vector.add(
+      Vector.multiplyScalar(N, 2 * c1),
       V,
     );
-    return new Flog.RayTracer.Ray(P, R1);
-  },
+    return new Ray(P, R1);
+  }
 
-  rayTrace: function (info, ray, scene, depth) {
+  rayTrace(info: IntersectionInfo, ray: Ray, scene: Scene, depth: number) {
     // Calc ambient
-    let color = Flog.RayTracer.Color.prototype.multiplyScalar(
+    let color = Color.multiplyScalar(
       info.color,
       scene.background.ambience,
     );
-    let oldColor = color;
-    let shininess = Math.pow(10, info.shape.material.gloss + 1);
+    let _oldColor = color;
+    let shininess = Math.pow(10, info.shape!.material.gloss + 1);
 
     for (let i = 0; i < scene.lights.length; i++) {
       let light = scene.lights[i];
 
       // Calc diffuse lighting
-      let v = Flog.RayTracer.Vector.prototype.subtract(
+      let v = Vector.subtract(
         light.position,
-        info.position,
+        info.position!,
       ).normalize();
 
       if (this.options.renderDiffuse) {
-        let L = v.dot(info.normal);
+        let L = v.dot(info.normal!);
         if (L > 0.0) {
-          color = Flog.RayTracer.Color.prototype.add(
+          color = Color.add(
             color,
-            Flog.RayTracer.Color.prototype.multiply(
+            Color.multiply(
               info.color,
-              Flog.RayTracer.Color.prototype.multiplyScalar(
+              Color.multiplyScalar(
                 light.color,
                 L,
               ),
@@ -734,25 +676,25 @@ Flog.RayTracer.Engine.prototype = {
       if (depth <= this.options.rayDepth) {
         // calculate reflection ray
         if (
-          this.options.renderReflections && info.shape.material.reflection > 0
+          this.options.renderReflections && info.shape!.material.reflection > 0
         ) {
           let reflectionRay = this.getReflectionRay(
-            info.position,
-            info.normal,
+            info.position!,
+            info.normal!,
             ray.direction,
           );
           let refl = this.testIntersection(reflectionRay, scene, info.shape);
 
-          if (refl.isHit && refl.distance > 0) {
+          if (refl.isHit && refl.distance! > 0) {
             refl.color = this.rayTrace(refl, reflectionRay, scene, depth + 1);
           } else {
             refl.color = scene.background.color;
           }
 
-          color = Flog.RayTracer.Color.prototype.blend(
+          color = Color.blend(
             color,
             refl.color,
-            info.shape.material.reflection,
+            info.shape!.material.reflection,
           );
         }
 
@@ -762,45 +704,45 @@ Flog.RayTracer.Engine.prototype = {
 
       /* Render shadows and highlights */
 
-      let shadowInfo = new Flog.RayTracer.IntersectionInfo();
+      let shadowInfo = new IntersectionInfo();
 
       if (this.options.renderShadows) {
-        let shadowRay = new Flog.RayTracer.Ray(info.position, v);
+        let shadowRay = new Ray(info.position!, v);
 
         shadowInfo = this.testIntersection(shadowRay, scene, info.shape);
         if (
           shadowInfo.isHit &&
           shadowInfo.shape != info.shape /*&& shadowInfo.shape.type != 'PLANE'*/
         ) {
-          let vA = Flog.RayTracer.Color.prototype.multiplyScalar(color, 0.5);
-          let dB = 0.5 * Math.pow(shadowInfo.shape.material.transparency, 0.5);
-          color = Flog.RayTracer.Color.prototype.addScalar(vA, dB);
+          let vA = Color.multiplyScalar(color, 0.5);
+          let dB = 0.5 * Math.pow(shadowInfo.shape!.material.transparency, 0.5);
+          color = Color.addScalar(vA, dB);
         }
       }
 
       // Phong specular highlights
       if (
         this.options.renderHighlights && !shadowInfo.isHit &&
-        info.shape.material.gloss > 0
+        info.shape!.material.gloss > 0
       ) {
-        let Lv = Flog.RayTracer.Vector.prototype.subtract(
-          info.shape.position,
+        let Lv = Vector.subtract(
+          info.shape!.position,
           light.position,
         ).normalize();
 
-        let E = Flog.RayTracer.Vector.prototype.subtract(
+        let E = Vector.subtract(
           scene.camera.position,
-          info.shape.position,
+          info.shape!.position,
         ).normalize();
 
-        let H = Flog.RayTracer.Vector.prototype.subtract(
+        let H = Vector.subtract(
           E,
           Lv,
         ).normalize();
 
-        let glossWeight = Math.pow(Math.max(info.normal.dot(H), 0), shininess);
-        color = Flog.RayTracer.Color.prototype.add(
-          Flog.RayTracer.Color.prototype.multiplyScalar(
+        let glossWeight = Math.pow(Math.max(info.normal!.dot(H), 0), shininess);
+        color = Color.add(
+          Color.multiplyScalar(
             light.color,
             glossWeight,
           ),
@@ -810,28 +752,28 @@ Flog.RayTracer.Engine.prototype = {
     }
     color.limit();
     return color;
-  },
-};
+  }
+}
 
 export default function renderScene() {
-  let scene = new Flog.RayTracer.Scene();
+  let scene = new Scene();
 
-  scene.camera = new Flog.RayTracer.Camera(
-    new Flog.RayTracer.Vector(0, 0, -15),
-    new Flog.RayTracer.Vector(-0.2, 0, 5),
-    new Flog.RayTracer.Vector(0, 1, 0),
+  scene.camera = new Camera(
+    new Vector(0, 0, -15),
+    new Vector(-0.2, 0, 5),
+    new Vector(0, 1, 0),
   );
 
-  scene.background = new Flog.RayTracer.Background(
-    new Flog.RayTracer.Color(0.5, 0.5, 0.5),
+  scene.background = new Background(
+    new Color(0.5, 0.5, 0.5),
     0.4,
   );
 
-  let sphere = new Flog.RayTracer.Shape.Sphere(
-    new Flog.RayTracer.Vector(-1.5, 1.5, 2),
+  let sphere = new Sphere(
+    new Vector(-1.5, 1.5, 2),
     1.5,
-    new Flog.RayTracer.Material.Solid(
-      new Flog.RayTracer.Color(0, 0.5, 0.5),
+    new SolidMaterial(
+      new Color(0, 0.5, 0.5),
       0.3,
       0.0,
       0.0,
@@ -839,11 +781,11 @@ export default function renderScene() {
     ),
   );
 
-  let sphere1 = new Flog.RayTracer.Shape.Sphere(
-    new Flog.RayTracer.Vector(1, 0.25, 1),
+  let sphere1 = new Sphere(
+    new Vector(1, 0.25, 1),
     0.5,
-    new Flog.RayTracer.Material.Solid(
-      new Flog.RayTracer.Color(0.9, 0.9, 0.9),
+    new SolidMaterial(
+      new Color(0.9, 0.9, 0.9),
       0.1,
       0.0,
       0.0,
@@ -851,12 +793,12 @@ export default function renderScene() {
     ),
   );
 
-  let plane = new Flog.RayTracer.Shape.Plane(
-    new Flog.RayTracer.Vector(0.1, 0.9, -0.5).normalize(),
+  let plane = new Plane(
+    new Vector(0.1, 0.9, -0.5).normalize(),
     1.2,
-    new Flog.RayTracer.Material.Chessboard(
-      new Flog.RayTracer.Color(1, 1, 1),
-      new Flog.RayTracer.Color(0, 0, 0),
+    new ChessboardMaterial(
+      new Color(1, 1, 1),
+      new Color(0, 0, 0),
       0.2,
       0.0,
       1.0,
@@ -868,14 +810,14 @@ export default function renderScene() {
   scene.shapes.push(sphere);
   scene.shapes.push(sphere1);
 
-  let light = new Flog.RayTracer.Light(
-    new Flog.RayTracer.Vector(5, 10, -1),
-    new Flog.RayTracer.Color(0.8, 0.8, 0.8),
+  let light = new Light(
+    new Vector(5, 10, -1),
+    new Color(0.8, 0.8, 0.8),
   );
 
-  let light1 = new Flog.RayTracer.Light(
-    new Flog.RayTracer.Vector(-3, 5, -15),
-    new Flog.RayTracer.Color(0.8, 0.8, 0.8),
+  let light1 = new Light(
+    new Vector(-3, 5, -15),
+    new Color(0.8, 0.8, 0.8),
     100,
   );
 
@@ -884,14 +826,14 @@ export default function renderScene() {
 
   let imageWidth = 100; // $F('imageWidth');
   let imageHeight = 100; // $F('imageHeight');
-  let pixelSize = "5,5".split(","); //  $F('pixelSize').split(',');
+  let pixelSize = [5, 5]; //  $F('pixelSize').split(',');
   let renderDiffuse = true; // $F('renderDiffuse');
   let renderShadows = true; // $F('renderShadows');
   let renderHighlights = true; // $F('renderHighlights');
   let renderReflections = true; // $F('renderReflections');
   let rayDepth = 2; //$F('rayDepth');
 
-  let raytracer = new Flog.RayTracer.Engine(
+  let raytracer = new Engine(
     {
       canvasWidth: imageWidth,
       canvasHeight: imageHeight,
@@ -905,7 +847,7 @@ export default function renderScene() {
     },
   );
 
-  raytracer.renderScene(scene, null, 0);
+  raytracer.renderScene(scene, null /* , 0 */);
 }
 
 renderScene();
