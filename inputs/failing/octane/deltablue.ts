@@ -170,14 +170,6 @@ abstract class Constraint {
   abstract inputsKnown(mark: number): boolean;
 
   /**
-   * Activate this constraint and attempt to satisfy it.
-   */
-  addConstraint(planner: Planner, _c?: Constraint) {
-    this.addToGraph();
-    planner.incrementalAdd(this);
-  }
-
-  /**
    * Attempt to find a way to enforce this constraint. If successful,
    * record the solution, perhaps modifying the current dataflow
    * graph. Answer the constraint that this constraint overrides, if
@@ -805,7 +797,7 @@ class Planner {
 
   change(v: Variable, newValue: number) {
     let edit = new EditConstraint(v, Strength.PREFERRED);
-    edit.addConstraint(this);
+    this.addConstraint(edit);
     let edits = new OrderedCollection<Constraint>();
     edits.add(edit);
     let plan = this.extractPlanFromConstraints(edits);
@@ -816,8 +808,12 @@ class Planner {
     edit.destroyConstraint(this);
   }
 
+  /**
+   * Activate this constraint and attempt to satisfy it.
+   */
   addConstraint(c: Constraint) {
-    c.addConstraint(this);
+    c.addToGraph();
+    this.incrementalAdd(c);
   }
 }
 
@@ -951,3 +947,5 @@ export function deltaBlue() {
   chainTest(100);
   projectionTest(100);
 }
+
+deltaBlue();
