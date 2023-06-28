@@ -8,10 +8,6 @@
 // untouched. This file also contains a copy of parts of the Prototype
 // JavaScript framework which is used by the ray tracer.
 
-// Variable used to hold a number that can be used to verify that
-// the scene was ray traced correctly.
-let checkNumber: number;
-
 // ------------------------------------------------------------------------
 // ------------------------------------------------------------------------
 
@@ -541,6 +537,10 @@ class Engine {
   canvas: unknown = null; /* 2d context we can render to */
   options;
 
+  // Variable used to hold a number that can be used to verify that
+  // the scene was ray traced correctly.
+  checkNumber = 0;
+
   constructor(options: EngineOptions) {
     this.options = options;
 
@@ -561,14 +561,14 @@ class Engine {
       // this.canvas.fillRect(x * pxW, y * pxH, pxW, pxH);
     } else {
       if (x === y) {
-        checkNumber += color.brightness();
+        this.checkNumber += color.brightness();
       }
       // print(x * pxW, y * pxH, pxW, pxH);
     }
   }
 
   renderScene(scene: Scene, canvas: unknown) {
-    checkNumber = 0;
+    this.checkNumber = 0;
     /* Get canvas */
     if (canvas) {
       throw new Error("Not implemented: canvas");
@@ -592,7 +592,7 @@ class Engine {
         this.setPixel(x, y, color);
       }
     }
-    if (checkNumber !== 2321) {
+    if (this.checkNumber !== 2321) {
       throw new Error("Scene rendered incorrectly");
     }
   }
