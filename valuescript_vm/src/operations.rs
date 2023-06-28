@@ -7,6 +7,7 @@ use num_bigint::Sign;
 use num_traits::FromPrimitive;
 use num_traits::ToPrimitive;
 
+use crate::array_methods::op_sub_array;
 use crate::bigint_methods::op_sub_bigint;
 use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::range_error_builtin::ToRangeError;
@@ -416,7 +417,7 @@ pub fn op_sub(left: &mut Val, right: &Val) -> Result<Val, Val> {
             return Ok(Val::Number(array_data.elements.len() as f64));
           }
 
-          return Ok(array_data.object.sub(right));
+          return op_sub_array(array_data, right);
         }
         Some(i) => i,
       };
