@@ -311,9 +311,8 @@ abstract class UnaryConstraint extends Constraint {
  * optimization".
  */
 class StayConstraint extends UnaryConstraint {
-  constructor(v: Variable, str: Strength, planner: Planner) {
+  constructor(v: Variable, str: Strength) {
     super(v, str);
-    this.addConstraint(planner);
   }
 
   execute() {
@@ -330,9 +329,8 @@ class StayConstraint extends UnaryConstraint {
  * wishes to change.
  */
 class EditConstraint extends UnaryConstraint {
-  constructor(v: Variable, str: Strength, planner: Planner) {
+  constructor(v: Variable, str: Strength) {
     super(v, str);
-    this.addConstraint(planner);
   }
 
   /**
@@ -492,13 +490,11 @@ class ScaleConstraint extends BinaryConstraint {
     offset: Variable,
     dest: Variable,
     strength: Strength,
-    planner: Planner,
   ) {
     super(src, dest, strength);
     this.direction = Direction.NONE;
     this.scale = scale;
     this.offset = offset;
-    this.addConstraint(planner);
   }
 
   /**
@@ -557,10 +553,8 @@ class EqualityConstraint extends BinaryConstraint {
     var1: Variable,
     var2: Variable,
     strength: Strength,
-    planner: Planner,
   ) {
     super(var1, var2, strength);
-    this.addConstraint(planner);
   }
 
   /**
@@ -810,7 +804,8 @@ class Planner {
   }
 
   change(v: Variable, newValue: number) {
-    let edit = new EditConstraint(v, Strength.PREFERRED, this);
+    let edit = new EditConstraint(v, Strength.PREFERRED);
+    edit.addConstraint(this);
     let edits = new OrderedCollection<Constraint>();
     edits.add(edit);
     let plan = this.extractPlanFromConstraints(edits);
@@ -884,15 +879,19 @@ function chainTest(n: number) {
     let name = "v" + i;
     let v = new Variable(name);
     if (prev != null) {
-      new EqualityConstraint(prev, v, Strength.REQUIRED, planner);
+      let ec = new EqualityConstraint(prev, v, Strength.REQUIRED);
+      ec.addConstraint(planner);
     }
     if (i == 0) first = v;
     if (i == n) last = v;
     prev = v;
   }
 
-  new StayConstraint(last!, Strength.STRONG_DEFAULT, planner);
-  let edit = new EditConstraint(first!, Strength.PREFERRED, planner);
+  let sc = new StayConstraint(last!, Strength.STRONG_DEFAULT);
+  sc.addConstraint(planner);
+
+  let edit = new EditConstraint(first!, Strength.PREFERRED);
+  edit.addConstraint(planner);
   let edits = new OrderedCollection<EditConstraint>();
   edits.add(edit);
   let plan = planner.extractPlanFromConstraints(edits);
@@ -922,8 +921,10 @@ function projectionTest(n: number) {
     src = new Variable("src" + i, i);
     dst = new Variable("dst" + i, i);
     dests.add(dst);
-    new StayConstraint(src, Strength.NORMAL, planner);
-    new ScaleConstraint(src, scale, offset, dst, Strength.REQUIRED, planner);
+    let sc = new StayConstraint(src, Strength.NORMAL);
+    sc.addConstraint(planner);
+    let sc2 = new ScaleConstraint(src, scale, offset, dst, Strength.REQUIRED);
+    sc2.addConstraint(planner);
   }
 
   planner.change(src!, 17);
