@@ -119,8 +119,7 @@ impl<'a> ExpressionCompiler<'a> {
         return CompiledExpression::empty();
       }
       Cond(cond_exp) => {
-        self.fnc.todo(cond_exp.span, "Cond expression");
-        return CompiledExpression::empty();
+        return self.cond_expression(cond_exp, target_register);
       }
       Call(call_exp) => {
         return match &call_exp.callee {
@@ -663,6 +662,56 @@ impl<'a> ExpressionCompiler<'a> {
     self.fnc.push(sub_instr);
 
     CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
+  }
+
+  pub fn cond_expression(
+    &mut self,
+    cond_exp: &swc_ecma_ast::CondExpr,
+    target_register: Option<Register>,
+  ) -> CompiledExpression {
+    let mut nested_registers = vec![];
+
+    let dst = match target_register {
+      Some(reg) => reg,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
+
+        tmp
+      }
+    };
+
+    self.compile_into(&cond_exp.test, dst.clone());
+
+    let true_label = Label {
+      name: self
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"cond_true".to_string()),
+    };
+
+    let cond_end_label = Label {
+      name: self
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"cond_end".to_string()),
+    };
+
+    self.fnc.push(Instruction::JmpIf(
+      Value::Register(dst.take()),
+      true_label.ref_(),
+    ));
+
+    self.compile_into(&cond_exp.alt, dst.clone());
+    self.fnc.push(Instruction::Jmp(cond_end_label.ref_()));
+
+    self.fnc.label(true_label);
+
+    self.compile_into(&cond_exp.cons, dst.clone());
+
+    self.fnc.label(cond_end_label);
+
+    CompiledExpression::new(Value::Register(dst), nested_registers)
   }
 
   pub fn update_expression(
