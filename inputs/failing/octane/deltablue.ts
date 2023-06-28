@@ -1,5 +1,9 @@
 // //! bench()
 
+// Work in progress. Challenges:
+// - Lots of shared reference mutation
+// - Use of inheritance and constants requiring compile-time evaluation
+
 // Copyright 2008 the V8 project authors. All rights reserved.
 // Copyright 1996 John Maloney and Mario Wolczko.
 
@@ -947,5 +951,3 @@ export function deltaBlue() {
   chainTest(100);
   projectionTest(100);
 }
-
-deltaBlue();
