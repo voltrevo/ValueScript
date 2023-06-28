@@ -815,6 +815,10 @@ class Planner {
     }
     edit.destroyConstraint(this);
   }
+
+  addConstraint(c: Constraint) {
+    c.addConstraint(this);
+  }
 }
 
 /* --- *
@@ -879,19 +883,17 @@ function chainTest(n: number) {
     let name = "v" + i;
     let v = new Variable(name);
     if (prev != null) {
-      let ec = new EqualityConstraint(prev, v, Strength.REQUIRED);
-      ec.addConstraint(planner);
+      planner.addConstraint(new EqualityConstraint(prev, v, Strength.REQUIRED));
     }
     if (i == 0) first = v;
     if (i == n) last = v;
     prev = v;
   }
 
-  let sc = new StayConstraint(last!, Strength.STRONG_DEFAULT);
-  sc.addConstraint(planner);
+  planner.addConstraint(new StayConstraint(last!, Strength.STRONG_DEFAULT));
 
   let edit = new EditConstraint(first!, Strength.PREFERRED);
-  edit.addConstraint(planner);
+  planner.addConstraint(edit);
   let edits = new OrderedCollection<EditConstraint>();
   edits.add(edit);
   let plan = planner.extractPlanFromConstraints(edits);
@@ -921,10 +923,10 @@ function projectionTest(n: number) {
     src = new Variable("src" + i, i);
     dst = new Variable("dst" + i, i);
     dests.add(dst);
-    let sc = new StayConstraint(src, Strength.NORMAL);
-    sc.addConstraint(planner);
-    let sc2 = new ScaleConstraint(src, scale, offset, dst, Strength.REQUIRED);
-    sc2.addConstraint(planner);
+    planner.addConstraint(new StayConstraint(src, Strength.NORMAL));
+    planner.addConstraint(
+      new ScaleConstraint(src, scale, offset, dst, Strength.REQUIRED),
+    );
   }
 
   planner.change(src!, 17);
