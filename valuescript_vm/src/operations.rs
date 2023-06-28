@@ -1,7 +1,10 @@
 use std::mem::take;
 use std::rc::Rc;
+use std::str::FromStr;
 
+use num_bigint::BigInt;
 use num_bigint::Sign;
+use num_traits::FromPrimitive;
 use num_traits::ToPrimitive;
 
 use crate::bigint_methods::op_sub_bigint;
@@ -179,55 +182,61 @@ pub fn op_not(input: &Val) -> Val {
 
 pub fn op_less(left: &Val, right: &Val) -> Result<Val, Val> {
   Ok(Val::Bool(match (left, right) {
-    (Val::Undefined, Val::Undefined) => false,
+    (_, Val::Undefined) | (Val::Undefined, _) => false,
     (Val::Null, Val::Null) => false,
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool < right_bool,
     (Val::Number(left_number), Val::Number(right_number)) => left_number < right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string < right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint < right_bigint,
-    _ => {
-      if left.typeof_() == VsType::Undefined || right.typeof_() == VsType::Undefined {
-        false
-      } else {
-        return Err("TODO: op< with other types".to_error());
-      }
-    }
+    _ => match ecma_is_less_than(left, right) {
+      None => false,
+      Some(x) => x,
+    },
   }))
 }
 
 pub fn op_less_eq(left: &Val, right: &Val) -> Result<Val, Val> {
   Ok(Val::Bool(match (left, right) {
-    (Val::Undefined, Val::Undefined) => false,
+    (_, Val::Undefined) | (Val::Undefined, _) => false,
     (Val::Null, Val::Null) => true,
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool <= right_bool,
     (Val::Number(left_number), Val::Number(right_number)) => left_number <= right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string <= right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint <= right_bigint,
-    _ => return Err("TODO: op<= with other types".to_type_error()),
+    _ => match ecma_is_less_than(right, left) {
+      None => false,
+      Some(x) => !x,
+    },
   }))
 }
 
 pub fn op_greater(left: &Val, right: &Val) -> Result<Val, Val> {
   Ok(Val::Bool(match (left, right) {
-    (Val::Undefined, Val::Undefined) => false,
+    (_, Val::Undefined) | (Val::Undefined, _) => false,
     (Val::Null, Val::Null) => false,
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool > right_bool,
     (Val::Number(left_number), Val::Number(right_number)) => left_number > right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string > right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint > right_bigint,
-    _ => return Err("TODO: op> with other types".to_error()),
+    _ => match ecma_is_less_than(right, left) {
+      None => false,
+      Some(x) => x,
+    },
   }))
 }
 
 pub fn op_greater_eq(left: &Val, right: &Val) -> Result<Val, Val> {
   Ok(Val::Bool(match (left, right) {
-    (Val::Undefined, Val::Undefined) => false,
+    (_, Val::Undefined) | (Val::Undefined, _) => false,
     (Val::Null, Val::Null) => true,
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool >= right_bool,
     (Val::Number(left_number), Val::Number(right_number)) => left_number >= right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string >= right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint >= right_bigint,
-    _ => return Err("TODO: op>= with other types".to_type_error()),
+    (left, right) => match ecma_is_less_than(left, right) {
+      None => false,
+      Some(x) => !x,
+    },
   }))
 }
 
@@ -324,7 +333,9 @@ pub fn op_left_shift(left: &Val, right: &Val) -> Result<Val, Val> {
 pub fn op_right_shift(left: &Val, right: &Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => {
-      let right_i64 = right_bigint.to_i64().ok_or("TODO: handle i64 conversion failure".to_val())?;
+      let right_i64 = right_bigint
+        .to_i64()
+        .ok_or("TODO: handle i64 conversion failure".to_val())?;
       Ok(Val::BigInt(left_bigint >> right_i64))
     }
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -481,6 +492,82 @@ pub fn op_submov(target: &mut Val, subscript: &Val, value: Val) -> Result<(), Va
     Val::Static(_) => Err("Cannot assign to subscript of static value".to_type_error()),
     Val::Dynamic(_) => Err("TODO: Assign to subscript of dynamic value".to_type_error()),
     Val::CopyCounter(_) => Err("Cannot assign to subscript of CopyCounter".to_type_error()),
+  }
+}
+
+pub fn ecma_is_less_than(x: &Val, y: &Val) -> Option<bool> {
+  let px = x.to_primitive();
+  let py = y.to_primitive();
+
+  match (px, py) {
+    (Val::BigInt(x), Val::BigInt(y)) => Some(x < y),
+    (Val::String(x), Val::String(y)) => Some(x < y),
+    (Val::BigInt(x), Val::String(y)) => match BigInt::from_str(&y) {
+      Ok(y) => Some(x < y),
+      Err(_) => None,
+    },
+    (Val::String(x), Val::BigInt(y)) => match BigInt::from_str(&x) {
+      Ok(x) => Some(x < y),
+      Err(_) => None,
+    },
+    (Val::BigInt(x), y) => {
+      let y = y.to_number();
+
+      if y.is_nan() {
+        return None;
+      }
+
+      if y.abs() == f64::INFINITY {
+        return Some(y.is_sign_positive());
+      }
+
+      let y_floor = y.floor();
+      let y_floor_big = BigInt::from_f64(y_floor).unwrap();
+
+      if x < y_floor_big {
+        return Some(false);
+      }
+
+      if x == y_floor_big {
+        return Some(y != y_floor);
+      }
+
+      Some(false)
+    }
+    (x, Val::BigInt(y)) => {
+      let x = x.to_number();
+
+      if x.is_nan() {
+        return None;
+      }
+
+      if x.abs() == f64::INFINITY {
+        return Some(x.is_sign_negative());
+      }
+
+      let x_ceil = x.ceil();
+      let x_ceil_big = BigInt::from_f64(x_ceil).unwrap();
+
+      if x_ceil_big < y {
+        return Some(true);
+      }
+
+      if x_ceil_big == y {
+        return Some(x != x_ceil);
+      }
+
+      Some(false)
+    }
+    (x, y) => {
+      let x = x.to_number();
+      let y = y.to_number();
+
+      if x.is_nan() || y.is_nan() {
+        None
+      } else {
+        Some(x < y)
+      }
+    }
   }
 }
 
