@@ -1,7 +1,7 @@
 use std::{rc::Rc, str::Chars};
 
 use crate::{
-  builtins::error_builtin::ToError,
+  builtins::internal_error_builtin::ToInternalError,
   helpers::{to_wrapping_index, to_wrapping_index_clamped},
   iteration::string_iterator::StringIterator,
   native_function::{native_fn, NativeFunction},
@@ -104,7 +104,7 @@ static AT: NativeFunction = native_fn(|this, params| {
         None => "".to_val(),
       }
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -126,7 +126,7 @@ static CODE_POINT_AT: NativeFunction = native_fn(|this, params| {
         None => Val::Undefined,
       }
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -141,7 +141,7 @@ static CONCAT: NativeFunction = native_fn(|this, params| {
 
       result.to_val()
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -182,7 +182,7 @@ static ENDS_WITH: NativeFunction = native_fn(|this, params| {
 
       Val::Bool(true)
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -212,7 +212,7 @@ static INCLUDES: NativeFunction = native_fn(|this, params| {
         None => Val::Bool(false),
       }
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -242,7 +242,7 @@ static INDEX_OF: NativeFunction = native_fn(|this, params| {
         None => Val::Number(-1.0),
       }
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -272,7 +272,7 @@ static LAST_INDEX_OF: NativeFunction = native_fn(|this, params| {
         None => Val::Number(-1.0),
       }
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -280,9 +280,9 @@ static TODO_LOCALE: NativeFunction = native_fn(|this, _params| {
   // TODO: Ok(...)
   match this.get() {
     Val::String(_string_data) => {
-      return Err("TODO: locale".to_error());
+      return Err("TODO: locale".to_internal_error());
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   }
 });
 
@@ -290,9 +290,9 @@ static TODO_REGEXES: NativeFunction = native_fn(|this, _params| {
   // TODO: Ok(...)
   match this.get() {
     Val::String(_string_data) => {
-      return Err("TODO: regexes".to_error());
+      return Err("TODO: regexes".to_internal_error());
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   }
 });
 
@@ -301,9 +301,9 @@ static NORMALIZE: NativeFunction = native_fn(|this, _params| {
   match this.get() {
     Val::String(_string_data) => {
       // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
-      return Err("TODO: normalize".to_error());
+      return Err("TODO: normalize".to_internal_error());
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   }
 });
 
@@ -355,7 +355,7 @@ static PAD_END: NativeFunction = native_fn(|this, params| {
 
       string.to_val()
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -409,7 +409,7 @@ static PAD_START: NativeFunction = native_fn(|this, params| {
 
       prefix.to_val()
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -432,7 +432,7 @@ static REPEAT: NativeFunction = native_fn(|this, params| {
 
       result.to_val()
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -464,7 +464,7 @@ static SLICE: NativeFunction = native_fn(|this, params| {
 
       new_string.to_val()
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -528,7 +528,7 @@ static SPLIT: NativeFunction = native_fn(|this, params| {
 
       result.to_val()
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -567,7 +567,7 @@ static STARTS_WITH: NativeFunction = native_fn(|this, params| {
 
       Val::Bool(true)
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
@@ -608,62 +608,62 @@ static SUBSTRING: NativeFunction = native_fn(|this, params| {
 
       new_string.to_val()
     }
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
 static TO_LOWER_CASE: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::String(string_data) => string_data.to_lowercase().to_val(),
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
 static TO_STRING: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::String(string_data) => Val::String(string_data.clone()),
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
 static TO_UPPER_CASE: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::String(string_data) => string_data.to_uppercase().to_val(),
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
 static TRIM: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::String(string_data) => string_data.trim().to_val(),
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
 static TRIM_END: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::String(string_data) => string_data.trim_end().to_val(),
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
 static TRIM_START: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::String(string_data) => string_data.trim_start().to_val(),
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
 static VALUE_OF: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::String(string_data) => Val::String(string_data.clone()),
-    _ => return Err("string indirection".to_error()),
+    _ => return Err("string indirection".to_internal_error()),
   })
 });
 
 static VALUES: NativeFunction = native_fn(|this, _params| match this.get() {
   Val::String(string_data) => Ok(StringIterator::new(string_data.clone()).to_dynamic_val()),
-  _ => Err("string indirection".to_error()),
+  _ => Err("string indirection".to_internal_error()),
 });
 
 /**

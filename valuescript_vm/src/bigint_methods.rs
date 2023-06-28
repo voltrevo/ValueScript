@@ -1,7 +1,7 @@
 use num_bigint::BigInt;
 
 use crate::{
-  builtins::error_builtin::ToError,
+  builtins::internal_error_builtin::ToInternalError,
   native_function::{native_fn, NativeFunction},
   todo_fn::TODO,
   vs_value::{ToVal, Val},
@@ -21,18 +21,18 @@ static TO_STRING: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::BigInt(bigint) => match params.get(0) {
       Some(_) => {
-        return Err("TODO: toString with radix".to_error());
+        return Err("TODO: toString with radix".to_internal_error());
       }
 
       None => bigint.clone().to_val().to_string().to_val(),
     },
-    _ => return Err("TODO: bigint indirection".to_error()),
+    _ => return Err("TODO: bigint indirection".to_internal_error()),
   })
 });
 
 static VALUE_OF: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::BigInt(bigint) => Val::BigInt(bigint.clone()),
-    _ => return Err("TODO: bigint indirection".to_error()),
+    _ => return Err("TODO: bigint indirection".to_internal_error()),
   })
 });

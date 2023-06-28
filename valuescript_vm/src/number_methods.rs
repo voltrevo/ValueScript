@@ -1,4 +1,4 @@
-use crate::builtins::error_builtin::ToError;
+use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::range_error_builtin::ToRangeError;
 use crate::native_function::native_fn;
 use crate::vs_value::ToVal;
@@ -67,32 +67,32 @@ static TO_EXPONENTIAL: NativeFunction = native_fn(|this, params| {
       }
       None => format_exponential(*number, None),
     },
-    _ => return Err("number indirection".to_error()),
+    _ => return Err("number indirection".to_internal_error()),
   })
 });
 
 static TODO_LOCALE: NativeFunction = native_fn(|this, _params| match this.get() {
-  Val::Number(_number) => return Err("TODO: locale".to_error()),
-  _ => return Err("number indirection".to_error()),
+  Val::Number(_number) => return Err("TODO: locale".to_internal_error()),
+  _ => return Err("number indirection".to_internal_error()),
 });
 
 static TO_STRING: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Number(number) => match params.get(0) {
       Some(_) => {
-        return Err("TODO: toString with radix".to_error());
+        return Err("TODO: toString with radix".to_internal_error());
       }
 
       None => number.to_val().to_string().to_val(),
     },
-    _ => return Err("number indirection".to_error()),
+    _ => return Err("number indirection".to_internal_error()),
   })
 });
 
 static VALUE_OF: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
     Val::Number(number) => Val::Number(*number),
-    _ => return Err("number indirection".to_error()),
+    _ => return Err("number indirection".to_internal_error()),
   })
 });
 

@@ -7,7 +7,7 @@ use std::{
 use num_bigint::BigInt;
 
 use crate::{
-  builtins::{error_builtin::ToError, type_error_builtin::ToTypeError},
+  builtins::{internal_error_builtin::ToInternalError, type_error_builtin::ToTypeError},
   iteration::{iteration_result::IterationResult, return_this::RETURN_THIS},
   native_frame_function::NativeFrameFunction,
   native_function::ThisWrapper,
@@ -132,7 +132,7 @@ impl StackFrameTrait for GeneratorFrame {
   fn write_this(&mut self, const_: bool, this: Val) -> Result<(), Val> {
     let mut dynamic = match this {
       Val::Dynamic(dynamic) => dynamic,
-      _ => return Err("TODO: indirection".to_error()),
+      _ => return Err("TODO: indirection".to_internal_error()),
     };
 
     if const_ {

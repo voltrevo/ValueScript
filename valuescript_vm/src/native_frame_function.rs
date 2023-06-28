@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use num_bigint::BigInt;
 
-use crate::builtins::error_builtin::ToError;
+use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::stack_frame::StackFrame;
 use crate::vs_array::VsArray;
@@ -60,7 +60,7 @@ impl ValTrait for NativeFrameFunction {
   }
 
   fn sub(&self, _key: &Val) -> Result<Val, Val> {
-    Err("TODO: Subscript native function".to_error())
+    Err("TODO: Subscript native function".to_internal_error())
   }
 
   fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {

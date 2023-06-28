@@ -8,7 +8,7 @@ use num_traits::FromPrimitive;
 use num_traits::ToPrimitive;
 
 use crate::bigint_methods::op_sub_bigint;
-use crate::builtins::error_builtin::ToError;
+use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::range_error_builtin::ToRangeError;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::native_function::native_fn;
@@ -40,7 +40,7 @@ pub fn op_plus(left: &Val, right: &Val) -> Result<Val, Val> {
       (Some(left_bigint), Some(right_bigint)) => {
         return Ok(Val::BigInt(left_bigint + right_bigint));
       }
-      _ => return Err("TODO: plus with bigint and non-bigint".to_error()),
+      _ => return Err("TODO: plus with bigint and non-bigint".to_internal_error()),
     }
   }
 
@@ -131,7 +131,7 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
           left.codify(),
           right.codify()
         )
-        .to_error(),
+        .to_internal_error(),
       )
     }
   })
@@ -157,7 +157,7 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
       if left.typeof_() != right.typeof_() {
         false
       } else {
-        return Err("TODO: op=== with other types".to_error());
+        return Err("TODO: op=== with other types".to_internal_error());
       }
     }
   })
@@ -386,16 +386,16 @@ pub fn op_typeof(input: &Val) -> Val {
 }
 
 pub fn op_instance_of(_left: &Val, _right: &Val) -> Result<Val, Val> {
-  Err("TODO: op_instance_of".to_error())
+  Err("TODO: op_instance_of".to_internal_error())
 }
 
 pub fn op_in(_left: &Val, _right: &Val) -> Result<Val, Val> {
-  Err("TODO: op_in".to_error())
+  Err("TODO: op_in".to_internal_error())
 }
 
 pub fn op_sub(left: &mut Val, right: &Val) -> Result<Val, Val> {
   match left {
-    Val::Void => Err("Internal: Shouldn't happen".to_error()), // TODO: Internal errors
+    Val::Void => Err("Internal: Shouldn't happen".to_internal_error()), // TODO: Internal errors
     Val::Undefined => Err("Cannot subscript undefined".to_type_error()),
     Val::Null => Err("Cannot subscript null".to_type_error()),
     Val::Bool(_) => Ok(match right.to_string().as_str() {
@@ -450,7 +450,7 @@ pub fn op_sub(left: &mut Val, right: &Val) -> Result<Val, Val> {
 
 pub fn op_submov(target: &mut Val, subscript: &Val, value: Val) -> Result<(), Val> {
   match target {
-    Val::Void => Err("Internal: Shouldn't happen".to_error()), // TODO: Internal errors
+    Val::Void => Err("Internal: Shouldn't happen".to_internal_error()), // TODO: Internal errors
     Val::Undefined => Err("Cannot assign to subscript of undefined".to_type_error()),
     Val::Null => Err("Cannot assign to subscript of null".to_type_error()),
     Val::Bool(_) => Err("Cannot assign to subscript of bool".to_type_error()),

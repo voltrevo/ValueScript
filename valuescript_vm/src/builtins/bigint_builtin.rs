@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::builtin_object::BuiltinObject;
-use super::error_builtin::ToError;
+use super::internal_error_builtin::ToInternalError;
 use super::range_error_builtin::ToRangeError;
 use super::type_error_builtin::ToTypeError;
 
@@ -42,7 +42,7 @@ impl BuiltinObject for BigIntBuiltin {
           }
         }
         Some(Val::Undefined) | None => Err("Can't convert undefined to BigInt".to_type_error()),
-        _ => Err("TODO: Other BigInt conversions".to_error()),
+        _ => Err("TODO: Other BigInt conversions".to_internal_error()),
       }
     })
   }

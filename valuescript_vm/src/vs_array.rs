@@ -9,7 +9,7 @@ use crate::array_higher_functions::{
   array_flat_map::FLAT_MAP, array_map::MAP, array_reduce::REDUCE, array_reduce_right::REDUCE_RIGHT,
   array_some::SOME, array_sort::SORT,
 };
-use crate::builtins::error_builtin::ToError;
+use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::type_error_builtin::ToTypeError;
 use crate::helpers::{to_wrapping_index, to_wrapping_index_clamped};
 use crate::iteration::array_entries_iterator::ArrayEntriesIterator;
@@ -174,7 +174,7 @@ static AT: NativeFunction = native_fn(|this, params| {
       None => Val::Undefined,
       Some(i) => array_data.elements[i].clone(),
     },
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -198,7 +198,7 @@ static CONCAT: NativeFunction = native_fn(|this, params| {
 
       new_array.to_val()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -211,7 +211,7 @@ static COPY_WITHIN: NativeFunction = native_fn(|mut this, params| {
       let ulen = array_data_mut.elements.len();
 
       if ulen > isize::MAX as usize {
-        return Err("TODO: array len exceeds isize".to_error());
+        return Err("TODO: array len exceeds isize".to_internal_error());
       }
 
       let mut target = match params.get(0) {
@@ -269,13 +269,13 @@ static COPY_WITHIN: NativeFunction = native_fn(|mut this, params| {
 
       this.clone()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
 static ENTRIES: NativeFunction = native_fn(|this, _params| match this.get() {
   Val::Array(array_data) => Ok(ArrayEntriesIterator::new(array_data.clone()).to_dynamic_val()),
-  _ => Err("array indirection".to_error()),
+  _ => Err("array indirection".to_internal_error()),
 });
 
 static FILL: NativeFunction = native_fn(|mut this, params| {
@@ -304,7 +304,7 @@ static FILL: NativeFunction = native_fn(|mut this, params| {
 
       this.clone()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -312,7 +312,7 @@ static FLAT: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(array_data) => {
       if params.len() > 0 {
-        return Err("TODO: .flat depth parameter".to_error());
+        return Err("TODO: .flat depth parameter".to_internal_error());
       }
 
       let mut new_elems = Vec::<Val>::new();
@@ -332,7 +332,7 @@ static FLAT: NativeFunction = native_fn(|this, params| {
 
       new_elems.to_val()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -353,7 +353,7 @@ static INCLUDES: NativeFunction = native_fn(|this, params| {
 
       Val::Bool(false)
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -374,7 +374,7 @@ static INDEX_OF: NativeFunction = native_fn(|this, params| {
 
       Val::Number(-1.0)
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -410,7 +410,7 @@ static JOIN: NativeFunction = native_fn(|this, params| {
 
       res.to_val()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -431,7 +431,7 @@ static LAST_INDEX_OF: NativeFunction = native_fn(|this, params| {
 
       Val::Number(-1_f64)
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -455,7 +455,7 @@ static POP: NativeFunction = native_fn(|mut this, _params| {
         _ => removed_el,
       }
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -468,7 +468,7 @@ static PUSH: NativeFunction = native_fn(|mut this, mut params| {
       array_data_mut.elements.append(&mut params);
       (array_data_mut.elements.len() as f64).to_val()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -495,7 +495,7 @@ static REVERSE: NativeFunction = native_fn(|mut this, _params| {
 
       this.clone()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -512,7 +512,7 @@ static SHIFT: NativeFunction = native_fn(|mut this, _params| {
 
       array_data_mut.elements.remove(0)
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -537,7 +537,7 @@ static SLICE: NativeFunction = native_fn(|this, params| {
 
       new_elems.to_val()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -614,7 +614,7 @@ static SPLICE: NativeFunction = native_fn(|mut this, params| {
 
       deleted_elements.to_val()
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
@@ -637,11 +637,11 @@ static UNSHIFT: NativeFunction = native_fn(|mut this, params| {
 
       Val::Number(array_data_mut.elements.len() as f64)
     }
-    _ => return Err("array indirection".to_error()),
+    _ => return Err("array indirection".to_internal_error()),
   })
 });
 
 static VALUES: NativeFunction = native_fn(|this, _params| match this.get() {
   Val::Array(array_data) => Ok(ArrayIterator::new(array_data.clone()).to_dynamic_val()),
-  _ => Err("array indirection".to_error()),
+  _ => Err("array indirection".to_internal_error()),
 });

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::builtins::error_builtin::ToError;
+use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::bytecode::Bytecode;
 use crate::bytecode::DecoderMaker;
 use crate::first_stack_frame::FirstStackFrame;
@@ -48,7 +48,7 @@ impl VirtualMachine {
           }
         }
 
-        Err("step limit reached".to_error())
+        Err("step limit reached".to_internal_error())
       }
       None => {
         while self.stack.len() > 0 {
@@ -87,8 +87,12 @@ impl VirtualMachine {
         self.push(new_frame);
       }
       // TODO: Internal errors
-      FrameStepOk::Yield(_) => return self.handle_exception("Unexpected yield".to_error()),
-      FrameStepOk::YieldStar(_) => return self.handle_exception("Unexpected yield*".to_error()),
+      FrameStepOk::Yield(_) => {
+        return self.handle_exception("Unexpected yield".to_internal_error())
+      }
+      FrameStepOk::YieldStar(_) => {
+        return self.handle_exception("Unexpected yield*".to_internal_error())
+      }
     }
 
     Ok(())

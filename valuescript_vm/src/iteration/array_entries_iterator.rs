@@ -3,7 +3,7 @@ use std::{fmt, rc::Rc};
 use num_bigint::BigInt;
 
 use crate::{
-  builtins::{error_builtin::ToError, type_error_builtin::ToTypeError},
+  builtins::{internal_error_builtin::ToInternalError, type_error_builtin::ToTypeError},
   native_function::{native_fn, NativeFunction},
   vs_array::VsArray,
   vs_class::VsClass,
@@ -113,7 +113,7 @@ impl fmt::Display for ArrayEntriesIterator {
 static NEXT: NativeFunction = native_fn(|mut this, _| {
   let dynamic = match this.get_mut()? {
     Val::Dynamic(dynamic) => dynamic,
-    _ => return Err("TODO: indirection".to_error()),
+    _ => return Err("TODO: indirection".to_internal_error()),
   };
 
   let iter = dynamic_make_mut(dynamic)
