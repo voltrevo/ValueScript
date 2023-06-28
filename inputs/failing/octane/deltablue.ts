@@ -172,9 +172,9 @@ abstract class Constraint {
   /**
    * Activate this constraint and attempt to satisfy it.
    */
-  addConstraint(_c?: Constraint) {
+  addConstraint(planner: Planner, _c?: Constraint) {
     this.addToGraph();
-    planner!.incrementalAdd(this);
+    planner.incrementalAdd(this);
   }
 
   /**
@@ -184,7 +184,7 @@ abstract class Constraint {
    * there is one, or nil, if there isn't.
    * Assume: I am not already satisfied.
    */
-  satisfy(mark: number) {
+  satisfy(planner: Planner, mark: number) {
     this.chooseMethod(mark);
     if (!this.isSatisfied()) {
       if (this.strength == Strength.REQUIRED) {
@@ -197,15 +197,15 @@ abstract class Constraint {
     let overridden = out.determinedBy;
     if (overridden != null) overridden.markUnsatisfied();
     out.determinedBy = this;
-    if (!planner!.addPropagate(this, mark)) {
+    if (!planner.addPropagate(this, mark)) {
       throw new Error("Cycle encountered");
     }
     out.mark = mark;
     return overridden;
   }
 
-  destroyConstraint() {
-    if (this.isSatisfied()) planner!.incrementalRemove(this);
+  destroyConstraint(planner: Planner) {
+    if (this.isSatisfied()) planner.incrementalRemove(this);
     else this.removeFromGraph();
   }
 
@@ -311,9 +311,9 @@ abstract class UnaryConstraint extends Constraint {
  * optimization".
  */
 class StayConstraint extends UnaryConstraint {
-  constructor(v: Variable, str: Strength) {
+  constructor(v: Variable, str: Strength, planner: Planner) {
     super(v, str);
-    this.addConstraint();
+    this.addConstraint(planner);
   }
 
   execute() {
@@ -330,9 +330,9 @@ class StayConstraint extends UnaryConstraint {
  * wishes to change.
  */
 class EditConstraint extends UnaryConstraint {
-  constructor(v: Variable, str: Strength) {
+  constructor(v: Variable, str: Strength, planner: Planner) {
     super(v, str);
-    this.addConstraint();
+    this.addConstraint(planner);
   }
 
   /**
@@ -492,12 +492,13 @@ class ScaleConstraint extends BinaryConstraint {
     offset: Variable,
     dest: Variable,
     strength: Strength,
+    planner: Planner,
   ) {
     super(src, dest, strength);
     this.direction = Direction.NONE;
     this.scale = scale;
     this.offset = offset;
-    this.addConstraint();
+    this.addConstraint(planner);
   }
 
   /**
@@ -552,9 +553,14 @@ class ScaleConstraint extends BinaryConstraint {
  * Constrains two variables to have the same value.
  */
 class EqualityConstraint extends BinaryConstraint {
-  constructor(var1: Variable, var2: Variable, strength: Strength) {
+  constructor(
+    var1: Variable,
+    var2: Variable,
+    strength: Strength,
+    planner: Planner,
+  ) {
     super(var1, var2, strength);
-    this.addConstraint();
+    this.addConstraint(planner);
   }
 
   /**
@@ -641,9 +647,9 @@ class Planner {
    */
   incrementalAdd(c: Constraint) {
     let mark = this.newMark();
-    let overridden = c.satisfy(mark);
+    let overridden = c.satisfy(this, mark);
     while (overridden != null) {
-      overridden = overridden.satisfy(mark);
+      overridden = overridden.satisfy(this, mark);
     }
   }
 
@@ -802,6 +808,18 @@ class Planner {
       }
     }
   }
+
+  change(v: Variable, newValue: number) {
+    let edit = new EditConstraint(v, Strength.PREFERRED, this);
+    let edits = new OrderedCollection<Constraint>();
+    edits.add(edit);
+    let plan = this.extractPlanFromConstraints(edits);
+    for (let i = 0; i < 10; i++) {
+      v.value = newValue;
+      plan.execute();
+    }
+    edit.destroyConstraint(this);
+  }
 }
 
 /* --- *
@@ -858,7 +876,7 @@ class Plan {
  * two extremes.
  */
 function chainTest(n: number) {
-  planner = new Planner();
+  let planner = new Planner();
   let prev = null, first: Variable | null = null, last: Variable | null = null;
 
   // Build chain of n equality constraints
@@ -866,15 +884,15 @@ function chainTest(n: number) {
     let name = "v" + i;
     let v = new Variable(name);
     if (prev != null) {
-      new EqualityConstraint(prev, v, Strength.REQUIRED);
+      new EqualityConstraint(prev, v, Strength.REQUIRED, planner);
     }
     if (i == 0) first = v;
     if (i == n) last = v;
     prev = v;
   }
 
-  new StayConstraint(last!, Strength.STRONG_DEFAULT);
-  let edit = new EditConstraint(first!, Strength.PREFERRED);
+  new StayConstraint(last!, Strength.STRONG_DEFAULT, planner);
+  let edit = new EditConstraint(first!, Strength.PREFERRED, planner);
   let edits = new OrderedCollection<EditConstraint>();
   edits.add(edit);
   let plan = planner.extractPlanFromConstraints(edits);
@@ -894,7 +912,7 @@ function chainTest(n: number) {
  * mapping and to change the scale and offset factors.
  */
 function projectionTest(n: number) {
-  planner = new Planner();
+  let planner = new Planner();
   let scale = new Variable("scale", 10);
   let offset = new Variable("offset", 1000);
   let src: Variable | null = null, dst: Variable | null = null;
@@ -904,42 +922,27 @@ function projectionTest(n: number) {
     src = new Variable("src" + i, i);
     dst = new Variable("dst" + i, i);
     dests.add(dst);
-    new StayConstraint(src, Strength.NORMAL);
-    new ScaleConstraint(src, scale, offset, dst, Strength.REQUIRED);
+    new StayConstraint(src, Strength.NORMAL, planner);
+    new ScaleConstraint(src, scale, offset, dst, Strength.REQUIRED, planner);
   }
 
-  change(src!, 17);
+  planner.change(src!, 17);
   if (dst!.value != 1170) throw new Error("Projection 1 failed");
-  change(dst!, 1050);
+  planner.change(dst!, 1050);
   if (src!.value != 5) throw new Error("Projection 2 failed");
-  change(scale, 5);
+  planner.change(scale, 5);
   for (let i = 0; i < n - 1; i++) {
     if (dests.at(i).value != i * 5 + 1000) {
       throw new Error("Projection 3 failed");
     }
   }
-  change(offset, 2000);
+  planner.change(offset, 2000);
   for (let i = 0; i < n - 1; i++) {
     if (dests.at(i).value != i * 5 + 2000) {
       throw new Error("Projection 4 failed");
     }
   }
 }
-
-function change(v: Variable, newValue: number) {
-  let edit = new EditConstraint(v, Strength.PREFERRED);
-  let edits = new OrderedCollection<Constraint>();
-  edits.add(edit);
-  let plan = planner!.extractPlanFromConstraints(edits);
-  for (let i = 0; i < 10; i++) {
-    v.value = newValue;
-    plan.execute();
-  }
-  edit.destroyConstraint();
-}
-
-// Global variable holding the current planner.
-let planner: Planner | null = null;
 
 export function deltaBlue() {
   chainTest(100);
