@@ -11,6 +11,7 @@ export const orderedFiles = [
   "/tutorial/revertOnCatch.ts",
   "/tutorial/strings.ts",
   "/tutorial/const.ts",
+  "/tutorial/structuralComparison.ts",
   "/tutorial/binaryTree.ts",
   "/tutorial/specialFunctions.ts",
   "/tutorial/treeShaking.ts",

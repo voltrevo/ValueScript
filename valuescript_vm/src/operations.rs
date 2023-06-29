@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::mem::take;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -124,8 +125,64 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool == right_bool,
     (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
+    (Val::Number(left_number), Val::String(right_string)) => {
+      left_number.to_string() == **right_string
+    }
+    (Val::String(left_string), Val::Number(right_number)) => {
+      **left_string == right_number.to_string()
+    }
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
+    (Val::Array(left_array), Val::Array(right_array)) => 'b: {
+      if &**left_array as *const _ == &**right_array as *const _ {
+        break 'b true;
+      }
+
+      let len = left_array.elements.len();
+
+      if right_array.elements.len() != len {
+        break 'b false;
+      }
+
+      for (left_item, right_item) in left_array.elements.iter().zip(right_array.elements.iter()) {
+        if !op_eq_impl(left_item, right_item)? {
+          break 'b false;
+        }
+      }
+
+      true
+    }
+    (Val::Object(left_object), Val::Object(right_object)) => 'b: {
+      if left_object.prototype.is_some() || right_object.prototype.is_some() {
+        return Err("TODO: class instance comparison".to_internal_error());
+      }
+
+      if &**left_object as *const _ == &**right_object as *const _ {
+        break 'b true;
+      }
+
+      if !compare_btrees(
+        &left_object.string_map,
+        &right_object.string_map,
+        op_eq_impl,
+      )? {
+        break 'b false;
+      }
+
+      if !compare_btrees(
+        &left_object.symbol_map,
+        &right_object.symbol_map,
+        op_eq_impl,
+      )? {
+        break 'b false;
+      }
+
+      true
+    }
     _ => {
+      if left.is_truthy() != right.is_truthy() {
+        return Ok(false);
+      }
+
       return Err(
         format!(
           "TODO: op== with other types ({}, {})",
@@ -133,9 +190,32 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
           right.codify()
         )
         .to_internal_error(),
-      )
+      );
     }
   })
+}
+
+fn compare_btrees<K, Cmp>(
+  left: &BTreeMap<K, Val>,
+  right: &BTreeMap<K, Val>,
+  cmp: Cmp,
+) -> Result<bool, Val>
+where
+  Cmp: Fn(&Val, &Val) -> Result<bool, Val>,
+{
+  let symbol_len = left.len();
+
+  if right.len() != symbol_len {
+    return Ok(false);
+  }
+
+  for (left_value, right_value) in left.values().zip(right.values()) {
+    if !cmp(left_value, right_value)? {
+      return Ok(false);
+    }
+  }
+
+  Ok(true)
 }
 
 pub fn op_eq(left: &Val, right: &Val) -> Result<Val, Val> {
@@ -154,12 +234,65 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
     (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
-    _ => {
-      if left.typeof_() != right.typeof_() {
-        false
-      } else {
-        return Err("TODO: op=== with other types".to_internal_error());
+    (Val::Array(left_array), Val::Array(right_array)) => 'b: {
+      if &**left_array as *const _ == &**right_array as *const _ {
+        break 'b true;
       }
+
+      let len = left_array.elements.len();
+
+      if right_array.elements.len() != len {
+        break 'b false;
+      }
+
+      for (left_item, right_item) in left_array.elements.iter().zip(right_array.elements.iter()) {
+        if !op_triple_eq_impl(left_item, right_item)? {
+          break 'b false;
+        }
+      }
+
+      true
+    }
+    (Val::Object(left_object), Val::Object(right_object)) => 'b: {
+      if left_object.prototype.is_some() || right_object.prototype.is_some() {
+        return Err("TODO: class instance comparison".to_internal_error());
+      }
+
+      if &**left_object as *const _ == &**right_object as *const _ {
+        break 'b true;
+      }
+
+      if !compare_btrees(
+        &left_object.string_map,
+        &right_object.string_map,
+        op_triple_eq_impl,
+      )? {
+        break 'b false;
+      }
+
+      if !compare_btrees(
+        &left_object.symbol_map,
+        &right_object.symbol_map,
+        op_triple_eq_impl,
+      )? {
+        break 'b false;
+      }
+
+      true
+    }
+    (Val::Static(..) | Val::Dynamic(..) | Val::CopyCounter(..), _)
+    | (_, Val::Static(..) | Val::Dynamic(..) | Val::CopyCounter(..)) => {
+      if left.typeof_() != right.typeof_() {
+        return Ok(false);
+      }
+
+      return Err(
+        format!("TODO: op=== with special types ({}, {})", left, right).to_internal_error(),
+      );
+    }
+    _ => {
+      assert!(left.typeof_() != right.typeof_());
+      false
     }
   })
 }

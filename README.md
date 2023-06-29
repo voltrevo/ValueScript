@@ -434,6 +434,10 @@ not the subset of ValueScript that has actually been implemented.
 - Iterators
 - Spread operator on iterables
 - Generators
+- Structural comparison (not yet for class instances)
+  - `{} === {} -> true`
+  - JS: `-> false`
+  - This is a value semantics thing - objects don't have identity
 - Many unusual JS things:
   - `[] + [] -> ""`
   - `[10, 1, 3].sort() -> [1, 10, 3]`
@@ -468,10 +472,7 @@ not the subset of ValueScript that has actually been implemented.
     - Uses `.toString()` to get the source code and compiles and runs it in
       WebAssembly
   - C libraries, and bindings for python etc
-- Structural comparison
-  - `{} === {} -> true`
-  - JS: `-> false`
-  - This is a value semantics thing - objects don't have identity
+- Comparison of class instances and functions
 - Object spreading
 - Rest params
 - Async functions
