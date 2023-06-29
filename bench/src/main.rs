@@ -26,6 +26,8 @@ fn main() {
 
   files.sort();
 
+  let mut results = Vec::<f64>::new();
+
   for file_path in files {
     let file_contents = fs::read_to_string(&file_path).expect("Failed to read file contents");
 
@@ -83,6 +85,8 @@ fn main() {
 
     let mut vm = VirtualMachine::new();
 
+    let mut file_results = Vec::<f64>::new();
+
     let start = Instant::now();
 
     while Instant::now() - start < Duration::from_secs(1) {
@@ -90,15 +94,28 @@ fn main() {
       let result = vm.run(bytecode.clone(), None, &[]);
       let after = Instant::now();
 
-      print!("  {}ms", after.duration_since(before).as_millis());
+      let duration_ms = after.duration_since(before).as_millis();
+      print!("  {}ms", duration_ms);
+
+      file_results.push(duration_ms as f64);
 
       if let Err(result) = result {
         assert!(false, "{}", result.codify());
       }
     }
 
+    if file_results.len() > 2 {
+      results.push(geometric_mean(&file_results[1..file_results.len() - 1]));
+    } else {
+      results.push(geometric_mean(&file_results));
+    }
+
     println!();
   }
+
+  let score = geometric_mean(&results);
+
+  println!("\nScore: {}ms", score.round());
 
   if !failed_paths.is_empty() {
     assert!(false, "See failures above");
@@ -138,4 +155,8 @@ pub fn resolve_entry_path(entry_path: &String) -> ResolvedPath {
   let resolved_entry_path = resolve_path(&cwd_file, entry_path);
 
   resolved_entry_path
+}
+
+fn geometric_mean(vals: &[f64]) -> f64 {
+  vals.iter().product::<f64>().powf(1.0 / vals.len() as f64)
 }

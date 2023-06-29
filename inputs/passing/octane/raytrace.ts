@@ -1,3 +1,5 @@
+//! bench()
+
 // The ray tracer code in this file is written by Adam Burmister. It
 // is available in its original form from:
 //
@@ -616,7 +618,7 @@ class Engine {
     for (let i = 0; i < scene.shapes.length; i++) {
       let shape = scene.shapes[i];
 
-      if (shape != exclude) {
+      if (!shapesEq(shape, exclude)) {
         let info = shape.intersect(ray);
         if (
           info.isHit && info.distance! >= 0 && info.distance! < best.distance!
@@ -714,7 +716,10 @@ class Engine {
         shadowInfo = this.testIntersection(shadowRay, scene, info.shape);
         if (
           shadowInfo.isHit &&
-          shadowInfo.shape != info.shape /*&& shadowInfo.shape.type != 'PLANE'*/
+          !shapesEq(
+            shadowInfo.shape,
+            info.shape,
+          ) /*&& shadowInfo.shape.type != 'PLANE'*/
         ) {
           let vA = Color.multiplyScalar(color, 0.5);
           let dB = 0.5 * Math.pow(shadowInfo.shape!.material.transparency, 0.5);
@@ -755,6 +760,15 @@ class Engine {
     color.limit();
     return color;
   }
+}
+
+function shapesEq(left: Shape | null, right: Shape | null) {
+  if (left === null || right === null) {
+    return left === right;
+  }
+
+  // TODO: class instance comparison
+  return left.toString() === right.toString();
 }
 
 export default function renderScene() {
