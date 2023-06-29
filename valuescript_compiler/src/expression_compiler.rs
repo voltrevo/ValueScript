@@ -698,7 +698,7 @@ impl<'a> ExpressionCompiler<'a> {
     };
 
     self.fnc.push(Instruction::JmpIf(
-      Value::Register(dst.take()),
+      Value::Register(dst.clone()),
       true_label.ref_(),
     ));
 
