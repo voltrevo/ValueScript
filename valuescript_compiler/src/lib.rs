@@ -12,7 +12,7 @@ mod instruction_mutates_this;
 mod link_module;
 mod module_compiler;
 mod name_allocator;
-mod optimize;
+mod optimization;
 mod resolve_path;
 mod scope;
 mod scope_analysis;

@@ -4,10 +4,11 @@ use crate::asm::{Definition, DefinitionContent, FnLine, Instruction, Object, Poi
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
 use crate::name_allocator::NameAllocator;
+use crate::optimization::optimize;
 use crate::resolve_path::{resolve_path, ResolvedPath};
 use crate::visit_pointers::{visit_pointers, PointerVisitation};
+use crate::DiagnosticLevel;
 use crate::{asm::Module, Diagnostic};
-use crate::{optimize::optimize, DiagnosticLevel};
 
 pub struct LinkModuleResult {
   pub module: Option<Module>,
