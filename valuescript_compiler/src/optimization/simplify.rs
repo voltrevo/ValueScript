@@ -24,7 +24,7 @@ pub fn simplify(module: &mut Module) {
 #[derive(Default)]
 struct FnState {
   mutable_this_established: bool,
-  registers: HashMap<Register, Value>,
+  registers: HashMap<String, Value>,
 }
 
 impl FnState {
@@ -130,7 +130,7 @@ impl FnState {
   fn simplify_arg(&self, arg: &mut Value) {
     arg.visit_values_mut(&mut |value| {
       if let Value::Register(reg) = value {
-        if let Some(new_value) = self.registers.get(reg) {
+        if let Some(new_value) = self.registers.get(&reg.name) {
           *value = new_value.clone();
         }
       }
@@ -148,21 +148,19 @@ impl FnState {
         Instruction::OpInc(reg) => {
           // TODO: Use apply_binary_op?
 
-          let new_value = match self.registers.get(reg) {
+          let new_value = match self.registers.get(&reg.name) {
             Some(Value::Number(Number(x))) => Some(Value::Number(Number(x + 1.0))),
             Some(Value::BigInt(x)) => Some(Value::BigInt(x + BigInt::from(1))),
-            Some(_) => None,
-            None => return,
+            Some(_) | None => None,
           };
 
           self.set_register(reg, new_value);
         }
         Instruction::OpDec(reg) => {
-          let new_value = match self.registers.get(reg) {
+          let new_value = match self.registers.get(&reg.name) {
             Some(Value::Number(Number(x))) => Some(Value::Number(Number(x - 1.0))),
             Some(Value::BigInt(x)) => Some(Value::BigInt(x - BigInt::from(1))),
-            Some(_) => None,
-            None => return,
+            Some(_) | None => None,
           };
 
           self.set_register(reg, new_value);
@@ -255,10 +253,15 @@ impl FnState {
           self.set_register(dst, None);
         }
 
-        Instruction::Apply(_a1, _this, _a3, dst) => self.set_register(dst, None),
+        Instruction::Apply(_a, this, _a3, dst)
+        | Instruction::SubCall(this, _a, _a3, dst)
+        | Instruction::ThisSubCall(this, _a, _a3, dst) => {
+          if let Value::Register(this) = this {
+            self.set_register(this, None);
+          }
 
-        Instruction::SubCall(_this, _a2, _a3, dst)
-        | Instruction::ThisSubCall(_this, _a2, _a3, dst) => self.set_register(dst, None),
+          self.set_register(dst, None);
+        }
 
         Instruction::ConstSubCall(_a1, _a2, _a3, dst) => self.set_register(dst, None),
 
@@ -286,7 +289,7 @@ impl FnState {
   }
 
   fn set_register(&mut self, reg: &Register, value: Option<Value>) {
-    let mut registers_to_clear = HashSet::<Register>::new();
+    let mut registers_to_clear = HashSet::<String>::new();
 
     for (k, v) in &mut self.registers {
       v.visit_values_mut(&mut |value| {
@@ -303,8 +306,8 @@ impl FnState {
     }
 
     match value {
-      Some(value) => self.registers.insert(reg.clone(), value),
-      None => self.registers.remove(reg),
+      Some(value) => self.registers.insert(reg.name.clone(), value),
+      None => self.registers.remove(&reg.name),
     };
   }
 

@@ -244,6 +244,13 @@ impl Register {
     }
   }
 
+  pub fn copy(&self) -> Self {
+    Register {
+      take: false,
+      name: self.name.clone(),
+    }
+  }
+
   pub fn is_return(&self) -> bool {
     return self.name == "return";
   }
