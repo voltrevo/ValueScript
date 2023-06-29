@@ -30,5 +30,6 @@ pub use gather_modules::gather_modules;
 pub use link_module::link_module;
 pub use module_compiler::compile_module;
 pub use module_compiler::CompilerOutput;
+pub use optimization::try_to_val::TryToVal;
 pub use resolve_path::resolve_path;
 pub use resolve_path::ResolvedPath;

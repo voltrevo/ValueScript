@@ -2243,6 +2243,7 @@ dependencies = [
  "swc_ecma_ast",
  "swc_ecma_parser",
  "valuescript_common",
+ "valuescript_vm",
 ]
 
 [[package]]

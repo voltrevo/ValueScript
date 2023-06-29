@@ -3,5 +3,7 @@ mod extract_constants;
 mod optimize;
 mod shake_tree;
 mod simplify;
+pub mod try_to_val;
+pub mod try_to_value;
 
 pub use optimize::optimize;

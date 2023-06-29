@@ -18,3 +18,4 @@ swc_ecma_ast = "0.76.0"
 queues = "1.0.2"
 
 valuescript_common = { path = "../valuescript_common" }
+valuescript_vm = { path = "../valuescript_vm" }

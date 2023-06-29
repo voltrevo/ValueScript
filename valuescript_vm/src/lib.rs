@@ -29,4 +29,5 @@ pub mod vs_value;
 
 pub use bytecode::Bytecode;
 pub use virtual_machine::VirtualMachine;
+pub use vs_symbol::VsSymbol;
 pub use vs_value::{LoadFunctionResult, ValTrait};
