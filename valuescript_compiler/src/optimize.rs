@@ -1,15 +1,15 @@
 use std::collections::{HashMap, HashSet};
 use std::mem::take;
 
-use crate::asm::Module;
 use crate::asm::{Definition, DefinitionContent, FnLine, InstructionFieldMut, Pointer, Value};
+use crate::asm::{Module, Number};
 use crate::name_allocator::NameAllocator;
 use crate::visit_pointers::{visit_pointers, PointerVisitation};
 
 pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
   collapse_pointers_of_pointers(module);
-  shake_tree(module);
   extract_constants(module, pointer_allocator);
+  shake_tree(module);
 }
 
 fn collapse_pointers_of_pointers(module: &mut Module) {
@@ -45,6 +45,7 @@ fn collapse_pointers_of_pointers(module: &mut Module) {
 
 fn shake_tree(module: &mut Module) {
   let mut dependency_graph = HashMap::<Pointer, HashSet<Pointer>>::new();
+  let mut reverse_dependency_graph = HashMap::<Pointer, HashSet<Pointer>>::new();
   let mut pointers_to_include = Vec::<Pointer>::new();
 
   visit_pointers(module, |visitation| match visitation {
@@ -57,62 +58,142 @@ fn shake_tree(module: &mut Module) {
         .entry(owner.clone())
         .or_default()
         .insert(pointer.clone());
+
+      reverse_dependency_graph
+        .entry(pointer.clone())
+        .or_default()
+        .insert(owner.clone());
     }
   });
 
-  let mut pointers_included = HashSet::<Pointer>::new();
-  let mut pointers_to_include_i = 0;
+  let mut required_pointers = HashSet::<Pointer>::new();
 
-  while pointers_to_include_i < pointers_to_include.len() {
-    let pointer = &pointers_to_include[pointers_to_include_i];
-    pointers_to_include_i += 1;
+  for p in &pointers_to_include {
+    gather_required_pointers(p, &mut required_pointers, &dependency_graph)
+  }
 
-    pointers_included.insert(pointer.clone());
+  let mut ordered_pointers = Vec::<Pointer>::new();
+  let mut pointers_in_progress = HashSet::<Pointer>::new();
 
-    if let Some(dependencies) = dependency_graph.get(pointer) {
-      // TODO: Avoid randomness caused by HashSet iteration
-      for dependency in dependencies {
-        if !pointers_included.contains(dependency) {
-          pointers_to_include.push(dependency.clone());
-        }
-      }
-    }
+  for p in pointers_to_include {
+    include_pointer(
+      &p,
+      &mut ordered_pointers,
+      &mut dependency_graph,
+      &mut reverse_dependency_graph,
+      &mut pointers_in_progress,
+      &required_pointers,
+    );
   }
 
   let previous_definitions = std::mem::take(&mut module.definitions);
   let mut new_definitions_map = HashMap::<Pointer, Definition>::new();
 
   for definition in previous_definitions {
-    if pointers_included.contains(&definition.pointer) {
+    if required_pointers.contains(&definition.pointer) {
       new_definitions_map.insert(definition.pointer.clone(), definition);
     }
   }
 
   let mut new_definitions = Vec::<Definition>::new();
 
-  for pointer in &pointers_to_include {
-    let defn = new_definitions_map.get_mut(pointer).unwrap();
+  for pointer in &ordered_pointers {
+    if required_pointers.contains(pointer) {
+      let defn = new_definitions_map.get_mut(pointer).unwrap();
 
-    if let DefinitionContent::Value(_) = defn.content {
-      // Exclude values on the first pass. TODO: Proper depth-first search (+reverse) to ensure
-      // correct ordering.
-      continue;
-    }
+      // First include pointers that are allowed to be circular
+      match &defn.content {
+        DefinitionContent::Function(..) | DefinitionContent::Class(..) => {}
+        DefinitionContent::Value(..) | DefinitionContent::Lazy(..) => continue,
+      }
 
-    if defn.pointer.name != "" {
       new_definitions.push(take(defn));
     }
   }
 
-  for pointer in pointers_to_include {
-    let defn = new_definitions_map.get_mut(&pointer).unwrap();
+  for pointer in ordered_pointers {
+    if required_pointers.contains(&pointer) {
+      let defn = new_definitions_map.get_mut(&pointer).unwrap();
 
-    if defn.pointer.name != "" {
+      if defn.pointer.name == "" {
+        // "" isn't a valid pointer name - this happens when `take` has already been used on the
+        // definition
+        continue;
+      }
+
       new_definitions.push(take(defn));
     }
   }
 
   module.definitions = new_definitions;
+}
+
+fn include_pointer(
+  p: &Pointer,
+  ordered_pointers: &mut Vec<Pointer>,
+  dependency_graph: &HashMap<Pointer, HashSet<Pointer>>,
+  reverse_dependency_graph: &HashMap<Pointer, HashSet<Pointer>>,
+  pointers_in_progress: &mut HashSet<Pointer>,
+  required_pointers: &HashSet<Pointer>,
+) {
+  if pointers_in_progress.contains(p) {
+    return;
+  }
+
+  pointers_in_progress.insert(p.clone());
+
+  // include things that depend on p
+  if let Some(rev_deps) = reverse_dependency_graph.get(p) {
+    for rev_dep in rev_deps {
+      if required_pointers.contains(rev_dep) {
+        include_pointer(
+          rev_dep,
+          ordered_pointers,
+          dependency_graph,
+          reverse_dependency_graph,
+          pointers_in_progress,
+          required_pointers,
+        );
+      }
+    }
+  }
+
+  // include p
+  ordered_pointers.push(p.clone());
+
+  // include p's dependencies
+  if let Some(deps) = dependency_graph.get(p) {
+    for dep in deps {
+      include_pointer(
+        dep,
+        ordered_pointers,
+        dependency_graph,
+        reverse_dependency_graph,
+        pointers_in_progress,
+        required_pointers,
+      )
+    }
+  }
+}
+
+fn gather_required_pointers(
+  p: &Pointer,
+  required_pointers: &mut HashSet<Pointer>,
+  dependency_graph: &HashMap<Pointer, HashSet<Pointer>>,
+) {
+  let inserted = required_pointers.insert(p.clone());
+
+  if !inserted {
+    // This pointer is already in progress, so don't redundantly include it.
+    // This indicates a circular dependency, which is perfectly fine for functions.
+    return;
+  }
+
+  if let Some(deps) = dependency_graph.get(p) {
+    for dep in deps {
+      gather_required_pointers(dep, required_pointers, dependency_graph);
+    }
+  }
 }
 
 fn extract_constants(module: &mut Module, pointer_allocator: &mut NameAllocator) {
@@ -157,13 +238,66 @@ fn extract_constants(module: &mut Module, pointer_allocator: &mut NameAllocator)
 }
 
 fn should_extract_value_as_constant(value: &Value) -> Option<String> {
-  if let Value::String(s) = value {
-    if s.len() >= 4 {
-      return Some(mangle_string(s));
-    }
+  if !is_constant(value) {
+    return None;
   }
 
-  None
+  match value {
+    Value::Void
+    | Value::Undefined
+    | Value::Null
+    | Value::Bool(..)
+    | Value::Number(Number(..))
+    | Value::BigInt(..)
+    | Value::Pointer(..)
+    | Value::Builtin(..)
+    | Value::Register(..) => None,
+    Value::String(s) => {
+      if s.len() >= 4 {
+        Some(mangle_string(s))
+      } else {
+        None
+      }
+    }
+    Value::Array(array) => {
+      if array.values.iter().all(is_constant) {
+        Some("array".to_string())
+      } else {
+        None
+      }
+    }
+    Value::Object(object) => {
+      if object
+        .properties
+        .iter()
+        .all(|(k, v)| is_constant(k) && is_constant(v))
+      {
+        Some("object".to_string())
+      } else {
+        None
+      }
+    }
+  }
+}
+
+fn is_constant(value: &Value) -> bool {
+  match value {
+    Value::Void
+    | Value::Undefined
+    | Value::Null
+    | Value::Bool(..)
+    | Value::Number(Number(..))
+    | Value::BigInt(..)
+    | Value::String(..)
+    | Value::Pointer(..)
+    | Value::Builtin(..) => true,
+    Value::Register(..) => false,
+    Value::Array(array) => array.values.iter().all(is_constant),
+    Value::Object(object) => object
+      .properties
+      .iter()
+      .all(|(k, v)| is_constant(k) && is_constant(v)),
+  }
 }
 
 fn mangle_string(s: &String) -> String {
