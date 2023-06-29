@@ -71,17 +71,18 @@ fn should_extract_value_as_constant(value: &Value) -> Option<String> {
       }
     }
     Value::Array(array) => {
-      if array.values.iter().all(is_constant) {
+      if array.values.len() >= 1 && array.values.iter().all(is_constant) {
         Some("array".to_string())
       } else {
         None
       }
     }
     Value::Object(object) => {
-      if object
-        .properties
-        .iter()
-        .all(|(k, v)| is_constant(k) && is_constant(v))
+      if object.properties.len() >= 1
+        && object
+          .properties
+          .iter()
+          .all(|(k, v)| is_constant(k) && is_constant(v))
       {
         Some("object".to_string())
       } else {
