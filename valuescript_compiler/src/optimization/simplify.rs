@@ -29,7 +29,7 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function) {
       FnLine::Instruction(instr) => {
         if let Instruction::RequireMutableThis = instr {
           if state.mutable_this_established {
-            *line = FnLine::Empty;
+            *line = FnLine::Comment(line.to_string());
           } else {
             state.mutable_this_established = true;
           }
