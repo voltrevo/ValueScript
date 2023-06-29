@@ -12,11 +12,13 @@ mod instruction_mutates_this;
 mod link_module;
 mod module_compiler;
 mod name_allocator;
+mod optimize;
 mod resolve_path;
 mod scope;
 mod scope_analysis;
 mod static_eval_expr;
 mod target_accessor;
+mod visit_pointers;
 
 pub use assembler::assemble;
 pub use assembly_parser::parse_module;
