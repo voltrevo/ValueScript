@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::mem::take;
 
 use crate::asm::Module;
@@ -6,8 +6,8 @@ use crate::asm::{Definition, DefinitionContent, Pointer};
 use crate::visit_pointers::{visit_pointers, PointerVisitation};
 
 pub fn shake_tree(module: &mut Module) {
-  let mut dependency_graph = HashMap::<Pointer, HashSet<Pointer>>::new();
-  let mut reverse_dependency_graph = HashMap::<Pointer, HashSet<Pointer>>::new();
+  let mut dependency_graph = BTreeMap::<Pointer, BTreeSet<Pointer>>::new();
+  let mut reverse_dependency_graph = BTreeMap::<Pointer, BTreeSet<Pointer>>::new();
   let mut pointers_to_include = Vec::<Pointer>::new();
 
   visit_pointers(module, |visitation| match visitation {
@@ -93,8 +93,8 @@ pub fn shake_tree(module: &mut Module) {
 fn include_pointer(
   p: &Pointer,
   ordered_pointers: &mut Vec<Pointer>,
-  dependency_graph: &HashMap<Pointer, HashSet<Pointer>>,
-  reverse_dependency_graph: &HashMap<Pointer, HashSet<Pointer>>,
+  dependency_graph: &BTreeMap<Pointer, BTreeSet<Pointer>>,
+  reverse_dependency_graph: &BTreeMap<Pointer, BTreeSet<Pointer>>,
   pointers_in_progress: &mut HashSet<Pointer>,
   required_pointers: &HashSet<Pointer>,
 ) {
@@ -141,7 +141,7 @@ fn include_pointer(
 fn gather_required_pointers(
   p: &Pointer,
   required_pointers: &mut HashSet<Pointer>,
-  dependency_graph: &HashMap<Pointer, HashSet<Pointer>>,
+  dependency_graph: &BTreeMap<Pointer, BTreeSet<Pointer>>,
 ) {
   let inserted = required_pointers.insert(p.clone());
 

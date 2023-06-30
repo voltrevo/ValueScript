@@ -107,7 +107,7 @@ impl std::fmt::Display for DefinitionContent {
   }
 }
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct Pointer {
   pub name: String,
 }
@@ -209,7 +209,7 @@ impl std::fmt::Display for Class {
   }
 }
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct Register {
   pub take: bool,
   pub name: String,

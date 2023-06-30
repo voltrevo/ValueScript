@@ -1,6 +1,6 @@
 use queues::*;
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::mem::take;
 use std::rc::Rc;
 
@@ -694,10 +694,10 @@ impl FunctionCompiler {
 
     self.apply_catch_setting();
 
-    let mut snap_pairs = HashSet::<(Register, Register)>::new();
+    let mut snap_pairs = BTreeSet::<(Register, Register)>::new();
 
     if try_.handler.is_some() {
-      let snap_registers: HashSet<Register> = self.get_mutated_registers(try_.block.span);
+      let snap_registers = self.get_mutated_registers(try_.block.span);
 
       for reg in snap_registers {
         if !reg.is_named() {
@@ -1181,7 +1181,7 @@ impl FunctionCompiler {
     compiled_expr.release_checker.has_unreleased_registers = false;
   }
 
-  fn get_mutated_registers(&self, span: swc_common::Span) -> HashSet<Register> {
+  fn get_mutated_registers(&self, span: swc_common::Span) -> BTreeSet<Register> {
     let start = swc_common::Span {
       lo: span.lo,
       hi: span.lo,
@@ -1194,7 +1194,7 @@ impl FunctionCompiler {
       ctxt: span.ctxt,
     };
 
-    let mut mutated_registers = HashSet::<Register>::new();
+    let mut mutated_registers = BTreeSet::<Register>::new();
 
     for (_span, mutated_name_id) in self.scope_analysis.mutations.range(start..end) {
       if let Some(Value::Register(reg)) = self.lookup_by_name_id(mutated_name_id) {
