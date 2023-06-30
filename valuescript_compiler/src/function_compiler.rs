@@ -218,6 +218,14 @@ impl FunctionCompiler {
     self.current.body.push(FnLine::Release(reg.clone()));
   }
 
+  pub fn insert_all_releases(&mut self) {
+    for reg in self.reg_allocator.all_used() {
+      if !reg.is_special() {
+        self.current.body.push(FnLine::Release(reg));
+      }
+    }
+  }
+
   pub fn compile(
     definition_pointer: Pointer,
     fn_name: Option<String>,
@@ -340,6 +348,8 @@ impl FunctionCompiler {
         };
       }
     };
+
+    self.insert_all_releases();
 
     if let Some(end_label) = self.end_label.as_ref() {
       self.current.body.push(FnLine::Label(end_label.clone()));
@@ -493,6 +503,7 @@ impl FunctionCompiler {
             self.push(Instruction::Mov(Value::Bool(true), is_returning.clone()));
             self.push(Instruction::Jmp(finally_label.ref_()));
           } else {
+            self.insert_all_releases();
             self.push(Instruction::End);
           }
         }

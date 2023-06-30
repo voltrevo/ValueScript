@@ -274,6 +274,10 @@ impl Register {
     return self.name == "ignore";
   }
 
+  pub fn is_special(&self) -> bool {
+    return self.is_return() || self.is_this() || self.is_ignore();
+  }
+
   pub fn value_type(&self) -> ValueType {
     if self.take {
       ValueType::TakeRegister

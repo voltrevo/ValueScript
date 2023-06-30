@@ -1,10 +1,10 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use crate::asm::{Pointer, Register};
 
 #[derive(Default, Clone)]
 pub struct NameAllocator {
-  used_names: HashSet<String>,
+  used_names: BTreeSet<String>,
   released_names: Vec<String>,
 }
 
@@ -148,6 +148,16 @@ impl RegAllocator {
       true => self.alloc.release(&reg.name),
       false => panic!("Can't release non-named register"),
     }
+  }
+
+  pub fn all_used(&self) -> Vec<Register> {
+    let mut res = Vec::<Register>::new();
+
+    for name in &self.alloc.used_names {
+      res.push(Register::named(name.clone()));
+    }
+
+    res
   }
 }
 
