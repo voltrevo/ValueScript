@@ -565,6 +565,10 @@ impl FunctionCompiler {
 
         self.push(instr);
         self.release_ce(arg);
+
+        if self.catch_settings.is_empty() {
+          self.insert_all_releases();
+        }
       }
       Try(try_) => {
         self.try_(try_);
