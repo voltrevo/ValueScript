@@ -551,9 +551,10 @@ impl FunctionCompiler {
         let mut expression_compiler = ExpressionCompiler { fnc: self };
 
         let arg = expression_compiler.compile(&throw.arg, None);
-        let instr = Instruction::Throw(self.use_(arg));
+        let instr = Instruction::Throw(arg.value.clone());
 
         self.push(instr);
+        self.release_ce(arg);
       }
       Try(try_) => {
         self.try_(try_);
@@ -587,19 +588,16 @@ impl FunctionCompiler {
   }
 
   fn if_(&mut self, if_: &swc_ecma_ast::IfStmt) {
-    let mut expression_compiler = ExpressionCompiler { fnc: self };
+    let mut ec = ExpressionCompiler { fnc: self };
 
-    let condition = expression_compiler.compile(&*if_.test, None);
-
-    // Usually we wouldn't capture the value_assembly before release, but
-    // it's safe to do so here, and allows cond_reg to re-use a register
-    // from the condition
-    let condition_asm = self.use_(condition);
-
-    let cond_reg = self.allocate_numbered_reg("_cond");
+    let cond_reg = ec.fnc.allocate_numbered_reg("_cond");
+    ec.compile_into(&*if_.test, cond_reg.clone());
 
     // TODO: Add negated jmpif instruction to avoid this
-    self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
+    self.push(Instruction::OpNot(
+      Value::Register(cond_reg.clone()),
+      cond_reg.clone(),
+    ));
 
     let else_label = Label {
       name: self.label_allocator.allocate_numbered(&"else".to_string()),
@@ -867,19 +865,16 @@ impl FunctionCompiler {
 
     self.label(start_label.clone());
 
-    let mut expression_compiler = ExpressionCompiler { fnc: self };
+    let mut ec = ExpressionCompiler { fnc: self };
 
-    let condition = expression_compiler.compile(&*while_.test, None);
-
-    // Usually we wouldn't capture the value_assembly before release, but
-    // it's safe to do so here, and allows cond_reg to re-use a register
-    // from the condition
-    let condition_asm = self.use_(condition);
-
-    let cond_reg = self.allocate_numbered_reg(&"_cond".to_string());
+    let cond_reg = ec.fnc.allocate_numbered_reg(&"_cond".to_string());
+    ec.compile_into(&*while_.test, cond_reg.clone());
 
     // TODO: Add negated jmpif instruction to avoid this
-    self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
+    self.push(Instruction::OpNot(
+      Value::Register(cond_reg.clone()),
+      cond_reg.clone(),
+    ));
 
     self.push(Instruction::JmpIf(
       Value::Register(cond_reg.clone()),
@@ -928,8 +923,12 @@ impl FunctionCompiler {
 
     self.label(continue_label);
 
-    let jmpif = Instruction::JmpIf(self.use_(condition), start_label.ref_());
-    self.push(jmpif);
+    self.push(Instruction::JmpIf(
+      condition.value.clone(),
+      start_label.ref_(),
+    ));
+
+    self.release_ce(condition);
 
     self.label(end_label);
 
@@ -978,17 +977,14 @@ impl FunctionCompiler {
       Some(cond) => {
         let mut ec = ExpressionCompiler { fnc: self };
 
-        let condition = ec.compile(cond, None);
-
-        // Usually we wouldn't capture the value_assembly before release, but
-        // it's safe to do so here, and allows cond_reg to re-use a register
-        // from the condition
-        let condition_asm = self.use_(condition);
-
-        let cond_reg = self.allocate_numbered_reg("_cond");
+        let cond_reg = ec.fnc.allocate_numbered_reg("_cond");
+        ec.compile_into(cond, cond_reg.clone());
 
         // TODO: Add negated jmpif instruction to avoid this
-        self.push(Instruction::OpNot(condition_asm, cond_reg.clone()));
+        self.push(Instruction::OpNot(
+          Value::Register(cond_reg.clone()),
+          cond_reg.clone(),
+        ));
 
         self.push(Instruction::JmpIf(
           Value::Register(cond_reg.clone()),
@@ -1175,27 +1171,15 @@ impl FunctionCompiler {
     let mut expression_compiler = ExpressionCompiler { fnc: self };
     let compiled = expression_compiler.compile_top_level(expr, None);
 
-    self.use_(compiled);
+    self.release_ce(compiled);
   }
 
-  pub fn use_(&mut self, mut compiled_expr: CompiledExpression) -> Value {
+  pub fn release_ce(&mut self, mut compiled_expr: CompiledExpression) {
     for reg in &compiled_expr.nested_registers {
       self.release_reg(reg);
     }
 
     compiled_expr.release_checker.has_unreleased_registers = false;
-
-    return compiled_expr.value;
-  }
-
-  pub fn use_ref(&mut self, compiled_expr: &mut CompiledExpression) -> Value {
-    for reg in &compiled_expr.nested_registers {
-      self.release_reg(reg);
-    }
-
-    compiled_expr.release_checker.has_unreleased_registers = false;
-
-    return compiled_expr.value.clone();
   }
 
   fn get_mutated_registers(&self, span: swc_common::Span) -> HashSet<Register> {

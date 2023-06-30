@@ -1,3 +1,5 @@
+use std::mem::take;
+
 use crate::{
   asm::{Instruction, Register, Value},
   expression_compiler::{CompiledExpression, ExpressionCompiler},
@@ -127,7 +129,7 @@ impl TargetAccessor {
       }
       Nested(nta) => {
         let submov_instr = Instruction::SubMov(
-          ec.fnc.use_ref(&mut nta.subscript),
+          nta.subscript.value.clone(),
           value.clone(),
           nta.obj.register(),
         );
@@ -141,6 +143,7 @@ impl TargetAccessor {
           ec.fnc.push(submov_instr);
         }
 
+        ec.fnc.release_ce(take(&mut nta.subscript));
         ec.fnc.release_reg(&nta.register);
 
         nta.obj.packup(ec, uses_this_subcall);
@@ -190,7 +193,7 @@ impl TargetAccessor {
       Register(_) => {}
       Nested(nta) => {
         let submov_instr = Instruction::SubMov(
-          ec.fnc.use_ref(&mut nta.subscript),
+          nta.subscript.value.clone(),
           Value::Register(nta.register.clone()),
           nta.obj.register(),
         );
@@ -201,6 +204,7 @@ impl TargetAccessor {
           ec.fnc.push(submov_instr);
         }
 
+        ec.fnc.release_ce(take(&mut nta.subscript));
         ec.fnc.release_reg(&nta.register);
 
         nta.obj.packup(ec, uses_this_subcall);

@@ -10,16 +10,15 @@ use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, NameType};
 use crate::target_accessor::TargetAccessor;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CompiledExpression {
-  /** It is usually better to access this via functionCompiler.use_ */
   pub value: Value,
 
   pub nested_registers: Vec<Register>,
   pub release_checker: ReleaseChecker,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ReleaseChecker {
   pub has_unreleased_registers: bool,
 }
@@ -248,22 +247,24 @@ impl<'a> ExpressionCompiler<'a> {
   }
 
   pub fn compile_into(&mut self, expr: &swc_ecma_ast::Expr, target_register: Register) {
-    let mut ce = self.compile(expr, Some(target_register.clone()));
+    let ce = self.compile(expr, Some(target_register.clone()));
     let mut in_target = false;
 
     if let Value::Register(ce_reg) = &ce.value {
       if ce_reg == &target_register {
         in_target = true;
-        self.fnc.use_ref(&mut ce);
         // Result is already in the target register, no mov needed
       }
     }
 
     if !in_target {
       // Put the value into the target
-      let value = self.fnc.use_(ce);
-      self.fnc.push(Instruction::Mov(value, target_register));
+      self
+        .fnc
+        .push(Instruction::Mov(ce.value.clone(), target_register));
     }
+
+    self.fnc.release_ce(ce);
   }
 
   pub fn unary_expression(
@@ -284,18 +285,20 @@ impl<'a> ExpressionCompiler<'a> {
       Some(t) => t.clone(),
     };
 
-    let instr = match make_unary_op(un_exp.op, self.fnc.use_(arg), target.clone()) {
-      Some(i) => i,
-      None => {
-        self
-          .fnc
-          .todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
+    self.fnc.push(
+      match make_unary_op(un_exp.op, arg.value.clone(), target.clone()) {
+        Some(i) => i,
+        None => {
+          self
+            .fnc
+            .todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
 
-        return CompiledExpression::empty();
-      }
-    };
+          return CompiledExpression::empty();
+        }
+      },
+    );
 
-    self.fnc.push(instr);
+    self.fnc.release_ce(arg);
 
     return CompiledExpression::new(Value::Register(target), nested_registers);
   }
@@ -322,14 +325,15 @@ impl<'a> ExpressionCompiler<'a> {
       Some(t) => t.clone(),
     };
 
-    let instr = make_binary_op(
+    self.fnc.push(make_binary_op(
       bin.op,
-      self.fnc.use_(left),
-      self.fnc.use_(right),
+      left.value.clone(),
+      right.value.clone(),
       target.clone(),
-    );
+    ));
 
-    self.fnc.push(instr);
+    self.fnc.release_ce(left);
+    self.fnc.release_ce(right);
 
     return CompiledExpression::new(Value::Register(target), nested_registers);
   }
@@ -653,13 +657,14 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let sub_instr = Instruction::Sub(
-      self.fnc.use_(compiled_obj),
-      self.fnc.use_(compiled_prop),
+    self.fnc.push(Instruction::Sub(
+      compiled_obj.value.clone(),
+      compiled_prop.value.clone(),
       dest.clone(),
-    );
+    ));
 
-    self.fnc.push(sub_instr);
+    self.fnc.release_ce(compiled_obj);
+    self.fnc.release_ce(compiled_prop);
 
     CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
   }
@@ -840,12 +845,14 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let args_value = self.fnc.use_(compiled_args);
-    let callee_value = self.fnc.use_(callee);
+    self.fnc.push(Instruction::Call(
+      callee.value.clone(),
+      compiled_args.value.clone(),
+      dest.clone(),
+    ));
 
-    self
-      .fnc
-      .push(Instruction::Call(callee_value, args_value, dest.clone()));
+    self.fnc.release_ce(compiled_args);
+    self.fnc.release_ce(callee);
 
     CompiledExpression::new(Value::Register(dest), nested_registers)
   }
@@ -879,12 +886,14 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let callee_value = self.fnc.use_(callee);
-    let args_value = self.fnc.use_(compiled_args);
+    self.fnc.push(Instruction::New(
+      callee.value.clone(),
+      compiled_args.value.clone(),
+      dest.clone(),
+    ));
 
-    self
-      .fnc
-      .push(Instruction::New(callee_value, args_value, dest.clone()));
+    self.fnc.release_ce(callee);
+    self.fnc.release_ce(compiled_args);
 
     CompiledExpression::new(Value::Register(dest), nested_registers)
   }
@@ -943,24 +952,35 @@ impl<'a> ExpressionCompiler<'a> {
       TargetAccessorOrCompiledExpression::TargetAccessor(mut ta) => {
         let targets_this = ta.targets_this();
 
-        let args_value = self.fnc.use_(compiled_args);
+        self.fnc.push(match targets_this {
+          false => Instruction::SubCall(
+            obj_value.clone(),
+            prop.value,
+            compiled_args.value.clone(),
+            dest.clone(),
+          ),
+          true => Instruction::ThisSubCall(
+            obj_value.clone(),
+            prop.value,
+            compiled_args.value.clone(),
+            dest.clone(),
+          ),
+        });
 
-        let instr = match targets_this {
-          false => Instruction::SubCall(obj_value.clone(), prop.value, args_value, dest.clone()),
-          true => Instruction::ThisSubCall(obj_value.clone(), prop.value, args_value, dest.clone()),
-        };
+        self.fnc.release_ce(compiled_args);
 
-        self.fnc.push(instr);
         ta.assign_and_packup(self, &obj_value, targets_this);
       }
       TargetAccessorOrCompiledExpression::CompiledExpression(ce) => {
-        let args_value = self.fnc.use_(compiled_args);
+        self.fnc.push(Instruction::ConstSubCall(
+          obj_value.clone(),
+          prop.value,
+          compiled_args.value.clone(),
+          dest.clone(),
+        ));
 
-        let instr =
-          Instruction::ConstSubCall(obj_value.clone(), prop.value, args_value, dest.clone());
-
-        self.fnc.push(instr);
-        self.fnc.use_(ce);
+        self.fnc.release_ce(compiled_args);
+        self.fnc.release_ce(ce);
       }
     }
 
@@ -1196,13 +1216,13 @@ impl<'a> ExpressionCompiler<'a> {
 
     let first_expr = self.compile(&tpl.exprs[0], None);
 
-    let plus_instr = Instruction::OpPlus(
+    self.fnc.push(Instruction::OpPlus(
       Value::String(tpl.quasis[0].raw.to_string()),
-      self.fnc.use_(first_expr),
+      first_expr.value.clone(),
       acc_reg.clone(),
-    );
+    ));
 
-    self.fnc.push(plus_instr);
+    self.fnc.release_ce(first_expr);
 
     for i in 1..len {
       self.fnc.push(Instruction::OpPlus(
@@ -1213,13 +1233,13 @@ impl<'a> ExpressionCompiler<'a> {
 
       let expr_i = self.compile(&tpl.exprs[i], None);
 
-      let plus_instr = Instruction::OpPlus(
+      self.fnc.push(Instruction::OpPlus(
         Value::Register(acc_reg.clone()),
-        self.fnc.use_(expr_i),
+        expr_i.value.clone(),
         acc_reg.clone(),
-      );
+      ));
 
-      self.fnc.push(plus_instr);
+      self.fnc.release_ce(expr_i);
     }
 
     let last_str = tpl.quasis[len].raw.to_string();
@@ -1256,12 +1276,12 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let instr = match yield_expr.delegate {
-      false => Instruction::Yield(self.fnc.use_(arg_compiled), dst.clone()),
-      true => Instruction::YieldStar(self.fnc.use_(arg_compiled), dst.clone()),
-    };
+    self.fnc.push(match yield_expr.delegate {
+      false => Instruction::Yield(arg_compiled.value.clone(), dst.clone()),
+      true => Instruction::YieldStar(arg_compiled.value.clone(), dst.clone()),
+    });
 
-    self.fnc.push(instr);
+    self.fnc.release_ce(arg_compiled);
 
     return CompiledExpression::new(Value::Register(dst), nested_registers);
   }
@@ -1424,13 +1444,13 @@ impl<'a> ExpressionCompiler<'a> {
               let param_reg = self.fnc.get_pattern_register(&kv.value);
               let compiled_key = self.prop_name(&kv.key);
 
-              let sub_instr = Instruction::Sub(
+              self.fnc.push(Instruction::Sub(
                 Value::Register(register.clone()),
-                self.fnc.use_(compiled_key),
+                compiled_key.value.clone(),
                 param_reg.clone(),
-              );
+              ));
 
-              self.fnc.push(sub_instr);
+              self.fnc.release_ce(compiled_key);
 
               self.pat(&kv.value, &param_reg, false);
             }

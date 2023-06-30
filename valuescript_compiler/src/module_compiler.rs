@@ -802,11 +802,14 @@ impl ModuleCompiler {
             Some(expr) => ec.compile(expr, None),
           };
 
-          let key_asm = ec.fnc.use_(compiled_key);
-          let value_asm = ec.fnc.use_(compiled_value);
+          ec.fnc.push(Instruction::SubMov(
+            compiled_key.value.clone(),
+            compiled_value.value.clone(),
+            Register::this(),
+          ));
 
-          ec.fnc
-            .push(Instruction::SubMov(key_asm, value_asm, Register::this()));
+          ec.fnc.release_ce(compiled_key);
+          ec.fnc.release_ce(compiled_value);
         }
         swc_ecma_ast::ClassMember::PrivateProp(private_prop) => {
           self.todo(private_prop.span, "private props")
