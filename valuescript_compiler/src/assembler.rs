@@ -102,7 +102,7 @@ impl Assembler {
         FnLine::Label(label) => {
           self.label(label);
         }
-        FnLine::Empty | FnLine::Comment(..) => {}
+        FnLine::Empty | FnLine::Comment(..) | FnLine::Release(..) => {}
       }
     }
 
@@ -130,7 +130,7 @@ impl Assembler {
         FnLine::Label(label) => {
           self.label(label);
         }
-        FnLine::Empty | FnLine::Comment(..) => {}
+        FnLine::Empty | FnLine::Comment(..) | FnLine::Release(..) => {}
       }
     }
 

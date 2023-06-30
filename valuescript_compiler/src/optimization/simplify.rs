@@ -123,7 +123,7 @@ impl FnState {
         Instruction::Next(_, _) => {}
         Instruction::UnpackIterRes(_, _, _) => {}
       },
-      FnLine::Label(..) | FnLine::Empty | FnLine::Comment(..) => {}
+      FnLine::Label(..) | FnLine::Empty | FnLine::Comment(..) | FnLine::Release(..) => {}
     }
   }
 
@@ -285,6 +285,9 @@ impl FnState {
       },
       FnLine::Label(..) => self.clear(),
       FnLine::Empty | FnLine::Comment(..) => {}
+      FnLine::Release(_reg) => {
+        // TODO
+      }
     }
   }
 

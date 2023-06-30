@@ -170,7 +170,7 @@ where
         FnLine::Instruction(instruction) => {
           self.instruction(owner, instruction);
         }
-        FnLine::Label(..) | FnLine::Empty | FnLine::Comment(..) => {}
+        FnLine::Label(..) | FnLine::Empty | FnLine::Comment(..) | FnLine::Release(..) => {}
       }
     }
   }

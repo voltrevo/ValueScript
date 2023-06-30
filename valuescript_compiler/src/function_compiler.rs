@@ -216,6 +216,7 @@ impl FunctionCompiler {
 
   pub fn release_reg(&mut self, reg: &Register) {
     self.reg_allocator.release(reg);
+    self.current.body.push(FnLine::Release(reg.clone()));
   }
 
   pub fn compile(

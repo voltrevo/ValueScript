@@ -497,6 +497,19 @@ impl<'a> AssemblyParser<'a> {
         continue;
       }
 
+      if c == '(' {
+        self.parse_exact("(release");
+        self.parse_whitespace();
+
+        let reg = self.assemble_register();
+        self.parse_optional_whitespace();
+        self.parse_exact(")\n");
+
+        function.body.push(FnLine::Release(reg));
+
+        continue;
+      }
+
       let optional_label = self.test_label();
 
       if optional_label.is_some() {

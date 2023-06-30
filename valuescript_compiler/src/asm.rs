@@ -142,6 +142,7 @@ impl std::fmt::Display for Function {
         FnLine::Label(label) => write!(f, "{}\n", label)?,
         FnLine::Empty => write!(f, "\n")?,
         FnLine::Comment(message) => write!(f, "  // {}\n", message)?,
+        FnLine::Release(reg) => write!(f, "  (release {})\n", reg)?,
       }
     }
     write!(f, "}}")
@@ -297,21 +298,17 @@ pub enum FnLine {
   Label(Label),
   Empty,
   Comment(String),
+  Release(Register),
 }
 
 impl std::fmt::Display for FnLine {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     match self {
-      FnLine::Instruction(instruction) => {
-        write!(f, "{}", instruction)
-      }
-      FnLine::Label(label) => {
-        write!(f, "{}", label)
-      }
+      FnLine::Instruction(instruction) => write!(f, "{}", instruction),
+      FnLine::Label(label) => write!(f, "{}", label),
       FnLine::Empty => Ok(()),
-      FnLine::Comment(message) => {
-        write!(f, "// {}", message)
-      }
+      FnLine::Comment(message) => write!(f, "// {}", message),
+      FnLine::Release(reg) => write!(f, "(release {})", reg),
     }
   }
 }
@@ -890,6 +887,7 @@ impl std::fmt::Display for Lazy {
         FnLine::Label(label) => write!(f, "{}\n", label)?,
         FnLine::Empty => write!(f, "\n")?,
         FnLine::Comment(message) => write!(f, "  // {}\n", message)?,
+        FnLine::Release(reg) => write!(f, "  (release {})\n", reg)?,
       }
     }
 
