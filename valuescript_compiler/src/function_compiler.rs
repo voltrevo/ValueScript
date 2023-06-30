@@ -13,7 +13,6 @@ use crate::asm::{
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
-use crate::instruction_mutates_this::instruction_mutates_this;
 use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, Name, ScopeAnalysis};
@@ -108,8 +107,8 @@ impl FunctionCompiler {
     };
   }
 
-  pub fn push(&mut self, instruction: Instruction) {
-    if instruction_mutates_this(&instruction) {
+  pub fn push(&mut self, mut instruction: Instruction) {
+    if instruction_needs_mutable_this(&mut instruction) {
       self.push_raw(Instruction::RequireMutableThis);
     }
 
@@ -1214,4 +1213,28 @@ impl FunctionCompiler {
 
     mutated_registers
   }
+}
+
+fn instruction_needs_mutable_this(
+  // We don't really mutate `instruction`, but we're using visit_registers_mut_rev which doesn't
+  // have a non-mut equivalent. Writing it just for this seems unnecessary.
+  instruction: &mut Instruction,
+) -> bool {
+  if let Instruction::ThisSubCall(_this, _, _, dst) = instruction {
+    // visit_registers_mut_rev flags `this` as write:true since a write can occur, but the whole
+    // purpose of this instruction is to conditionally propagate constness into the next call to
+    // deal with this issue. Therefore, we only check `dst` here.
+
+    return dst.is_this();
+  }
+
+  let mut result = false;
+
+  instruction.visit_registers_mut_rev(&mut |rvm| {
+    if rvm.write && rvm.register.is_this() {
+      result = true;
+    }
+  });
+
+  result
 }

@@ -9,7 +9,6 @@ mod function_compiler;
 mod gather_modules;
 mod import_pattern;
 mod instruction;
-mod instruction_mutates_this;
 mod link_module;
 mod module_compiler;
 mod name_allocator;
