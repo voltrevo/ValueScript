@@ -109,11 +109,11 @@ impl VirtualMachine {
     std::mem::swap(&mut self.frame, &mut old_frame);
   }
 
-  pub fn handle_exception(&mut self, exception: Val) -> Result<(), Val> {
+  pub fn handle_exception(&mut self, mut exception: Val) -> Result<(), Val> {
     while !self.stack.is_empty() {
-      let handled = self.frame.catch_exception(exception.clone());
+      self.frame.catch_exception(&mut exception);
 
-      if handled {
+      if let Val::Void = exception {
         return Ok(());
       }
 

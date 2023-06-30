@@ -218,7 +218,7 @@ impl StackFrameTrait for GeneratorFrame {
     panic!("Not appropriate for GeneratorFrame")
   }
 
-  fn catch_exception(&mut self, exception: Val) -> bool {
+  fn catch_exception(&mut self, exception: &mut Val) {
     self.generator.frame.catch_exception(exception)
   }
 
@@ -331,9 +331,7 @@ impl StackFrameTrait for YieldStarFrame {
     panic!("Not appropriate for YieldStarFrame")
   }
 
-  fn catch_exception(&mut self, _exception: Val) -> bool {
-    false
-  }
+  fn catch_exception(&mut self, _exception: &mut Val) {}
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())

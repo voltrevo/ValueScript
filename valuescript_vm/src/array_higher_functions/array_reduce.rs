@@ -111,9 +111,7 @@ impl StackFrameTrait for ReduceFrame {
     panic!("Not appropriate for ReduceFrame")
   }
 
-  fn catch_exception(&mut self, _exception: Val) -> bool {
-    return false;
-  }
+  fn catch_exception(&mut self, _exception: &mut Val) {}
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())

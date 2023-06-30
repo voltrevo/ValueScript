@@ -319,9 +319,7 @@ impl StackFrameTrait for SortFrame {
     panic!("Not appropriate for SortFrame")
   }
 
-  fn catch_exception(&mut self, _exception: Val) -> bool {
-    false
-  }
+  fn catch_exception(&mut self, _exception: &mut Val) {}
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())

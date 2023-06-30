@@ -40,7 +40,7 @@ impl StackFrameTrait for FirstStackFrame {
     return self.call_result.clone();
   }
 
-  fn catch_exception(&mut self, _exception: Val) -> bool {
+  fn catch_exception(&mut self, _exception: &mut Val) {
     panic!("Not appropriate for FirstStackFrame");
   }
 
