@@ -5,6 +5,7 @@ use valuescript_vm::{operations, vs_value::Val};
 
 use crate::{
   asm::{DefinitionContent, FnLine, Function, Instruction, Module, Number, Register, Value},
+  instruction::InstructionFieldMut,
   TryToVal,
 };
 
@@ -34,95 +35,20 @@ impl FnState {
 
   fn simplify_line(&self, line: &mut FnLine) {
     match line {
-      FnLine::Instruction(instr) => match instr {
-        Instruction::End => {}
-        Instruction::Mov(a1, _) => {
-          self.simplify_arg(a1);
-        }
-
-        Instruction::OpInc(_) => {}
-        Instruction::OpDec(_) => {}
-
-        Instruction::OpNot(a1, _)
-        | Instruction::OpBitNot(a1, _)
-        | Instruction::TypeOf(a1, _)
-        | Instruction::UnaryPlus(a1, _)
-        | Instruction::UnaryMinus(a1, _)
-        | Instruction::Throw(a1)
-        | Instruction::Import(a1, _)
-        | Instruction::ImportStar(a1, _)
-        | Instruction::Cat(a1, _)
-        | Instruction::Yield(a1, _)
-        | Instruction::YieldStar(a1, _) => {
-          self.simplify_arg(a1);
-        }
-
-        Instruction::OpPlus(a1, a2, _)
-        | Instruction::OpMinus(a1, a2, _)
-        | Instruction::OpMul(a1, a2, _)
-        | Instruction::OpDiv(a1, a2, _)
-        | Instruction::OpMod(a1, a2, _)
-        | Instruction::OpExp(a1, a2, _)
-        | Instruction::OpEq(a1, a2, _)
-        | Instruction::OpNe(a1, a2, _)
-        | Instruction::OpTripleEq(a1, a2, _)
-        | Instruction::OpTripleNe(a1, a2, _)
-        | Instruction::OpAnd(a1, a2, _)
-        | Instruction::OpOr(a1, a2, _)
-        | Instruction::OpLess(a1, a2, _)
-        | Instruction::OpLessEq(a1, a2, _)
-        | Instruction::OpGreater(a1, a2, _)
-        | Instruction::OpGreaterEq(a1, a2, _)
-        | Instruction::OpNullishCoalesce(a1, a2, _)
-        | Instruction::OpOptionalChain(a1, a2, _)
-        | Instruction::OpBitAnd(a1, a2, _)
-        | Instruction::OpBitOr(a1, a2, _)
-        | Instruction::OpBitXor(a1, a2, _)
-        | Instruction::OpLeftShift(a1, a2, _)
-        | Instruction::OpRightShift(a1, a2, _)
-        | Instruction::OpRightShiftUnsigned(a1, a2, _)
-        | Instruction::InstanceOf(a1, a2, _)
-        | Instruction::In(a1, a2, _)
-        | Instruction::Call(a1, a2, _)
-        | Instruction::Bind(a1, a2, _)
-        | Instruction::Sub(a1, a2, _)
-        | Instruction::SubMov(a1, a2, _)
-        | Instruction::New(a1, a2, _) => {
-          self.simplify_arg(a1);
-          self.simplify_arg(a2);
-        }
-
-        Instruction::Apply(a1, _this, a3, _) => {
-          self.simplify_arg(a1);
-          self.simplify_arg(a3);
-        }
-
-        Instruction::SubCall(_this, a2, a3, _) | Instruction::ThisSubCall(_this, a2, a3, _) => {
-          self.simplify_arg(a2);
-          self.simplify_arg(a3);
-        }
-
-        Instruction::ConstSubCall(a1, a2, a3, _) => {
-          self.simplify_arg(a1);
-          self.simplify_arg(a2);
-          self.simplify_arg(a3);
-        }
-
-        Instruction::JmpIf(a1, _) => {
-          self.simplify_arg(a1);
-        }
-
-        Instruction::Jmp(_) => {}
-        Instruction::SetCatch(_, _) => {}
-        Instruction::UnsetCatch => {}
-        Instruction::RequireMutableThis => {
+      FnLine::Instruction(instr) => {
+        if let Instruction::RequireMutableThis = instr {
           if self.mutable_this_established {
             *line = FnLine::Comment(line.to_string());
           }
+        } else {
+          instr.visit_fields_mut(&mut |field| match field {
+            InstructionFieldMut::Value(arg) => {
+              self.simplify_arg(arg);
+            }
+            _ => {}
+          });
         }
-        Instruction::Next(_, _) => {}
-        Instruction::UnpackIterRes(_, _, _) => {}
-      },
+      }
       FnLine::Label(..) | FnLine::Empty | FnLine::Comment(..) | FnLine::Release(..) => {}
     }
   }
