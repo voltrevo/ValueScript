@@ -292,19 +292,43 @@ impl FnState {
   }
 
   fn handle_releases(&self, body: &mut Vec<FnLine>, i: usize) {
-    let released_reg = match &body[i] {
-      FnLine::Instruction(_instr) => {
-        // TODO
-        return;
+    let mut calls = Vec::<(Register, usize)>::new();
+
+    match &mut body[i] {
+      FnLine::Instruction(instr) => {
+        let mut skips_needed = 0;
+
+        instr.visit_registers_mut_rev(&mut |rvm| {
+          skips_needed += 1;
+
+          if rvm.write && !rvm.read {
+            calls.push((rvm.register.clone(), skips_needed));
+          }
+        });
       }
-      FnLine::Release(released_reg) => released_reg.clone(),
-      FnLine::Label(_) | FnLine::Empty | FnLine::Comment(_) => return,
+      FnLine::Release(released_reg) => {
+        calls.push((released_reg.clone(), 0));
+      }
+      FnLine::Label(_) | FnLine::Empty | FnLine::Comment(_) => {}
     };
 
+    for (released_reg, skips) in calls {
+      self.handle_releases_impl(body, i, released_reg, skips);
+    }
+  }
+
+  fn handle_releases_impl(
+    &self,
+    body: &mut Vec<FnLine>,
+    i: usize,
+    released_reg: Register,
+    skips_needed: usize,
+  ) {
     // Search backwards to find where this register was last written. If a jump instruction occurs,
     // then we don't know for sure whether the release point will be hit, and we can't apply our
     // analysis.
-    let mut j = i;
+    let mut j = i + 1;
+    let mut skips = 0;
     while j > 0 {
       j -= 1;
 
@@ -320,6 +344,11 @@ impl FnState {
       let mut write_found = false;
 
       instr.visit_registers_mut_rev(&mut |rvm| {
+        if skips < skips_needed {
+          skips += 1;
+          return;
+        }
+
         if rvm.write && rvm.register.name == released_reg.name {
           write_found = true;
         }
@@ -333,7 +362,8 @@ impl FnState {
     // Now that we've established that the last write always hits the release point, find the last
     // read and use .take() instead of copying. Also, if this .take() never occurs, it means the
     // value was never used, and comment out the instruction that writes the value, if possible.
-    let mut j = i;
+    let mut j = i + 1;
+    let mut skip_i = 0;
     let mut taken = false;
     while j > 0 {
       j -= 1;
@@ -347,6 +377,11 @@ impl FnState {
 
       if !taken {
         instr.visit_registers_mut_rev(&mut |rvm| {
+          if skip_i < skips_needed {
+            skip_i += 1;
+            return;
+          }
+
           if rvm.register.name != released_reg.name {
             return;
           }
@@ -386,9 +421,8 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function) {
 
 fn is_jmp_instr(instr: &Instruction) -> bool {
   match instr {
-    Instruction::Jmp(..) | Instruction::JmpIf(..) => true,
-    Instruction::End
-    | Instruction::Mov(..)
+    Instruction::End | Instruction::Jmp(..) | Instruction::JmpIf(..) => true,
+    Instruction::Mov(..)
     | Instruction::OpInc(..)
     | Instruction::OpDec(..)
     | Instruction::OpPlus(..)

@@ -275,11 +275,19 @@ impl Instruction {
       | Call(left, right, dst)
       | Bind(left, right, dst)
       | Sub(left, right, dst)
-      | SubMov(left, right, dst)
       | New(left, right, dst) => {
         visit(RegisterVisitMut::write(dst));
         right.visit_registers_mut_rev(visit);
         left.visit_registers_mut_rev(visit);
+      }
+
+      SubMov(key, value, obj) => {
+        // `obj` is 'read' here in the sense that it needs to be intact for this to work, it's not
+        // just newly constructed from the inputs.
+        visit(RegisterVisitMut::read_and_write(obj));
+
+        value.visit_registers_mut_rev(visit);
+        key.visit_registers_mut_rev(visit);
       }
 
       Apply(fn_, this, args, dst) => {
