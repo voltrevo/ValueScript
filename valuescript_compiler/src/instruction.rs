@@ -326,7 +326,13 @@ impl Instruction {
       UnpackIterRes(iter_res, value_dst, done_dst) => {
         visit(RegisterVisitMut::write(done_dst));
         visit(RegisterVisitMut::write(value_dst));
-        visit(RegisterVisitMut::read_and_write(iter_res));
+
+        // This does a write in the sense that the register is consumed. However, the new value
+        // being written is not supposed to matter, `unpack_iter_res` should only be used once and
+        // the emptiness of the register isn't supposed to be then consumed the way a regular write
+        // would. In other words, well-constructed programs should be equivalent whether the VM
+        // decides to consume this memory or not.
+        visit(RegisterVisitMut::read(iter_res));
       }
 
       UnsetCatch | RequireMutableThis => {}

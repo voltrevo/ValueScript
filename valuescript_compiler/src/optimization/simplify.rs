@@ -347,26 +347,26 @@ impl FnState {
 
       if !taken {
         instr.visit_registers_mut_rev(&mut |rvm| {
-          if !taken && !rvm.write && rvm.register.name == released_reg.name {
+          if rvm.register.name != released_reg.name {
+            return;
+          }
+
+          if !taken && !rvm.write {
             *rvm.register = rvm.register.take();
             taken = true;
           }
 
-          if rvm.write && rvm.register.name == released_reg.name {
+          if !write_found && rvm.write {
             write_found = true;
+
+            if !rvm.read && !taken {
+              *rvm.register = Register::ignore();
+            }
           }
         });
       }
 
       if write_found {
-        if !taken {
-          // TODO: Support removal of more instructions.
-          if let Instruction::Mov(..) = instr {
-            let line = &mut body[j];
-            *line = FnLine::Comment(line.to_string());
-          }
-        }
-
         break;
       }
     }
