@@ -256,10 +256,7 @@ impl FnState {
         Instruction::Apply(_a, this, _a3, dst)
         | Instruction::SubCall(this, _a, _a3, dst)
         | Instruction::ThisSubCall(this, _a, _a3, dst) => {
-          if let Value::Register(this) = this {
-            self.set_register(this, None);
-          }
-
+          self.set_register(this, None);
           self.set_register(dst, None);
         }
 

@@ -150,13 +150,18 @@ where
         self.value(Some(owner), arg1);
         self.value(Some(owner), arg2);
       }
-      Apply(arg1, arg2, arg3, _)
-      | SubCall(arg1, arg2, arg3, _)
-      | ConstSubCall(arg1, arg2, arg3, _)
-      | ThisSubCall(arg1, arg2, arg3, _) => {
-        self.value(Some(owner), arg1);
-        self.value(Some(owner), arg2);
-        self.value(Some(owner), arg3);
+      Apply(fn_, _this, args, _) => {
+        self.value(Some(owner), fn_);
+        self.value(Some(owner), args);
+      }
+      ConstSubCall(this, key, args, _) => {
+        self.value(Some(owner), this);
+        self.value(Some(owner), key);
+        self.value(Some(owner), args);
+      }
+      SubCall(_this, key, args, _) | ThisSubCall(_this, key, args, _) => {
+        self.value(Some(owner), key);
+        self.value(Some(owner), args);
       }
       JmpIf(arg, _) => {
         self.value(Some(owner), arg);

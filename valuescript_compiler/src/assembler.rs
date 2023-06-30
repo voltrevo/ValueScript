@@ -214,13 +214,22 @@ impl Assembler {
         self.value(arg2);
         self.register(dst);
       }
-      Apply(arg1, arg2, arg3, dst)
-      | SubCall(arg1, arg2, arg3, dst)
-      | ConstSubCall(arg1, arg2, arg3, dst)
-      | ThisSubCall(arg1, arg2, arg3, dst) => {
-        self.value(arg1);
-        self.value(arg2);
-        self.value(arg3);
+      Apply(fn_, this, args, dst) => {
+        self.value(fn_);
+        self.register(this);
+        self.value(args);
+        self.register(dst);
+      }
+      ConstSubCall(this, key, args, dst) => {
+        self.value(this);
+        self.value(key);
+        self.value(args);
+        self.register(dst);
+      }
+      SubCall(this, key, args, dst) | ThisSubCall(this, key, args, dst) => {
+        self.register(this);
+        self.value(key);
+        self.value(args);
         self.register(dst);
       }
       Jmp(label_ref) => {

@@ -952,15 +952,20 @@ impl<'a> ExpressionCompiler<'a> {
       TargetAccessorOrCompiledExpression::TargetAccessor(mut ta) => {
         let targets_this = ta.targets_this();
 
+        let obj_reg = match obj_value.clone() {
+          Value::Register(obj_reg) => obj_reg,
+          _ => panic!("Read of target accessor should always be a register"),
+        };
+
         self.fnc.push(match targets_this {
           false => Instruction::SubCall(
-            obj_value.clone(),
+            obj_reg,
             prop.value,
             compiled_args.value.clone(),
             dest.clone(),
           ),
           true => Instruction::ThisSubCall(
-            obj_value.clone(),
+            obj_reg,
             prop.value,
             compiled_args.value.clone(),
             dest.clone(),

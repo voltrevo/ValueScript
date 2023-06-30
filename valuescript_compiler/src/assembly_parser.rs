@@ -704,7 +704,7 @@ impl<'a> AssemblyParser<'a> {
       ),
       Apply => Instruction::Apply(
         self.assemble_value(),
-        self.assemble_value(),
+        self.assemble_register(),
         self.assemble_value(),
         self.assemble_register(),
       ),
@@ -724,7 +724,7 @@ impl<'a> AssemblyParser<'a> {
         self.assemble_register(),
       ),
       SubCall => Instruction::SubCall(
-        self.assemble_value(),
+        self.assemble_register(),
         self.assemble_value(),
         self.assemble_value(),
         self.assemble_register(),
@@ -751,7 +751,7 @@ impl<'a> AssemblyParser<'a> {
       ),
       RequireMutableThis => Instruction::RequireMutableThis,
       ThisSubCall => Instruction::ThisSubCall(
-        self.assemble_value(),
+        self.assemble_register(),
         self.assemble_value(),
         self.assemble_value(),
         self.assemble_register(),

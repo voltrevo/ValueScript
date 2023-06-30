@@ -38,11 +38,11 @@ pub enum Instruction {
   InstanceOf(Value, Value, Register),
   In(Value, Value, Register),
   Call(Value, Value, Register),
-  Apply(Value, Value, Value, Register),
+  Apply(Value, Register, Value, Register),
   Bind(Value, Value, Register),
   Sub(Value, Value, Register),
   SubMov(Value, Value, Register),
-  SubCall(Value, Value, Value, Register),
+  SubCall(Register, Value, Value, Register),
   Jmp(LabelRef),
   JmpIf(Value, LabelRef),
   UnaryPlus(Value, Register),
@@ -55,7 +55,7 @@ pub enum Instruction {
   UnsetCatch,
   ConstSubCall(Value, Value, Value, Register),
   RequireMutableThis,
-  ThisSubCall(Value, Value, Value, Register),
+  ThisSubCall(Register, Value, Value, Register),
   Next(Register, Register),
   UnpackIterRes(Register, Register, Register),
   Cat(Value, Register),
@@ -133,13 +133,24 @@ impl Instruction {
         visit(InstructionFieldMut::Register(dst));
       }
 
-      Apply(a1, a2, a3, dst)
-      | SubCall(a1, a2, a3, dst)
-      | ConstSubCall(a1, a2, a3, dst)
-      | ThisSubCall(a1, a2, a3, dst) => {
+      Apply(fn_, this, args, dst) => {
+        visit(InstructionFieldMut::Value(fn_));
+        visit(InstructionFieldMut::Register(this));
+        visit(InstructionFieldMut::Value(args));
+        visit(InstructionFieldMut::Register(dst));
+      }
+
+      ConstSubCall(a1, a2, a3, dst) => {
         visit(InstructionFieldMut::Value(a1));
         visit(InstructionFieldMut::Value(a2));
         visit(InstructionFieldMut::Value(a3));
+        visit(InstructionFieldMut::Register(dst));
+      }
+
+      SubCall(this, key, args, dst) | ThisSubCall(this, key, args, dst) => {
+        visit(InstructionFieldMut::Register(this));
+        visit(InstructionFieldMut::Value(key));
+        visit(InstructionFieldMut::Value(args));
         visit(InstructionFieldMut::Register(dst));
       }
 
