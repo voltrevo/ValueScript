@@ -175,6 +175,71 @@ impl Instruction {
       UnsetCatch | RequireMutableThis => {}
     }
   }
+
+  pub fn byte(&self) -> InstructionByte {
+    use Instruction::*;
+
+    // TODO: Define this in one place only
+    match self {
+      End => InstructionByte::End,
+      Mov(..) => InstructionByte::Mov,
+      OpInc(..) => InstructionByte::OpInc,
+      OpDec(..) => InstructionByte::OpDec,
+      OpPlus(..) => InstructionByte::OpPlus,
+      OpMinus(..) => InstructionByte::OpMinus,
+      OpMul(..) => InstructionByte::OpMul,
+      OpDiv(..) => InstructionByte::OpDiv,
+      OpMod(..) => InstructionByte::OpMod,
+      OpExp(..) => InstructionByte::OpExp,
+      OpEq(..) => InstructionByte::OpEq,
+      OpNe(..) => InstructionByte::OpNe,
+      OpTripleEq(..) => InstructionByte::OpTripleEq,
+      OpTripleNe(..) => InstructionByte::OpTripleNe,
+      OpAnd(..) => InstructionByte::OpAnd,
+      OpOr(..) => InstructionByte::OpOr,
+      OpNot(..) => InstructionByte::OpNot,
+      OpLess(..) => InstructionByte::OpLess,
+      OpLessEq(..) => InstructionByte::OpLessEq,
+      OpGreater(..) => InstructionByte::OpGreater,
+      OpGreaterEq(..) => InstructionByte::OpGreaterEq,
+      OpNullishCoalesce(..) => InstructionByte::OpNullishCoalesce,
+      OpOptionalChain(..) => InstructionByte::OpOptionalChain,
+      OpBitAnd(..) => InstructionByte::OpBitAnd,
+      OpBitOr(..) => InstructionByte::OpBitOr,
+      OpBitNot(..) => InstructionByte::OpBitNot,
+      OpBitXor(..) => InstructionByte::OpBitXor,
+      OpLeftShift(..) => InstructionByte::OpLeftShift,
+      OpRightShift(..) => InstructionByte::OpRightShift,
+      OpRightShiftUnsigned(..) => InstructionByte::OpRightShiftUnsigned,
+      TypeOf(..) => InstructionByte::TypeOf,
+      InstanceOf(..) => InstructionByte::InstanceOf,
+      In(..) => InstructionByte::In,
+      Call(..) => InstructionByte::Call,
+      Apply(..) => InstructionByte::Apply,
+      Bind(..) => InstructionByte::Bind,
+      Sub(..) => InstructionByte::Sub,
+      SubMov(..) => InstructionByte::SubMov,
+      SubCall(..) => InstructionByte::SubCall,
+      Jmp(..) => InstructionByte::Jmp,
+      JmpIf(..) => InstructionByte::JmpIf,
+      UnaryPlus(..) => InstructionByte::UnaryPlus,
+      UnaryMinus(..) => InstructionByte::UnaryMinus,
+      New(..) => InstructionByte::New,
+      Throw(..) => InstructionByte::Throw,
+      Import(..) => InstructionByte::Import,
+      ImportStar(..) => InstructionByte::ImportStar,
+      SetCatch(..) => InstructionByte::SetCatch,
+      UnsetCatch => InstructionByte::UnsetCatch,
+      ConstSubCall(..) => InstructionByte::ConstSubCall,
+      RequireMutableThis => InstructionByte::RequireMutableThis,
+      ThisSubCall(..) => InstructionByte::ThisSubCall,
+      Next(..) => InstructionByte::Next,
+      UnpackIterRes(..) => InstructionByte::UnpackIterRes,
+      Cat(..) => InstructionByte::Cat,
+      Yield(..) => InstructionByte::Yield,
+      YieldStar(..) => InstructionByte::YieldStar,
+    }
+  }
 }
 
 impl std::fmt::Display for Instruction {
@@ -349,73 +414,6 @@ impl std::fmt::Display for Instruction {
       Instruction::YieldStar(value, register) => {
         write!(f, "yield* {} {}", value, register)
       }
-    }
-  }
-}
-
-impl Instruction {
-  pub fn byte(&self) -> InstructionByte {
-    use Instruction::*;
-
-    // TODO: Define this in one place only
-    match self {
-      End => InstructionByte::End,
-      Mov(..) => InstructionByte::Mov,
-      OpInc(..) => InstructionByte::OpInc,
-      OpDec(..) => InstructionByte::OpDec,
-      OpPlus(..) => InstructionByte::OpPlus,
-      OpMinus(..) => InstructionByte::OpMinus,
-      OpMul(..) => InstructionByte::OpMul,
-      OpDiv(..) => InstructionByte::OpDiv,
-      OpMod(..) => InstructionByte::OpMod,
-      OpExp(..) => InstructionByte::OpExp,
-      OpEq(..) => InstructionByte::OpEq,
-      OpNe(..) => InstructionByte::OpNe,
-      OpTripleEq(..) => InstructionByte::OpTripleEq,
-      OpTripleNe(..) => InstructionByte::OpTripleNe,
-      OpAnd(..) => InstructionByte::OpAnd,
-      OpOr(..) => InstructionByte::OpOr,
-      OpNot(..) => InstructionByte::OpNot,
-      OpLess(..) => InstructionByte::OpLess,
-      OpLessEq(..) => InstructionByte::OpLessEq,
-      OpGreater(..) => InstructionByte::OpGreater,
-      OpGreaterEq(..) => InstructionByte::OpGreaterEq,
-      OpNullishCoalesce(..) => InstructionByte::OpNullishCoalesce,
-      OpOptionalChain(..) => InstructionByte::OpOptionalChain,
-      OpBitAnd(..) => InstructionByte::OpBitAnd,
-      OpBitOr(..) => InstructionByte::OpBitOr,
-      OpBitNot(..) => InstructionByte::OpBitNot,
-      OpBitXor(..) => InstructionByte::OpBitXor,
-      OpLeftShift(..) => InstructionByte::OpLeftShift,
-      OpRightShift(..) => InstructionByte::OpRightShift,
-      OpRightShiftUnsigned(..) => InstructionByte::OpRightShiftUnsigned,
-      TypeOf(..) => InstructionByte::TypeOf,
-      InstanceOf(..) => InstructionByte::InstanceOf,
-      In(..) => InstructionByte::In,
-      Call(..) => InstructionByte::Call,
-      Apply(..) => InstructionByte::Apply,
-      Bind(..) => InstructionByte::Bind,
-      Sub(..) => InstructionByte::Sub,
-      SubMov(..) => InstructionByte::SubMov,
-      SubCall(..) => InstructionByte::SubCall,
-      Jmp(..) => InstructionByte::Jmp,
-      JmpIf(..) => InstructionByte::JmpIf,
-      UnaryPlus(..) => InstructionByte::UnaryPlus,
-      UnaryMinus(..) => InstructionByte::UnaryMinus,
-      New(..) => InstructionByte::New,
-      Throw(..) => InstructionByte::Throw,
-      Import(..) => InstructionByte::Import,
-      ImportStar(..) => InstructionByte::ImportStar,
-      SetCatch(..) => InstructionByte::SetCatch,
-      UnsetCatch => InstructionByte::UnsetCatch,
-      ConstSubCall(..) => InstructionByte::ConstSubCall,
-      RequireMutableThis => InstructionByte::RequireMutableThis,
-      ThisSubCall(..) => InstructionByte::ThisSubCall,
-      Next(..) => InstructionByte::Next,
-      UnpackIterRes(..) => InstructionByte::UnpackIterRes,
-      Cat(..) => InstructionByte::Cat,
-      Yield(..) => InstructionByte::Yield,
-      YieldStar(..) => InstructionByte::YieldStar,
     }
   }
 }
