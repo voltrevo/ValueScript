@@ -69,6 +69,38 @@ pub enum InstructionFieldMut<'a> {
   LabelRef(&'a mut LabelRef),
 }
 
+pub struct RegisterVisitMut<'a> {
+  pub register: &'a mut Register,
+  pub read: bool,
+  pub write: bool,
+}
+
+impl<'a> RegisterVisitMut<'a> {
+  pub fn read(register: &'a mut Register) -> Self {
+    RegisterVisitMut {
+      register,
+      read: true,
+      write: false,
+    }
+  }
+
+  pub fn write(register: &'a mut Register) -> Self {
+    RegisterVisitMut {
+      register,
+      read: false,
+      write: true,
+    }
+  }
+
+  pub fn read_and_write(register: &'a mut Register) -> Self {
+    RegisterVisitMut {
+      register,
+      read: true,
+      write: true,
+    }
+  }
+}
+
 impl Instruction {
   pub fn visit_fields_mut<F>(&mut self, visit: &mut F)
   where
@@ -181,6 +213,120 @@ impl Instruction {
         visit(InstructionFieldMut::Register(iter_res));
         visit(InstructionFieldMut::Register(value_dst));
         visit(InstructionFieldMut::Register(done_dst));
+      }
+
+      UnsetCatch | RequireMutableThis => {}
+    }
+  }
+
+  pub fn visit_registers_mut_rev<F>(&mut self, visit: &mut F)
+  where
+    F: FnMut(RegisterVisitMut) -> (),
+  {
+    use Instruction::*;
+
+    match self {
+      End => {}
+      Mov(arg, dst)
+      | OpNot(arg, dst)
+      | OpBitNot(arg, dst)
+      | TypeOf(arg, dst)
+      | UnaryPlus(arg, dst)
+      | UnaryMinus(arg, dst)
+      | Import(arg, dst)
+      | ImportStar(arg, dst)
+      | Cat(arg, dst)
+      | Yield(arg, dst)
+      | YieldStar(arg, dst) => {
+        visit(RegisterVisitMut::write(dst));
+        arg.visit_registers_mut_rev(visit);
+      }
+
+      OpInc(arg) | OpDec(arg) => {
+        visit(RegisterVisitMut::read_and_write(arg));
+      }
+
+      OpPlus(left, right, dst)
+      | OpMinus(left, right, dst)
+      | OpMul(left, right, dst)
+      | OpDiv(left, right, dst)
+      | OpMod(left, right, dst)
+      | OpExp(left, right, dst)
+      | OpEq(left, right, dst)
+      | OpNe(left, right, dst)
+      | OpTripleEq(left, right, dst)
+      | OpTripleNe(left, right, dst)
+      | OpAnd(left, right, dst)
+      | OpOr(left, right, dst)
+      | OpLess(left, right, dst)
+      | OpLessEq(left, right, dst)
+      | OpGreater(left, right, dst)
+      | OpGreaterEq(left, right, dst)
+      | OpNullishCoalesce(left, right, dst)
+      | OpOptionalChain(left, right, dst)
+      | OpBitAnd(left, right, dst)
+      | OpBitOr(left, right, dst)
+      | OpBitXor(left, right, dst)
+      | OpLeftShift(left, right, dst)
+      | OpRightShift(left, right, dst)
+      | OpRightShiftUnsigned(left, right, dst)
+      | InstanceOf(left, right, dst)
+      | In(left, right, dst)
+      | Call(left, right, dst)
+      | Bind(left, right, dst)
+      | Sub(left, right, dst)
+      | SubMov(left, right, dst)
+      | New(left, right, dst) => {
+        visit(RegisterVisitMut::write(dst));
+        right.visit_registers_mut_rev(visit);
+        left.visit_registers_mut_rev(visit);
+      }
+
+      Apply(fn_, this, args, dst) => {
+        visit(RegisterVisitMut::write(dst));
+        args.visit_registers_mut_rev(visit);
+        visit(RegisterVisitMut::read_and_write(this));
+        fn_.visit_registers_mut_rev(visit);
+      }
+
+      ConstSubCall(a1, a2, a3, dst) => {
+        visit(RegisterVisitMut::write(dst));
+        a3.visit_registers_mut_rev(visit);
+        a2.visit_registers_mut_rev(visit);
+        a1.visit_registers_mut_rev(visit);
+      }
+
+      SubCall(this, key, args, dst) | ThisSubCall(this, key, args, dst) => {
+        visit(RegisterVisitMut::write(dst));
+        args.visit_registers_mut_rev(visit);
+        key.visit_registers_mut_rev(visit);
+        visit(RegisterVisitMut::read_and_write(this));
+      }
+
+      Jmp(_label_ref) => {}
+
+      JmpIf(cond, _label_ref) => {
+        cond.visit_registers_mut_rev(visit);
+      }
+
+      Throw(ex) => {
+        ex.visit_registers_mut_rev(visit);
+      }
+
+      SetCatch(_label_ref, _dst) => {
+        // TODO: Does the write to dst need to be accounted for?
+        // (It doesn't occur 'here')
+      }
+
+      Next(iterable, dst) => {
+        visit(RegisterVisitMut::write(dst));
+        visit(RegisterVisitMut::read_and_write(iterable));
+      }
+
+      UnpackIterRes(iter_res, value_dst, done_dst) => {
+        visit(RegisterVisitMut::write(done_dst));
+        visit(RegisterVisitMut::write(value_dst));
+        visit(RegisterVisitMut::read_and_write(iter_res));
       }
 
       UnsetCatch | RequireMutableThis => {}

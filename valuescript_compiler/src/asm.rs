@@ -2,7 +2,9 @@ use std::hash::{Hash as HashTrait, Hasher};
 
 use num_bigint::BigInt;
 
-use crate::{assembler::ValueType, expression_compiler::CompiledExpression};
+use crate::{
+  assembler::ValueType, expression_compiler::CompiledExpression, instruction::RegisterVisitMut,
+};
 
 pub use crate::instruction::{Instruction, InstructionFieldMut};
 
@@ -416,6 +418,37 @@ impl Value {
       Value::BigInt(..) => {}
       Value::String(..) => {}
       Value::Register(..) => {}
+      Value::Pointer(..) => {}
+      Value::Builtin(..) => {}
+    }
+  }
+
+  pub fn visit_registers_mut_rev<F>(&mut self, visit: &mut F)
+  where
+    F: FnMut(RegisterVisitMut) -> (),
+  {
+    match self {
+      Value::Array(array) => {
+        for item in &mut array.values.iter_mut().rev() {
+          item.visit_registers_mut_rev(visit);
+        }
+      }
+      Value::Object(object) => {
+        for (k, v) in &mut object.properties.iter_mut().rev() {
+          v.visit_registers_mut_rev(visit);
+          k.visit_registers_mut_rev(visit);
+        }
+      }
+      Value::Void => {}
+      Value::Undefined => {}
+      Value::Null => {}
+      Value::Bool(..) => {}
+      Value::Number(..) => {}
+      Value::BigInt(..) => {}
+      Value::String(..) => {}
+      Value::Register(register) => {
+        visit(RegisterVisitMut::read(register));
+      }
       Value::Pointer(..) => {}
       Value::Builtin(..) => {}
     }
