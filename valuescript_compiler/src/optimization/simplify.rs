@@ -208,8 +208,8 @@ impl FnState {
       },
       FnLine::Label(..) => self.clear(),
       FnLine::Empty | FnLine::Comment(..) => {}
-      FnLine::Release(_reg) => {
-        // TODO
+      FnLine::Release(reg) => {
+        self.set_register(reg, None);
       }
     }
   }
@@ -290,11 +290,157 @@ impl FnState {
 
     Ok(())
   }
+
+  fn handle_releases(&self, body: &mut Vec<FnLine>, i: usize) {
+    let released_reg = match &body[i] {
+      FnLine::Instruction(_instr) => {
+        // TODO
+        return;
+      }
+      FnLine::Release(released_reg) => released_reg.clone(),
+      FnLine::Label(_) | FnLine::Empty | FnLine::Comment(_) => return,
+    };
+
+    // Search backwards to find where this register was last written. If a jump instruction occurs,
+    // then we don't know for sure whether the release point will be hit, and we can't apply our
+    // analysis.
+    let mut j = i;
+    while j > 0 {
+      j -= 1;
+
+      let instr = match &mut body[j] {
+        FnLine::Instruction(instr) => instr,
+        _ => continue,
+      };
+
+      if is_jmp_instr(instr) {
+        return;
+      }
+
+      let mut write_found = false;
+
+      instr.visit_registers_mut_rev(&mut |rvm| {
+        if rvm.write && rvm.register.name == released_reg.name {
+          write_found = true;
+        }
+      });
+
+      if write_found {
+        break;
+      }
+    }
+
+    // Now that we've established that the last write always hits the release point, find the last
+    // read and use .take() instead of copying. Also, if this .take() never occurs, it means the
+    // value was never used, and comment out the instruction that writes the value, if possible.
+    let mut j = i;
+    let mut taken = false;
+    while j > 0 {
+      j -= 1;
+
+      let instr = match &mut body[j] {
+        FnLine::Instruction(instr) => instr,
+        _ => continue,
+      };
+
+      let mut write_found = false;
+
+      if !taken {
+        instr.visit_registers_mut_rev(&mut |rvm| {
+          if !taken && !rvm.write && rvm.register.name == released_reg.name {
+            *rvm.register = rvm.register.take();
+            taken = true;
+          }
+
+          if rvm.write && rvm.register.name == released_reg.name {
+            write_found = true;
+          }
+        });
+      }
+
+      if write_found {
+        if !taken {
+          // TODO: Support removal of more instructions.
+          if let Instruction::Mov(..) = instr {
+            let line = &mut body[j];
+            *line = FnLine::Comment(line.to_string());
+          }
+        }
+
+        break;
+      }
+    }
+  }
 }
 
 fn simplify_fn(mut state: FnState, fn_: &mut Function) {
-  for line in &mut fn_.body {
+  for i in 0..fn_.body.len() {
+    let line = &mut fn_.body[i];
+
     state.simplify_line(line);
     state.apply_line(line);
+
+    state.handle_releases(&mut fn_.body, i);
+  }
+}
+
+fn is_jmp_instr(instr: &Instruction) -> bool {
+  match instr {
+    Instruction::Jmp(..) | Instruction::JmpIf(..) => true,
+    Instruction::End
+    | Instruction::Mov(..)
+    | Instruction::OpInc(..)
+    | Instruction::OpDec(..)
+    | Instruction::OpPlus(..)
+    | Instruction::OpMinus(..)
+    | Instruction::OpMul(..)
+    | Instruction::OpDiv(..)
+    | Instruction::OpMod(..)
+    | Instruction::OpExp(..)
+    | Instruction::OpEq(..)
+    | Instruction::OpNe(..)
+    | Instruction::OpTripleEq(..)
+    | Instruction::OpTripleNe(..)
+    | Instruction::OpAnd(..)
+    | Instruction::OpOr(..)
+    | Instruction::OpNot(..)
+    | Instruction::OpLess(..)
+    | Instruction::OpLessEq(..)
+    | Instruction::OpGreater(..)
+    | Instruction::OpGreaterEq(..)
+    | Instruction::OpNullishCoalesce(..)
+    | Instruction::OpOptionalChain(..)
+    | Instruction::OpBitAnd(..)
+    | Instruction::OpBitOr(..)
+    | Instruction::OpBitNot(..)
+    | Instruction::OpBitXor(..)
+    | Instruction::OpLeftShift(..)
+    | Instruction::OpRightShift(..)
+    | Instruction::OpRightShiftUnsigned(..)
+    | Instruction::TypeOf(..)
+    | Instruction::InstanceOf(..)
+    | Instruction::In(..)
+    | Instruction::Call(..)
+    | Instruction::Apply(..)
+    | Instruction::Bind(..)
+    | Instruction::Sub(..)
+    | Instruction::SubMov(..)
+    | Instruction::SubCall(..)
+    | Instruction::UnaryPlus(..)
+    | Instruction::UnaryMinus(..)
+    | Instruction::New(..)
+    | Instruction::Throw(..)
+    | Instruction::Import(..)
+    | Instruction::ImportStar(..)
+    | Instruction::SetCatch(..)
+    | Instruction::UnsetCatch
+    | Instruction::ConstSubCall(..)
+    | Instruction::RequireMutableThis
+    | Instruction::ThisSubCall(..)
+    | Instruction::Next(..)
+    | Instruction::UnpackIterRes(..)
+    | Instruction::Cat(..)
+    | Instruction::Yield(..)
+    | Instruction::YieldStar(..) => false,
   }
 }

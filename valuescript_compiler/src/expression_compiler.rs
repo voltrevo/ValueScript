@@ -1586,10 +1586,6 @@ impl<'a> ExpressionCompiler<'a> {
       };
     }
 
-    for reg in sub_nested_registers {
-      self.fnc.release_reg(&reg);
-    }
-
     if !current.is_empty() {
       segments.push(Value::Array(Box::new(Array { values: current })));
     }
@@ -1609,6 +1605,10 @@ impl<'a> ExpressionCompiler<'a> {
       Value::Array(Box::new(Array { values: segments })),
       res_reg.clone(),
     ));
+
+    for reg in sub_nested_registers {
+      self.fnc.release_reg(&reg);
+    }
 
     CompiledExpression::new(Value::Register(res_reg), nested_registers)
   }
