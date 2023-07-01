@@ -1,13 +1,21 @@
-use std::mem::take;
+use std::{collections::HashMap, mem::take};
 
-use crate::asm::{DefinitionContent, FnLine, Function, Instruction, Module, Register};
+use crate::asm::{DefinitionContent, FnLine, Function, Instruction, Module, Pointer, Register};
 
-use super::kal::FnState;
+use super::kal::{FnState, Kal};
 
 pub fn simplify(module: &mut Module) {
+  let mut pointer_kals = HashMap::<Pointer, Kal>::new();
+
+  for defn in &mut module.definitions {
+    if let DefinitionContent::Value(value) = &defn.content {
+      pointer_kals.insert(defn.pointer.clone(), Kal::from_value(value));
+    }
+  }
+
   for defn in &mut module.definitions {
     match &mut defn.content {
-      DefinitionContent::Function(fn_) => simplify_fn(FnState::default(), fn_),
+      DefinitionContent::Function(fn_) => simplify_fn(FnState::new(pointer_kals.clone()), fn_),
       DefinitionContent::Class(_) => {}
       DefinitionContent::Value(_) => {}
       DefinitionContent::Lazy(_) => {}
@@ -115,7 +123,7 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function) {
 
     match &mut fn_.body[i] {
       FnLine::Instruction(instr) => state.eval_instruction(instr),
-      FnLine::Label(_) => state = FnState::default(),
+      FnLine::Label(_) => state.clear_local(),
       FnLine::Empty | FnLine::Comment(_) => {}
       FnLine::Release(reg) => pending_releases.push(reg.clone()),
     }

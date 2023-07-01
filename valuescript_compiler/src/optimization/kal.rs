@@ -5,7 +5,10 @@ use valuescript_vm::{
   vs_value::{number_to_index, ToVal, Val},
 };
 
-use std::collections::BTreeMap;
+use std::{
+  collections::{BTreeMap, HashMap},
+  mem::take,
+};
 
 use crate::{
   asm::{self, Builtin, Number, Pointer, Register, Value},
@@ -95,7 +98,7 @@ impl Kal {
     }
   }
 
-  fn from_value(value: &Value) -> Self {
+  pub fn from_value(value: &Value) -> Self {
     match value {
       Value::Void => Kal::Void,
       Value::Undefined => Kal::Undefined,
@@ -232,11 +235,29 @@ impl Kal {
 
 #[derive(Default)]
 pub struct FnState {
+  pub pointer_kals: HashMap<Pointer, Kal>,
   pub mutable_this_established: bool,
   pub registers: BTreeMap<String, Kal>,
 }
 
 impl FnState {
+  pub fn new(pointer_kals: HashMap<Pointer, Kal>) -> Self {
+    FnState {
+      pointer_kals,
+      ..Default::default()
+    }
+  }
+
+  pub fn clear_local(&mut self) {
+    let pointer_kals = take(&mut self.pointer_kals);
+
+    *self = Self {
+      pointer_kals,
+      mutable_this_established: Default::default(),
+      registers: Default::default(),
+    }
+  }
+
   fn get_mut(&mut self, reg_name: String) -> &mut Kal {
     self.registers.entry(reg_name).or_default()
   }
@@ -451,8 +472,16 @@ impl FnState {
       | Value::Number(_)
       | Value::BigInt(_)
       | Value::String(_)
-      | Value::Pointer(_)
       | Value::Builtin(_) => Kal::from_value(arg),
+      Value::Pointer(p) => match self.pointer_kals.get(p) {
+        Some(kal) => {
+          if let Some(new_arg) = kal.try_to_value() {
+            *arg = new_arg;
+          }
+          kal.clone()
+        }
+        None => Kal::Pointer(p.clone()),
+      },
       Value::Array(array) => {
         let mut values = Vec::<Kal>::new();
 
