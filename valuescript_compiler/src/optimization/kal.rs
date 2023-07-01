@@ -356,14 +356,6 @@ impl FnState {
       OpNullishCoalesce(a1, a2, dst) => {
         self.apply_binary_op(a1, a2, dst, operations::op_nullish_coalesce)
       }
-      OpOptionalChain(a1, a2, dst) => {
-        self.eval_arg(a1);
-        self.eval_arg(a2);
-
-        // self.apply_binary_op(a1, a2, dst, operations::op_optional_chain)
-        // TODO: op_optional_chain takes mut lhs to optimize, but breaks this pattern
-        self.set(dst.name.clone(), Kal::Unknown);
-      }
       OpBitAnd(a1, a2, dst) => self.apply_binary_op(a1, a2, dst, operations::op_bit_and),
       OpBitOr(a1, a2, dst) => self.apply_binary_op(a1, a2, dst, operations::op_bit_or),
       OpBitXor(a1, a2, dst) => self.apply_binary_op(a1, a2, dst, operations::op_bit_xor),
@@ -374,6 +366,15 @@ impl FnState {
       }
       InstanceOf(a1, a2, dst) => self.apply_binary_op(a1, a2, dst, operations::op_instance_of),
       In(a1, a2, dst) => self.apply_binary_op(a1, a2, dst, operations::op_in),
+
+      OpOptionalChain(a1, a2, dst) => {
+        self.eval_arg(a1);
+        self.eval_arg(a2);
+
+        // self.apply_binary_op(a1, a2, dst, operations::op_optional_chain)
+        // TODO: op_optional_chain takes mut lhs to optimize, but breaks this pattern
+        self.set(dst.name.clone(), Kal::Unknown);
+      }
 
       Sub(obj, key, dst) => {
         let obj = self.eval_arg(obj);
@@ -461,6 +462,70 @@ impl FnState {
         self.set(done.name.clone(), Kal::Unknown);
       }
     }
+
+    match instr {
+      OpNot(_, dst)
+      | OpBitNot(_, dst)
+      | TypeOf(_, dst)
+      | UnaryPlus(_, dst)
+      | UnaryMinus(_, dst)
+      | OpPlus(_, _, dst)
+      | OpMinus(_, _, dst)
+      | OpMul(_, _, dst)
+      | OpDiv(_, _, dst)
+      | OpMod(_, _, dst)
+      | OpExp(_, _, dst)
+      | OpEq(_, _, dst)
+      | OpNe(_, _, dst)
+      | OpTripleEq(_, _, dst)
+      | OpTripleNe(_, _, dst)
+      | OpAnd(_, _, dst)
+      | OpOr(_, _, dst)
+      | OpLess(_, _, dst)
+      | OpLessEq(_, _, dst)
+      | OpGreater(_, _, dst)
+      | OpGreaterEq(_, _, dst)
+      | OpNullishCoalesce(_, _, dst)
+      | OpBitAnd(_, _, dst)
+      | OpBitOr(_, _, dst)
+      | OpBitXor(_, _, dst)
+      | OpLeftShift(_, _, dst)
+      | OpRightShift(_, _, dst)
+      | OpRightShiftUnsigned(_, _, dst)
+      | InstanceOf(_, _, dst)
+      | In(_, _, dst) => match self.get(dst.name.clone()).try_to_value() {
+        Some(value) => *instr = Instruction::Mov(value, dst.clone()),
+        None => {}
+      },
+
+      End
+      | Mov(_, _)
+      | OpInc(_)
+      | OpDec(_)
+      | OpOptionalChain(_, _, _)
+      | Call(_, _, _)
+      | Apply(_, _, _, _)
+      | Bind(_, _, _)
+      | Sub(_, _, _)
+      | SubMov(_, _, _)
+      | SubCall(_, _, _, _)
+      | Jmp(_)
+      | JmpIf(_, _)
+      | New(_, _, _)
+      | Throw(_)
+      | Import(_, _)
+      | ImportStar(_, _)
+      | SetCatch(_, _)
+      | UnsetCatch
+      | ConstSubCall(_, _, _, _)
+      | RequireMutableThis
+      | ThisSubCall(_, _, _, _)
+      | Next(_, _)
+      | UnpackIterRes(_, _, _)
+      | Cat(_, _)
+      | Yield(_, _)
+      | YieldStar(_, _) => {}
+    }
   }
 
   fn eval_arg(&mut self, arg: &mut Value) -> Kal {
@@ -537,7 +602,7 @@ impl FnState {
       None => {
         self.set(dst.name.clone(), Kal::Unknown);
       }
-    }
+    };
   }
 
   fn apply_unary_op_impl(
