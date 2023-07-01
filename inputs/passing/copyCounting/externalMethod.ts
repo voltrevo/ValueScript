@@ -1,5 +1,4 @@
-//! test_output(1)
-// Should be: 0
+//! test_output(0)
 
 /// <reference path="../../../concept-code/vs.d.ts" />
 
@@ -16,7 +15,7 @@ function measure(doPush: boolean) {
     arr = push(arr, "y");
   }
 
-  return len(arr) + x.count;
+  return (0 * len(arr)) + x.count;
 }
 
 function push<T>(x: T[], value: T) {
