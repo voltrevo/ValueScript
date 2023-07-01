@@ -641,8 +641,14 @@ impl FnState {
     dst: &Register,
     op: fn(left: &Val, right: &Val) -> Result<Val, Val>,
   ) -> Option<()> {
-    let left = self.eval_arg(left).try_to_val()?;
-    let right = self.eval_arg(right).try_to_val()?;
+    // It's important that the eval happens on both args (left shouldn't emit None early) because
+    // eval_arg also substitutes the Value using knowledge
+    let left = self.eval_arg(left);
+    let right = self.eval_arg(right);
+
+    let left = left.try_to_val()?;
+    let right = right.try_to_val()?;
+
     let kal = op(&left, &right).ok()?.try_to_kal()?;
 
     self.set(dst.name.clone(), kal);
