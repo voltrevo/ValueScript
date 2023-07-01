@@ -493,7 +493,8 @@ impl FnState {
       | OpRightShift(_, _, dst)
       | OpRightShiftUnsigned(_, _, dst)
       | InstanceOf(_, _, dst)
-      | In(_, _, dst) => match self.get(dst.name.clone()).try_to_value() {
+      | In(_, _, dst)
+      | Sub(_, _, dst) => match self.get(dst.name.clone()).try_to_value() {
         Some(value) => *instr = Instruction::Mov(value, dst.clone()),
         None => {}
       },
@@ -506,7 +507,6 @@ impl FnState {
       | Call(_, _, _)
       | Apply(_, _, _, _)
       | Bind(_, _, _)
-      | Sub(_, _, _)
       | SubMov(_, _, _)
       | SubCall(_, _, _, _)
       | Jmp(_)
