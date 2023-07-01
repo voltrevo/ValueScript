@@ -324,16 +324,15 @@ impl FnState {
     released_reg: Register,
     skips_needed: usize,
   ) {
-    // Search backwards to find where this register was last written. If a jump instruction occurs,
-    // then we don't know for sure whether the release point will be hit, and we can't apply our
-    // analysis.
     let mut j = i + 1;
     let mut skips = 0;
+    let mut taken = false;
     while j > 0 {
       j -= 1;
 
       let instr = match &mut body[j] {
         FnLine::Instruction(instr) => instr,
+        FnLine::Label(_) => return,
         _ => continue,
       };
 
@@ -343,42 +342,10 @@ impl FnState {
 
       let mut write_found = false;
 
-      instr.visit_registers_mut_rev(&mut |rvm| {
-        if skips < skips_needed {
-          skips += 1;
-          return;
-        }
-
-        if rvm.write && rvm.register.name == released_reg.name {
-          write_found = true;
-        }
-      });
-
-      if write_found {
-        break;
-      }
-    }
-
-    // Now that we've established that the last write always hits the release point, find the last
-    // read and use .take() instead of copying. Also, if this .take() never occurs, it means the
-    // value was never used, and comment out the instruction that writes the value, if possible.
-    let mut j = i + 1;
-    let mut skip_i = 0;
-    let mut taken = false;
-    while j > 0 {
-      j -= 1;
-
-      let instr = match &mut body[j] {
-        FnLine::Instruction(instr) => instr,
-        _ => continue,
-      };
-
-      let mut write_found = false;
-
       if !taken {
         instr.visit_registers_mut_rev(&mut |rvm| {
-          if skip_i < skips_needed {
-            skip_i += 1;
+          if skips < skips_needed {
+            skips += 1;
             return;
           }
 
