@@ -120,7 +120,7 @@ impl Kal {
     }
   }
 
-  fn to_value(&self) -> Option<Value> {
+  fn try_to_value(&self) -> Option<Value> {
     match self {
       Kal::Unknown => None,
       Kal::Void => Some(Value::Void),
@@ -135,7 +135,7 @@ impl Kal {
           let mut values = Vec::<asm::Value>::new();
 
           for k in &x.values {
-            match k.to_value() {
+            match k.try_to_value() {
               Some(v) => values.push(v),
               None => return None,
             }
@@ -149,12 +149,12 @@ impl Kal {
           let mut properties = Vec::<(asm::Value, asm::Value)>::new();
 
           for (k, v) in &x.properties {
-            let k = match k.to_value() {
+            let k = match k.try_to_value() {
               Some(k) => k,
               None => return None,
             };
 
-            let v = match v.to_value() {
+            let v = match v.try_to_value() {
               Some(v) => v,
               None => return None,
             };
@@ -425,7 +425,7 @@ impl FnState {
           self.set(reg.name.clone(), Kal::Void);
         }
 
-        match kal.to_value() {
+        match kal.try_to_value() {
           Some(v) => {
             // Note: if `reg.take` was true, then we're removing that take operation from the
             // register here. This should be ok because well-formed programs should never read from
