@@ -5,29 +5,29 @@ use crate::{
   instruction::Instruction,
 };
 
-pub fn remove_noops(module: &mut Module) {
+pub fn reduce_instructions(module: &mut Module) {
   for defn in &mut module.definitions {
     if let DefinitionContent::Function(fn_) = &mut defn.content {
       for line in take(&mut fn_.body) {
-        if let FnLine::Instruction(instr) = &line {
-          if is_noop(instr) {
-            continue;
+        if let FnLine::Instruction(instr) = line {
+          if let Some(instr) = reduce(instr) {
+            fn_.body.push(FnLine::Instruction(instr));
           }
+        } else {
+          fn_.body.push(line);
         }
-
-        fn_.body.push(line);
       }
     }
   }
 }
 
-fn is_noop(instr: &Instruction) -> bool {
+fn reduce(instr: Instruction) -> Option<Instruction> {
   use Instruction::*;
 
-  match instr {
+  match &instr {
     End | OpInc(..) | OpDec(..) | Call(..) | Apply(..) | SubCall(..) | Jmp(..) | New(..)
     | Throw(..) | SetCatch(..) | UnsetCatch | ConstSubCall(..) | RequireMutableThis
-    | ThisSubCall(..) | Next(..) | Yield(..) | YieldStar(..) => false,
+    | ThisSubCall(..) | Next(..) | Yield(..) | YieldStar(..) => Some(instr),
 
     Mov(_, dst)
     | OpPlus(_, _, dst)
@@ -66,9 +66,26 @@ fn is_noop(instr: &Instruction) -> bool {
     | UnaryMinus(_, dst)
     | Import(_, dst)
     | ImportStar(_, dst)
-    | Cat(_, dst) => dst.is_ignore(),
+    | Cat(_, dst) => {
+      if dst.is_ignore() {
+        None
+      } else {
+        Some(instr)
+      }
+    }
 
-    JmpIf(cond, _) => *cond == Value::Bool(false),
-    UnpackIterRes(_, value_dst, done_dst) => value_dst.is_ignore() && done_dst.is_ignore(),
+    JmpIf(cond, label_ref) => match cond {
+      // TODO: Kal::from_value(cond).is_truthy()
+      Value::Bool(false) => None,
+      Value::Bool(true) => Some(Instruction::Jmp(label_ref.clone())),
+      _ => Some(instr),
+    },
+    UnpackIterRes(_, value_dst, done_dst) => {
+      if value_dst.is_ignore() && done_dst.is_ignore() {
+        None
+      } else {
+        Some(instr)
+      }
+    }
   }
 }

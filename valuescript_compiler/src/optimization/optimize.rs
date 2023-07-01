@@ -3,8 +3,8 @@ use crate::name_allocator::NameAllocator;
 
 use super::collapse_pointers_of_pointers::collapse_pointers_of_pointers;
 use super::extract_constants::extract_constants;
+use super::reduce_instructions::reduce_instructions;
 use super::remove_meta_lines::remove_meta_lines;
-use super::remove_noops::remove_noops;
 use super::shake_tree::shake_tree;
 use super::simplify::simplify;
 
@@ -14,7 +14,7 @@ pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
 
   for _ in 0..2 {
     simplify(module);
-    remove_noops(module);
+    reduce_instructions(module);
   }
 
   remove_meta_lines(module);
