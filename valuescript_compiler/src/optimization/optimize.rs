@@ -12,6 +12,7 @@ pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
   collapse_pointers_of_pointers(module);
   shake_tree(module);
   simplify(module);
+  simplify(module);
   remove_noops(module);
   remove_meta_lines(module);
   extract_constants(module, pointer_allocator);
