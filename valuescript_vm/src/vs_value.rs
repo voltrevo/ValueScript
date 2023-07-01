@@ -679,7 +679,7 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
   }
 }
 
-fn number_to_index(x: f64) -> Option<usize> {
+pub fn number_to_index(x: f64) -> Option<usize> {
   if x < 0_f64 || x != x.floor() {
     return None;
   }

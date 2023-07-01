@@ -2,7 +2,7 @@ use num_bigint::BigInt;
 use valuescript_vm::{
   operations,
   vs_object::VsObject,
-  vs_value::{ToVal, Val},
+  vs_value::{number_to_index, ToVal, Val},
 };
 
 use std::collections::BTreeMap;
@@ -209,6 +209,25 @@ impl Kal {
       }
     })
   }
+
+  // None can indicate not implemented, not just unknowable
+  fn to_known_string(&self) -> Option<String> {
+    match self {
+      Kal::Unknown => None,
+      Kal::Void => None, // 🤔
+      Kal::Undefined => Some("undefined".to_string()),
+      Kal::Null => Some("null".to_string()),
+      Kal::Bool(b) => Some(b.to_string()),
+      Kal::Number(Number(x)) => Some(x.to_string()),
+      Kal::BigInt(bi) => Some(bi.to_string()),
+      Kal::String(s) => Some(s.clone()),
+      Kal::Array(_) => None,
+      Kal::Object(_) => None,
+      Kal::Register(_) => None,
+      Kal::Pointer(_) => None,
+      Kal::Builtin(_) => None,
+    }
+  }
 }
 
 #[derive(Default)]
@@ -335,11 +354,50 @@ impl FnState {
       InstanceOf(a1, a2, dst) => self.apply_binary_op(a1, a2, dst, operations::op_instance_of),
       In(a1, a2, dst) => self.apply_binary_op(a1, a2, dst, operations::op_in),
 
-      Call(a1, a2, dst)
-      | Bind(a1, a2, dst)
-      | Sub(a1, a2, dst)
-      | SubMov(a1, a2, dst)
-      | New(a1, a2, dst) => {
+      Sub(obj, key, dst) => {
+        let obj = self.eval_arg(obj);
+        let key = self.eval_arg(key);
+
+        let item = match obj {
+          Kal::Array(array) => match key {
+            Kal::Number(Number(i)) => match number_to_index(i) {
+              Some(i) => match array.values.get(i) {
+                Some(item) => item.clone(),
+                None => Kal::Undefined,
+              },
+              None => Kal::Undefined,
+            },
+            _ => Kal::Unknown, // TODO: Implement more cases
+          },
+          Kal::Object(object) => 'b: {
+            let key_str = match key.to_known_string() {
+              Some(s) => s,
+              None => break 'b Kal::Unknown,
+            };
+
+            for (k, v) in object.properties.iter().rev() {
+              match k.to_known_string() {
+                Some(k) => {
+                  if k == key_str {
+                    break 'b v.clone();
+                  }
+                }
+                None => break 'b Kal::Unknown,
+              }
+            }
+
+            // TODO: Prototypes (currently anything with a prototype should be Kal::Unknown, but
+            // when this changes Kal::Undefined could be wrong)
+
+            Kal::Undefined
+          }
+          _ => Kal::Unknown, // TODO: Implement more cases
+        };
+
+        self.set(dst.name.clone(), item);
+      }
+
+      Call(a1, a2, dst) | Bind(a1, a2, dst) | SubMov(a1, a2, dst) | New(a1, a2, dst) => {
         self.eval_arg(a1);
         self.eval_arg(a2);
         self.set(dst.name.clone(), Kal::Unknown);
