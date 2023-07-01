@@ -143,6 +143,11 @@ impl RegAllocator {
     Register::named(name)
   }
 
+  // TODO: We used to release names back into the allocator a lot. However, the optimizer now
+  // extends lifetimes, which means re-purposing a register is no longer safe. The optimizer needs
+  // to do its own analysis to restore register re-use, because we're now using way too many.
+  // Anyway, marking this as dead code for now but maybe it should just be removed.
+  #[allow(dead_code)]
   pub fn release(&mut self, reg: &Register) {
     match reg.is_named() {
       true => self.alloc.release(&reg.name),
