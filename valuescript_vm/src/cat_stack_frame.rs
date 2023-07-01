@@ -27,7 +27,7 @@ pub enum CatFrameState {
 }
 
 impl CatStackFrame {
-  pub fn from_args(args: Vec<Val>) -> Self {
+  pub fn from_vec_val(args: Vec<Val>) -> Self {
     Self {
       state: CatFrameState::ReadNext,
       iter_result: None,

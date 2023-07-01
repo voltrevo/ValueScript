@@ -561,12 +561,20 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Cat => {
-        assert!(
-          self.decoder.decode_type() == BytecodeType::Array,
-          "TODO: cat non-inline arrays"
-        );
-
-        let cat_frame = CatStackFrame::from_args(self.decoder.decode_vec_val(&mut self.registers));
+        let cat_frame = match self.decoder.peek_type() {
+          BytecodeType::Array => {
+            self.decoder.decode_type();
+            CatStackFrame::from_vec_val(self.decoder.decode_vec_val(&mut self.registers))
+          }
+          _ => match self.decoder.decode_val(&mut self.registers) {
+            Val::Array(array) => CatStackFrame::from_vec_val(array.elements.clone()),
+            _ => {
+              return Err(
+                "TODO: cat instruction on non-array (usually type error)".to_internal_error(),
+              )
+            }
+          },
+        };
 
         self.this_target = None;
         self.return_target = self.decoder.decode_register_index();
