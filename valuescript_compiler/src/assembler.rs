@@ -235,7 +235,7 @@ impl Assembler {
       Jmp(label_ref) => {
         self.label_ref(label_ref);
       }
-      JmpIf(value, label_ref) => {
+      JmpIf(value, label_ref) | JmpIfNot(value, label_ref) => {
         self.value(value);
         self.label_ref(label_ref);
       }

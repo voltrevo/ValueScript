@@ -80,6 +80,12 @@ fn reduce(instr: Instruction) -> Option<Instruction> {
       Value::Bool(true) => Some(Instruction::Jmp(label_ref.clone())),
       _ => Some(instr),
     },
+    JmpIfNot(cond, label_ref) => match cond {
+      // TODO: Kal::from_value(cond).is_truthy()
+      Value::Bool(false) => Some(Instruction::Jmp(label_ref.clone())),
+      Value::Bool(true) => None,
+      _ => Some(instr),
+    },
     UnpackIterRes(_, value_dst, done_dst) => {
       if value_dst.is_ignore() && done_dst.is_ignore() {
         None

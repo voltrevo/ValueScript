@@ -163,7 +163,7 @@ where
         self.value(Some(owner), key);
         self.value(Some(owner), args);
       }
-      JmpIf(arg, _) => {
+      JmpIf(arg, _) | JmpIfNot(arg, _) => {
         self.value(Some(owner), arg);
       }
     };

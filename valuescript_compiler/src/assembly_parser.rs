@@ -238,6 +238,7 @@ impl<'a> AssemblyParser<'a> {
       ("subcall", InstructionByte::SubCall),
       ("jmp", InstructionByte::Jmp),
       ("jmpif", InstructionByte::JmpIf),
+      ("jmpif_not", InstructionByte::JmpIfNot),
       ("unary+", InstructionByte::UnaryPlus),
       ("unary-", InstructionByte::UnaryMinus),
       ("new", InstructionByte::New),
@@ -731,6 +732,7 @@ impl<'a> AssemblyParser<'a> {
       ),
       Jmp => Instruction::Jmp(self.assemble_label_read()),
       JmpIf => Instruction::JmpIf(self.assemble_value(), self.assemble_label_read()),
+      JmpIfNot => Instruction::JmpIfNot(self.assemble_value(), self.assemble_label_read()),
       UnaryPlus => Instruction::UnaryPlus(self.assemble_value(), self.assemble_register()),
       UnaryMinus => Instruction::UnaryMinus(self.assemble_value(), self.assemble_register()),
       New => Instruction::New(

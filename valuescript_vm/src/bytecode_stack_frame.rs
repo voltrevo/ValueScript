@@ -412,6 +412,15 @@ impl StackFrameTrait for BytecodeStackFrame {
         }
       }
 
+      JmpIfNot => {
+        let cond = self.decoder.decode_val(&mut self.registers);
+        let dst = self.decoder.decode_pos();
+
+        if !cond.is_truthy() {
+          self.decoder.pos = dst;
+        }
+      }
+
       UnaryPlus => self.apply_unary_op(operations::op_unary_plus),
       UnaryMinus => self.apply_unary_op(operations::op_unary_minus),
 

@@ -150,7 +150,10 @@ fn is_jmp_or_label(line: &FnLine) -> bool {
 
 fn is_jmp_instr(instr: &Instruction) -> bool {
   match instr {
-    Instruction::End | Instruction::Jmp(..) | Instruction::JmpIf(..) => true,
+    Instruction::End
+    | Instruction::Jmp(..)
+    | Instruction::JmpIf(..)
+    | Instruction::JmpIfNot(..) => true,
     Instruction::Mov(..)
     | Instruction::OpInc(..)
     | Instruction::OpDec(..)

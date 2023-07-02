@@ -442,7 +442,7 @@ impl FnState {
         self.set(dst.name.clone(), Kal::Unknown);
       }
 
-      JmpIf(a1, _) => {
+      JmpIf(a1, _) | JmpIfNot(a1, _) => {
         self.eval_arg(a1);
       }
 
@@ -511,6 +511,7 @@ impl FnState {
       | SubCall(_, _, _, _)
       | Jmp(_)
       | JmpIf(_, _)
+      | JmpIfNot(_, _)
       | New(_, _, _)
       | Throw(_)
       | Import(_, _)

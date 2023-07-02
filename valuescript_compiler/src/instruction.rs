@@ -45,6 +45,7 @@ pub enum Instruction {
   SubCall(Register, Value, Value, Register),
   Jmp(LabelRef),
   JmpIf(Value, LabelRef),
+  JmpIfNot(Value, LabelRef),
   UnaryPlus(Value, Register),
   UnaryMinus(Value, Register),
   New(Value, Value, Register),
@@ -190,7 +191,7 @@ impl Instruction {
         visit(InstructionFieldMut::LabelRef(label_ref));
       }
 
-      JmpIf(cond, label_ref) => {
+      JmpIf(cond, label_ref) | JmpIfNot(cond, label_ref) => {
         visit(InstructionFieldMut::Value(cond));
         visit(InstructionFieldMut::LabelRef(label_ref));
       }
@@ -313,7 +314,7 @@ impl Instruction {
 
       Jmp(_label_ref) => {}
 
-      JmpIf(cond, _label_ref) => {
+      JmpIf(cond, _label_ref) | JmpIfNot(cond, _label_ref) => {
         cond.visit_registers_mut_rev(visit);
       }
 
@@ -393,6 +394,7 @@ impl Instruction {
       SubCall(..) => InstructionByte::SubCall,
       Jmp(..) => InstructionByte::Jmp,
       JmpIf(..) => InstructionByte::JmpIf,
+      JmpIfNot(..) => InstructionByte::JmpIfNot,
       UnaryPlus(..) => InstructionByte::UnaryPlus,
       UnaryMinus(..) => InstructionByte::UnaryMinus,
       New(..) => InstructionByte::New,
@@ -530,6 +532,9 @@ impl std::fmt::Display for Instruction {
       Instruction::Jmp(label_ref) => write!(f, "jmp {}", label_ref),
       Instruction::JmpIf(value, label_ref) => {
         write!(f, "jmpif {} {}", value, label_ref)
+      }
+      Instruction::JmpIfNot(value, label_ref) => {
+        write!(f, "jmpif_not {} {}", value, label_ref)
       }
       Instruction::UnaryPlus(value, register) => {
         write!(f, "unary+ {} {}", value, register)
