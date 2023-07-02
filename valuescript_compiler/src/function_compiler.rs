@@ -610,17 +610,11 @@ impl FunctionCompiler {
     let cond_reg = ec.fnc.allocate_numbered_reg("_cond");
     ec.compile_into(&*if_.test, cond_reg.clone());
 
-    // TODO: Add negated jmpif instruction to avoid this
-    self.push(Instruction::OpNot(
-      Value::Register(cond_reg.clone()),
-      cond_reg.clone(),
-    ));
-
     let else_label = Label {
       name: self.label_allocator.allocate_numbered(&"else".to_string()),
     };
 
-    self.push(Instruction::JmpIf(
+    self.push(Instruction::JmpIfNot(
       Value::Register(cond_reg.clone()),
       else_label.ref_(),
     ));
@@ -819,6 +813,7 @@ impl FunctionCompiler {
             end_label.ref_(),
           ));
         } else {
+          // TODO: Why are we negating `local_is_returning` here? Can we use `jmpif_not` instead?
           self.push(Instruction::OpNot(
             Value::Register(local_is_returning.clone()),
             local_is_returning.clone(),
@@ -887,13 +882,7 @@ impl FunctionCompiler {
     let cond_reg = ec.fnc.allocate_numbered_reg(&"_cond".to_string());
     ec.compile_into(&*while_.test, cond_reg.clone());
 
-    // TODO: Add negated jmpif instruction to avoid this
-    self.push(Instruction::OpNot(
-      Value::Register(cond_reg.clone()),
-      cond_reg.clone(),
-    ));
-
-    self.push(Instruction::JmpIf(
+    self.push(Instruction::JmpIfNot(
       Value::Register(cond_reg.clone()),
       end_label.ref_(),
     ));
@@ -997,13 +986,7 @@ impl FunctionCompiler {
         let cond_reg = ec.fnc.allocate_numbered_reg("_cond");
         ec.compile_into(cond, cond_reg.clone());
 
-        // TODO: Add negated jmpif instruction to avoid this
-        self.push(Instruction::OpNot(
-          Value::Register(cond_reg.clone()),
-          cond_reg.clone(),
-        ));
-
-        self.push(Instruction::JmpIf(
+        self.push(Instruction::JmpIfNot(
           Value::Register(cond_reg.clone()),
           for_end_label.ref_(),
         ));
