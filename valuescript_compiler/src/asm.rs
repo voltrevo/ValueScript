@@ -142,7 +142,7 @@ impl std::fmt::Display for Function {
     for fn_line in &self.body {
       match fn_line {
         FnLine::Instruction(instruction) => write!(f, "    {}\n", instruction)?,
-        FnLine::Label(label) => write!(f, "{}\n", label)?,
+        FnLine::Label(label) => write!(f, "  {}\n", label)?,
         FnLine::Empty => write!(f, "\n")?,
         FnLine::Comment(message) => write!(f, "    // {}\n", message)?,
         FnLine::Release(reg) => write!(f, "    (release {})\n", reg)?,
@@ -504,7 +504,7 @@ impl std::fmt::Display for Lazy {
     for fn_line in &self.body {
       match fn_line {
         FnLine::Instruction(instruction) => write!(f, "    {}\n", instruction)?,
-        FnLine::Label(label) => write!(f, "{}\n", label)?,
+        FnLine::Label(label) => write!(f, "  {}\n", label)?,
         FnLine::Empty => write!(f, "\n")?,
         FnLine::Comment(message) => write!(f, "    // {}\n", message)?,
         FnLine::Release(reg) => write!(f, "    (release {})\n", reg)?,
