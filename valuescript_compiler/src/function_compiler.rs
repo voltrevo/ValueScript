@@ -120,7 +120,6 @@ impl FunctionCompiler {
   }
 
   pub fn label(&mut self, label: Label) {
-    self.current.body.push(FnLine::Empty);
     self.current.body.push(FnLine::Label(label));
   }
 
