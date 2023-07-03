@@ -40,15 +40,6 @@ fn main() {
       continue;
     }
 
-    println!(
-      "\n{}:",
-      file_path
-        .strip_prefix(project_dir)
-        .unwrap()
-        .to_str()
-        .unwrap(),
-    );
-
     let resolved_path = resolve_entry_path(
       &file_path
         .to_str()
@@ -77,6 +68,12 @@ fn main() {
       }
     }
 
+    let friendly_file_path = file_path
+      .strip_prefix(project_dir)
+      .unwrap()
+      .to_str()
+      .unwrap();
+
     let module = compile_result
       .module
       .expect("Should have exited if module is None");
@@ -95,27 +92,29 @@ fn main() {
       let after = Instant::now();
 
       let duration_ms = after.duration_since(before).as_millis();
-      print!("  {}ms", duration_ms);
 
       file_results.push(duration_ms as f64);
 
       if let Err(result) = result {
-        assert!(false, "{}", result.codify());
+        assert!(false, "{} failed: {}", friendly_file_path, result.codify());
       }
     }
 
-    if file_results.len() > 2 {
-      results.push(geometric_mean(&file_results[1..file_results.len() - 1]));
+    let result = if file_results.len() > 2 {
+      geometric_mean(&file_results[1..file_results.len() - 1])
     } else {
-      results.push(geometric_mean(&file_results));
-    }
+      geometric_mean(&file_results)
+    };
 
-    println!();
+    results.push(result);
+
+    println!("{:<37} {:>6.1}ms", friendly_file_path, result);
   }
 
   let score = geometric_mean(&results);
 
-  println!("\nScore: {}ms", score.round());
+  println!("{:<37} ========", "");
+  println!("{:<37} {:>6.1}ms", "Score", score);
 
   if !failed_paths.is_empty() {
     assert!(false, "See failures above");
