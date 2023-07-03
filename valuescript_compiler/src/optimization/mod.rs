@@ -7,6 +7,7 @@ mod remove_meta_lines;
 mod remove_unused_labels;
 mod shake_tree;
 mod simplify;
+mod simplify_jumps;
 pub mod try_to_kal;
 pub mod try_to_val;
 

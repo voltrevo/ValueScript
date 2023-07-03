@@ -8,6 +8,7 @@ use super::remove_meta_lines::remove_meta_lines;
 use super::remove_unused_labels::remove_unused_labels;
 use super::shake_tree::shake_tree;
 use super::simplify::simplify;
+use super::simplify_jumps::simplify_jumps;
 
 pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
   collapse_pointers_of_pointers(module);
@@ -17,6 +18,7 @@ pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
     simplify(module);
     reduce_instructions(module);
     remove_unused_labels(module);
+    simplify_jumps(module);
   }
 
   remove_meta_lines(module);
