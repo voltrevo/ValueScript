@@ -17,6 +17,14 @@ fn simplify_jumps_fn(fn_: &mut Function) {
   let mut substitutions = HashMap::<usize, FnLine>::new();
 
   for i in 0..fn_.body.len() {
+    if let FnLine::Instruction(Instruction::End) = &fn_.body[i] {
+      if next_instruction_index(&fn_.body, i) == None {
+        // Remove `end` instructions when we're already at the end of the function.
+        substitutions.insert(i, FnLine::Comment(fn_.body[i].to_string()));
+        continue;
+      }
+    }
+
     let (conditional, label_ref) = match &fn_.body[i] {
       FnLine::Instruction(instr) => match instr {
         Instruction::Jmp(label_ref) => (false, label_ref),
@@ -80,6 +88,8 @@ fn simplify_jumps_fn(fn_: &mut Function) {
 }
 
 fn next_instruction_index(body: &Vec<FnLine>, mut i: usize) -> Option<usize> {
+  i += 1;
+
   while i < body.len() {
     match &body[i] {
       FnLine::Instruction(_) => return Some(i),
