@@ -43,7 +43,7 @@ impl std::fmt::Display for Module {
       write!(f, "export {} {{\n", self.export_default)?;
 
       for (name, value) in &self.export_star.properties {
-        write!(f, "  {}: {},\n", name, value)?;
+        write!(f, "    {}: {},\n", name, value)?;
       }
 
       write!(f, "}}")?;
@@ -141,11 +141,11 @@ impl std::fmt::Display for Function {
     write!(f, ") {{\n")?;
     for fn_line in &self.body {
       match fn_line {
-        FnLine::Instruction(instruction) => write!(f, "  {}\n", instruction)?,
+        FnLine::Instruction(instruction) => write!(f, "    {}\n", instruction)?,
         FnLine::Label(label) => write!(f, "{}\n", label)?,
         FnLine::Empty => write!(f, "\n")?,
-        FnLine::Comment(message) => write!(f, "  // {}\n", message)?,
-        FnLine::Release(reg) => write!(f, "  (release {})\n", reg)?,
+        FnLine::Comment(message) => write!(f, "    // {}\n", message)?,
+        FnLine::Release(reg) => write!(f, "    (release {})\n", reg)?,
       }
     }
     write!(f, "}}")
@@ -163,9 +163,9 @@ impl std::fmt::Display for Class {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     writeln!(f, "class {{")?;
 
-    writeln!(f, "  constructor: {},", self.constructor)?;
+    writeln!(f, "    constructor: {},", self.constructor)?;
 
-    write!(f, "  prototype: ")?;
+    write!(f, "    prototype: ")?;
 
     match &self.prototype {
       Value::Object(object) => {
@@ -174,9 +174,9 @@ impl std::fmt::Display for Class {
         } else {
           write!(f, "{{\n")?;
           for (name, method) in &object.properties {
-            write!(f, "    {}: {},\n", name, method)?;
+            write!(f, "        {}: {},\n", name, method)?;
           }
-          writeln!(f, "  }},")?;
+          writeln!(f, "    }},")?;
         }
       }
       _ => {
@@ -184,7 +184,7 @@ impl std::fmt::Display for Class {
       }
     }
 
-    write!(f, "  static: ")?;
+    write!(f, "    static: ")?;
 
     match &self.static_ {
       Value::Object(object) => {
@@ -193,9 +193,9 @@ impl std::fmt::Display for Class {
         } else {
           write!(f, "{{\n")?;
           for (name, method) in &object.properties {
-            write!(f, "    {}: {},\n", name, method)?;
+            write!(f, "        {}: {},\n", name, method)?;
           }
-          writeln!(f, "  }},")?;
+          writeln!(f, "    }},")?;
         }
       }
       _ => {
@@ -503,11 +503,11 @@ impl std::fmt::Display for Lazy {
 
     for fn_line in &self.body {
       match fn_line {
-        FnLine::Instruction(instruction) => write!(f, "  {}\n", instruction)?,
+        FnLine::Instruction(instruction) => write!(f, "    {}\n", instruction)?,
         FnLine::Label(label) => write!(f, "{}\n", label)?,
         FnLine::Empty => write!(f, "\n")?,
-        FnLine::Comment(message) => write!(f, "  // {}\n", message)?,
-        FnLine::Release(reg) => write!(f, "  (release {})\n", reg)?,
+        FnLine::Comment(message) => write!(f, "    // {}\n", message)?,
+        FnLine::Release(reg) => write!(f, "    (release {})\n", reg)?,
       }
     }
 
