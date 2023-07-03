@@ -16,10 +16,10 @@ pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
   for _ in 0..2 {
     simplify(module);
     reduce_instructions(module);
+    remove_unused_labels(module);
   }
 
   remove_meta_lines(module);
-  remove_unused_labels(module);
   extract_constants(module, pointer_allocator);
 
   // After possibly repeated optimization, this ensures that the pointers are ordered correctly.
