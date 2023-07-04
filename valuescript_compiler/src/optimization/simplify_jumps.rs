@@ -67,7 +67,11 @@ fn simplify_jumps_fn(fn_: &mut Function) {
             // Instead of jumping to `end`, just end
             substitutions.insert(i, FnLine::Instruction(Instruction::End));
           }
-          FnLine::Instruction(_) => {} // TODO: Collapse jump to jump
+          FnLine::Instruction(Instruction::Jmp(label_ref)) => {
+            // Instead of jumping to another jump, jump directly to where that one goes
+            substitutions.insert(i, FnLine::Instruction(Instruction::Jmp(label_ref.clone())));
+          }
+          FnLine::Instruction(_) => {}
           FnLine::Label(_) | FnLine::Empty | FnLine::Comment(_) | FnLine::Release(_) => {
             panic!("Jump to non-instruction")
           }
