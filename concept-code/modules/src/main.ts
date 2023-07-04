@@ -6,5 +6,7 @@ export default function main() {
   let x = f1(1, 2, 3);
   x = f2(x);
 
-  return [x, util.dist(3, 4)];
+  const dist = util.dist;
+
+  return [x, dist(3, 4)];
 }

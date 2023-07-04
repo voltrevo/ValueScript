@@ -6,6 +6,7 @@ use super::extract_constants::extract_constants;
 use super::reduce_instructions::reduce_instructions;
 use super::remove_meta_lines::remove_meta_lines;
 use super::remove_unused_labels::remove_unused_labels;
+use super::remove_unused_registers::remove_unused_registers;
 use super::shake_tree::shake_tree;
 use super::simplify::simplify;
 use super::simplify_jumps::simplify_jumps;
@@ -18,6 +19,7 @@ pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
     simplify(module);
     reduce_instructions(module);
     remove_unused_labels(module);
+    remove_unused_registers(module);
     simplify_jumps(module);
   }
 
