@@ -1,5 +1,4 @@
-//! test_output(0)
-// Should be: undefined
+//! test_output(undefined)
 
 export default function () {
   const x = foo();

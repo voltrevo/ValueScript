@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  asm::{DefinitionContent, FnLine, Function, Module, Register},
+  asm::{DefinitionContent, FnLine, Function, Module, Register, Value},
   instruction::Instruction,
 };
 
@@ -74,15 +74,7 @@ fn remove_unused_registers_fn(fn_: &mut Function) {
         }
       }
 
-      // FIXME: This logic is not ideal. I'm not sure it's 100% correct. The idea is to fix the case
-      // where `single_return_dep` is used after returning it. You could certainly break it with
-      // handwritten assembly.
-      //
-      // In future, this return renaming should be replaced by a more robust logic from control flow
-      // analysis, which can determine that the returned value always coincides with one other
-      // register.
-      //
-      if !return_dep_always_taken(&mut fn_.body, &single_return_dep) {
+      if !reg_is_always_returned(&mut fn_.body, &single_return_dep) {
         break 'b;
       }
 
@@ -91,34 +83,34 @@ fn remove_unused_registers_fn(fn_: &mut Function) {
   }
 }
 
-fn return_dep_always_taken(body: &mut Vec<FnLine>, dep: &String) -> bool {
-  let return_string = "return".to_string();
+fn reg_is_always_returned(body: &mut Vec<FnLine>, reg: &String) -> bool {
+  let mut last_was_return_reg = false;
 
   for line in body {
-    let instr = match line {
-      FnLine::Instruction(instr) => instr,
-      _ => continue,
+    let is_return_reg = match line {
+      FnLine::Instruction(Instruction::Mov(arg, dst)) => 'b: {
+        if let Value::Register(arg) = arg {
+          if &arg.name == reg && dst.name == "return" {
+            break 'b true;
+          }
+        }
+
+        false
+      }
+      FnLine::Instruction(_) | FnLine::Label(_) => false,
+      FnLine::Empty | FnLine::Comment(_) | FnLine::Release(_) => last_was_return_reg,
     };
 
-    let mut reads_dep_copy = false;
-    let mut writes_return = false;
-
-    instr.visit_registers_mut_rev(&mut |rvm| {
-      if rvm.read && &rvm.register.name == dep && !rvm.register.take {
-        reads_dep_copy = true;
+    if let FnLine::Instruction(Instruction::End) = line {
+      if !last_was_return_reg {
+        return false;
       }
-
-      if rvm.write && rvm.register.name == return_string {
-        writes_return = true;
-      }
-    });
-
-    if reads_dep_copy && writes_return {
-      return false;
     }
+
+    last_was_return_reg = is_return_reg;
   }
 
-  return true;
+  last_was_return_reg
 }
 
 fn rename_register_in_body(body: &mut Vec<FnLine>, from: &String, to: &String) {
