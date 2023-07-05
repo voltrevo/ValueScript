@@ -29,8 +29,21 @@ fn reduce(instr: Instruction) -> Option<Instruction> {
     | Throw(..) | SetCatch(..) | UnsetCatch | ConstSubCall(..) | RequireMutableThis
     | ThisSubCall(..) | Next(..) | Yield(..) | YieldStar(..) => Some(instr),
 
-    Mov(_, dst)
-    | OpPlus(_, _, dst)
+    Mov(arg, dst) => 'b: {
+      if dst.is_ignore() {
+        break 'b None;
+      }
+
+      if let Value::Register(arg) = arg {
+        if arg.name == dst.name {
+          break 'b None;
+        }
+      }
+
+      Some(instr)
+    }
+
+    OpPlus(_, _, dst)
     | OpMinus(_, _, dst)
     | OpMul(_, _, dst)
     | OpDiv(_, _, dst)
