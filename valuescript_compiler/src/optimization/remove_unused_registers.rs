@@ -40,6 +40,105 @@ fn remove_unused_registers_fn(fn_: &mut Function) {
       *line = FnLine::Comment(line.to_string());
     }
   }
+
+  let single_return_dep = {
+    match dependency_tree.get("return") {
+      Some(deps) => match deps.iter().next() {
+        Some(dep) => match deps.len() {
+          1 => Some(dep.clone()),
+          _ => None,
+        },
+        None => None,
+      },
+      None => None,
+    }
+  };
+
+  'b: {
+    if let Some(single_return_dep) = single_return_dep {
+      if &single_return_dep == "this" {
+        break 'b;
+      }
+
+      let return_string = "return".to_string();
+
+      for deps in dependency_tree.values() {
+        if deps.contains(&return_string) {
+          break 'b;
+        }
+      }
+
+      for param in &fn_.parameters {
+        if &param.name == &single_return_dep {
+          break 'b;
+        }
+      }
+
+      // FIXME: This logic is not ideal. I'm not sure it's 100% correct. The idea is to fix the case
+      // where `single_return_dep` is used after returning it. You could certainly break it with
+      // handwritten assembly.
+      //
+      // In future, this return renaming should be replaced by a more robust logic from control flow
+      // analysis, which can determine that the returned value always coincides with one other
+      // register.
+      //
+      if !return_dep_always_taken(&mut fn_.body, &single_return_dep) {
+        break 'b;
+      }
+
+      rename_register_in_body(&mut fn_.body, &single_return_dep, &return_string);
+    }
+  }
+}
+
+fn return_dep_always_taken(body: &mut Vec<FnLine>, dep: &String) -> bool {
+  let return_string = "return".to_string();
+
+  for line in body {
+    let instr = match line {
+      FnLine::Instruction(instr) => instr,
+      _ => continue,
+    };
+
+    let mut reads_dep_copy = false;
+    let mut writes_return = false;
+
+    instr.visit_registers_mut_rev(&mut |rvm| {
+      if rvm.read && &rvm.register.name == dep && !rvm.register.take {
+        reads_dep_copy = true;
+      }
+
+      if rvm.write && rvm.register.name == return_string {
+        writes_return = true;
+      }
+    });
+
+    if reads_dep_copy && writes_return {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+fn rename_register_in_body(body: &mut Vec<FnLine>, from: &String, to: &String) {
+  // Note: This only does the rename in the body and basically assumes that %from is not a
+  // parameter.
+
+  for line in body {
+    let instr = match line {
+      FnLine::Instruction(instr) => instr,
+      _ => continue,
+    };
+
+    instr.visit_registers_mut_rev(&mut |rvm| {
+      if &rvm.register.name == from {
+        // TODO: Preserving `.take=true` can cause problems. Is just using `.take=false` the right
+        // solution?
+        *rvm.register = Register::named(to.clone());
+      }
+    });
+  }
 }
 
 fn gather_used_registers(

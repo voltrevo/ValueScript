@@ -81,7 +81,7 @@ fn handle_release(
           return;
         }
 
-        if !taken && !rvm.write {
+        if !taken && rvm.read && !rvm.write {
           *rvm.register = rvm.register.take();
           taken = true;
         }

@@ -322,9 +322,14 @@ impl Instruction {
         ex.visit_registers_mut_rev(visit);
       }
 
-      SetCatch(_label_ref, _dst) => {
-        // TODO: Does the write to dst need to be accounted for?
-        // (It doesn't occur 'here')
+      SetCatch(_label_ref, dst) => {
+        // TODO: There is a write but it doesn't occur here. There should really be a write at the
+        // catch label. This is only ok right now because Kals currently get cleared on labels.
+        visit(RegisterVisitMut {
+          register: dst,
+          read: false,
+          write: false,
+        });
       }
 
       Next(iterable, dst) => {
