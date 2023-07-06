@@ -484,6 +484,17 @@ impl StackFrameTrait for BytecodeStackFrame {
 
       Throw => {
         return match self.decoder.peek_type() {
+          BytecodeType::TakeRegister => {
+            self.decoder.decode_type();
+
+            // Avoid the void->undefined conversion here
+            let error = take(&mut self.registers[self.decoder.decode_register_index().unwrap()]);
+
+            match error {
+              Val::Void => Ok(FrameStepOk::Continue),
+              _ => Err(error),
+            }
+          }
           BytecodeType::Register => {
             self.decoder.decode_type();
 
