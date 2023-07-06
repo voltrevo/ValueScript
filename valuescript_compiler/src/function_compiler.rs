@@ -673,7 +673,7 @@ impl FunctionCompiler {
       .collect::<Vec<Label>>();
 
     let cond_reg = ec.fnc.allocate_numbered_reg("_sw_cond");
-    let mut has_default = false;
+    let mut default_i: Option<usize> = None;
 
     for (i, case) in switch.cases.iter().enumerate() {
       match &case.test {
@@ -694,15 +694,23 @@ impl FunctionCompiler {
         }
         // default:
         None => {
-          has_default = true;
-          ec.fnc.push(Instruction::Jmp(case_labels[i].ref_()));
+          if default_i.is_some() {
+            ec.fnc.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::Error,
+              message: "A switch can only have one default".to_string(),
+              span: case.span,
+            });
+          }
+
+          default_i = Some(i);
         }
       };
     }
 
-    if !has_default {
-      ec.fnc.push(Instruction::Jmp(end_label.ref_()));
-    }
+    ec.fnc.push(Instruction::Jmp(match default_i {
+      Some(default_i) => case_labels[default_i].ref_(),
+      None => end_label.ref_(),
+    }));
 
     for (i, case) in switch.cases.iter().enumerate() {
       ec.fnc.label(case_labels[i].clone());

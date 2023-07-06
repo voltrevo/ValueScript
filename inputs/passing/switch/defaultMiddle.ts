@@ -1,5 +1,4 @@
-//! test_output(["default","matched 42"])
-// Should be: ["matched 42"]
+//! test_output(["matched 42"])
 
 export default function foo() {
   let logs: string[] = [];

@@ -1,5 +1,4 @@
-//! test_output(["c1","default"])
-// Should be: ["c1","c2","default"]
+//! test_output(["c1","c2","default"])
 
 export default function foo() {
   let logs = [];
