@@ -12,7 +12,9 @@ use crate::{
   LoadFunctionResult, ValTrait,
 };
 
-use super::{iteration_result::IterationResult, return_this::RETURN_THIS};
+use super::{
+  iteration_result::IterationResult, iterator_has::iterator_has, return_this::RETURN_THIS,
+};
 
 #[derive(Clone)]
 pub struct StringIterator {
@@ -121,6 +123,10 @@ impl ValTrait for StringIterator {
     }
 
     Ok(Val::Undefined)
+  }
+
+  fn has(&self, key: &Val) -> Option<bool> {
+    iterator_has(key)
   }
 
   fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {

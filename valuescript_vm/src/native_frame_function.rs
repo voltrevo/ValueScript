@@ -63,6 +63,10 @@ impl ValTrait for NativeFrameFunction {
     Err("TODO: Subscript native function".to_internal_error())
   }
 
+  fn has(&self, _key: &Val) -> Option<bool> {
+    Some(false)
+  }
+
   fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {
     Err("Cannot assign to subscript of native function".to_type_error())
   }

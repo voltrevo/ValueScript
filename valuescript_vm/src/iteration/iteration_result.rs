@@ -69,6 +69,13 @@ impl ValTrait for IterationResult {
     })
   }
 
+  fn has(&self, key: &Val) -> Option<bool> {
+    Some(match key.to_string().as_str() {
+      "value" | "done" => true,
+      _ => false,
+    })
+  }
+
   fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {
     Err("Cannot assign to subscript of iteration result".to_type_error())
   }

@@ -70,6 +70,13 @@ where
     Ok(Self::bo_sub(&key.to_string()))
   }
 
+  fn has(&self, key: &Val) -> Option<bool> {
+    match Self::bo_sub(&key.to_string()) {
+      Val::Undefined => Some(false),
+      _ => Some(true),
+    }
+  }
+
   fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {
     Err(format!("Cannot assign to subscript of {} builtin", Self::bo_name()).to_type_error())
   }

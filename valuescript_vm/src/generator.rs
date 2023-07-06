@@ -92,6 +92,18 @@ impl ValTrait for Generator {
     Ok(Val::Undefined)
   }
 
+  fn has(&self, key: &Val) -> Option<bool> {
+    if key.to_string() == "next" {
+      return Some(true);
+    }
+
+    if let Val::Symbol(VsSymbol::ITERATOR) = key {
+      return Some(true);
+    }
+
+    Some(false)
+  }
+
   fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {
     Err("Cannot assign to subscript of a generator".to_type_error())
   }

@@ -1,5 +1,6 @@
 use core::fmt;
 use std::any::Any;
+use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -57,6 +58,24 @@ pub enum VsType {
   Class,
 }
 
+impl Display for VsType {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      VsType::Undefined => f.write_str("undefined"),
+      VsType::Null => f.write_str("null"),
+      VsType::Bool => f.write_str("bool"),
+      VsType::Number => f.write_str("number"),
+      VsType::BigInt => f.write_str("bigint"),
+      VsType::Symbol => f.write_str("symbol"),
+      VsType::String => f.write_str("string"),
+      VsType::Array => f.write_str("array"),
+      VsType::Object => f.write_str("object"),
+      VsType::Function => f.write_str("function"),
+      VsType::Class => f.write_str("class"),
+    }
+  }
+}
+
 pub enum LoadFunctionResult {
   NotAFunction,
   StackFrame(StackFrame),
@@ -80,6 +99,7 @@ pub trait ValTrait: fmt::Display {
   fn load_function(&self) -> LoadFunctionResult;
 
   fn sub(&self, key: &Val) -> Result<Val, Val>;
+  fn has(&self, key: &Val) -> Option<bool>;
   fn submov(&mut self, key: &Val, value: Val) -> Result<(), Val>;
 
   fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
@@ -353,6 +373,97 @@ impl ValTrait for Val {
   fn sub(&self, key: &Val) -> Result<Val, Val> {
     // TODO: mut version?
     op_sub(&mut self.clone(), key)
+  }
+
+  fn has(&self, key: &Val) -> Option<bool> {
+    match self {
+      Val::Void
+      | Val::Undefined
+      | Val::Null
+      | Val::Bool(_)
+      | Val::Number(_)
+      | Val::BigInt(_)
+      | Val::Symbol(_)
+      | Val::String(_) => None,
+
+      Val::Array(array) => {
+        let index = match key.to_index() {
+          None => {
+            return Some(match key.to_string().as_str() {
+              "at" => true,
+              "concat" => true,
+              "copyWithin" => true,
+              "entries" => true,
+              "every" => true,
+              "fill" => true,
+              "filter" => true,
+              "find" => true,
+              "findIndex" => true,
+              "flat" => true,
+              "flatMap" => true,
+              "includes" => true,
+              "indexOf" => true,
+              "join" => true,
+              "keys" => true,
+              "lastIndexOf" => true,
+              "length" => true,
+              "map" => true,
+              "pop" => true,
+              "push" => true,
+              "reduce" => true,
+              "reduceRight" => true,
+              "reverse" => true,
+              "shift" => true,
+              "slice" => true,
+              "some" => true,
+              "sort" => true,
+              "splice" => true,
+              "toLocaleString" => true,
+              "toString" => true,
+              "unshift" => true,
+              "values" => true,
+
+              _ => false,
+            });
+          }
+          Some(i) => i,
+        };
+
+        return Some(index < array.elements.len());
+      }
+      Val::Object(object) => match key {
+        Val::Symbol(symbol) => {
+          if object.symbol_map.contains_key(symbol) {
+            return Some(true);
+          }
+
+          if let Some(proto) = &object.prototype {
+            return proto.has(key);
+          }
+
+          return Some(false);
+        }
+        _ => {
+          if object.string_map.contains_key(&key.to_string()) {
+            return Some(true);
+          }
+
+          if let Some(proto) = &object.prototype {
+            return proto.has(key);
+          }
+
+          return Some(false);
+        }
+      },
+      Val::Function(_) => Some(false),
+      Val::Class(class) => class.static_.has(key),
+      Val::Static(static_) => static_.has(key),
+      Val::Dynamic(dynamic) => dynamic.has(key),
+      Val::CopyCounter(_) => Some(match key.to_string().as_str() {
+        "tag" | "count" => true,
+        _ => false,
+      }),
+    }
   }
 
   fn submov(&mut self, key: &Val, value: Val) -> Result<(), Val> {

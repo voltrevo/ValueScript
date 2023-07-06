@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::mem::take;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -523,8 +522,11 @@ pub fn op_instance_of(_left: &Val, _right: &Val) -> Result<Val, Val> {
   Err("TODO: op_instance_of".to_internal_error())
 }
 
-pub fn op_in(_left: &Val, _right: &Val) -> Result<Val, Val> {
-  Err("TODO: op_in".to_internal_error())
+pub fn op_in(left: &Val, right: &Val) -> Result<Val, Val> {
+  match right.has(left) {
+    Some(found) => Ok(found.to_val()),
+    None => Err(format!("Can't use `in` with a {}", right.typeof_()).to_type_error()),
+  }
 }
 
 pub fn op_sub(left: &mut Val, right: &Val) -> Result<Val, Val> {
@@ -541,34 +543,7 @@ pub fn op_sub(left: &mut Val, right: &Val) -> Result<Val, Val> {
     Val::BigInt(bigint) => Ok(op_sub_bigint(bigint, right)),
     Val::Symbol(_) => Ok(Val::Undefined),
     Val::String(string_data) => Ok(op_sub_string(string_data, right)),
-    Val::Array(array_data) => {
-      let right_index = match right.to_index() {
-        None => {
-          // FIXME: Inefficient to_string() that gets duplicated
-          // when subscripting the object
-          if right.to_string() == "length" {
-            return Ok(Val::Number(array_data.elements.len() as f64));
-          }
-
-          return op_sub_array(array_data, right);
-        }
-        Some(i) => i,
-      };
-
-      if right_index >= array_data.elements.len() {
-        return Ok(Val::Undefined);
-      }
-
-      let res = match Rc::get_mut(array_data) {
-        Some(array_data) => take(&mut array_data.elements[right_index]),
-        None => array_data.elements[right_index].clone(),
-      };
-
-      return Ok(match res {
-        Val::Void => Val::Undefined,
-        _ => res,
-      });
-    }
+    Val::Array(array_data) => op_sub_array(array_data, right),
     Val::Object(object_data) => Ok(object_data.sub(right)), // TODO: move on single ref
     Val::Function(_) => Ok(Val::Undefined),
     Val::Class(class) => op_sub(&mut class.static_.clone(), right),
