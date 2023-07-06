@@ -287,7 +287,7 @@ impl ModuleCompiler {
                     "Determine whether initializer can be statically evaluated",
                   );
 
-                  continue;
+                  Value::String("(Static eval failed)".to_string())
                 }
               };
 
