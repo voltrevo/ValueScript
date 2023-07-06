@@ -51,7 +51,7 @@ pub struct QueuedFunction {
 }
 
 pub struct LoopLabels {
-  pub continue_: Label,
+  pub continue_: Option<Label>,
   pub break_: Label,
 }
 
@@ -542,23 +542,26 @@ impl FunctionCompiler {
           return;
         }
 
-        match self.loop_labels.last() {
-          Some(loop_labels) => {
-            self.push(Instruction::Jmp(loop_labels.continue_.ref_()));
-          }
-          None => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: "continue statement outside loop".to_string(),
-              span: continue_.span,
-            });
+        for label_pair in self.loop_labels.iter().rev() {
+          match &label_pair.continue_ {
+            Some(continue_label) => {
+              self.push(Instruction::Jmp(continue_label.ref_()));
+              return;
+            }
+            None => {}
           }
         }
+
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::Error,
+          message: "continue statement outside loop".to_string(),
+          span: continue_.span,
+        });
       }
       If(if_) => {
         self.if_(if_);
       }
-      Switch(switch) => self.todo(switch.span, "Switch statement"),
+      Switch(switch) => self.switch(switch),
       Throw(throw) => {
         let mut expression_compiler = ExpressionCompiler { fnc: self };
 
@@ -640,6 +643,79 @@ impl FunctionCompiler {
         self.label(after_else_label);
       }
     }
+  }
+
+  fn switch(&mut self, switch: &swc_ecma_ast::SwitchStmt) {
+    let mut ec = ExpressionCompiler { fnc: self };
+
+    let sw_expr_reg = ec.fnc.allocate_numbered_reg("_sw_expr");
+    ec.compile_into(&switch.discriminant, sw_expr_reg.clone());
+
+    let end_label = Label {
+      name: ec
+        .fnc
+        .label_allocator
+        .allocate_numbered(&"sw_end".to_string()),
+    };
+
+    ec.fnc.loop_labels.push(LoopLabels {
+      continue_: None,
+      break_: end_label.clone(),
+    });
+
+    let case_labels = (0..switch.cases.len())
+      .map(&mut |i| Label {
+        name: ec
+          .fnc
+          .label_allocator
+          .allocate_numbered(&format!("sw_{}_case", i)),
+      })
+      .collect::<Vec<Label>>();
+
+    let cond_reg = ec.fnc.allocate_numbered_reg("_sw_cond");
+    let mut has_default = false;
+
+    for (i, case) in switch.cases.iter().enumerate() {
+      match &case.test {
+        // case test:
+        Some(test) => {
+          ec.compile_into(test, cond_reg.clone());
+
+          ec.fnc.push(Instruction::OpTripleEq(
+            Value::Register(sw_expr_reg.clone()),
+            Value::Register(cond_reg.clone()),
+            cond_reg.clone(),
+          ));
+
+          ec.fnc.push(Instruction::JmpIf(
+            Value::Register(cond_reg.clone()),
+            case_labels[i].ref_(),
+          ));
+        }
+        // default:
+        None => {
+          has_default = true;
+          ec.fnc.push(Instruction::Jmp(case_labels[i].ref_()));
+        }
+      };
+    }
+
+    if !has_default {
+      ec.fnc.push(Instruction::Jmp(end_label.ref_()));
+    }
+
+    for (i, case) in switch.cases.iter().enumerate() {
+      ec.fnc.label(case_labels[i].clone());
+
+      for stmt in &case.cons {
+        ec.fnc.statement(stmt, false);
+      }
+    }
+
+    self.release_reg(&cond_reg);
+    self.release_reg(&sw_expr_reg);
+
+    self.label(end_label);
   }
 
   fn try_(&mut self, try_: &swc_ecma_ast::TryStmt) {
@@ -870,7 +946,7 @@ impl FunctionCompiler {
     };
 
     self.loop_labels.push(LoopLabels {
-      continue_: start_label.clone(),
+      continue_: Some(start_label.clone()),
       break_: end_label.clone(),
     });
 
@@ -914,7 +990,7 @@ impl FunctionCompiler {
     };
 
     self.loop_labels.push(LoopLabels {
-      continue_: continue_label.clone(),
+      continue_: Some(continue_label.clone()),
       break_: end_label.clone(),
     });
 
@@ -974,7 +1050,7 @@ impl FunctionCompiler {
     self.label(for_test_label.clone());
 
     self.loop_labels.push(LoopLabels {
-      continue_: for_continue_label.clone(),
+      continue_: Some(for_continue_label.clone()),
       break_: for_end_label.clone(),
     });
 
@@ -1068,7 +1144,7 @@ impl FunctionCompiler {
     ec.fnc.label(for_test_label.clone());
 
     ec.fnc.loop_labels.push(LoopLabels {
-      continue_: for_continue_label.clone(),
+      continue_: Some(for_continue_label.clone()),
       break_: for_end_label.clone(),
     });
 
