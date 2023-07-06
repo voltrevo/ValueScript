@@ -15,7 +15,7 @@ pub fn simplify(module: &mut Module) {
 
   for defn in &mut module.definitions {
     match &mut defn.content {
-      DefinitionContent::Function(fn_) => simplify_fn(FnState::new(pointer_kals.clone()), fn_),
+      DefinitionContent::Function(fn_) => simplify_fn(FnState::new(fn_, pointer_kals.clone()), fn_),
       DefinitionContent::Class(_) => {}
       DefinitionContent::Value(_) => {}
       DefinitionContent::Lazy(_) => {}
@@ -107,7 +107,9 @@ fn handle_release(
 fn simplify_fn(mut state: FnState, fn_: &mut Function) {
   let mut pending_releases = Vec::<Register>::new();
 
-  for i in 0..fn_.body.len() {
+  let mut i = 0;
+
+  while i < fn_.body.len() {
     if let FnLine::Instruction(Instruction::RequireMutableThis) = &fn_.body[i] {
       if state.mutable_this_established {
         fn_.body[i] = FnLine::Comment(fn_.body[i].to_string());
@@ -122,13 +124,23 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function) {
     }
 
     match &mut fn_.body[i] {
-      FnLine::Instruction(instr) => state.eval_instruction(instr),
+      FnLine::Instruction(instr) => {
+        state.eval_instruction(instr);
+
+        // FIXME: Hacky side effect mechanism (eval_instruction populates new_instructions)
+        for instr in take(&mut state.new_instructions) {
+          fn_.body.insert(i, FnLine::Instruction(instr));
+          i += 1;
+        }
+      }
       FnLine::Label(_) => state.clear_local(),
       FnLine::Empty | FnLine::Comment(_) => {}
       FnLine::Release(reg) => pending_releases.push(reg.clone()),
     }
 
     handle_mutation_releases(&mut fn_.body, i);
+
+    i += 1;
   }
 
   if !fn_.body.is_empty() {

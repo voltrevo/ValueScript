@@ -61,6 +61,10 @@ impl NameAllocator {
     }
   }
 
+  pub fn mark_used(&mut self, name: &String) {
+    self.used_names.insert(name.clone());
+  }
+
   pub fn release(&mut self, name: &String) {
     self.used_names.remove(name);
     self.released_names.push(name.clone());
@@ -119,7 +123,7 @@ impl PointerAllocator {
 
 #[derive(Clone)]
 pub struct RegAllocator {
-  alloc: NameAllocator,
+  pub alloc: NameAllocator,
 }
 
 impl RegAllocator {

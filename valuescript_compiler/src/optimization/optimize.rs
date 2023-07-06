@@ -20,6 +20,7 @@ pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
     reduce_instructions(module);
     remove_unused_labels(module);
     remove_unused_registers(module);
+    reduce_instructions(module);
     simplify_jumps(module);
   }
 

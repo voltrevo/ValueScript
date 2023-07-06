@@ -11,8 +11,9 @@ use std::{
 };
 
 use crate::{
-  asm::{self, Builtin, Number, Pointer, Register, Value},
+  asm::{self, Builtin, Function, Number, Pointer, Register, Value},
   instruction::Instruction,
+  name_allocator::RegAllocator,
 };
 
 use super::try_to_kal::TryToKal;
@@ -235,14 +236,38 @@ impl Kal {
 
 #[derive(Default)]
 pub struct FnState {
+  pub reg_allocator: RegAllocator,
   pub pointer_kals: HashMap<Pointer, Kal>,
   pub mutable_this_established: bool,
   pub registers: BTreeMap<String, Kal>,
+  pub new_instructions: Vec<Instruction>,
 }
 
 impl FnState {
-  pub fn new(pointer_kals: HashMap<Pointer, Kal>) -> Self {
+  pub fn new(fn_: &Function, pointer_kals: HashMap<Pointer, Kal>) -> Self {
+    let mut reg_allocator = RegAllocator::default();
+
+    for p in &fn_.parameters {
+      reg_allocator.alloc.mark_used(&p.name);
+    }
+
+    for line in &fn_.body {
+      match line {
+        asm::FnLine::Instruction(instr) => {
+          let mut instr = instr.clone(); // TODO: Need non-mut register visitor
+          instr.visit_registers_mut_rev(&mut |rvm| {
+            reg_allocator.alloc.mark_used(&rvm.register.name);
+          });
+        }
+        asm::FnLine::Label(_) => {}
+        asm::FnLine::Empty => {}
+        asm::FnLine::Comment(_) => {}
+        asm::FnLine::Release(reg) => reg_allocator.alloc.mark_used(&reg.name),
+      }
+    }
+
     FnState {
+      reg_allocator,
       pointer_kals,
       ..Default::default()
     }
@@ -252,9 +277,11 @@ impl FnState {
     let pointer_kals = take(&mut self.pointer_kals);
 
     *self = Self {
+      reg_allocator: take(&mut self.reg_allocator),
       pointer_kals,
       mutable_this_established: Default::default(),
       registers: Default::default(),
+      new_instructions: take(&mut self.new_instructions),
     }
   }
 
@@ -272,11 +299,28 @@ impl FnState {
   }
 
   fn handle_reg_changed(&mut self, changed_reg: &String) {
+    let mut new_reg: Option<String> = None;
+
     for kal in self.registers.values_mut() {
       kal.visit_kals_mut(&mut |sub_kal| {
         if let Kal::Register(reg) = sub_kal {
           if reg.name == *changed_reg {
-            *sub_kal = Kal::Unknown;
+            let new_reg = match &new_reg {
+              Some(new_reg) => new_reg.clone(),
+              None => {
+                let new_reg_str = self.reg_allocator.allocate_numbered("_tmp").name;
+                new_reg = Some(new_reg_str.clone());
+
+                self.new_instructions.push(Instruction::Mov(
+                  Value::Register(Register::named(changed_reg.clone())),
+                  Register::named(new_reg_str.clone()),
+                ));
+
+                new_reg_str
+              }
+            };
+
+            *sub_kal = Kal::Register(Register::named(new_reg));
           }
         }
       });
