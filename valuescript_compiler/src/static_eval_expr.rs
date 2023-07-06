@@ -1,5 +1,5 @@
 use crate::{
-  asm::{Builtin, Value},
+  asm::{Array, Builtin, Value},
   expression_compiler::value_from_literal,
 };
 
@@ -15,7 +15,25 @@ pub fn static_eval_expr(expr: &swc_ecma_ast::Expr) -> Option<Value> {
       Ok(value) => return Some(value),
       _ => {}
     },
-    _ => {} // TODO: Array, Object
+    swc_ecma_ast::Expr::Array(array) => {
+      let mut values = Vec::<Value>::new();
+
+      for item in &array.elems {
+        values.push(match item {
+          Some(item) => {
+            if item.spread.is_some() {
+              return None;
+            }
+
+            static_eval_expr(&item.expr)?
+          }
+          None => Value::Void,
+        });
+      }
+
+      return Some(Value::Array(Box::new(Array { values })));
+    }
+    _ => {} // TODO: Object
   }
 
   None
