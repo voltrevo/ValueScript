@@ -11,9 +11,6 @@ export default function main() {
 
 function toWords(n: number): string {
   if (n < 10) {
-    // TODO: Constant extraction. This is a good example of where this would be
-    // very beneficial. (Instead, there's a giant literal in the bytecode here
-    // and it needs to be decoded every time we enter this code path.)
     return [
       "zero",
       "one",
@@ -86,7 +83,7 @@ function toWords(n: number): string {
 }
 
 function panic(): never {
-  return (undefined as any).boom as never;
+  throw new Error("Something went wrong");
 }
 
 function countEligibleLetters(str: string) {
