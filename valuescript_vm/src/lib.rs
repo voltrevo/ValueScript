@@ -28,6 +28,7 @@ mod vs_symbol;
 pub mod vs_value;
 
 pub use bytecode::Bytecode;
+pub use string_methods::unicode_at;
 pub use virtual_machine::VirtualMachine;
 pub use vs_symbol::VsSymbol;
 pub use vs_value::{LoadFunctionResult, ValTrait};

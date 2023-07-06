@@ -748,7 +748,7 @@ fn last_index_of(string_bytes: &[u8], search_bytes: &[u8], at_least_pos: usize) 
   None
 }
 
-fn unicode_at(bytes: &[u8], len: usize, index: usize) -> Option<char> {
+pub fn unicode_at(bytes: &[u8], len: usize, index: usize) -> Option<char> {
   match code_point_at(bytes, len, index) {
     Some(code_point) => Some(
       std::char::from_u32(code_point).expect("Invalid code point"), // TODO: Find out if this is reachable and what to do about it

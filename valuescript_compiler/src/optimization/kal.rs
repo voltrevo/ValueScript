@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 use valuescript_vm::{
-  operations,
+  operations, unicode_at,
   vs_object::VsObject,
   vs_value::{number_to_index, ToVal, Val},
 };
@@ -381,6 +381,24 @@ impl FnState {
         let key = self.eval_arg(key);
 
         let item = match obj {
+          Kal::String(string) => match key {
+            Kal::Number(Number(i)) => match number_to_index(i) {
+              Some(i) => 'b: {
+                let string_bytes = string.as_bytes();
+
+                if i >= string_bytes.len() {
+                  break 'b Kal::Undefined;
+                }
+
+                match unicode_at(string_bytes, string_bytes.len(), i) {
+                  Some(char) => Kal::String(char.to_string()),
+                  None => Kal::String("".to_string()),
+                }
+              }
+              None => Kal::Undefined,
+            },
+            _ => Kal::Unknown,
+          },
           Kal::Array(array) => match key {
             Kal::Number(Number(i)) => match number_to_index(i) {
               Some(i) => match array.values.get(i) {
