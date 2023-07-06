@@ -400,10 +400,19 @@ impl FunctionCompiler {
         for potspp in &constructor.params {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
-              self.todo(ts_param_prop.span(), "TypeScript parameter properties");
-              param_registers.push(Some(
-                self.allocate_numbered_reg(&"_todo_ts_param_prop".to_string()),
-              ));
+              let reg = match &ts_param_prop.param {
+                swc_ecma_ast::TsParamPropParam::Ident(ident) => {
+                  match ident.id.sym.to_string().as_str() {
+                    "this" => None,
+                    _ => Some(self.get_variable_register(&ident.id)),
+                  }
+                }
+                swc_ecma_ast::TsParamPropParam::Assign(assign) => {
+                  self.get_pattern_register_opt(&assign.left)
+                }
+              };
+
+              param_registers.push(reg);
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
               param_registers.push(self.get_pattern_register_opt(&p.pat))
@@ -483,8 +492,31 @@ impl FunctionCompiler {
       Functionish::Constructor(_, _class_span, constructor) => {
         for (i, potspp) in constructor.params.iter().enumerate() {
           match potspp {
-            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(_) => {
-              // TODO (Diagnostic emitted elsewhere)
+            swc_ecma_ast::ParamOrTsParamProp::TsParamProp(tpp) => {
+              if let Some(reg) = &param_registers[i] {
+                let mut ec = ExpressionCompiler { fnc: self };
+
+                let field_name = match &tpp.param {
+                  swc_ecma_ast::TsParamPropParam::Ident(bi) => bi.id.sym.to_string(),
+                  swc_ecma_ast::TsParamPropParam::Assign(assign) => {
+                    ec.assign_pat(&assign, reg);
+
+                    match &*assign.left {
+                      swc_ecma_ast::Pat::Ident(bi) => bi.id.sym.to_string(),
+                      _ => {
+                        ec.fnc.error(assign.left.span(), "Invalid pattern");
+                        "_invalid_pattern".to_string()
+                      }
+                    }
+                  }
+                };
+
+                ec.fnc.push(Instruction::SubMov(
+                  Value::String(field_name),
+                  Value::Register(reg.clone()),
+                  Register::this(),
+                ));
+              }
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
               if let Some(reg) = &param_registers[i] {

@@ -1,3 +1,5 @@
+//! test_output({"x":3,"y":5})
+
 export default function main() {
   return new Point(3, 5);
 }

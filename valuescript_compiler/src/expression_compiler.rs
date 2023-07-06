@@ -1408,16 +1408,7 @@ impl<'a> ExpressionCompiler<'a> {
           ));
         }
       }
-      Pat::Assign(assign) => {
-        if let Pat::Expr(expr) = &*assign.left {
-          let mut at = TargetAccessor::compile(self, expr, true);
-          self.default_expr(&assign.right, register);
-          at.assign_and_packup(self, &Value::Register(register.clone()), false);
-        } else {
-          self.default_expr(&assign.right, register);
-          self.pat(&assign.left, register, false);
-        }
-      }
+      Pat::Assign(assign) => self.assign_pat(assign, register),
       Pat::Array(array) => {
         for (i, elem_opt) in array.elems.iter().enumerate() {
           let elem = match elem_opt {
@@ -1495,6 +1486,19 @@ impl<'a> ExpressionCompiler<'a> {
         let mut at = TargetAccessor::compile(self, expr, true);
         at.assign_and_packup(self, &Value::Register(register.clone()), false);
       }
+    }
+  }
+
+  pub fn assign_pat(&mut self, assign: &swc_ecma_ast::AssignPat, register: &Register) {
+    use swc_ecma_ast::Pat;
+
+    if let Pat::Expr(expr) = &*assign.left {
+      let mut at = TargetAccessor::compile(self, expr, true);
+      self.default_expr(&assign.right, register);
+      at.assign_and_packup(self, &Value::Register(register.clone()), false);
+    } else {
+      self.default_expr(&assign.right, register);
+      self.pat(&assign.left, register, false);
     }
   }
 
