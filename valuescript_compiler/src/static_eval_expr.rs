@@ -1,5 +1,5 @@
 use crate::{
-  asm::{Array, Builtin, Value},
+  asm::{Array, Builtin, Number, Object, Value},
   expression_compiler::value_from_literal,
 };
 
@@ -12,8 +12,8 @@ pub fn static_eval_expr(expr: &swc_ecma_ast::Expr) -> Option<Value> {
 
   match expr {
     swc_ecma_ast::Expr::Lit(lit) => match value_from_literal(lit) {
-      Ok(value) => return Some(value),
-      _ => {}
+      Ok(value) => Some(value),
+      _ => None,
     },
     swc_ecma_ast::Expr::Array(array) => {
       let mut values = Vec::<Value>::new();
@@ -31,12 +31,43 @@ pub fn static_eval_expr(expr: &swc_ecma_ast::Expr) -> Option<Value> {
         });
       }
 
-      return Some(Value::Array(Box::new(Array { values })));
+      Some(Value::Array(Box::new(Array { values })))
     }
-    _ => {} // TODO: Object
-  }
+    swc_ecma_ast::Expr::Object(object) => {
+      let mut properties = Vec::<(Value, Value)>::new();
 
-  None
+      for prop in &object.props {
+        let (key, value) = match prop {
+          swc_ecma_ast::PropOrSpread::Spread(_) => return None,
+          swc_ecma_ast::PropOrSpread::Prop(prop) => match &**prop {
+            swc_ecma_ast::Prop::Shorthand(_) => return None,
+            swc_ecma_ast::Prop::KeyValue(kv) => {
+              let key = match &kv.key {
+                swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
+                swc_ecma_ast::PropName::Str(str) => Value::String(str.value.to_string()),
+                swc_ecma_ast::PropName::Num(num) => Value::Number(Number(num.value)),
+                swc_ecma_ast::PropName::Computed(computed) => static_eval_expr(&computed.expr)?,
+                swc_ecma_ast::PropName::BigInt(bi) => Value::BigInt(bi.value.clone()),
+              };
+
+              let value = static_eval_expr(&kv.value)?;
+
+              (key, value)
+            }
+            swc_ecma_ast::Prop::Assign(_) => return None,
+            swc_ecma_ast::Prop::Getter(_) => return None,
+            swc_ecma_ast::Prop::Setter(_) => return None,
+            swc_ecma_ast::Prop::Method(_) => return None,
+          },
+        };
+
+        properties.push((key, value));
+      }
+
+      Some(Value::Object(Box::new(Object { properties })))
+    }
+    _ => None,
+  }
 }
 
 fn as_symbol_iterator(expr: &swc_ecma_ast::Expr) -> Option<Value> {
