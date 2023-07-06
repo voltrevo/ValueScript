@@ -302,32 +302,38 @@ impl FnState {
     let mut new_reg: Option<String> = None;
 
     for kal in self.registers.values_mut() {
-      let mut flag = true;
+      match kal {
+        Kal::Register(reg) => {
+          if &reg.name == changed_reg {
+            // When it's just a register, avoid using new_reg. This would just create spurious
+            // renames. The real point of new_reg is to improve the *inner* knowledge of registers
+            // that contain the changed_reg.
+            *kal = Kal::Unknown;
+            continue;
+          }
+        }
+        _ => {}
+      };
+
       kal.visit_kals_mut(&mut |sub_kal| {
-        let first = flag;
-        flag = false;
         if let Kal::Register(reg) = sub_kal {
           if reg.name == *changed_reg {
-            if first {
-              *sub_kal = Kal::Unknown;
-            } else {
-              let new_reg = match &new_reg {
-                Some(new_reg) => new_reg.clone(),
-                None => {
-                  let new_reg_str = self.reg_allocator.allocate_numbered("_tmp").name;
-                  new_reg = Some(new_reg_str.clone());
+            let new_reg = match &new_reg {
+              Some(new_reg) => new_reg.clone(),
+              None => {
+                let new_reg_str = self.reg_allocator.allocate_numbered("_tmp").name;
+                new_reg = Some(new_reg_str.clone());
 
-                  self.new_instructions.push(Instruction::Mov(
-                    Value::Register(Register::named(changed_reg.clone())),
-                    Register::named(new_reg_str.clone()),
-                  ));
+                self.new_instructions.push(Instruction::Mov(
+                  Value::Register(Register::named(changed_reg.clone())),
+                  Register::named(new_reg_str.clone()),
+                ));
 
-                  new_reg_str
-                }
-              };
+                new_reg_str
+              }
+            };
 
-              *sub_kal = Kal::Register(Register::named(new_reg));
-            }
+            *sub_kal = Kal::Register(Register::named(new_reg));
           }
         }
       });
