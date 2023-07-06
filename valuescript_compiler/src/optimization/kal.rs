@@ -397,6 +397,10 @@ impl FnState {
               }
               None => Kal::Undefined,
             },
+            Kal::String(key) => match key.as_str() {
+              "length" => Kal::Number(Number(string.len() as f64)),
+              _ => Kal::Unknown,
+            },
             _ => Kal::Unknown,
           },
           Kal::Array(array) => match key {
