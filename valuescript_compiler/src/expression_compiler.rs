@@ -1341,7 +1341,6 @@ impl<'a> ExpressionCompiler<'a> {
           }
 
           // Otherwise, we need to capture the current value for the result of the expression
-          // TODO: This case can be limited further by checking *where* the mutations are
           let new_reg = self.fnc.allocate_tmp();
 
           self.fnc.push(Instruction::Mov(
