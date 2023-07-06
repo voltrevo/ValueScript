@@ -1,11 +1,7 @@
 import { primes } from "./primes.ts";
 
 export default class Range<T = never> implements Iterable<T> {
-  iterable: Iterable<T>;
-
-  constructor(iterable: Iterable<T>) {
-    this.iterable = iterable;
-  }
+  constructor(public iterable: Iterable<T>) {}
 
   [Symbol.iterator]() {
     return this.iterable[Symbol.iterator]();

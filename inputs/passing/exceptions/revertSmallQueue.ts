@@ -20,14 +20,10 @@ export default function () {
 }
 
 class SmallQueue<T extends {}> {
-  items: T[];
-
-  constructor(items: T[]) {
+  constructor(public items: T[]) {
     if (items.length > 3) {
       throw new Error(`${items.length} is too many items for SmallQueue`);
     }
-
-    this.items = items;
   }
 
   pop(): T {

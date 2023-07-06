@@ -25,11 +25,9 @@ export default function main() {
 
 class MergeSortStepper<T> {
   tree: MergeSortNode<T>;
-  cmp: (a: T, b: T) => number;
 
-  constructor(vals: T[], cmp: (a: T, b: T) => number) {
+  constructor(vals: T[], public cmp: (a: T, b: T) => number) {
     this.tree = makeTree(vals);
-    this.cmp = cmp;
   }
 
   step(): boolean {
@@ -38,11 +36,9 @@ class MergeSortStepper<T> {
 }
 
 class MergeSortNode<T> {
-  data: MergeSortNodeData<T>;
-
-  constructor(data: MergeSortNodeData<T>) {
-    this.data = data;
-  }
+  constructor(
+    public data: MergeSortNodeData<T>,
+  ) {}
 
   step(cmp: (a: T, b: T) => number): boolean {
     if (this.data.type === "sorted") {

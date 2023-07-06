@@ -335,11 +335,6 @@ const STATE_SUSPENDED_RUNNABLE = 3 /* STATE_SUSPENDED | STATE_RUNNABLE */;
  * with it.
  */
 class TaskControlBlock {
-  link: number | null;
-  id: number;
-  priority: number;
-  queue: Packet | null;
-  task: Task;
   state: number;
 
   /**
@@ -351,18 +346,12 @@ class TaskControlBlock {
    * @constructor
    */
   constructor(
-    link: number | null,
-    id: number,
-    priority: number,
-    queue: Packet | null,
-    task: Task,
+    public link: number | null,
+    public id: number,
+    public priority: number,
+    public queue: Packet | null,
+    public task: Task,
   ) {
-    this.link = link;
-    this.id = id;
-    this.priority = priority;
-    this.queue = queue;
-    this.task = task;
-
     if (queue == null) {
       this.state = STATE_SUSPENDED;
     } else {
@@ -445,17 +434,14 @@ type Task = {
  * device tasks.
  */
 class IdleTask implements Task {
-  v1: number;
-  count: number;
-
   /**
    * @param {int} v1 a seed value that controls how the device tasks are scheduled
    * @param {int} count the number of times this task should be scheduled
    */
-  constructor(v1: number, count: number) {
-    this.v1 = v1;
-    this.count = count;
-  }
+  constructor(
+    public v1: number,
+    public count: number,
+  ) {}
 
   run(_packet: Packet | null) {
     this.count--;
@@ -614,19 +600,14 @@ class Packet {
    * @constructor
    */
 
-  link: Packet | null;
-  id: number | null;
-  kind: number;
-  a1: number;
-  a2: (number | null)[];
+  a1 = 0;
+  a2: (number | null)[] = [null, null, null, null]; // new Array(DATA_SIZE);
 
-  constructor(link: Packet | null, id: number, kind: number) {
-    this.link = link;
-    this.id = id;
-    this.kind = kind;
-    this.a1 = 0;
-    this.a2 = [null, null, null, null]; // new Array(DATA_SIZE);
-  }
+  constructor(
+    public link: Packet | null,
+    public id: number | null,
+    public kind: number,
+  ) {}
 
   /**
    * Add this packet to the end of a worklist, and return the worklist.

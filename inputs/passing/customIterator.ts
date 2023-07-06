@@ -11,13 +11,10 @@ export default function () {
 }
 
 class Range {
-  start: number;
-  end: number;
-
-  constructor(start: number, end: number) {
-    this.start = start;
-    this.end = end;
-  }
+  constructor(
+    public start: number,
+    public end: number,
+  ) {}
 
   [Symbol.iterator]() {
     return new RangeIterator(this.start, this.end);
@@ -25,13 +22,7 @@ class Range {
 }
 
 class RangeIterator {
-  value: number;
-  end: number;
-
-  constructor(value: number, end: number) {
-    this.value = value;
-    this.end = end;
-  }
+  constructor(public value: number, public end: number) {}
 
   next() {
     const done = this.value >= this.end;

@@ -94,13 +94,10 @@ type StrengthValue = 0 | 1 | 2 | 3 | 4 | 5 | 6;
  */
 
 class Strength {
-  strengthValue;
-  name;
-
-  constructor(strengthValue: StrengthValue, name: string) {
-    this.strengthValue = strengthValue;
-    this.name = name;
-  }
+  constructor(
+    public strengthValue: StrengthValue,
+    public name: string,
+  ) {}
 
   static stronger(s1: Strength, s2: Strength) {
     return s1.strengthValue < s2.strengthValue;
@@ -156,11 +153,9 @@ class Strength {
  * to represent a constraint.
  */
 abstract class Constraint {
-  strength;
-
-  constructor(strength: Strength) {
-    this.strength = strength;
-  }
+  constructor(
+    public strength: Strength,
+  ) {}
 
   abstract addToGraph(): void;
   abstract removeFromGraph(): void;
@@ -356,15 +351,11 @@ const Direction = {
  * variables.
  */
 abstract class BinaryConstraint extends Constraint {
-  v1;
-  v2;
   direction;
 
-  constructor(var1: Variable, var2: Variable, strength: Strength) {
+  constructor(public v1: Variable, public v2: Variable, strength: Strength) {
     super(strength);
 
-    this.v1 = var1;
-    this.v2 = var2;
     this.direction = Direction.NONE;
   }
 
@@ -477,20 +468,16 @@ abstract class BinaryConstraint extends Constraint {
  */
 class ScaleConstraint extends BinaryConstraint {
   direction;
-  scale;
-  offset;
 
   constructor(
     src: Variable,
-    scale: Variable,
-    offset: Variable,
+    public scale: Variable,
+    public offset: Variable,
     dest: Variable,
     strength: Strength,
   ) {
     super(src, dest, strength);
     this.direction = Direction.NONE;
-    this.scale = scale;
-    this.offset = offset;
   }
 
   /**
@@ -572,23 +559,16 @@ class EqualityConstraint extends BinaryConstraint {
  * constraint solver.
  */
 class Variable {
-  value;
-  constraints;
-  determinedBy: Constraint | null;
-  mark;
-  walkStrength;
-  stay;
-  name;
+  constraints = new OrderedCollection<Constraint>();
+  determinedBy: Constraint | null = null;
+  mark = 0;
+  walkStrength = Strength.WEAKEST;
+  stay = true;
 
-  constructor(name: string, initialValue = 0) {
-    this.value = initialValue;
-    this.constraints = new OrderedCollection<Constraint>();
-    this.determinedBy = null;
-    this.mark = 0;
-    this.walkStrength = Strength.WEAKEST;
-    this.stay = true;
-    this.name = name;
-  }
+  constructor(
+    public name: string,
+    public value = 0,
+  ) {}
 
   /**
    * Add the given constraint to the set of all constraints that refer

@@ -135,15 +135,11 @@ class Color {
 }
 
 class Light {
-  position;
-  color;
-  intensity;
-
-  constructor(pos: Vector, color: Color, intensity = 10) {
-    this.position = pos;
-    this.color = color;
-    this.intensity = intensity;
-  }
+  constructor(
+    public position: Vector,
+    public color: Color,
+    public intensity = 10,
+  ) {}
 
   toString() {
     return "Light [" + this.position.x + "," + this.position.y + "," +
@@ -152,15 +148,11 @@ class Light {
 }
 
 class Vector {
-  x;
-  y;
-  z;
-
-  constructor(x = 0, y = 0, z = 0) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-  }
+  constructor(
+    public x = 0,
+    public y = 0,
+    public z = 0,
+  ) {}
 
   copy(vector: Vector) {
     this.x = vector.x;
@@ -264,26 +256,17 @@ function wrapUpMaterial(t: number) {
 }
 
 class SolidMaterial implements Material {
-  reflection: number;
   refraction: number;
-  transparency: number;
-  gloss: number;
   hasTexture: boolean;
 
-  color;
-
   constructor(
-    color: Color,
-    reflection: number,
+    public color: Color,
+    public reflection: number,
     _refraction: number,
-    transparency: number,
-    gloss: number,
+    public transparency: number,
+    public gloss: number,
   ) {
-    this.color = color;
-    this.reflection = reflection;
     this.refraction = 0.5; // TODO: Why not use parameter?
-    this.transparency = transparency;
-    this.gloss = gloss;
     this.hasTexture = false;
   }
 
@@ -298,33 +281,17 @@ class SolidMaterial implements Material {
 }
 
 class ChessboardMaterial implements Material {
-  reflection: number;
-  refraction: number;
-  transparency: number;
-  gloss: number;
-  hasTexture: boolean;
-
-  colorEven;
-  colorOdd;
-  density;
+  refraction = 0.5;
+  hasTexture = true;
 
   constructor(
-    colorEven: Color,
-    colorOdd: Color,
-    reflection: number,
-    transparency: number,
-    gloss: number,
-    density: number,
-  ) {
-    this.colorEven = colorEven;
-    this.colorOdd = colorOdd;
-    this.reflection = reflection;
-    this.refraction = 0.5;
-    this.transparency = transparency;
-    this.gloss = gloss;
-    this.density = density;
-    this.hasTexture = true;
-  }
+    public colorEven: Color,
+    public colorOdd: Color,
+    public reflection: number,
+    public transparency: number,
+    public gloss: number,
+    public density: number,
+  ) {}
 
   getColor(u: number, v: number) {
     let t = wrapUpMaterial(u * this.density) * wrapUpMaterial(v * this.density);
@@ -350,15 +317,11 @@ type Shape = {
 };
 
 class Sphere implements Shape {
-  radius;
-  position;
-  material;
-
-  constructor(pos: Vector, radius: number, material: Material) {
-    this.radius = radius;
-    this.position = pos;
-    this.material = material;
-  }
+  constructor(
+    public position: Vector,
+    public radius: number,
+    public material: Material,
+  ) {}
 
   intersect(ray: Ray) {
     let info = new IntersectionInfo();
@@ -402,15 +365,11 @@ class Sphere implements Shape {
 }
 
 class Plane implements Shape {
-  position;
-  d;
-  material;
-
-  constructor(pos: Vector, d: number, material: Material) {
-    this.position = pos;
-    this.d = d;
-    this.material = material;
-  }
+  constructor(
+    public position: Vector,
+    public d: number,
+    public material: Material,
+  ) {}
 
   intersect(ray: Ray) {
     let info = new IntersectionInfo();
@@ -474,16 +433,14 @@ class IntersectionInfo {
 }
 
 class Camera {
-  position;
-  lookAt;
   equator;
-  up;
   screen;
 
-  constructor(pos: Vector, lookAt: Vector, up: Vector) {
-    this.position = pos;
-    this.lookAt = lookAt;
-    this.up = up;
+  constructor(
+    public position: Vector,
+    public lookAt: Vector,
+    public up: Vector,
+  ) {
     this.equator = lookAt.normalize().cross(this.up);
     this.screen = Vector.add(
       this.position,
@@ -516,13 +473,10 @@ class Camera {
 }
 
 class Background {
-  color;
-  ambience;
-
-  constructor(color: Color, ambience: number) {
-    this.color = color;
-    this.ambience = ambience;
-  }
+  constructor(
+    public color: Color,
+    public ambience: number,
+  ) {}
 }
 
 type EngineOptions = {
@@ -539,15 +493,12 @@ type EngineOptions = {
 
 class Engine {
   canvas: unknown = null; /* 2d context we can render to */
-  options;
 
   // Variable used to hold a number that can be used to verify that
   // the scene was ray traced correctly.
   checkNumber = 0;
 
-  constructor(options: EngineOptions) {
-    this.options = options;
-
+  constructor(public options: EngineOptions) {
     this.options.canvasHeight /= this.options.pixelHeight;
     this.options.canvasWidth /= this.options.pixelWidth;
 
