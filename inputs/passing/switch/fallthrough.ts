@@ -1,6 +1,6 @@
 //! test_output(["matched 43","matched 42"])
 
-export default function foo() {
+export default function () {
   let logs: string[] = [];
 
   switch (21 + 22) {
