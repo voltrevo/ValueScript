@@ -34,8 +34,7 @@ export default class SillyBigInt {
       str = padStart(`${this.data[i]}`, 15, "0") + str;
     }
 
-    // FIXME: There's a bug here when using template strings
-    str = this.data[this.data.length - 1] + str;
+    str = `${this.data[this.data.length - 1]}${str}`;
 
     return str;
   }

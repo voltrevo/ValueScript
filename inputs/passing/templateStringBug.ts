@@ -1,5 +1,4 @@
-//! test_output("foofoo")
-// Should be: "foobar"
+//! test_output("foobar")
 
 export default function () {
   let str = "bar";

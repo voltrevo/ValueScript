@@ -1197,7 +1197,7 @@ impl<'a> ExpressionCompiler<'a> {
   pub fn template_literal(
     &mut self,
     tpl: &swc_ecma_ast::Tpl,
-    target_register: Option<Register>,
+    _target_register: Option<Register>,
   ) -> CompiledExpression {
     let len = tpl.exprs.len();
 
@@ -1209,14 +1209,11 @@ impl<'a> ExpressionCompiler<'a> {
 
     let mut nested_registers = Vec::<Register>::new();
 
-    let acc_reg = match target_register {
-      Some(tr) => tr,
-      None => {
-        let reg = self.fnc.allocate_tmp();
-        nested_registers.push(reg.clone());
+    let acc_reg = {
+      let reg = self.fnc.allocate_tmp();
+      nested_registers.push(reg.clone());
 
-        reg
-      }
+      reg
     };
 
     let first_expr = self.compile(&tpl.exprs[0], None);
