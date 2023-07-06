@@ -202,11 +202,7 @@ impl<'a> ExpressionCompiler<'a> {
         return CompiledExpression::empty();
       }
       TsTypeAssertion(ts_type_assertion) => {
-        self
-          .fnc
-          .todo(ts_type_assertion.span, "TsTypeAssertion expression");
-
-        return CompiledExpression::empty();
+        return self.compile(&ts_type_assertion.expr, target_register);
       }
       TsConstAssertion(ts_const_assertion) => {
         return self.compile(&ts_const_assertion.expr, target_register);
