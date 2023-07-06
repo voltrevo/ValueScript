@@ -302,25 +302,32 @@ impl FnState {
     let mut new_reg: Option<String> = None;
 
     for kal in self.registers.values_mut() {
+      let mut flag = true;
       kal.visit_kals_mut(&mut |sub_kal| {
+        let first = flag;
+        flag = false;
         if let Kal::Register(reg) = sub_kal {
           if reg.name == *changed_reg {
-            let new_reg = match &new_reg {
-              Some(new_reg) => new_reg.clone(),
-              None => {
-                let new_reg_str = self.reg_allocator.allocate_numbered("_tmp").name;
-                new_reg = Some(new_reg_str.clone());
+            if first {
+              *sub_kal = Kal::Unknown;
+            } else {
+              let new_reg = match &new_reg {
+                Some(new_reg) => new_reg.clone(),
+                None => {
+                  let new_reg_str = self.reg_allocator.allocate_numbered("_tmp").name;
+                  new_reg = Some(new_reg_str.clone());
 
-                self.new_instructions.push(Instruction::Mov(
-                  Value::Register(Register::named(changed_reg.clone())),
-                  Register::named(new_reg_str.clone()),
-                ));
+                  self.new_instructions.push(Instruction::Mov(
+                    Value::Register(Register::named(changed_reg.clone())),
+                    Register::named(new_reg_str.clone()),
+                  ));
 
-                new_reg_str
-              }
-            };
+                  new_reg_str
+                }
+              };
 
-            *sub_kal = Kal::Register(Register::named(new_reg));
+              *sub_kal = Kal::Register(Register::named(new_reg));
+            }
           }
         }
       });
