@@ -141,8 +141,11 @@ impl<'a> ExpressionCompiler<'a> {
         return self.new_expression(new_exp, target_register);
       }
       Seq(seq_exp) => {
-        self.fnc.todo(seq_exp.span, "Seq expression");
-        return CompiledExpression::empty();
+        for i in 0..(seq_exp.exprs.len() - 1) {
+          self.compile_into(&seq_exp.exprs[i], Register::ignore());
+        }
+
+        return self.compile(seq_exp.exprs.last().unwrap(), target_register);
       }
       Ident(ident) => {
         return self.identifier(ident, target_register);
@@ -257,7 +260,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     }
 
-    if !in_target {
+    if !in_target && !target_register.is_ignore() {
       // Put the value into the target
       self
         .fnc
