@@ -42,7 +42,7 @@ pub fn run_command(args: &Vec<String>) {
 
   let val_args: Vec<Val> = args[argpos..]
     .iter()
-    .map(|a| Val::String(Rc::new(a.into())))
+    .map(|a| Val::String(Rc::from(a.clone())))
     .collect();
 
   match vm.run(bytecode, None, &val_args) {

@@ -10,7 +10,7 @@ use crate::{
   ValTrait,
 };
 
-pub fn op_sub_string(string_data: &Rc<String>, subscript: &Val) -> Val {
+pub fn op_sub_string(string_data: &Rc<str>, subscript: &Val) -> Val {
   if let Some(subscript) = subscript.to_index() {
     let string_bytes = string_data.as_bytes();
 
@@ -133,10 +133,13 @@ static CODE_POINT_AT: NativeFunction = native_fn(|this, params| {
 static CONCAT: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::String(string_data) => {
-      let mut result = string_data.as_str().to_string();
+      let mut result = string_data.to_string();
 
       for param in params {
-        result.push_str(param.to_string().as_str());
+        match param {
+          Val::String(str) => result.push_str(&str),
+          _ => result.push_str(param.to_string().as_str()),
+        };
       }
 
       result.to_val()

@@ -18,12 +18,12 @@ use super::{
 
 #[derive(Clone)]
 pub struct StringIterator {
-  pub string: Rc<String>,
+  pub string: Rc<str>,
   pub index: usize,
 }
 
 impl StringIterator {
-  pub fn new(string: Rc<String>) -> StringIterator {
+  pub fn new(string: Rc<str>) -> StringIterator {
     StringIterator { string, index: 0 }
   }
 

@@ -27,7 +27,7 @@ pub enum Val {
   Number(f64),
   BigInt(BigInt),
   Symbol(VsSymbol),
-  String(Rc<String>),
+  String(Rc<str>),
   Array(Rc<VsArray>),
   Object(Rc<VsObject>),
   Function(Rc<VsFunction>),
@@ -638,13 +638,13 @@ impl ToVal for char {
 
 impl ToVal for &str {
   fn to_val(self) -> Val {
-    Val::String(Rc::new(self.to_string()))
+    Val::String(Rc::from(self.to_owned()))
   }
 }
 
 impl ToVal for String {
   fn to_val(self) -> Val {
-    Val::String(Rc::new(self))
+    Val::String(Rc::from(self))
   }
 }
 
@@ -798,7 +798,7 @@ pub fn number_to_index(x: f64) -> Option<usize> {
   return Some(x as usize);
 }
 
-fn stringify_string(str: &String) -> String {
+fn stringify_string(str: &str) -> String {
   let mut res: String = "\"".into();
 
   for c in str.chars() {
