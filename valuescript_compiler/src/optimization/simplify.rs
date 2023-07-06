@@ -4,7 +4,7 @@ use crate::asm::{DefinitionContent, FnLine, Function, Instruction, Module, Point
 
 use super::kal::{FnState, Kal};
 
-pub fn simplify(module: &mut Module) {
+pub fn simplify(module: &mut Module, take_registers: bool) {
   let mut pointer_kals = HashMap::<Pointer, Kal>::new();
 
   for defn in &mut module.definitions {
@@ -15,7 +15,9 @@ pub fn simplify(module: &mut Module) {
 
   for defn in &mut module.definitions {
     match &mut defn.content {
-      DefinitionContent::Function(fn_) => simplify_fn(FnState::new(fn_, pointer_kals.clone()), fn_),
+      DefinitionContent::Function(fn_) => {
+        simplify_fn(FnState::new(fn_, pointer_kals.clone()), fn_, take_registers)
+      }
       DefinitionContent::Class(_) => {}
       DefinitionContent::Value(_) => {}
       DefinitionContent::Lazy(_) => {}
@@ -23,7 +25,7 @@ pub fn simplify(module: &mut Module) {
   }
 }
 
-fn handle_mutation_releases(body: &mut Vec<FnLine>, i: usize) {
+fn handle_mutation_releases(body: &mut Vec<FnLine>, i: usize, take_registers: bool) {
   let mut calls = Vec::<(Register, usize)>::new();
 
   match &mut body[i] {
@@ -42,7 +44,7 @@ fn handle_mutation_releases(body: &mut Vec<FnLine>, i: usize) {
   };
 
   for (released_reg, skips) in calls {
-    handle_release(body, i, released_reg.clone(), skips);
+    handle_release(body, i, released_reg.clone(), skips, take_registers);
   }
 }
 
@@ -51,6 +53,7 @@ fn handle_release(
   i: usize,
   released_reg: Register,
   skips_needed: usize,
+  take_registers: bool,
 ) -> bool {
   let mut j = i + 1;
   let mut skips = 0;
@@ -82,7 +85,10 @@ fn handle_release(
         }
 
         if !taken && rvm.read && !rvm.write {
-          *rvm.register = rvm.register.take();
+          if take_registers {
+            *rvm.register = rvm.register.take();
+          }
+
           taken = true;
         }
 
@@ -104,7 +110,7 @@ fn handle_release(
   taken
 }
 
-fn simplify_fn(mut state: FnState, fn_: &mut Function) {
+fn simplify_fn(mut state: FnState, fn_: &mut Function, take_registers: bool) {
   let mut pending_releases = Vec::<Register>::new();
 
   let mut i = 0;
@@ -119,7 +125,7 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function) {
 
     if is_jmp_or_label(&fn_.body[i]) && i > 0 {
       for released_reg in take(&mut pending_releases) {
-        handle_release(&mut fn_.body, i - 1, released_reg, 0);
+        handle_release(&mut fn_.body, i - 1, released_reg, 0, take_registers);
       }
     }
 
@@ -138,7 +144,7 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function) {
       FnLine::Release(reg) => pending_releases.push(reg.clone()),
     }
 
-    handle_mutation_releases(&mut fn_.body, i);
+    handle_mutation_releases(&mut fn_.body, i, take_registers);
 
     i += 1;
   }
@@ -147,7 +153,7 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function) {
     let last_i = fn_.body.len() - 1;
 
     for released_reg in pending_releases {
-      handle_release(&mut fn_.body, last_i, released_reg, 0);
+      handle_release(&mut fn_.body, last_i, released_reg, 0, take_registers);
     }
   }
 }

@@ -15,8 +15,10 @@ pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
   collapse_pointers_of_pointers(module);
   shake_tree(module);
 
-  for _ in 0..2 {
-    simplify(module);
+  let passes = 3;
+
+  for i in 0..passes {
+    simplify(module, i == passes - 1);
     reduce_instructions(module);
     remove_unused_labels(module);
     remove_unused_registers(module);
