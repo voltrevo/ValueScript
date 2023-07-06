@@ -1,5 +1,4 @@
-//! test_output(NaN)
-// Should be: 10
+//! test_output(10)
 
 export default function () {
   return foo(5);

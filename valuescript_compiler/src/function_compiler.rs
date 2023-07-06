@@ -160,6 +160,14 @@ impl FunctionCompiler {
     });
   }
 
+  pub fn error(&mut self, span: swc_common::Span, message: &str) {
+    self.diagnostics.push(Diagnostic {
+      level: DiagnosticLevel::Error,
+      message: format!("{}", message),
+      span,
+    });
+  }
+
   pub fn internal_error(&mut self, span: swc_common::Span, message: &str) {
     self.diagnostics.push(Diagnostic {
       level: DiagnosticLevel::InternalError,
@@ -311,7 +319,9 @@ impl FunctionCompiler {
     let param_registers = self.get_param_registers(functionish);
 
     for reg in &param_registers {
-      self.current.parameters.push(reg.clone());
+      if let Some(reg) = reg {
+        self.current.parameters.push(reg.clone());
+      }
     }
 
     self.add_param_code(functionish, &param_registers);
@@ -372,8 +382,8 @@ impl FunctionCompiler {
     }
   }
 
-  fn get_param_registers(&mut self, functionish: &Functionish) -> Vec<Register> {
-    let mut param_registers = Vec::<Register>::new();
+  fn get_param_registers(&mut self, functionish: &Functionish) -> Vec<Option<Register>> {
+    let mut param_registers = Vec::<Option<Register>>::new();
 
     match functionish {
       Functionish::Fn(_, fn_) => {
@@ -391,7 +401,9 @@ impl FunctionCompiler {
           match potspp {
             swc_ecma_ast::ParamOrTsParamProp::TsParamProp(ts_param_prop) => {
               self.todo(ts_param_prop.span(), "TypeScript parameter properties");
-              param_registers.push(self.allocate_numbered_reg(&"_todo_ts_param_prop".to_string()));
+              param_registers.push(Some(
+                self.allocate_numbered_reg(&"_todo_ts_param_prop".to_string()),
+              ));
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
               param_registers.push(self.get_pattern_register(&p.pat))
@@ -404,18 +416,21 @@ impl FunctionCompiler {
     return param_registers;
   }
 
-  pub fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat) -> Register {
+  pub fn get_pattern_register(&mut self, param_pat: &swc_ecma_ast::Pat) -> Option<Register> {
     use swc_ecma_ast::Pat;
 
-    match param_pat {
-      Pat::Ident(ident) => self.get_variable_register(&ident.id),
-      Pat::Assign(assign) => self.get_pattern_register(&assign.left),
+    Some(match param_pat {
+      Pat::Ident(ident) => match ident.id.sym.to_string().as_str() {
+        "this" => return None,
+        _ => self.get_variable_register(&ident.id),
+      },
+      Pat::Assign(assign) => return self.get_pattern_register(&assign.left),
       Pat::Array(_) => self.allocate_numbered_reg(&"_array_pat".to_string()),
       Pat::Object(_) => self.allocate_numbered_reg(&"_object_pat".to_string()),
       Pat::Invalid(_) => self.allocate_numbered_reg(&"_invalid_pat".to_string()),
       Pat::Rest(_) => self.allocate_numbered_reg(&"_rest_pat".to_string()),
       Pat::Expr(_) => self.allocate_numbered_reg(&"_expr_pat".to_string()),
-    }
+    })
   }
 
   pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
@@ -437,18 +452,22 @@ impl FunctionCompiler {
     }
   }
 
-  fn add_param_code(&mut self, functionish: &Functionish, param_registers: &Vec<Register>) {
+  fn add_param_code(&mut self, functionish: &Functionish, param_registers: &Vec<Option<Register>>) {
     match functionish {
       Functionish::Fn(_, fn_) => {
         for (i, p) in fn_.params.iter().enumerate() {
-          let mut ec = ExpressionCompiler { fnc: self };
-          ec.pat(&p.pat, &param_registers[i], false);
+          if let Some(reg) = &param_registers[i] {
+            let mut ec = ExpressionCompiler { fnc: self };
+            ec.pat(&p.pat, reg, false);
+          }
         }
       }
       Functionish::Arrow(arrow) => {
         for (i, p) in arrow.params.iter().enumerate() {
-          let mut ec = ExpressionCompiler { fnc: self };
-          ec.pat(p, &param_registers[i], false);
+          if let Some(reg) = &param_registers[i] {
+            let mut ec = ExpressionCompiler { fnc: self };
+            ec.pat(p, reg, false);
+          }
         }
       }
       Functionish::Constructor(_, _class_span, constructor) => {
@@ -458,8 +477,10 @@ impl FunctionCompiler {
               // TODO (Diagnostic emitted elsewhere)
             }
             swc_ecma_ast::ParamOrTsParamProp::Param(p) => {
-              let mut ec = ExpressionCompiler { fnc: self };
-              ec.pat(&p.pat, &param_registers[i], false);
+              if let Some(reg) = &param_registers[i] {
+                let mut ec = ExpressionCompiler { fnc: self };
+                ec.pat(&p.pat, reg, false);
+              }
             }
           }
         }
@@ -828,15 +849,17 @@ impl FunctionCompiler {
       if let Some(param) = &catch_clause.param {
         let mut ec = ExpressionCompiler { fnc: self };
 
-        let pattern_reg = ec.fnc.get_pattern_register(&param);
+        if let Some(pattern_reg) = ec.fnc.get_pattern_register(&param) {
+          // TODO: Set up this register through set_catch instead of copying into it
+          ec.fnc.push(Instruction::Mov(
+            Value::Register(catch_error_reg.unwrap()),
+            pattern_reg.clone(),
+          ));
 
-        // TODO: Set up this register through set_catch instead of copying into it
-        ec.fnc.push(Instruction::Mov(
-          Value::Register(catch_error_reg.unwrap()),
-          pattern_reg.clone(),
-        ));
-
-        ec.pat(&param, &pattern_reg, false);
+          ec.pat(&param, &pattern_reg, false);
+        } else {
+          ec.fnc.error(param.span(), "Invalid catch pattern");
+        }
       }
 
       self.block_statement(&catch_clause.body);
@@ -1109,7 +1132,14 @@ impl FunctionCompiler {
       swc_ecma_ast::VarDeclOrPat::Pat(pat) => pat,
     };
 
-    let value_reg = ec.fnc.get_pattern_register(pat);
+    let value_reg = match ec.fnc.get_pattern_register(pat) {
+      Some(value_reg) => value_reg,
+      None => {
+        ec.fnc
+          .error(pat.span(), "Loop variable has invalid pattern");
+        ec.fnc.allocate_reg(&"_invalid_pattern".to_string())
+      }
+    };
 
     let iter_reg = ec.fnc.allocate_numbered_reg(&"_iter".to_string());
     let iter_res_reg = ec.fnc.allocate_numbered_reg(&"_iter_res".to_string());
@@ -1225,7 +1255,13 @@ impl FunctionCompiler {
     for decl in &var_decl.decls {
       match &decl.init {
         Some(expr) => {
-          let target_register = self.get_pattern_register(&decl.name);
+          let target_register = match self.get_pattern_register(&decl.name) {
+            Some(tr) => tr,
+            None => {
+              self.error(decl.name.span(), "Invalid pattern");
+              self.allocate_reg(&"_invalid_pattern".to_string())
+            }
+          };
 
           let mut ec = ExpressionCompiler { fnc: self };
           ec.compile_into(expr, target_register.clone());

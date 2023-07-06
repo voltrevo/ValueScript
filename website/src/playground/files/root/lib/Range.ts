@@ -67,12 +67,7 @@ export default class Range<T = never> implements Iterable<T> {
     return res;
   }
 
-  sum(
-    // Warning: ValueScript has a bug where typing the `this` parameter causes it to create a
-    // phantom regular parameter. This only works because there aren't any other parameters.
-    // TODO: Fix this.
-    this: Range<number>,
-  ) {
+  sum(this: Range<number>) {
     let res = 0;
 
     for (const x of this.iterable) {
@@ -82,12 +77,7 @@ export default class Range<T = never> implements Iterable<T> {
     return res;
   }
 
-  bigSum(
-    // Warning: ValueScript has a bug where typing the `this` parameter causes it to create a
-    // phantom regular parameter. This only works because there aren't any other parameters.
-    // TODO: Fix this.
-    this: Range<bigint>,
-  ) {
+  bigSum(this: Range<bigint>) {
     let res = 0n;
 
     for (const x of this.iterable) {
@@ -107,12 +97,7 @@ export default class Range<T = never> implements Iterable<T> {
     return res;
   }
 
-  bigProduct(
-    // Warning: ValueScript has a bug where typing the `this` parameter causes it to create a
-    // phantom regular parameter. This only works because there aren't any other parameters.
-    // TODO: Fix this.
-    this: Range<bigint>,
-  ) {
+  bigProduct(this: Range<bigint>) {
     let res = 1n;
 
     for (const x of this.iterable) {
