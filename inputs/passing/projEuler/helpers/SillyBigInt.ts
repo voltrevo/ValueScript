@@ -31,20 +31,11 @@ export default class SillyBigInt {
     let str = "";
 
     for (let i = 0; i < this.data.length - 1; i++) {
-      str = padStart(`${this.data[i]}`, 15, "0") + str;
+      str = `${this.data[i].toString().padStart(15, "0")}${str}`;
     }
 
     str = `${this.data[this.data.length - 1]}${str}`;
 
     return str;
   }
-}
-
-// TODO: Support String.prototype.padStart
-function padStart(str: string, targetLength: number, padChar: string) {
-  while (str.length < targetLength) {
-    str = padChar + str;
-  }
-
-  return str;
 }

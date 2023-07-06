@@ -1,3 +1,5 @@
+//! test_output_slow(1366)
+
 import Range from "../helpers/Range.ts";
 import SillyBigInt from "./helpers/SillyBigInt.ts";
 
