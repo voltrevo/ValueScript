@@ -1,4 +1,4 @@
-// test_output((TODO broken!) [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18])
+//! test_output([58,[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]])
 
 declare const Debug: {
   log: (...args: unknown[]) => undefined;
@@ -7,11 +7,7 @@ declare const Debug: {
 export default function main() {
   let stepper = new MergeSortStepper(
     [7, 18, 9, 11, 16, 3, 8, 2, 5, 4, 6, 14, 15, 17, 10, 12, 1, 13],
-    (a, b) => {
-      let swap = a > b;
-      Debug.log({ a, b, swap });
-      return a - b;
-    },
+    (a, b) => a - b,
   );
 
   let count = 0;
@@ -24,14 +20,11 @@ export default function main() {
     }
   }
 
-  return {
-    count,
-    vals: (stepper.tree.data as any).vals,
-  };
+  return [count, (stepper.tree.data as any).vals];
 }
 
 class MergeSortStepper<T> {
-  tree: MergeSortNode<T>
+  tree: MergeSortNode<T>;
   cmp: (a: T, b: T) => number;
 
   constructor(vals: T[], cmp: (a: T, b: T) => number) {
@@ -52,18 +45,18 @@ class MergeSortNode<T> {
   }
 
   step(cmp: (a: T, b: T) => number): boolean {
-    if (this.data.type === 'sorted') {
+    if (this.data.type === "sorted") {
       return false;
     }
 
-    if (this.data.type === 'sorting') {
+    if (this.data.type === "sorting") {
       if (this.data.left.length === 0 || this.data.right.length === 0) {
         let vals = this.data.vals;
         vals = vals.concat(this.data.left);
         vals = vals.concat(this.data.right);
 
         this.data = {
-          type: 'sorted',
+          type: "sorted",
           vals,
         };
 
@@ -92,11 +85,11 @@ class MergeSortNode<T> {
       return true;
     }
 
-    assert(this.data.left.data.type === 'sorted');
-    assert(this.data.right.data.type === 'sorted');
+    assert(this.data.left.data.type === "sorted");
+    assert(this.data.right.data.type === "sorted");
 
     this.data = {
-      type: 'sorting',
+      type: "sorting",
       vals: [],
       left: this.data.left.data.vals,
       right: this.data.right.data.vals,
@@ -106,20 +99,19 @@ class MergeSortNode<T> {
   }
 }
 
-type MergeSortNodeData<T> = (
-  | { type: 'tree', left: MergeSortNode<T>, right: MergeSortNode<T> }
-  | { type: 'sorting', vals: T[], left: T[], right: T[] }
-  | { type: 'sorted', vals: T[] }
-);
+type MergeSortNodeData<T> =
+  | { type: "tree"; left: MergeSortNode<T>; right: MergeSortNode<T> }
+  | { type: "sorting"; vals: T[]; left: T[]; right: T[] }
+  | { type: "sorted"; vals: T[] };
 
 function makeTree<T>(vals: T[]): MergeSortNode<T> {
   if (vals.length <= 1) {
-    return new MergeSortNode({ type: 'sorted', vals });
+    return new MergeSortNode({ type: "sorted", vals });
   }
 
   if (vals.length === 2) {
     return new MergeSortNode({
-      type: 'sorting',
+      type: "sorting",
       vals: [],
       left: [vals[0]],
       right: [vals[1]],
@@ -129,7 +121,7 @@ function makeTree<T>(vals: T[]): MergeSortNode<T> {
   const mid = Math.floor(vals.length / 2);
 
   return new MergeSortNode({
-    type: 'tree',
+    type: "tree",
     left: makeTree(vals.slice(0, mid)),
     right: makeTree(vals.slice(mid)),
   });
@@ -137,6 +129,6 @@ function makeTree<T>(vals: T[]): MergeSortNode<T> {
 
 function assert(value: boolean): asserts value {
   if (!value) {
-    (undefined as any).boom; // TODO: Implement exceptions
+    throw new Error("Asserted false");
   }
 }
