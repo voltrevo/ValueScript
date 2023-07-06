@@ -396,7 +396,7 @@ pub fn op_optional_chain(left: &mut Val, right: &Val) -> Result<Val, Val> {
   };
 }
 
-fn to_i32(x: f64) -> i32 {
+pub fn to_i32(x: f64) -> i32 {
   if x == f64::INFINITY {
     return 0;
   }

@@ -1,6 +1,6 @@
 mod collapse_pointers_of_pointers;
 mod extract_constants;
-mod kal;
+pub mod kal;
 mod optimize;
 mod reduce_instructions;
 mod remove_meta_lines;

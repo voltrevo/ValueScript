@@ -1,3 +1,5 @@
+use valuescript_vm::operations::to_i32;
+
 use crate::{
   asm::{Array, Builtin, Number, Object, Value},
   expression_compiler::value_from_literal,
@@ -66,7 +68,77 @@ pub fn static_eval_expr(expr: &swc_ecma_ast::Expr) -> Option<Value> {
 
       Some(Value::Object(Box::new(Object { properties })))
     }
-    _ => None,
+    swc_ecma_ast::Expr::This(_) => None,
+    swc_ecma_ast::Expr::Fn(_) => None,
+    swc_ecma_ast::Expr::Update(_) => None,
+    swc_ecma_ast::Expr::Assign(_) => None,
+    swc_ecma_ast::Expr::SuperProp(_) => None,
+    swc_ecma_ast::Expr::Call(_) => None,
+    swc_ecma_ast::Expr::New(_) => None,
+    swc_ecma_ast::Expr::Ident(_) => None,
+    swc_ecma_ast::Expr::TaggedTpl(_) => None,
+    swc_ecma_ast::Expr::Arrow(_) => None,
+    swc_ecma_ast::Expr::Class(_) => None,
+    swc_ecma_ast::Expr::Yield(_) => None,
+    swc_ecma_ast::Expr::MetaProp(_) => None,
+    swc_ecma_ast::Expr::Await(_) => None,
+    swc_ecma_ast::Expr::JSXMember(_) => None,
+    swc_ecma_ast::Expr::JSXNamespacedName(_) => None,
+    swc_ecma_ast::Expr::JSXEmpty(_) => None,
+    swc_ecma_ast::Expr::JSXElement(_) => None,
+    swc_ecma_ast::Expr::JSXFragment(_) => None,
+    swc_ecma_ast::Expr::TsInstantiation(_) => None,
+    swc_ecma_ast::Expr::PrivateName(_) => None,
+    swc_ecma_ast::Expr::OptChain(_) => None,
+    swc_ecma_ast::Expr::Invalid(_) => None,
+    swc_ecma_ast::Expr::Member(_) => None,
+    swc_ecma_ast::Expr::Cond(_) => None,
+    swc_ecma_ast::Expr::Unary(unary) => match unary.op {
+      swc_ecma_ast::UnaryOp::Minus => match static_eval_expr(&unary.arg)? {
+        Value::Number(Number(x)) => Some(Value::Number(Number(-x))),
+        Value::BigInt(bi) => Some(Value::BigInt(-bi)),
+        _ => None,
+      },
+      swc_ecma_ast::UnaryOp::Plus => match static_eval_expr(&unary.arg)? {
+        Value::Number(Number(x)) => Some(Value::Number(Number(x))),
+        Value::BigInt(bi) => Some(Value::BigInt(bi)),
+        _ => None,
+      },
+      swc_ecma_ast::UnaryOp::Bang => None,
+      swc_ecma_ast::UnaryOp::Tilde => match static_eval_expr(&unary.arg)? {
+        Value::Number(Number(x)) => Some(Value::Number(Number(!to_i32(x) as f64))),
+        Value::BigInt(bi) => Some(Value::BigInt(!bi)),
+        _ => None,
+      },
+      swc_ecma_ast::UnaryOp::TypeOf => None,
+      swc_ecma_ast::UnaryOp::Void => None,
+      swc_ecma_ast::UnaryOp::Delete => None,
+    },
+    swc_ecma_ast::Expr::Bin(_) => None,
+    swc_ecma_ast::Expr::Seq(seq) => {
+      let mut last = Value::Void;
+
+      for expr in &seq.exprs {
+        last = static_eval_expr(expr)?;
+      }
+
+      Some(last)
+    }
+    swc_ecma_ast::Expr::Tpl(tpl) => 'b: {
+      let len = tpl.exprs.len();
+      assert_eq!(tpl.quasis.len(), len + 1);
+
+      if len == 0 {
+        break 'b Some(Value::String(tpl.quasis[0].raw.to_string()));
+      }
+
+      None // TODO
+    }
+    swc_ecma_ast::Expr::Paren(paren) => static_eval_expr(&paren.expr),
+    swc_ecma_ast::Expr::TsTypeAssertion(tta) => static_eval_expr(&tta.expr),
+    swc_ecma_ast::Expr::TsConstAssertion(tca) => static_eval_expr(&tca.expr),
+    swc_ecma_ast::Expr::TsNonNull(tnn) => static_eval_expr(&tnn.expr),
+    swc_ecma_ast::Expr::TsAs(ta) => static_eval_expr(&ta.expr),
   }
 }
 
