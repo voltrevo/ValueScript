@@ -1,4 +1,4 @@
-//! test_output([true,false,false,true,true,true,false,true])
+//! test_output([true,false,false,true,true,true,false,true,true])
 
 export default function () {
   return [
@@ -10,6 +10,7 @@ export default function () {
     "foo" in new C(),
     "forEach" in [],
     "map" in [],
+    Symbol.iterator in [].entries(),
   ];
 }
 

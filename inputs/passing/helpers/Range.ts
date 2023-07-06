@@ -369,12 +369,11 @@ export default class Range<T = never> implements Iterable<T> {
       return new Range(iter());
     }
 
-    // TODO: `in` operator
-    if (hasKey(iter, Symbol.iterator)) {
+    if (Symbol.iterator in iter) {
       return new Range(iter);
     }
 
-    if (hasKey(iter, "next")) {
+    if ("next" in iter) {
       return Range.fromIterator(iter);
     }
 
@@ -410,13 +409,6 @@ export default class Range<T = never> implements Iterable<T> {
   static primes() {
     return new Range(primes());
   }
-}
-
-function hasKey<Obj, K extends string | symbol>(
-  obj: unknown,
-  key: K,
-): obj is Obj & Record<K, unknown> {
-  return (obj as Record<K, unknown>)[key] !== undefined;
 }
 
 function never(x: never): never {
