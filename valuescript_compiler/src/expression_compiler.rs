@@ -1385,13 +1385,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     match pat {
       Pat::Ident(ident) => {
-        let ident_reg = match self.fnc.get_pattern_register(pat) {
-          Some(r) => r,
-          None => {
-            self.fnc.error(pat.span(), &"Invalid pattern".to_string());
-            self.fnc.allocate_reg(&"_invalid_pattern".to_string())
-          }
-        };
+        let ident_reg = self.fnc.get_pattern_register(pat);
 
         if register != &ident_reg {
           self.fnc.diagnostics.push(Diagnostic {
@@ -1431,13 +1425,7 @@ impl<'a> ExpressionCompiler<'a> {
             None => continue,
           };
 
-          let elem_reg = match self.fnc.get_pattern_register(elem) {
-            Some(r) => r,
-            None => {
-              self.fnc.error(elem.span(), "Invalid pattern");
-              self.fnc.allocate_reg(&"_invalid_pattern".to_string())
-            }
-          };
+          let elem_reg = self.fnc.get_pattern_register(elem);
 
           self.fnc.push(Instruction::Sub(
             Value::Register(register.clone()),
@@ -1458,14 +1446,7 @@ impl<'a> ExpressionCompiler<'a> {
 
           match prop {
             ObjectPatProp::KeyValue(kv) => {
-              let param_reg = match self.fnc.get_pattern_register(&kv.value) {
-                Some(r) => r,
-                None => {
-                  self.fnc.error(kv.value.span(), "Invalid pattern");
-                  self.fnc.allocate_reg(&"_invalid_pattern".to_string())
-                }
-              };
-
+              let param_reg = self.fnc.get_pattern_register(&kv.value);
               let compiled_key = self.prop_name(&kv.key);
 
               self.fnc.push(Instruction::Sub(
