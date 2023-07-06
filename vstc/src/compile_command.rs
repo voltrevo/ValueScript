@@ -20,21 +20,19 @@ pub fn compile_command(args: &Vec<String>) {
     std::fs::read_to_string(path).map_err(|err| err.to_string())
   });
 
+  if let Some(module) = &compile_result.module {
+    let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
+
+    file
+      .write(module.to_string().as_bytes())
+      .expect("Failed to write out.vsm");
+
+    file.write(b"\n").expect("Failed to write out.vsm");
+  }
+
   for (path, diagnostics) in compile_result.diagnostics.iter() {
     handle_diagnostics_cli(&path.path, diagnostics);
   }
-
-  let module = compile_result
-    .module
-    .expect("Should have exited if module is None");
-
-  let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
-
-  file
-    .write(module.to_string().as_bytes())
-    .expect("Failed to write out.vsm");
-
-  file.write(b"\n").expect("Failed to write out.vsm");
 }
 
 fn show_help() {
