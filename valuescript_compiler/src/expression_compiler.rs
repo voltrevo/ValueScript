@@ -173,12 +173,7 @@ impl<'a> ExpressionCompiler<'a> {
         return CompiledExpression::empty();
       }
       Await(await_exp) => {
-        self.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Await expression is not supported".to_string(),
-          span: await_exp.span,
-        });
-
+        self.fnc.todo(await_exp.span, "Await expression");
         return CompiledExpression::empty();
       }
       Paren(p) => {
