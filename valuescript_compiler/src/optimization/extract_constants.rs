@@ -59,10 +59,21 @@ fn should_extract_value_as_constant(value: &Value) -> Option<String> {
     | Value::Null
     | Value::Bool(..)
     | Value::Number(Number(..))
-    | Value::BigInt(..)
     | Value::Pointer(..)
     | Value::Builtin(..)
     | Value::Register(..) => None,
+    Value::BigInt(bi) => {
+      let (_, bytes) = bi.to_bytes_le();
+
+      // 2 extra bytes are needed for sign and byte len, so the idea is to
+      // allow inlining if it's encoded in 8 bytes (ie size of f64). No idea
+      // what's actually optimal here.
+      if bytes.len() > 6 {
+        Some("bigint".to_string())
+      } else {
+        None
+      }
+    }
     Value::String(s) => {
       if s.len() >= 4 {
         Some(mangle_string(s))

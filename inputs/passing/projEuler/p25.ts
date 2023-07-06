@@ -4,13 +4,12 @@ import assert from "../helpers/assert.ts";
 import Range from "../helpers/Range.ts";
 
 export default function main() {
-  // TODO: Remove the temptation pull out this constant (optimization to eval
-  // known expressions).
-  const threshold = 10n ** 999n;
-
   const result = Range.from(fibonacci())
     .indexed()
-    .filter(([_, x]) => x > threshold)
+    // Note: A naive implementation would calculate 10n ** 999n on every
+    // iteration. Fortunately, the optimizer picks up this constant expression
+    // and replaces it with its actual value.
+    .filter(([_, x]) => x > 10n ** 999n)
     .first();
 
   assert(result !== undefined);
