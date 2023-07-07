@@ -985,24 +985,11 @@ impl<'a> AssemblyParser<'a> {
       let mut c = *self.pos.peek().expect("Expected object content or end");
 
       let key = match c {
-        '"' => Value::String(self.parse_string_literal()),
-        '%' => Value::Register(self.assemble_register()),
-        '@' => {
-          self.parse_exact("@");
-          let name = self.parse_identifier();
-          Value::Pointer(Pointer { name })
-        }
-        '$' => Value::Builtin(self.assemble_builtin()),
         '}' => {
           self.pos.next();
           break object;
         }
-        _ => {
-          panic!(
-            "{}",
-            self.render_pos(0, &format!("Unexpected character {}", c))
-          );
-        }
+        _ => self.assemble_value(),
       };
 
       self.parse_optional_whitespace();
