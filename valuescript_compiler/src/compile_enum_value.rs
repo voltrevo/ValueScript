@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use swc_common::Spanned;
 
 use crate::{
-  asm::{Number, Object, Value},
+  asm::{Number, Object, Pointer, Value},
   scope_analysis::ScopeAnalysis,
   static_eval_expr::static_eval_expr,
   Diagnostic, DiagnosticLevel,
@@ -9,6 +11,7 @@ use crate::{
 
 pub fn compile_enum_value(
   sa: &ScopeAnalysis,
+  cm: &HashMap<Pointer, Value>,
   ts_enum: &swc_ecma_ast::TsEnumDecl,
   diagnostics: &mut Vec<Diagnostic>,
 ) -> Value {
@@ -22,7 +25,7 @@ pub fn compile_enum_value(
     };
 
     let init_value = match &member.init {
-      Some(init) => match static_eval_expr(sa, init) {
+      Some(init) => match static_eval_expr(sa, cm, init) {
         Some(init_value) => match init_value {
           Value::Number(Number(n)) => {
             next_default_id = Some(n + 1.0);

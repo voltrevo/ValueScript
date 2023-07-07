@@ -1,6 +1,6 @@
 use queues::*;
 use std::cell::RefCell;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::mem::take;
 use std::rc::Rc;
 
@@ -66,6 +66,7 @@ pub struct FunctionCompiler {
   pub definitions: Vec<Definition>,
   pub owner_id: OwnerId,
   pub scope_analysis: Rc<ScopeAnalysis>,
+  pub constants_map: Rc<RefCell<HashMap<Pointer, Value>>>,
   pub definition_allocator: Rc<RefCell<NameAllocator>>,
   pub reg_allocator: RegAllocator,
   pub label_allocator: NameAllocator,
@@ -82,6 +83,7 @@ pub struct FunctionCompiler {
 impl FunctionCompiler {
   pub fn new(
     scope_analysis: &Rc<ScopeAnalysis>,
+    constants_map: &Rc<RefCell<HashMap<Pointer, Value>>>,
     owner_id: OwnerId,
     definition_allocator: Rc<RefCell<NameAllocator>>,
   ) -> FunctionCompiler {
@@ -95,6 +97,7 @@ impl FunctionCompiler {
       definitions: vec![],
       owner_id,
       scope_analysis: scope_analysis.clone(),
+      constants_map: constants_map.clone(),
       definition_allocator,
       reg_allocator,
       label_allocator: NameAllocator::default(),
@@ -240,10 +243,15 @@ impl FunctionCompiler {
     fn_name: Option<String>,
     functionish: Functionish,
     scope_analysis: &Rc<ScopeAnalysis>,
+    constants_map: &Rc<RefCell<HashMap<Pointer, Value>>>,
     definition_allocator: Rc<RefCell<NameAllocator>>,
   ) -> (Vec<Definition>, Vec<Diagnostic>) {
-    let mut self_ =
-      FunctionCompiler::new(scope_analysis, functionish.owner_id(), definition_allocator);
+    let mut self_ = FunctionCompiler::new(
+      scope_analysis,
+      constants_map,
+      functionish.owner_id(),
+      definition_allocator,
+    );
 
     self_
       .queue
@@ -1253,7 +1261,12 @@ impl FunctionCompiler {
           }
         };
 
-        let enum_value = compile_enum_value(&self.scope_analysis, ts_enum, &mut self.diagnostics);
+        let enum_value = compile_enum_value(
+          &self.scope_analysis,
+          &self.constants_map.borrow(),
+          ts_enum,
+          &mut self.diagnostics,
+        );
 
         self.definitions.push(Definition {
           pointer,

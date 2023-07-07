@@ -8,7 +8,7 @@ use crate::{
 
 pub use crate::instruction::{Instruction, InstructionFieldMut};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Module {
   pub export_default: Value,
   pub export_star: Object,
@@ -21,16 +21,6 @@ impl Module {
     let assembly_lines = assembly_str.split('\n');
 
     assembly_lines.map(|s| s.to_string()).collect()
-  }
-}
-
-impl Default for Module {
-  fn default() -> Self {
-    Module {
-      export_default: Value::Void,
-      export_star: Object::default(),
-      definitions: Vec::default(),
-    }
   }
 }
 

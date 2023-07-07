@@ -1,12 +1,18 @@
+use std::collections::HashMap;
+
 use valuescript_vm::operations::to_i32;
 
 use crate::{
-  asm::{Array, Builtin, Number, Object, Value},
+  asm::{Array, Builtin, Number, Object, Pointer, Value},
   expression_compiler::value_from_literal,
   scope_analysis::ScopeAnalysis,
 };
 
-pub fn static_eval_expr(sa: &ScopeAnalysis, expr: &swc_ecma_ast::Expr) -> Option<Value> {
+pub fn static_eval_expr(
+  sa: &ScopeAnalysis,
+  cm: &HashMap<Pointer, Value>,
+  expr: &swc_ecma_ast::Expr,
+) -> Option<Value> {
   let symbol_iterator_opt = as_symbol_iterator(expr);
 
   if symbol_iterator_opt.is_some() {
@@ -28,7 +34,7 @@ pub fn static_eval_expr(sa: &ScopeAnalysis, expr: &swc_ecma_ast::Expr) -> Option
               return None;
             }
 
-            static_eval_expr(sa, &item.expr)?
+            static_eval_expr(sa, cm, &item.expr)?
           }
           None => Value::Void,
         });
@@ -49,11 +55,13 @@ pub fn static_eval_expr(sa: &ScopeAnalysis, expr: &swc_ecma_ast::Expr) -> Option
                 swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
                 swc_ecma_ast::PropName::Str(str) => Value::String(str.value.to_string()),
                 swc_ecma_ast::PropName::Num(num) => Value::Number(Number(num.value)),
-                swc_ecma_ast::PropName::Computed(computed) => static_eval_expr(sa, &computed.expr)?,
+                swc_ecma_ast::PropName::Computed(computed) => {
+                  static_eval_expr(sa, cm, &computed.expr)?
+                }
                 swc_ecma_ast::PropName::BigInt(bi) => Value::BigInt(bi.value.clone()),
               };
 
-              let value = static_eval_expr(sa, &kv.value)?;
+              let value = static_eval_expr(sa, cm, &kv.value)?;
 
               (key, value)
             }
@@ -76,7 +84,11 @@ pub fn static_eval_expr(sa: &ScopeAnalysis, expr: &swc_ecma_ast::Expr) -> Option
     swc_ecma_ast::Expr::SuperProp(_) => None,
     swc_ecma_ast::Expr::Call(_) => None,
     swc_ecma_ast::Expr::New(_) => None,
-    swc_ecma_ast::Expr::Ident(ident) => sa.lookup(ident).map(|name| name.value.clone()),
+    swc_ecma_ast::Expr::Ident(ident) => match sa.lookup(ident).map(|name| name.value.clone()) {
+      Some(Value::Pointer(p)) => cm.get(&p).cloned(),
+      Some(value) => Some(value),
+      None => None,
+    },
     swc_ecma_ast::Expr::TaggedTpl(_) => None,
     swc_ecma_ast::Expr::Arrow(_) => None,
     swc_ecma_ast::Expr::Class(_) => None,
@@ -95,18 +107,18 @@ pub fn static_eval_expr(sa: &ScopeAnalysis, expr: &swc_ecma_ast::Expr) -> Option
     swc_ecma_ast::Expr::Member(_) => None,
     swc_ecma_ast::Expr::Cond(_) => None,
     swc_ecma_ast::Expr::Unary(unary) => match unary.op {
-      swc_ecma_ast::UnaryOp::Minus => match static_eval_expr(sa, &unary.arg)? {
+      swc_ecma_ast::UnaryOp::Minus => match static_eval_expr(sa, cm, &unary.arg)? {
         Value::Number(Number(x)) => Some(Value::Number(Number(-x))),
         Value::BigInt(bi) => Some(Value::BigInt(-bi)),
         _ => None,
       },
-      swc_ecma_ast::UnaryOp::Plus => match static_eval_expr(sa, &unary.arg)? {
+      swc_ecma_ast::UnaryOp::Plus => match static_eval_expr(sa, cm, &unary.arg)? {
         Value::Number(Number(x)) => Some(Value::Number(Number(x))),
         Value::BigInt(bi) => Some(Value::BigInt(bi)),
         _ => None,
       },
       swc_ecma_ast::UnaryOp::Bang => None,
-      swc_ecma_ast::UnaryOp::Tilde => match static_eval_expr(sa, &unary.arg)? {
+      swc_ecma_ast::UnaryOp::Tilde => match static_eval_expr(sa, cm, &unary.arg)? {
         Value::Number(Number(x)) => Some(Value::Number(Number(!to_i32(x) as f64))),
         Value::BigInt(bi) => Some(Value::BigInt(!bi)),
         _ => None,
@@ -120,7 +132,7 @@ pub fn static_eval_expr(sa: &ScopeAnalysis, expr: &swc_ecma_ast::Expr) -> Option
       let mut last = Value::Void;
 
       for expr in &seq.exprs {
-        last = static_eval_expr(sa, expr)?;
+        last = static_eval_expr(sa, cm, expr)?;
       }
 
       Some(last)
@@ -135,11 +147,11 @@ pub fn static_eval_expr(sa: &ScopeAnalysis, expr: &swc_ecma_ast::Expr) -> Option
 
       None // TODO
     }
-    swc_ecma_ast::Expr::Paren(paren) => static_eval_expr(sa, &paren.expr),
-    swc_ecma_ast::Expr::TsTypeAssertion(tta) => static_eval_expr(sa, &tta.expr),
-    swc_ecma_ast::Expr::TsConstAssertion(tca) => static_eval_expr(sa, &tca.expr),
-    swc_ecma_ast::Expr::TsNonNull(tnn) => static_eval_expr(sa, &tnn.expr),
-    swc_ecma_ast::Expr::TsAs(ta) => static_eval_expr(sa, &ta.expr),
+    swc_ecma_ast::Expr::Paren(paren) => static_eval_expr(sa, cm, &paren.expr),
+    swc_ecma_ast::Expr::TsTypeAssertion(tta) => static_eval_expr(sa, cm, &tta.expr),
+    swc_ecma_ast::Expr::TsConstAssertion(tca) => static_eval_expr(sa, cm, &tca.expr),
+    swc_ecma_ast::Expr::TsNonNull(tnn) => static_eval_expr(sa, cm, &tnn.expr),
+    swc_ecma_ast::Expr::TsAs(ta) => static_eval_expr(sa, cm, &ta.expr),
   }
 }
 
