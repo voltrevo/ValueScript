@@ -14,6 +14,7 @@ export const orderedFiles = [
   "/tutorial/structuralComparison.ts",
   "/tutorial/binaryTree.ts",
   "/tutorial/specialFunctions.ts",
+  "/tutorial/typeScriptFeatures.ts",
   "/tutorial/treeShaking.ts",
 ];
 

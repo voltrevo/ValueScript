@@ -1,7 +1,7 @@
 //! test_output(10)
 
-import Numbers from "./helpers/Numbers.ts";
+import Num from "./helpers/Num.ts";
 
 export default function () {
-  return Numbers.One + Numbers.Two + Numbers.Three + Numbers.Four;
+  return Num.One + Num.Two + Num.Three + Num.Four;
 }

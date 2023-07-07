@@ -1,4 +1,4 @@
-enum Numbers {
+enum Num {
   Zero,
   One,
   Two,
@@ -6,4 +6,4 @@ enum Numbers {
   Four,
 }
 
-export default Numbers;
+export default Num;
