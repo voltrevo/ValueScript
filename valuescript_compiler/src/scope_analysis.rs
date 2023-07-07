@@ -1584,13 +1584,6 @@ impl ScopeAnalysis {
   }
 
   fn ident(&mut self, scope: &Scope, ident: &swc_ecma_ast::Ident) {
-    if ident.sym.to_string() == "undefined" {
-      // The way that `undefined` is considered to be an identifier is an artifact of history. It's
-      // not an identifier (unless used in an identifier context like an object key), instead it's a
-      // keyword like `null`.
-      return;
-    }
-
     let name_id = match scope.get(&ident.sym) {
       Some(name_id) => name_id,
       None => {

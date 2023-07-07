@@ -1282,11 +1282,6 @@ impl<'a> ExpressionCompiler<'a> {
     ident: &swc_ecma_ast::Ident,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    // TODO: Use constant instead?
-    if ident.sym.to_string() == "undefined" {
-      return Value::Undefined.to_ce();
-    }
-
     let fn_as_owner_id = match self.fnc.scope_analysis.lookup(ident) {
       Some(name) => match name.type_ == NameType::Function {
         true => match name.id {
