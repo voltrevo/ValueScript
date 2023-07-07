@@ -2,6 +2,7 @@ pub mod asm;
 mod assembler;
 pub mod assembly_parser;
 mod compile;
+mod compile_enum_value;
 mod constants;
 mod diagnostic;
 mod expression_compiler;

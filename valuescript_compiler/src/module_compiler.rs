@@ -11,6 +11,7 @@ use crate::asm::{
   Class, Definition, DefinitionContent, FnLine, Function, Instruction, Lazy, Module, Object,
   Pointer, Register, Value,
 };
+use crate::compile_enum_value::compile_enum_value;
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
 use crate::function_compiler::{FunctionCompiler, Functionish};
@@ -199,7 +200,27 @@ impl ModuleCompiler {
       ExportDecl(ed) => self.compile_export_decl(ed),
       ExportNamed(en) => self.compile_named_export(en),
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
-      ExportDefaultExpr(_) => self.todo(module_decl.span(), "ExportDefaultExpr declaration"),
+      ExportDefaultExpr(ede) => {
+        let value = match &*ede.expr {
+          swc_ecma_ast::Expr::Ident(ident) => match self.scope_analysis.lookup(ident) {
+            Some(name) => Some(name.value.clone()),
+            None => None,
+          },
+          expr => static_eval_expr(expr),
+        };
+
+        match value {
+          Some(value) => {
+            self.module.export_default = value;
+          }
+          None => {
+            self.todo(
+              module_decl.span(),
+              "Failed to evaluate export default expression",
+            );
+          }
+        };
+      }
       ExportAll(_) => self.todo(module_decl.span(), "ExportAll declaration"),
       TsImportEquals(_) => self.not_supported(module_decl.span(), "TsImportEquals declaration"),
       TsExportAssignment(_) => {
@@ -326,7 +347,7 @@ impl ModuleCompiler {
       }
       TsInterface(_) => {}
       TsTypeAlias(_) => {}
-      TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
+      TsEnum(ts_enum) => self.compile_enum_decl(false, ts_enum),
       TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration"),
     };
   }
@@ -364,6 +385,38 @@ impl ModuleCompiler {
     );
 
     self.module.definitions.append(&mut fn_defns);
+  }
+
+  fn compile_enum_decl(&mut self, export: bool, ts_enum: &swc_ecma_ast::TsEnumDecl) {
+    let pointer = match self
+      .scope_analysis
+      .lookup_value(&OwnerId::Module, &ts_enum.id)
+    {
+      Some(Value::Pointer(p)) => p,
+      _ => {
+        self.diagnostics.push(Diagnostic {
+          level: DiagnosticLevel::InternalError,
+          message: format!("Pointer for {} should have been in scope", ts_enum.id.sym),
+          span: ts_enum.id.span,
+        });
+
+        return;
+      }
+    };
+
+    if export {
+      self.module.export_star.properties.push((
+        Value::String(ts_enum.id.sym.to_string()),
+        Value::Pointer(pointer.clone()),
+      ));
+    }
+
+    let enum_value = compile_enum_value(ts_enum, &mut self.diagnostics);
+
+    self.module.definitions.push(Definition {
+      pointer,
+      content: DefinitionContent::Value(enum_value),
+    });
   }
 
   fn compile_export_default_decl(&mut self, edd: &swc_ecma_ast::ExportDefaultDecl) {
@@ -432,7 +485,7 @@ impl ModuleCompiler {
       }
       Decl::TsInterface(_) => {}
       Decl::TsTypeAlias(_) => {}
-      Decl::TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration in export"),
+      Decl::TsEnum(ts_enum) => self.compile_enum_decl(true, ts_enum),
       Decl::TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration in export"),
     };
   }

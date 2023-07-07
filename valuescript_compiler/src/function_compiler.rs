@@ -10,6 +10,7 @@ use crate::asm::{
   Array, Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Pointer,
   Register, Value,
 };
+use crate::compile_enum_value::compile_enum_value;
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
@@ -1279,7 +1280,30 @@ impl FunctionCompiler {
       Var(var_decl) => self.var_declaration(var_decl),
       TsInterface(interface_decl) => self.todo(interface_decl.span, "TsInterface declaration"),
       TsTypeAlias(_) => {}
-      TsEnum(ts_enum) => self.todo(ts_enum.span, "TsEnum declaration"),
+      TsEnum(ts_enum) => {
+        let pointer = match self
+          .scope_analysis
+          .lookup_value(&OwnerId::Module, &ts_enum.id)
+        {
+          Some(Value::Pointer(p)) => p,
+          _ => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: format!("Pointer for {} should have been in scope", ts_enum.id.sym),
+              span: ts_enum.id.span,
+            });
+
+            return;
+          }
+        };
+
+        let enum_value = compile_enum_value(ts_enum, &mut self.diagnostics);
+
+        self.definitions.push(Definition {
+          pointer,
+          content: DefinitionContent::Value(enum_value),
+        });
+      }
       TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration"),
     };
   }

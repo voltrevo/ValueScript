@@ -33,6 +33,7 @@ pub enum NameType {
   Param,
   Function,
   Class,
+  Enum,
   Import,
   Builtin,
   Constant,
@@ -187,6 +188,7 @@ impl ScopeAnalysis {
       effectively_const: match type_ {
         NameType::Var | NameType::Let | NameType::Param => false,
         NameType::Const
+        | NameType::Enum
         | NameType::Function
         | NameType::Class
         | NameType::Import
@@ -434,12 +436,16 @@ impl ScopeAnalysis {
       }
       Decl::TsInterface(_) => {}
       Decl::TsTypeAlias(_) => {}
-      Decl::TsEnum(ts_enum) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: Implement TsEnum declarations".to_string(),
-          span: ts_enum.span,
-        });
+      Decl::TsEnum(ts_enum) => 'b: {
+        if ts_enum.declare {
+          break 'b;
+        }
+
+        for member in &ts_enum.members {
+          if let Some(init) = &member.init {
+            self.expr(scope, &init);
+          }
+        }
       }
       Decl::TsModule(ts_module) => {
         self.diagnostics.push(Diagnostic {
@@ -510,8 +516,8 @@ impl ScopeAnalysis {
           }
           swc_ecma_ast::Decl::TsInterface(_) => {}
           swc_ecma_ast::Decl::TsTypeAlias(_) => {}
-          swc_ecma_ast::Decl::TsEnum(_) => {
-            // Diagnostic emitted after hoist processing
+          swc_ecma_ast::Decl::TsEnum(ts_enum) => {
+            self.insert_pointer_name(scope, NameType::Enum, &ts_enum.id);
           }
           swc_ecma_ast::Decl::TsModule(_) => {
             // Diagnostic emitted after hoist processing
@@ -570,6 +576,9 @@ impl ScopeAnalysis {
               }
             }
           }
+        }
+        Decl::TsEnum(ts_enum) => {
+          self.insert_pointer_name(scope, NameType::Enum, &ts_enum.id);
         }
         _ => {}
       },
@@ -687,9 +696,7 @@ impl ScopeAnalysis {
       }
       Decl::TsInterface(_) => {}
       Decl::TsTypeAlias(_) => {}
-      Decl::TsEnum(_) => {
-        // Diagnostic emitted after hoist processing
-      }
+      Decl::TsEnum(_) => {}
       Decl::TsModule(_) => {
         // Diagnostic emitted after hoist processing
       }
