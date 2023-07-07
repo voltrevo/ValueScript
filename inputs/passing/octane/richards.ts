@@ -100,16 +100,18 @@ const COUNT = 1000;
 const EXPECTED_QUEUE_COUNT = 2322;
 const EXPECTED_HOLD_COUNT = 928;
 
-type SCHEDULER_RELEASE = 0;
-type SCHEDULER_HOLD_CURRENT = 1;
-type SCHEDULER_SUSPEND_CURRENT = 2;
-type SCHEDULER_QUEUE = 3;
+enum SchedulerActionType {
+  Release,
+  HoldCurrent,
+  SuspendCurrent,
+  Queue,
+}
 
 type SchedulerAction =
-  | [type: SCHEDULER_RELEASE, id: number]
-  | [type: SCHEDULER_HOLD_CURRENT]
-  | [type: SCHEDULER_SUSPEND_CURRENT]
-  | [type: SCHEDULER_QUEUE, packet: Packet];
+  | [type: typeof SchedulerActionType.Release, id: number]
+  | [type: typeof SchedulerActionType.HoldCurrent]
+  | [type: typeof SchedulerActionType.SuspendCurrent]
+  | [type: typeof SchedulerActionType.Queue, packet: Packet];
 
 /**
  * A scheduler can be used to schedule a set of tasks based on their relative
@@ -237,7 +239,7 @@ class Scheduler {
    * @param {int} id the id of the task to suspend
    */
   static release(id: number): SchedulerAction {
-    return [0, id];
+    return [SchedulerActionType.Release, id];
   }
 
   /**
@@ -246,7 +248,7 @@ class Scheduler {
    * released, even if new work is added to it.
    */
   static holdCurrent(): SchedulerAction {
-    return [1];
+    return [SchedulerActionType.HoldCurrent];
   }
 
   /**
@@ -254,7 +256,7 @@ class Scheduler {
    * to run.  If new work is added to the suspended task it will be made runnable.
    */
   static suspendCurrent(): SchedulerAction {
-    return [2];
+    return [SchedulerActionType.SuspendCurrent];
   }
 
   /**
@@ -264,45 +266,55 @@ class Scheduler {
    * @param {Packet} packet the packet to add
    */
   static queue(packet: Packet): SchedulerAction {
-    return [3, packet];
+    return [SchedulerActionType.Queue, packet];
   }
 
   processAction(action: SchedulerAction): number | null {
-    if (action[0] === 0) { // release
-      const id = action[1];
+    switch (action[0]) {
+      case SchedulerActionType.Release: {
+        const id = action[1];
 
-      var tcbId = this.blocks[id];
-      if (tcbId == null) return tcbId;
-      this.tcbStore[tcbId].markAsNotHeld();
-      if (
-        this.tcbStore[tcbId].priority > this.tcbStore[this.currentId!].priority
-      ) {
-        return tcbId;
-      } else {
+        var tcbId = this.blocks[id];
+        if (tcbId == null) return tcbId;
+        this.tcbStore[tcbId].markAsNotHeld();
+        if (
+          this.tcbStore[tcbId].priority >
+            this.tcbStore[this.currentId!].priority
+        ) {
+          return tcbId;
+        } else {
+          return this.currentId;
+        }
+      }
+
+      case SchedulerActionType.HoldCurrent: {
+        this.holdCount++;
+        this.tcbStore[this.currentId!].markAsHeld();
+        return this.tcbStore[this.currentId!].link;
+      }
+
+      case SchedulerActionType.SuspendCurrent: {
+        this.tcbStore[this.currentId!].markAsSuspended();
         return this.currentId;
       }
-    } else if (action[0] === 1) { // holdCurrent
-      this.holdCount++;
-      this.tcbStore[this.currentId!].markAsHeld();
-      return this.tcbStore[this.currentId!].link;
-    } else if (action[0] === 2) { // suspendCurrent
-      this.tcbStore[this.currentId!].markAsSuspended();
-      return this.currentId;
-    } else if (action[0] === 3) { // queue
-      let packet = action[1];
 
-      var t = this.blocks[packet.id!];
-      if (t == null) return t;
-      this.queueCount++;
-      packet.link = null;
-      packet.id = this.currentId;
-      return this.tcbStore[t].checkPriorityAdd(
-        this.tcbStore[this.currentId!],
-        packet,
-      );
+      case SchedulerActionType.Queue: {
+        let packet = action[1];
+
+        var t = this.blocks[packet.id!];
+        if (t == null) return t;
+        this.queueCount++;
+        packet.link = null;
+        packet.id = this.currentId;
+        return this.tcbStore[t].checkPriorityAdd(
+          this.tcbStore[this.currentId!],
+          packet,
+        );
+      }
+
+      default:
+        never(action[0]);
     }
-
-    never(action);
   }
 }
 
