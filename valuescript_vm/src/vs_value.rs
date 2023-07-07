@@ -174,7 +174,7 @@ impl ValTrait for Val {
   fn typeof_(&self) -> VsType {
     use Val::*;
 
-    return match self {
+    match self {
       Void => VsType::Undefined,
       Undefined => VsType::Undefined,
       Null => VsType::Null,
@@ -190,13 +190,13 @@ impl ValTrait for Val {
       Static(val) => val.typeof_(),
       Dynamic(val) => val.typeof_(),
       CopyCounter(_) => VsType::Object,
-    };
+    }
   }
 
   fn to_number(&self) -> f64 {
     use Val::*;
 
-    return match self {
+    match self {
       Void => f64::NAN,
       Undefined => f64::NAN,
       Null => 0_f64,
@@ -216,7 +216,7 @@ impl ValTrait for Val {
       Static(val) => val.to_number(),
       Dynamic(val) => val.to_number(),
       CopyCounter(_) => f64::NAN,
-    };
+    }
   }
 
   fn to_index(&self) -> Option<usize> {
@@ -247,7 +247,7 @@ impl ValTrait for Val {
   fn is_primitive(&self) -> bool {
     use Val::*;
 
-    return match self {
+    match self {
       Void => true,
       Undefined => true,
       Null => true,
@@ -263,13 +263,13 @@ impl ValTrait for Val {
       Static(val) => val.is_primitive(), // TODO: false?
       Dynamic(val) => val.is_primitive(),
       CopyCounter(_) => false,
-    };
+    }
   }
 
   fn is_truthy(&self) -> bool {
     use Val::*;
 
-    return match self {
+    match self {
       Void => false,
       Undefined => false,
       Null => false,
@@ -285,7 +285,7 @@ impl ValTrait for Val {
       Static(val) => val.is_truthy(), // TODO: true?
       Dynamic(val) => val.is_truthy(),
       CopyCounter(_) => true,
-    };
+    }
   }
 
   fn is_nullish(&self) -> bool {
@@ -313,49 +313,49 @@ impl ValTrait for Val {
   fn bind(&self, params: Vec<Val>) -> Option<Val> {
     use Val::*;
 
-    return match self {
+    match self {
       Function(f) => Some(f.bind(params).to_val()),
       Static(val) => val.bind(params),
       Dynamic(val) => val.bind(params),
 
       _ => None,
-    };
+    }
   }
 
   // TODO: &BigInt ?
   fn as_bigint_data(&self) -> Option<BigInt> {
     use Val::*;
 
-    return match self {
+    match self {
       BigInt(b) => Some(b.clone()),
       // TODO: Static? Others too?
       Dynamic(val) => val.as_bigint_data(),
 
       _ => None,
-    };
+    }
   }
 
   fn as_array_data(&self) -> Option<Rc<VsArray>> {
     use Val::*;
 
-    return match self {
+    match self {
       Array(a) => Some(a.clone()),
       Dynamic(val) => val.as_array_data(),
 
       _ => None,
-    };
+    }
   }
 
   fn as_class_data(&self) -> Option<Rc<VsClass>> {
     use Val::*;
 
-    return match self {
+    match self {
       Class(class) => Some(class.clone()),
       Static(s) => s.as_class_data(),
       Dynamic(val) => val.as_class_data(),
 
       _ => None,
-    };
+    }
   }
 
   fn load_function(&self) -> LoadFunctionResult {
@@ -389,47 +389,46 @@ impl ValTrait for Val {
       Val::Array(array) => {
         let index = match key.to_index() {
           None => {
-            return Some(match key.to_string().as_str() {
-              "at" => true,
-              "concat" => true,
-              "copyWithin" => true,
-              "entries" => true,
-              "every" => true,
-              "fill" => true,
-              "filter" => true,
-              "find" => true,
-              "findIndex" => true,
-              "flat" => true,
-              "flatMap" => true,
-              "includes" => true,
-              "indexOf" => true,
-              "join" => true,
-              "keys" => true,
-              "lastIndexOf" => true,
-              "length" => true,
-              "map" => true,
-              "pop" => true,
-              "push" => true,
-              "reduce" => true,
-              "reduceRight" => true,
-              "reverse" => true,
-              "shift" => true,
-              "slice" => true,
-              "some" => true,
-              "sort" => true,
-              "splice" => true,
-              "toLocaleString" => true,
-              "toString" => true,
-              "unshift" => true,
-              "values" => true,
-
-              _ => false,
-            });
+            return Some(matches!(
+              key.to_string().as_str(),
+              "at"
+                | "concat"
+                | "copyWithin"
+                | "entries"
+                | "every"
+                | "fill"
+                | "filter"
+                | "find"
+                | "findIndex"
+                | "flat"
+                | "flatMap"
+                | "includes"
+                | "indexOf"
+                | "join"
+                | "keys"
+                | "lastIndexOf"
+                | "length"
+                | "map"
+                | "pop"
+                | "push"
+                | "reduce"
+                | "reduceRight"
+                | "reverse"
+                | "shift"
+                | "slice"
+                | "some"
+                | "sort"
+                | "splice"
+                | "toLocaleString"
+                | "toString"
+                | "unshift"
+                | "values"
+            ));
           }
           Some(i) => i,
         };
 
-        return Some(index < array.elements.len());
+        Some(index < array.elements.len())
       }
       Val::Object(object) => match key {
         Val::Symbol(symbol) => {
@@ -441,7 +440,7 @@ impl ValTrait for Val {
             return proto.has(key);
           }
 
-          return Some(false);
+          Some(false)
         }
         _ => {
           if object.string_map.contains_key(&key.to_string()) {
@@ -452,17 +451,14 @@ impl ValTrait for Val {
             return proto.has(key);
           }
 
-          return Some(false);
+          Some(false)
         }
       },
       Val::Function(_) => Some(false),
       Val::Class(class) => class.static_.has(key),
       Val::Static(static_) => static_.has(key),
       Val::Dynamic(dynamic) => dynamic.has(key),
-      Val::CopyCounter(_) => Some(match key.to_string().as_str() {
-        "tag" | "count" => true,
-        _ => false,
-      }),
+      Val::CopyCounter(_) => Some(matches!(key.to_string().as_str(), "tag" | "count")),
     }
   }
 
@@ -485,7 +481,7 @@ impl ValTrait for Val {
       Val::Symbol(s) => format!("Symbol.{}", symbol_to_name(s.clone())),
       Val::String(str) => stringify_string(str),
       Val::Array(vals) => {
-        if vals.elements.len() == 0 {
+        if vals.elements.is_empty() {
           "[]".to_string()
         } else if vals.elements.len() == 1 {
           "[".to_string() + vals.elements[0].codify().as_str() + "]"
@@ -508,17 +504,14 @@ impl ValTrait for Val {
         let mut res = String::new();
 
         if let Some(proto) = &object.prototype {
-          match proto.sub(&"name".to_val()) {
-            Ok(name) => {
-              if name.typeof_() == VsType::String {
-                res += &name.to_string();
-              }
+          if let Ok(name) = proto.sub(&"name".to_val()) {
+            if name.typeof_() == VsType::String {
+              res += &name.to_string();
             }
-            Err(_) => {}
           }
         }
 
-        if object.string_map.len() == 0 {
+        if object.string_map.is_empty() {
           res += "{}";
           return res;
         }
@@ -580,7 +573,7 @@ impl fmt::Display for Val {
       Symbol(s) => write!(f, "Symbol(Symbol.{})", symbol_to_name(s.clone())),
       String(s) => s.fmt(f),
       Array(vals) => {
-        if vals.elements.len() == 0 {
+        if vals.elements.is_empty() {
           Ok(())
         } else if vals.elements.len() == 1 {
           vals.elements[0].fmt(f)
@@ -716,7 +709,7 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
       Val::Symbol(_) => write!(f, "\x1b[32m{}\x1b[39m", self.val.codify()),
       Val::String(_) => write!(f, "\x1b[32m{}\x1b[39m", self.val.codify()),
       Val::Array(array) => {
-        if array.elements.len() == 0 {
+        if array.elements.is_empty() {
           return write!(f, "[]");
         }
 
@@ -738,17 +731,14 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
       }
       Val::Object(object) => {
         if let Some(proto) = &object.prototype {
-          match proto.sub(&"name".to_val()) {
-            Ok(name) => {
-              if name.typeof_() == VsType::String {
-                write!(f, "{} ", name)?;
-              }
+          if let Ok(name) = proto.sub(&"name".to_val()) {
+            if name.typeof_() == VsType::String {
+              write!(f, "{} ", name)?;
             }
-            Err(_) => {}
           }
         }
 
-        if object.string_map.len() == 0 {
+        if object.string_map.is_empty() {
           return f.write_str("{}");
         }
 
@@ -795,7 +785,7 @@ pub fn number_to_index(x: f64) -> Option<usize> {
     return None;
   }
 
-  return Some(x as usize);
+  Some(x as usize)
 }
 
 fn stringify_string(str: &str) -> String {

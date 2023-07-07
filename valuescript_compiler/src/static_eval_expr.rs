@@ -166,7 +166,7 @@ fn as_symbol_iterator(expr: &swc_ecma_ast::Expr) -> Option<Value> {
     _ => return None,
   }
 
-  return Some(Value::Builtin(Builtin {
+  Some(Value::Builtin(Builtin {
     name: "SymbolIterator".to_string(),
-  }));
+  }))
 }

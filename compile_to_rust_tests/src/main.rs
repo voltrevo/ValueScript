@@ -82,7 +82,7 @@ pub fn fib(n: Val) -> Result<Val, Val> {
   let mut _tmp3 = fib(_tmp1)?;
   _return = op_plus(&_tmp2, &_tmp3)?;
 
-  return Ok(_return);
+  Ok(_return)
 }
 
 // 0.120s
@@ -91,5 +91,5 @@ pub fn fib2(n: f64) -> f64 {
     return n;
   }
 
-  return fib2(n - 1.0) + fib2(n - 2.0);
+  fib2(n - 1.0) + fib2(n - 2.0)
 }

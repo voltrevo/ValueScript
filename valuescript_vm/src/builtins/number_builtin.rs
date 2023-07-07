@@ -127,15 +127,15 @@ pub static PARSE_INT: NativeFunction = native_fn(|_this, params| {
       return Ok(Val::Number(f64::NAN));
     }
 
-    let (is_negative, string_value) = if string_value.starts_with('-') {
-      (true, &string_value[1..])
+    let (is_negative, string_value) = if let Some(stripped) = string_value.strip_prefix('-') {
+      (true, stripped)
     } else {
       (false, string_value.as_str())
     };
 
     let string_value = match string_value.find(|c: char| !c.is_digit(radix as u32)) {
       Some(pos) => &string_value[..pos],
-      None => &string_value,
+      None => string_value,
     };
 
     match i64::from_str_radix(string_value, radix as u32) {

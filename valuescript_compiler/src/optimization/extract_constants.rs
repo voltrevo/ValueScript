@@ -17,12 +17,12 @@ pub fn extract_constants(module: &mut Module, pointer_allocator: &mut NameAlloca
           instr.visit_fields_mut(&mut |field| match field {
             InstructionFieldMut::Value(value) => {
               value.visit_values_mut(&mut |sub_value| {
-                if let Some(p) = constants.get(&sub_value) {
+                if let Some(p) = constants.get(sub_value) {
                   *sub_value = Value::Pointer(p.clone());
                   return;
                 }
 
-                if let Some(name) = should_extract_value_as_constant(&sub_value) {
+                if let Some(name) = should_extract_value_as_constant(sub_value) {
                   let p = Pointer {
                     name: pointer_allocator.allocate(&name),
                   };
@@ -82,14 +82,14 @@ fn should_extract_value_as_constant(value: &Value) -> Option<String> {
       }
     }
     Value::Array(array) => {
-      if array.values.len() >= 1 && array.values.iter().all(is_constant) {
+      if !array.values.is_empty() && array.values.iter().all(is_constant) {
         Some("array".to_string())
       } else {
         None
       }
     }
     Value::Object(object) => {
-      if object.properties.len() >= 1
+      if !object.properties.is_empty()
         && object
           .properties
           .iter()
@@ -123,7 +123,7 @@ fn is_constant(value: &Value) -> bool {
   }
 }
 
-fn mangle_string(s: &String) -> String {
+fn mangle_string(s: &str) -> String {
   let mut res = "s_".to_string();
 
   for c in s.chars() {

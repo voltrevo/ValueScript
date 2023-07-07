@@ -70,10 +70,7 @@ impl ValTrait for IterationResult {
   }
 
   fn has(&self, key: &Val) -> Option<bool> {
-    Some(match key.to_string().as_str() {
-      "value" | "done" => true,
-      _ => false,
-    })
+    Some(matches!(key.to_string().as_str(), "value" | "done"))
   }
 
   fn submov(&mut self, _key: &Val, _value: Val) -> Result<(), Val> {

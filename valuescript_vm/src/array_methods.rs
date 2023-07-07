@@ -81,10 +81,10 @@ pub fn op_sub_array_index(array: &mut Rc<VsArray>, index: usize) -> Result<Val, 
     None => array.elements[index].clone(),
   };
 
-  return Ok(match res {
+  Ok(match res {
     Val::Void => Val::Undefined,
     _ => res,
-  });
+  })
 }
 
 static AT: NativeFunction = native_fn(|this, params| {
@@ -230,7 +230,7 @@ static FILL: NativeFunction = native_fn(|mut this, params| {
 static FLAT: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(array_data) => {
-      if params.len() > 0 {
+      if !params.is_empty() {
         return Err("TODO: .flat depth parameter".to_internal_error());
       }
 
@@ -300,7 +300,7 @@ static INDEX_OF: NativeFunction = native_fn(|this, params| {
 static JOIN: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(vals) => {
-      if vals.elements.len() == 0 {
+      if vals.elements.is_empty() {
         return Ok("".to_val());
       }
 
@@ -359,7 +359,7 @@ static POP: NativeFunction = native_fn(|mut this, _params| {
 
   Ok(match this {
     Val::Array(array_data) => {
-      if array_data.elements.len() == 0 {
+      if array_data.elements.is_empty() {
         return Ok(Val::Undefined);
       }
 
@@ -396,7 +396,7 @@ static REVERSE: NativeFunction = native_fn(|mut this, _params| {
 
   Ok(match this {
     Val::Array(array_data) => {
-      if array_data.elements.len() == 0 {
+      if array_data.elements.is_empty() {
         // Treating this as an edge case because rust protects us from
         // underflow when computing last below.
         return Ok(this.clone());
@@ -423,7 +423,7 @@ static SHIFT: NativeFunction = native_fn(|mut this, _params| {
 
   Ok(match this {
     Val::Array(array_data) => {
-      if array_data.elements.len() == 0 {
+      if array_data.elements.is_empty() {
         return Ok(Val::Undefined);
       }
 
@@ -496,9 +496,8 @@ static SPLICE: NativeFunction = native_fn(|mut this, params| {
       let replace_len = min(insert_len, delete_count);
 
       if insert_len > replace_len {
-        for i in 0..replace_len {
-          array_data_mut.elements[start + i] = params[i + 2].clone();
-        }
+        array_data_mut.elements[start..(replace_len + start)]
+          .clone_from_slice(&params[2..(replace_len + 2)]);
 
         let gap = insert_len - replace_len;
 
@@ -510,13 +509,11 @@ static SPLICE: NativeFunction = native_fn(|mut this, params| {
           array_data_mut.elements[i + gap] = array_data_mut.elements[i].clone();
         }
 
-        for i in replace_len..insert_len {
-          array_data_mut.elements[start + i] = params[i + 2].clone();
-        }
+        array_data_mut.elements[(replace_len + start)..(insert_len + start)]
+          .clone_from_slice(&params[(replace_len + 2)..(insert_len + 2)]);
       } else {
-        for i in 0..insert_len {
-          array_data_mut.elements[start + i] = params[i + 2].clone();
-        }
+        array_data_mut.elements[start..(insert_len + start)]
+          .clone_from_slice(&params[2..(insert_len + 2)]);
 
         let gap = delete_count - insert_len;
 
@@ -547,11 +544,8 @@ static UNSHIFT: NativeFunction = native_fn(|mut this, params| {
     Val::Array(array_data) => {
       let array_data_mut = Rc::make_mut(array_data);
 
-      let mut i = 0;
-
-      for p in params {
+      for (i, p) in params.into_iter().enumerate() {
         array_data_mut.elements.insert(i, p);
-        i += 1;
       }
 
       Val::Number(array_data_mut.elements.len() as f64)

@@ -7,8 +7,8 @@ use std::rc::Rc;
 use swc_common::Spanned;
 
 use crate::asm::{
-  Array, Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Pointer,
-  Register, Value,
+  Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Pointer, Register,
+  Value,
 };
 use crate::compile_enum_value::compile_enum_value;
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
@@ -39,7 +39,7 @@ impl Functionish {
   pub fn owner_id(&self) -> OwnerId {
     match self {
       Functionish::Fn(ident, fn_) => fn_to_owner_id(ident, fn_),
-      _ => OwnerId::Span(self.span().clone()),
+      _ => OwnerId::Span(self.span()),
     }
   }
 }
@@ -90,7 +90,7 @@ impl FunctionCompiler {
       None => RegAllocator::default(),
     };
 
-    return FunctionCompiler {
+    FunctionCompiler {
       current: Function::default(),
       definitions: vec![],
       owner_id,
@@ -105,7 +105,7 @@ impl FunctionCompiler {
       is_returning_register: None,
       finally_labels: vec![],
       diagnostics: vec![],
-    };
+    }
   }
 
   pub fn push(&mut self, mut instruction: Instruction) {
@@ -164,7 +164,7 @@ impl FunctionCompiler {
   pub fn error(&mut self, span: swc_common::Span, message: &str) {
     self.diagnostics.push(Diagnostic {
       level: DiagnosticLevel::Error,
-      message: format!("{}", message),
+      message: message.to_string(),
       span,
     });
   }
@@ -172,7 +172,7 @@ impl FunctionCompiler {
   pub fn internal_error(&mut self, span: swc_common::Span, message: &str) {
     self.diagnostics.push(Diagnostic {
       level: DiagnosticLevel::InternalError,
-      message: format!("{}", message),
+      message: message.to_string(),
       span,
     });
   }
@@ -192,7 +192,7 @@ impl FunctionCompiler {
     let allocated_name = self
       .definition_allocator
       .borrow_mut()
-      .allocate_numbered(&name.to_string());
+      .allocate_numbered(name);
 
     Pointer {
       name: allocated_name,
@@ -203,11 +203,11 @@ impl FunctionCompiler {
     self.reg_allocator.allocate_numbered("_tmp")
   }
 
-  pub fn allocate_reg(&mut self, based_on: &String) -> Register {
+  pub fn allocate_reg(&mut self, based_on: &str) -> Register {
     self.reg_allocator.allocate(based_on)
   }
 
-  pub fn allocate_reg_fresh(&mut self, based_on: &String) -> Register {
+  pub fn allocate_reg_fresh(&mut self, based_on: &str) -> Register {
     self.reg_allocator.allocate_fresh(based_on)
   }
 
@@ -216,9 +216,7 @@ impl FunctionCompiler {
   }
 
   pub fn allocate_numbered_reg_fresh(&mut self, prefix: &str) -> Register {
-    self
-      .reg_allocator
-      .allocate_numbered_fresh(&prefix.to_string())
+    self.reg_allocator.allocate_numbered_fresh(prefix)
   }
 
   pub fn release_reg(&mut self, reg: &Register) {
@@ -250,7 +248,7 @@ impl FunctionCompiler {
     self_
       .queue
       .add(QueuedFunction {
-        definition_pointer: definition_pointer.clone(),
+        definition_pointer,
         fn_name,
         functionish,
       })
@@ -258,17 +256,12 @@ impl FunctionCompiler {
 
     self_.process_queue();
 
-    return (self_.definitions, self_.diagnostics);
+    (self_.definitions, self_.diagnostics)
   }
 
   pub fn process_queue(&mut self) {
-    loop {
-      match self.queue.remove() {
-        Ok(qfn) => self.compile_functionish(qfn.definition_pointer, &qfn.functionish),
-        Err(_) => {
-          break;
-        }
-      }
+    while let Ok(qfn) = self.queue.remove() {
+      self.compile_functionish(qfn.definition_pointer, &qfn.functionish);
     }
   }
 
@@ -319,10 +312,8 @@ impl FunctionCompiler {
 
     let param_registers = self.get_param_registers(functionish);
 
-    for reg in &param_registers {
-      if let Some(reg) = reg {
-        self.current.parameters.push(reg.clone());
-      }
+    for reg in param_registers.iter().flatten() {
+      self.current.parameters.push(reg.clone());
     }
 
     self.add_param_code(functionish, &param_registers);
@@ -423,7 +414,7 @@ impl FunctionCompiler {
       }
     };
 
-    return param_registers;
+    param_registers
   }
 
   pub fn get_pattern_register_opt(&mut self, param_pat: &swc_ecma_ast::Pat) -> Option<Register> {
@@ -435,11 +426,11 @@ impl FunctionCompiler {
         _ => self.get_variable_register(&ident.id),
       },
       Pat::Assign(assign) => return self.get_pattern_register_opt(&assign.left),
-      Pat::Array(_) => self.allocate_numbered_reg(&"_array_pat".to_string()),
-      Pat::Object(_) => self.allocate_numbered_reg(&"_object_pat".to_string()),
-      Pat::Invalid(_) => self.allocate_numbered_reg(&"_invalid_pat".to_string()),
-      Pat::Rest(_) => self.allocate_numbered_reg(&"_rest_pat".to_string()),
-      Pat::Expr(_) => self.allocate_numbered_reg(&"_expr_pat".to_string()),
+      Pat::Array(_) => self.allocate_numbered_reg("_array_pat"),
+      Pat::Object(_) => self.allocate_numbered_reg("_object_pat"),
+      Pat::Invalid(_) => self.allocate_numbered_reg("_invalid_pat"),
+      Pat::Rest(_) => self.allocate_numbered_reg("_rest_pat"),
+      Pat::Expr(_) => self.allocate_numbered_reg("_expr_pat"),
     })
   }
 
@@ -448,7 +439,7 @@ impl FunctionCompiler {
       Some(r) => r,
       None => {
         self.error(param_pat.span(), "Invalid pattern");
-        self.allocate_reg(&"_invalid_pattern".to_string())
+        self.allocate_reg("_invalid_pattern")
       }
     }
   }
@@ -461,18 +452,17 @@ impl FunctionCompiler {
           level: DiagnosticLevel::InternalError,
           message: format!(
             "Register should have been allocated for variable {}, instead: {:?}",
-            ident.sym.to_string(),
-            lookup_result,
+            ident.sym, lookup_result,
           ),
           span: ident.span(),
         });
 
-        self.allocate_numbered_reg(&"_error_variable_without_register".to_string())
+        self.allocate_numbered_reg("_error_variable_without_register")
       }
     }
   }
 
-  fn add_param_code(&mut self, functionish: &Functionish, param_registers: &Vec<Option<Register>>) {
+  fn add_param_code(&mut self, functionish: &Functionish, param_registers: &[Option<Register>]) {
     match functionish {
       Functionish::Fn(_, fn_) => {
         for (i, p) in fn_.params.iter().enumerate() {
@@ -500,7 +490,7 @@ impl FunctionCompiler {
                 let field_name = match &tpp.param {
                   swc_ecma_ast::TsParamPropParam::Ident(bi) => bi.id.sym.to_string(),
                   swc_ecma_ast::TsParamPropParam::Assign(assign) => {
-                    ec.assign_pat(&assign, reg);
+                    ec.assign_pat(assign, reg);
 
                     match &*assign.left {
                       swc_ecma_ast::Pat::Ident(bi) => bi.id.sym.to_string(),
@@ -558,15 +548,15 @@ impl FunctionCompiler {
         if !fn_last {
           if let Some(finally_label) = self.finally_labels.last().cloned() {
             let is_returning = match self.is_returning_register.clone() {
-              Some(is_returning) => is_returning.clone(),
+              Some(is_returning) => is_returning,
               None => {
-                let is_returning = self.allocate_reg_fresh(&"_is_returning".to_string());
+                let is_returning = self.allocate_reg_fresh("_is_returning");
                 self.is_returning_register = Some(is_returning.clone());
                 is_returning
               }
             };
 
-            self.push(Instruction::Mov(Value::Bool(true), is_returning.clone()));
+            self.push(Instruction::Mov(Value::Bool(true), is_returning));
             self.push(Instruction::Jmp(finally_label.ref_()));
           } else {
             self.insert_all_releases();
@@ -674,10 +664,10 @@ impl FunctionCompiler {
     let mut ec = ExpressionCompiler { fnc: self };
 
     let cond_reg = ec.fnc.allocate_numbered_reg("_cond");
-    ec.compile_into(&*if_.test, cond_reg.clone());
+    ec.compile_into(&if_.test, cond_reg.clone());
 
     let else_label = Label {
-      name: self.label_allocator.allocate_numbered(&"else".to_string()),
+      name: self.label_allocator.allocate_numbered("else"),
     };
 
     self.push(Instruction::JmpIfNot(
@@ -687,7 +677,7 @@ impl FunctionCompiler {
 
     self.release_reg(&cond_reg);
 
-    self.statement(&*if_.cons, false);
+    self.statement(&if_.cons, false);
 
     match &if_.alt {
       None => {
@@ -695,15 +685,13 @@ impl FunctionCompiler {
       }
       Some(alt) => {
         let after_else_label = Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"after_else".to_string()),
+          name: self.label_allocator.allocate_numbered("after_else"),
         };
 
         self.push(Instruction::Jmp(after_else_label.ref_()));
 
         self.label(else_label);
-        self.statement(&*alt, false);
+        self.statement(alt, false);
         self.label(after_else_label);
       }
     }
@@ -716,10 +704,7 @@ impl FunctionCompiler {
     ec.compile_into(&switch.discriminant, sw_expr_reg.clone());
 
     let end_label = Label {
-      name: ec
-        .fnc
-        .label_allocator
-        .allocate_numbered(&"sw_end".to_string()),
+      name: ec.fnc.label_allocator.allocate_numbered("sw_end"),
     };
 
     ec.fnc.loop_labels.push(LoopLabels {
@@ -794,12 +779,10 @@ impl FunctionCompiler {
     let (catch_label, after_catch_label) = match try_.handler {
       Some(_) => (
         Some(Label {
-          name: self.label_allocator.allocate_numbered(&"catch".to_string()),
+          name: self.label_allocator.allocate_numbered("catch"),
         }),
         Some(Label {
-          name: self
-            .label_allocator
-            .allocate_numbered(&"after_catch".to_string()),
+          name: self.label_allocator.allocate_numbered("after_catch"),
         }),
       ),
       None => (None, None),
@@ -807,9 +790,7 @@ impl FunctionCompiler {
 
     let finally_label = match &try_.finalizer {
       Some(_) => Some(Label {
-        name: self
-          .label_allocator
-          .allocate_numbered(&"finally".to_string()),
+        name: self.label_allocator.allocate_numbered("finally"),
       }),
       None => None,
     };
@@ -892,7 +873,7 @@ impl FunctionCompiler {
       if let Some(param) = &catch_clause.param {
         let mut ec = ExpressionCompiler { fnc: self };
 
-        let pattern_reg = ec.fnc.get_pattern_register(&param);
+        let pattern_reg = ec.fnc.get_pattern_register(param);
 
         // TODO: Set up this register through set_catch instead of copying into it
         ec.fnc.push(Instruction::Mov(
@@ -900,12 +881,12 @@ impl FunctionCompiler {
           pattern_reg.clone(),
         ));
 
-        ec.pat(&param, &pattern_reg, false);
+        ec.pat(param, &pattern_reg, false);
       }
 
       self.block_statement(&catch_clause.body);
 
-      if let Some(_) = finally_label {
+      if finally_label.is_some() {
         self.pop_catch_setting();
       }
 
@@ -935,7 +916,7 @@ impl FunctionCompiler {
         None => None,
       };
 
-      self.block_statement(&finally_clause);
+      self.block_statement(finally_clause);
 
       self.push(Instruction::Throw(Value::Register(
         finally_error_reg.unwrap(),
@@ -956,7 +937,7 @@ impl FunctionCompiler {
           };
 
           self.push(Instruction::JmpIf(
-            Value::Register(local_is_returning.clone()),
+            Value::Register(local_is_returning),
             end_label.ref_(),
           ));
         } else {
@@ -967,13 +948,11 @@ impl FunctionCompiler {
           ));
 
           let after_finally_label = Label {
-            name: self
-              .label_allocator
-              .allocate_numbered(&"after_finally".to_string()),
+            name: self.label_allocator.allocate_numbered("after_finally"),
           };
 
           self.push(Instruction::JmpIf(
-            Value::Register(local_is_returning.clone()),
+            Value::Register(local_is_returning),
             after_finally_label.ref_(),
           ));
 
@@ -1006,15 +985,13 @@ impl FunctionCompiler {
     self.apply_catch_setting();
   }
 
-  fn while_(self: &mut Self, while_: &swc_ecma_ast::WhileStmt) {
+  fn while_(&mut self, while_: &swc_ecma_ast::WhileStmt) {
     let start_label = Label {
-      name: self.label_allocator.allocate_numbered(&"while".to_string()),
+      name: self.label_allocator.allocate_numbered("while"),
     };
 
     let end_label = Label {
-      name: self
-        .label_allocator
-        .allocate_numbered(&"while_end".to_string()),
+      name: self.label_allocator.allocate_numbered("while_end"),
     };
 
     self.loop_labels.push(LoopLabels {
@@ -1026,8 +1003,8 @@ impl FunctionCompiler {
 
     let mut ec = ExpressionCompiler { fnc: self };
 
-    let cond_reg = ec.fnc.allocate_numbered_reg(&"_cond".to_string());
-    ec.compile_into(&*while_.test, cond_reg.clone());
+    let cond_reg = ec.fnc.allocate_numbered_reg("_cond");
+    ec.compile_into(&while_.test, cond_reg.clone());
 
     self.push(Instruction::JmpIfNot(
       Value::Register(cond_reg.clone()),
@@ -1035,30 +1012,24 @@ impl FunctionCompiler {
     ));
 
     self.release_reg(&cond_reg);
-    self.statement(&*while_.body, false);
+    self.statement(&while_.body, false);
     self.push(Instruction::Jmp(start_label.ref_()));
     self.label(end_label);
 
     self.loop_labels.pop();
   }
 
-  fn do_while(self: &mut Self, do_while: &swc_ecma_ast::DoWhileStmt) {
+  fn do_while(&mut self, do_while: &swc_ecma_ast::DoWhileStmt) {
     let start_label = Label {
-      name: self
-        .label_allocator
-        .allocate_numbered(&"do_while".to_string()),
+      name: self.label_allocator.allocate_numbered("do_while"),
     };
 
     let continue_label = Label {
-      name: self
-        .label_allocator
-        .allocate_numbered(&"do_while_continue".to_string()),
+      name: self.label_allocator.allocate_numbered("do_while_continue"),
     };
 
     let end_label = Label {
-      name: self
-        .label_allocator
-        .allocate_numbered(&"do_while_end".to_string()),
+      name: self.label_allocator.allocate_numbered("do_while_end"),
     };
 
     self.loop_labels.push(LoopLabels {
@@ -1068,11 +1039,11 @@ impl FunctionCompiler {
 
     self.label(start_label.clone());
 
-    self.statement(&*do_while.body, false);
+    self.statement(&do_while.body, false);
 
     let mut expression_compiler = ExpressionCompiler { fnc: self };
 
-    let condition = expression_compiler.compile(&*do_while.test, None);
+    let condition = expression_compiler.compile(&do_while.test, None);
 
     self.label(continue_label);
 
@@ -1102,21 +1073,15 @@ impl FunctionCompiler {
     }
 
     let for_test_label = Label {
-      name: self
-        .label_allocator
-        .allocate_numbered(&"for_test".to_string()),
+      name: self.label_allocator.allocate_numbered("for_test"),
     };
 
     let for_continue_label = Label {
-      name: self
-        .label_allocator
-        .allocate_numbered(&"for_continue".to_string()),
+      name: self.label_allocator.allocate_numbered("for_continue"),
     };
 
     let for_end_label = Label {
-      name: self
-        .label_allocator
-        .allocate_numbered(&"for_end".to_string()),
+      name: self.label_allocator.allocate_numbered("for_end"),
     };
 
     self.label(for_test_label.clone());
@@ -1175,9 +1140,9 @@ impl FunctionCompiler {
 
     let value_reg = ec.fnc.get_pattern_register(pat);
 
-    let iter_reg = ec.fnc.allocate_numbered_reg(&"_iter".to_string());
-    let iter_res_reg = ec.fnc.allocate_numbered_reg(&"_iter_res".to_string());
-    let done_reg = ec.fnc.allocate_numbered_reg(&"_done".to_string());
+    let iter_reg = ec.fnc.allocate_numbered_reg("_iter");
+    let iter_res_reg = ec.fnc.allocate_numbered_reg("_iter_res");
+    let done_reg = ec.fnc.allocate_numbered_reg("_done");
 
     ec.compile_into(&for_of.right, iter_reg.clone());
 
@@ -1186,29 +1151,20 @@ impl FunctionCompiler {
       Value::Builtin(Builtin {
         name: "SymbolIterator".to_string(),
       }),
-      Value::Array(Box::new(Array::default())),
+      Value::Array(Box::default()),
       iter_reg.clone(),
     ));
 
     let for_test_label = Label {
-      name: ec
-        .fnc
-        .label_allocator
-        .allocate_numbered(&"for_test".to_string()),
+      name: ec.fnc.label_allocator.allocate_numbered("for_test"),
     };
 
     let for_continue_label = Label {
-      name: ec
-        .fnc
-        .label_allocator
-        .allocate_numbered(&"for_continue".to_string()),
+      name: ec.fnc.label_allocator.allocate_numbered("for_continue"),
     };
 
     let for_end_label = Label {
-      name: ec
-        .fnc
-        .label_allocator
-        .allocate_numbered(&"for_end".to_string()),
+      name: ec.fnc.label_allocator.allocate_numbered("for_end"),
     };
 
     ec.fnc.push(Instruction::Jmp(for_continue_label.ref_()));

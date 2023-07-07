@@ -48,7 +48,7 @@ static TO_FIXED: NativeFunction = native_fn(|this, params| {
 
       format!("{:.*}", precision as usize, number).to_val()
     }
-    _ => return Err(format!("TODO: number indirection").to_val()),
+    _ => return Err("TODO: number indirection".to_internal_error()),
   })
 });
 
@@ -72,8 +72,8 @@ static TO_EXPONENTIAL: NativeFunction = native_fn(|this, params| {
 });
 
 static TODO_LOCALE: NativeFunction = native_fn(|this, _params| match this.get() {
-  Val::Number(_number) => return Err("TODO: locale".to_internal_error()),
-  _ => return Err("number indirection".to_internal_error()),
+  Val::Number(_number) => Err("TODO: locale".to_internal_error()),
+  _ => Err("number indirection".to_internal_error()),
 });
 
 static TO_STRING: NativeFunction = native_fn(|this, params| {

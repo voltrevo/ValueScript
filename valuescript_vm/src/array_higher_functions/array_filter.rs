@@ -5,6 +5,7 @@ use super::super::vs_value::{Val, ValTrait};
 use super::array_mapping_frame::{ArrayMappingFrame, ArrayMappingState};
 
 pub static FILTER: NativeFrameFunction = NativeFrameFunction {
+  #[allow(clippy::box_default)]
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(FilterState::default()))),
 };
 
@@ -19,7 +20,7 @@ impl ArrayMappingState for FilterState {
       self.filter_results.push(element.clone());
     }
 
-    return None;
+    None
   }
 
   fn finish(&mut self) -> Val {

@@ -38,10 +38,8 @@ impl BytecodeStackFrame {
   pub fn apply_unary_op(&mut self, op: fn(input: &Val) -> Val) {
     let input = self.decoder.decode_val(&mut self.registers);
 
-    let register_index = self.decoder.decode_register_index();
-
-    if register_index.is_some() {
-      self.registers[register_index.unwrap()] = op(&input);
+    if let Some(register_index) = self.decoder.decode_register_index() {
+      self.registers[register_index] = op(&input);
     }
   }
 
@@ -142,10 +140,9 @@ impl StackFrameTrait for BytecodeStackFrame {
 
       Mov => {
         let val = self.decoder.decode_val(&mut self.registers);
-        let register_index = self.decoder.decode_register_index();
 
-        if register_index.is_some() {
-          self.registers[register_index.unwrap()] = val;
+        if let Some(register_index) = self.decoder.decode_register_index() {
+          self.registers[register_index] = val;
         }
       }
 
@@ -235,11 +232,8 @@ impl StackFrameTrait for BytecodeStackFrame {
               self.decode_parameters(),
             )?;
 
-            match self.decoder.decode_register_index() {
-              Some(return_target) => {
-                self.registers[return_target] = res;
-              }
-              None => {}
+            if let Some(return_target) = self.decoder.decode_register_index() {
+              self.registers[return_target] = res;
             };
           }
         };
@@ -277,24 +271,24 @@ impl StackFrameTrait for BytecodeStackFrame {
         let params = self.decoder.decode_val(&mut self.registers);
         let register_index = self.decoder.decode_register_index();
 
-        let params_array = params.as_array_data();
+        let params_array = match params.as_array_data() {
+          Some(params_array) => params_array,
 
-        if params_array.is_none() {
           // Not sure this needs to be an exception in future since compiled
           // code should never violate this
-          return Err("bind params should always be array".to_internal_error());
-        }
+          None => return Err("bind params should always be array".to_internal_error()),
+        };
 
-        let bound_fn = fn_val.bind((*params_array.unwrap()).elements.clone());
+        let bound_fn = match fn_val.bind(params_array.elements.clone()) {
+          Some(bound_fn) => bound_fn,
 
-        if bound_fn.is_none() {
           // Not sure this needs to be an exception in future since compiled
           // code should never violate this
-          return Err("fn parameter of bind should always be bindable".to_internal_error());
-        }
+          None => return Err("fn parameter of bind should always be bindable".to_internal_error()),
+        };
 
-        if register_index.is_some() {
-          self.registers[register_index.unwrap()] = bound_fn.unwrap();
+        if let Some(register_index) = register_index {
+          self.registers[register_index] = bound_fn;
         }
       }
 
@@ -348,11 +342,8 @@ impl StackFrameTrait for BytecodeStackFrame {
 
             let res = native_fn(ThisWrapper::new(true, &mut obj), params)?;
 
-            match self.decoder.decode_register_index() {
-              Some(return_target) => {
-                self.registers[return_target] = res;
-              }
-              None => {}
+            if let Some(return_target) = self.decoder.decode_register_index() {
+              self.registers[return_target] = res;
             };
           }
         };
@@ -388,11 +379,8 @@ impl StackFrameTrait for BytecodeStackFrame {
               params,
             )?;
 
-            match self.decoder.decode_register_index() {
-              Some(return_target) => {
-                self.registers[return_target] = res;
-              }
-              None => {}
+            if let Some(return_target) = self.decoder.decode_register_index() {
+              self.registers[return_target] = res;
             };
           }
         };
@@ -471,11 +459,8 @@ impl StackFrameTrait for BytecodeStackFrame {
                 self.decode_parameters(),
               )?;
 
-              match self.decoder.decode_register_index() {
-                Some(target) => {
-                  self.registers[target] = instance;
-                }
-                None => {}
+              if let Some(target) = self.decoder.decode_register_index() {
+                self.registers[target] = instance;
               };
             }
           },

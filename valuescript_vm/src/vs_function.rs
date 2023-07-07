@@ -27,14 +27,14 @@ impl VsFunction {
       new_binds.push(p);
     }
 
-    return VsFunction {
+    VsFunction {
       bytecode: self.bytecode.clone(),
       is_generator: self.is_generator,
       register_count: self.register_count,
       parameter_count: self.parameter_count,
       start: self.start,
       binds: new_binds,
-    };
+    }
   }
 
   pub fn make_bytecode_frame(&self) -> BytecodeStackFrame {
@@ -51,7 +51,7 @@ impl VsFunction {
       registers.push(Val::Void);
     }
 
-    return BytecodeStackFrame {
+    BytecodeStackFrame {
       decoder: BytecodeDecoder {
         bytecode: self.bytecode.clone(),
         pos: self.start,
@@ -63,7 +63,7 @@ impl VsFunction {
       this_target: None,
       return_target: None,
       catch_setting: None,
-    };
+    }
   }
 
   pub fn make_frame(&self) -> StackFrame {

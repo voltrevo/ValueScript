@@ -30,8 +30,7 @@ mod tests {
 
     let mut failed_paths = HashSet::<PathBuf>::new();
 
-    let mut files =
-      get_files_recursively(&input_dir_path.to_path_buf()).expect("Failed to get files");
+    let mut files = get_files_recursively(&input_dir_path).expect("Failed to get files");
 
     files.sort();
 
@@ -113,7 +112,7 @@ mod tests {
             failed_paths.insert(rel_file_path.clone());
           }
 
-          let mut vm = VirtualMachine::new();
+          let mut vm = VirtualMachine::default();
 
           let result = vm.run(bytecode, Some(2_000_000), &[]);
 

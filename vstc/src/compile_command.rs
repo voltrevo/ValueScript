@@ -24,10 +24,10 @@ pub fn compile_command(args: &Vec<String>) {
     let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
 
     file
-      .write(module.to_string().as_bytes())
+      .write_all(module.to_string().as_bytes())
       .expect("Failed to write out.vsm");
 
-    file.write(b"\n").expect("Failed to write out.vsm");
+    file.write_all(b"\n").expect("Failed to write out.vsm");
   }
 
   for (path, diagnostics) in compile_result.diagnostics.iter() {

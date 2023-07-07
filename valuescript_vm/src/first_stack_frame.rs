@@ -10,12 +10,12 @@ pub struct FirstStackFrame {
 
 impl FirstStackFrame {
   pub fn new() -> FirstStackFrame {
-    return FirstStackFrame {
+    FirstStackFrame {
       call_result: CallResult {
         return_: Val::Void,
         this: Val::Void,
       },
-    };
+    }
   }
 }
 
@@ -37,7 +37,8 @@ impl StackFrameTrait for FirstStackFrame {
   }
 
   fn get_call_result(&mut self) -> CallResult {
-    return self.call_result.clone();
+    // TODO: get_call_result(self) version? (Move memory variation)
+    self.call_result.clone()
   }
 
   fn catch_exception(&mut self, _exception: &mut Val) {

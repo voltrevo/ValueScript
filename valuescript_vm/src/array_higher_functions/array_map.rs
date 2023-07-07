@@ -5,6 +5,7 @@ use super::super::vs_value::Val;
 use super::array_mapping_frame::{ArrayMappingFrame, ArrayMappingState};
 
 pub static MAP: NativeFrameFunction = NativeFrameFunction {
+  #[allow(clippy::box_default)]
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(MapState::default()))),
 };
 
@@ -16,7 +17,7 @@ struct MapState {
 impl ArrayMappingState for MapState {
   fn process(&mut self, _i: usize, _element: &Val, mapped: Val) -> Option<Val> {
     self.map_results.push(mapped);
-    return None;
+    None
   }
 
   fn finish(&mut self) -> Val {

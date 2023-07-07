@@ -21,8 +21,7 @@ fn main() {
 
   let mut failed_paths = HashSet::<PathBuf>::new();
 
-  let mut files =
-    get_files_recursively(&input_dir_path.to_path_buf()).expect("Failed to get files");
+  let mut files = get_files_recursively(&input_dir_path).expect("Failed to get files");
 
   files.sort();
 
@@ -52,7 +51,7 @@ fn main() {
     });
 
     for (path, diagnostics) in compile_result.diagnostics.iter() {
-      if diagnostics.len() > 0 {
+      if !diagnostics.is_empty() {
         dbg!(&path.path, diagnostics);
       }
 
@@ -80,7 +79,7 @@ fn main() {
 
     let bytecode = Rc::new(Bytecode::new(assemble(&module)));
 
-    let mut vm = VirtualMachine::new();
+    let mut vm = VirtualMachine::default();
 
     let mut file_results = Vec::<f64>::new();
 
@@ -96,7 +95,7 @@ fn main() {
       file_results.push(duration_ms as f64);
 
       if let Err(result) = result {
-        assert!(false, "{} failed: {}", friendly_file_path, result.codify());
+        panic!("{} failed: {}", friendly_file_path, result.codify());
       }
     }
 
@@ -117,7 +116,7 @@ fn main() {
   println!("{:<37} {:>6.1}ms", "Score", score);
 
   if !failed_paths.is_empty() {
-    assert!(false, "See failures above");
+    panic!("See failures above");
   }
 }
 
@@ -151,9 +150,7 @@ pub fn resolve_entry_path(entry_path: &String) -> ResolvedPath {
       .to_string(),
   };
 
-  let resolved_entry_path = resolve_path(&cwd_file, entry_path);
-
-  resolved_entry_path
+  resolve_path(&cwd_file, entry_path)
 }
 
 fn geometric_mean(vals: &[f64]) -> f64 {

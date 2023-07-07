@@ -9,7 +9,8 @@ use crate::{
 };
 
 use super::{
-  builtin_object::BuiltinObject, range_error_builtin::ToRangeError, type_error_builtin::ToTypeError,
+  builtin_object::BuiltinObject, internal_error_builtin::ToInternalError,
+  range_error_builtin::ToRangeError, type_error_builtin::ToTypeError,
 };
 
 pub struct ArrayBuiltin {}
@@ -24,7 +25,7 @@ impl BuiltinObject for ArrayBuiltin {
       "isArray" => IS_ARRAY.to_val(),
       "from" => FROM.to_val(),
       "of" => OF.to_val(),
-      _ => return Val::Undefined,
+      _ => Val::Undefined,
     }
   }
 
@@ -60,7 +61,7 @@ static FROM: NativeFunction = native_fn(|_this, params| {
   };
 
   if params.len() > 1 {
-    return Err(format!("TODO: Using Array.from with a map function").to_val());
+    return Err("TODO: Using Array.from with a map function".to_internal_error());
   }
 
   Ok(match first_param {
@@ -69,7 +70,9 @@ static FROM: NativeFunction = native_fn(|_this, params| {
     Val::Void | Val::Undefined | Val::Null | Val::CopyCounter(..) => {
       return Err("items is not iterable".to_type_error())
     }
-    Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => VsArray::new().to_val(),
+    Val::Bool(..) | Val::Number(..) | Val::BigInt(..) | Val::Symbol(..) => {
+      VsArray::default().to_val()
+    }
     Val::Object(..) | Val::Function(..) | Val::Class(..) | Val::Static(..) | Val::Dynamic(..) => {
       let len = first_param
         .sub(&"length".to_val())
@@ -78,7 +81,7 @@ static FROM: NativeFunction = native_fn(|_this, params| {
         .to_number();
 
       if len.is_sign_negative() || len.is_nan() {
-        return Ok(VsArray::new().to_val());
+        return Ok(VsArray::default().to_val());
       }
 
       if len.is_infinite() {

@@ -69,7 +69,7 @@ pub struct Object {
 impl Kal {
   fn visit_kals_mut<F>(&mut self, visit: &mut F)
   where
-    F: FnMut(&mut Kal) -> (),
+    F: FnMut(&mut Kal),
   {
     visit(self);
 
@@ -302,17 +302,14 @@ impl FnState {
     let mut new_reg: Option<String> = None;
 
     for kal in self.registers.values_mut() {
-      match kal {
-        Kal::Register(reg) => {
-          if &reg.name == changed_reg {
-            // When it's just a register, avoid using new_reg. This would just create spurious
-            // renames. The real point of new_reg is to improve the *inner* knowledge of registers
-            // that contain the changed_reg.
-            *kal = Kal::Unknown;
-            continue;
-          }
+      if let Kal::Register(reg) = kal {
+        if &reg.name == changed_reg {
+          // When it's just a register, avoid using new_reg. This would just create spurious
+          // renames. The real point of new_reg is to improve the *inner* knowledge of registers
+          // that contain the changed_reg.
+          *kal = Kal::Unknown;
+          continue;
         }
-        _ => {}
       };
 
       kal.visit_kals_mut(&mut |sub_kal| {
@@ -573,10 +570,11 @@ impl FnState {
       | OpRightShiftUnsigned(_, _, dst)
       | InstanceOf(_, _, dst)
       | In(_, _, dst)
-      | Sub(_, _, dst) => match self.get(dst.name.clone()).try_to_value() {
-        Some(value) => *instr = Instruction::Mov(value, dst.clone()),
-        None => {}
-      },
+      | Sub(_, _, dst) => {
+        if let Some(value) = self.get(dst.name.clone()).try_to_value() {
+          *instr = Instruction::Mov(value, dst.clone())
+        }
+      }
 
       End
       | Mov(_, _)

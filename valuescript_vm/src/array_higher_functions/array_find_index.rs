@@ -3,6 +3,7 @@ use super::super::vs_value::{Val, ValTrait};
 use super::array_mapping_frame::{ArrayMappingFrame, ArrayMappingState};
 
 pub static FIND_INDEX: NativeFrameFunction = NativeFrameFunction {
+  #[allow(clippy::box_default)]
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(FindIndexState::default()))),
 };
 

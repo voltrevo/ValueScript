@@ -5,6 +5,7 @@ use super::super::vs_value::{Val, ValTrait};
 use super::array_mapping_frame::{ArrayMappingFrame, ArrayMappingState};
 
 pub static FLAT_MAP: NativeFrameFunction = NativeFrameFunction {
+  #[allow(clippy::box_default)]
   make_frame: || Box::new(ArrayMappingFrame::new(Box::new(FlatMapState::default()))),
 };
 
@@ -24,7 +25,7 @@ impl ArrayMappingState for FlatMapState {
       }
     }
 
-    return None;
+    None
   }
 
   fn finish(&mut self) -> Val {

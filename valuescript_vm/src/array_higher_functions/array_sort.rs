@@ -84,7 +84,7 @@ impl SortTreeNode {
 
     let mid = vals.start + (vals.end - vals.start) / 2;
 
-    return SortTreeNode {
+    SortTreeNode {
       data: SortTreeNodeData::Branch(
         Box::new(SortTreeNode::new(VecSlice {
           vec: vals.vec,
@@ -97,33 +97,27 @@ impl SortTreeNode {
           end: vals.end,
         })),
       ),
-    };
+    }
   }
 
   fn get_compare_elements(&self) -> Option<(Val, Val)> {
     match &self.data {
-      SortTreeNodeData::Branch(left, right) => {
-        return left
-          .get_compare_elements()
-          .or_else(|| right.get_compare_elements());
-      }
+      SortTreeNodeData::Branch(left, right) => left
+        .get_compare_elements()
+        .or_else(|| right.get_compare_elements()),
       SortTreeNodeData::Sorting(_vals, left, right) => {
         let lval_opt = left.vec.get(left.pos);
         let rval_opt = right.vec.get(right.pos);
 
         match (lval_opt, rval_opt) {
-          (Some(lval), Some(rval)) => {
-            return Some((lval.clone(), rval.clone()));
-          }
+          (Some(lval), Some(rval)) => Some((lval.clone(), rval.clone())),
           _ => {
             panic!("Failed to get compare elements from sorting state");
           }
         }
       }
-      SortTreeNodeData::Sorted(_) => {
-        return None;
-      }
-    };
+      SortTreeNodeData::Sorted(_) => None,
+    }
   }
 
   fn apply_outcome(&mut self, should_swap: bool) {
@@ -136,26 +130,23 @@ impl SortTreeNode {
           SortTreeNodeData::Sorted(left_vals) => {
             right.apply_outcome(should_swap);
 
-            match &mut right.data {
-              SortTreeNodeData::Sorted(right_vals) => {
-                let mut owned_left_vals = vec![];
-                std::mem::swap(&mut owned_left_vals, left_vals);
-                let mut owned_right_vals = vec![];
-                std::mem::swap(&mut owned_right_vals, right_vals);
+            if let SortTreeNodeData::Sorted(right_vals) = &mut right.data {
+              let mut owned_left_vals = vec![];
+              std::mem::swap(&mut owned_left_vals, left_vals);
+              let mut owned_right_vals = vec![];
+              std::mem::swap(&mut owned_right_vals, right_vals);
 
-                self.data = SortTreeNodeData::Sorting(
-                  vec![],
-                  VecPos {
-                    vec: owned_left_vals,
-                    pos: 0,
-                  },
-                  VecPos {
-                    vec: owned_right_vals,
-                    pos: 0,
-                  },
-                );
-              }
-              _ => {}
+              self.data = SortTreeNodeData::Sorting(
+                vec![],
+                VecPos {
+                  vec: owned_left_vals,
+                  pos: 0,
+                },
+                VecPos {
+                  vec: owned_right_vals,
+                  pos: 0,
+                },
+              );
             };
           }
         };
@@ -220,12 +211,9 @@ impl StackFrameTrait for SortFrame {
   }
 
   fn write_param(&mut self, param: Val) {
-    match self.param_i {
-      0 => {
-        self.comparator = param;
-      }
-      _ => {}
-    };
+    if self.param_i == 0 {
+      self.comparator = param;
+    }
 
     self.param_i += 1;
   }
@@ -241,9 +229,7 @@ impl StackFrameTrait for SortFrame {
         Val::Void => {
           let array_data_mut = Rc::make_mut(array_data);
 
-          array_data_mut
-            .elements
-            .sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+          array_data_mut.elements.sort_by_key(|a| a.to_string());
 
           return Ok(FrameStepOk::Pop(CallResult {
             return_: Val::Array(array_data.clone()),

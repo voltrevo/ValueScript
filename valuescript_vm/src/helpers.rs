@@ -12,7 +12,7 @@ pub fn to_wrapping_index(index: Option<&Val>, len: usize) -> Option<usize> {
     return None;
   }
 
-  return Some(unchecked as usize);
+  Some(unchecked as usize)
 }
 
 pub fn to_wrapping_index_clamped(index: &Val, len: usize) -> isize {
@@ -28,7 +28,7 @@ pub fn to_wrapping_index_clamped(index: &Val, len: usize) -> isize {
     return len as isize;
   }
 
-  return wrapping_index;
+  wrapping_index
 }
 
 pub fn to_unchecked_wrapping_index(index: &Val, len: usize) -> isize {
@@ -43,5 +43,5 @@ pub fn to_unchecked_wrapping_index(index: &Val, len: usize) -> isize {
 
   // TODO: Investigate potential pitfalls for arrays with length exceeding max
   // isize.
-  return floored_index as isize;
+  floored_index as isize
 }

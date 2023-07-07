@@ -82,8 +82,8 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) ->
 
   let diagnostic_len = compile_result
     .diagnostics
-    .iter()
-    .map(|(_, v)| v.len())
+    .values()
+    .map(|v| v.len())
     .sum::<usize>();
 
   if diagnostic_len > 0 {
@@ -109,17 +109,16 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) ->
 
   let bytecode = Rc::new(Bytecode::new(assemble(&module)));
 
-  match VirtualMachine::read_default_export(bytecode.clone()).load_function() {
-    LoadFunctionResult::NotAFunction => {
-      return RunResult {
-        diagnostics: HashMap::default(),
-        output: Ok("(Default export is not a function)".into()),
-      }
-    }
-    _ => {}
+  if let LoadFunctionResult::NotAFunction =
+    VirtualMachine::read_default_export(bytecode.clone()).load_function()
+  {
+    return RunResult {
+      diagnostics: HashMap::default(),
+      output: Ok("(Default export is not a function)".into()),
+    };
   };
 
-  let mut vm = VirtualMachine::new();
+  let mut vm = VirtualMachine::default();
 
   let val_args: Vec<Val> = match parse_args(args) {
     Ok(args) => args,

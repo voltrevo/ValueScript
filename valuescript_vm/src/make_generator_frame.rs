@@ -14,7 +14,7 @@ pub struct MakeGeneratorFrame {
 
 impl MakeGeneratorFrame {
   pub fn new(frame: BytecodeStackFrame) -> MakeGeneratorFrame {
-    return MakeGeneratorFrame { frame: Some(frame) };
+    MakeGeneratorFrame { frame: Some(frame) }
   }
 
   fn frame_mut(&mut self) -> &mut BytecodeStackFrame {

@@ -395,7 +395,7 @@ impl Assembler {
     self.output.push(ValueType::Builtin as u8);
 
     let builtin_name = BuiltinName::from_str(&builtin.name)
-      .expect(format!("Unknown builtin: {}", builtin.name).as_str());
+      .unwrap_or_else(|_| panic!("Unknown builtin: {}", builtin.name));
 
     self.varsize_uint(builtin_name.to_code());
   }
@@ -476,7 +476,7 @@ impl LocationMap {
     output.push(0xff); // TODO: Support >65535
   }
 
-  fn resolve(&self, output: &mut Vec<u8>) {
+  fn resolve(&self, output: &mut [u8]) {
     for (name, ref_locations) in &self.references {
       let location_optional = self.found_locations.get(name);
 

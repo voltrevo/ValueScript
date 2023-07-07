@@ -38,7 +38,7 @@ pub fn run_command(args: &Vec<String>) {
 
   let bytecode = Rc::new(to_bytecode(format, file_path));
 
-  let mut vm = VirtualMachine::new();
+  let mut vm = VirtualMachine::default();
 
   let val_args: Vec<Val> = args[argpos..]
     .iter()

@@ -41,8 +41,8 @@ pub fn shake_tree(module: &mut Module) {
     include_pointer(
       &p,
       &mut ordered_pointers,
-      &mut dependency_graph,
-      &mut reverse_dependency_graph,
+      &dependency_graph,
+      &reverse_dependency_graph,
       &mut pointers_in_progress,
       &required_pointers,
     );
@@ -77,7 +77,7 @@ pub fn shake_tree(module: &mut Module) {
     if required_pointers.contains(&pointer) {
       let defn = new_definitions_map.get_mut(&pointer).unwrap();
 
-      if defn.pointer.name == "" {
+      if defn.pointer.name.is_empty() {
         // "" isn't a valid pointer name - this happens when `take` has already been used on the
         // definition
         continue;

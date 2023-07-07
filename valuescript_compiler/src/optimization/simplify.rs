@@ -25,7 +25,7 @@ pub fn simplify(module: &mut Module, take_registers: bool) {
   }
 }
 
-fn handle_mutation_releases(body: &mut Vec<FnLine>, i: usize, take_registers: bool) {
+fn handle_mutation_releases(body: &mut [FnLine], i: usize, take_registers: bool) {
   let mut calls = Vec::<(Register, usize)>::new();
 
   match &mut body[i] {
@@ -49,7 +49,7 @@ fn handle_mutation_releases(body: &mut Vec<FnLine>, i: usize, take_registers: bo
 }
 
 fn handle_release(
-  body: &mut Vec<FnLine>,
+  body: &mut [FnLine],
   i: usize,
   released_reg: Register,
   skips_needed: usize,

@@ -13,6 +13,15 @@ pub struct VirtualMachine {
   pub stack: Vec<StackFrame>,
 }
 
+impl Default for VirtualMachine {
+  fn default() -> Self {
+    VirtualMachine {
+      frame: Box::new(FirstStackFrame::new()),
+      stack: Default::default(),
+    }
+  }
+}
+
 impl VirtualMachine {
   pub fn run(
     &mut self,
@@ -43,7 +52,7 @@ impl VirtualMachine {
           self.step()?;
           step_count += 1;
 
-          if self.stack.len() == 0 {
+          if self.stack.is_empty() {
             return Ok(self.frame.get_call_result().return_);
           }
         }
@@ -51,24 +60,13 @@ impl VirtualMachine {
         Err("step limit reached".to_internal_error())
       }
       None => {
-        while self.stack.len() > 0 {
+        while !self.stack.is_empty() {
           self.step()?;
         }
 
         Ok(self.frame.get_call_result().return_)
       }
     }
-  }
-
-  pub fn new() -> VirtualMachine {
-    let mut registers: Vec<Val> = Vec::with_capacity(2);
-    registers.push(Val::Undefined);
-    registers.push(Val::Undefined);
-
-    return VirtualMachine {
-      frame: Box::new(FirstStackFrame::new()),
-      stack: Default::default(),
-    };
   }
 
   pub fn step(&mut self) -> Result<(), Val> {

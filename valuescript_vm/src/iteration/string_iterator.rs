@@ -60,7 +60,7 @@ impl StringIterator {
       value = (value << 6) | (next_byte & 0x3F) as u32;
     }
 
-    Some(std::char::from_u32(value as u32).expect("Invalid code point"))
+    Some(std::char::from_u32(value).expect("Invalid code point"))
   }
 }
 

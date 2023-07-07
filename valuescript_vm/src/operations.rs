@@ -45,7 +45,7 @@ pub fn op_plus(left: &Val, right: &Val) -> Result<Val, Val> {
     }
   }
 
-  return Ok(Val::Number(left_prim.to_number() + right_prim.to_number()));
+  Ok(Val::Number(left_prim.to_number() + right_prim.to_number()))
 }
 
 pub fn op_unary_plus(input: &Val) -> Val {
@@ -58,9 +58,7 @@ pub fn op_unary_plus(input: &Val) -> Val {
 pub fn op_minus(left: &Val, right: &Val) -> Result<Val, Val> {
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint - right_bigint)),
-    (Some(_), None) | (None, Some(_)) => {
-      return Err("Cannot mix BigInt with other types".to_type_error())
-    }
+    (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
     _ => Ok(Val::Number(left.to_number() - right.to_number())),
   }
 }
@@ -117,10 +115,7 @@ pub fn op_exp(left: &Val, right: &Val) -> Result<Val, Val> {
 
 pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
   Ok(match (left, right) {
-    (left, Val::Undefined | Val::Null) => match left {
-      Val::Undefined | Val::Null => true,
-      _ => false,
-    },
+    (left, Val::Undefined | Val::Null) => matches!(left, Val::Undefined | Val::Null),
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool == right_bool,
     (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
@@ -132,7 +127,7 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
     }
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
     (Val::Array(left_array), Val::Array(right_array)) => 'b: {
-      if &**left_array as *const _ == &**right_array as *const _ {
+      if std::ptr::eq(&**left_array, &**right_array) {
         break 'b true;
       }
 
@@ -155,7 +150,7 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
         return Err("TODO: class instance comparison".to_internal_error());
       }
 
-      if &**left_object as *const _ == &**right_object as *const _ {
+      if std::ptr::eq(&**left_object, &**right_object) {
         break 'b true;
       }
 
@@ -234,7 +229,7 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
     (Val::String(left_string), Val::String(right_string)) => left_string == right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint == right_bigint,
     (Val::Array(left_array), Val::Array(right_array)) => 'b: {
-      if &**left_array as *const _ == &**right_array as *const _ {
+      if std::ptr::eq(&**left_array, &**right_array) {
         break 'b true;
       }
 
@@ -257,7 +252,7 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
         return Err("TODO: class instance comparison".to_internal_error());
       }
 
-      if &**left_object as *const _ == &**right_object as *const _ {
+      if std::ptr::eq(&**left_object, &**right_object) {
         break 'b true;
       }
 
@@ -319,7 +314,7 @@ pub fn op_or(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_not(input: &Val) -> Val {
-  return Val::Bool(!input.is_truthy());
+  Val::Bool(!input.is_truthy())
 }
 
 pub fn op_less(left: &Val, right: &Val) -> Result<Val, Val> {
@@ -330,10 +325,7 @@ pub fn op_less(left: &Val, right: &Val) -> Result<Val, Val> {
     (Val::Number(left_number), Val::Number(right_number)) => left_number < right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string < right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint < right_bigint,
-    _ => match ecma_is_less_than(left, right) {
-      None => false,
-      Some(x) => x,
-    },
+    _ => ecma_is_less_than(left, right).unwrap_or(false),
   }))
 }
 
@@ -360,10 +352,7 @@ pub fn op_greater(left: &Val, right: &Val) -> Result<Val, Val> {
     (Val::Number(left_number), Val::Number(right_number)) => left_number > right_number,
     (Val::String(left_string), Val::String(right_string)) => left_string > right_string,
     (Val::BigInt(left_bigint), Val::BigInt(right_bigint)) => left_bigint > right_bigint,
-    _ => match ecma_is_less_than(right, left) {
-      None => false,
-      Some(x) => x,
-    },
+    _ => ecma_is_less_than(right, left).unwrap_or(false),
   }))
 }
 
@@ -389,11 +378,11 @@ pub fn op_nullish_coalesce(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_optional_chain(left: &mut Val, right: &Val) -> Result<Val, Val> {
-  return match left {
+  match left {
     Val::Undefined | Val::Null => Ok(Val::Undefined),
 
     _ => op_sub(left, right),
-  };
+  }
 }
 
 pub fn to_i32(x: f64) -> i32 {
@@ -403,7 +392,7 @@ pub fn to_i32(x: f64) -> i32 {
 
   let int1 = (x.trunc() as i64) & 0xffffffff;
 
-  return int1 as i32;
+  int1 as i32
 }
 
 pub fn to_u32(x: f64) -> u32 {
@@ -413,7 +402,7 @@ pub fn to_u32(x: f64) -> u32 {
 
   let int1 = (x.trunc() as i64) & 0xffffffff;
 
-  return int1 as u32;
+  int1 as u32
 }
 
 pub fn op_bit_and(left: &Val, right: &Val) -> Result<Val, Val> {

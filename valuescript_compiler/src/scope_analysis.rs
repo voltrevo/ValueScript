@@ -131,7 +131,7 @@ impl ScopeAnalysis {
 
     sa.diagnose_tdz_violations();
 
-    return sa;
+    sa
   }
 
   pub fn lookup(&self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
@@ -168,7 +168,7 @@ impl ScopeAnalysis {
     self
       .reg_allocators
       .entry(scope.clone())
-      .or_insert_with(|| RegAllocator::default())
+      .or_insert_with(RegAllocator::default)
       .allocate(based_on_name)
   }
 
@@ -219,7 +219,7 @@ impl ScopeAnalysis {
 
     scope.set(
       &origin_ident.sym,
-      name.id.clone(),
+      name.id,
       origin_ident.span,
       &mut self.diagnostics,
     );
@@ -287,7 +287,7 @@ impl ScopeAnalysis {
         let reg = self
           .reg_allocators
           .entry(captor_id.clone())
-          .or_insert_with(|| RegAllocator::default())
+          .or_insert_with(RegAllocator::default)
           .allocate(&name.sym);
 
         self.capture_values.insert(key, Value::Register(reg));
@@ -310,21 +310,21 @@ impl ScopeAnalysis {
       ModuleItem::ModuleDecl(module_decl) => match module_decl {
         ModuleDecl::Import(_) => {}
         ModuleDecl::ExportDecl(ed) => {
-          self.decl(&scope, &ed.decl);
+          self.decl(scope, &ed.decl);
         }
         ModuleDecl::ExportNamed(en) => match en.src {
           Some(_) => {}
           None => {
             for specifier in &en.specifiers {
-              self.export_specifier(&scope, specifier);
+              self.export_specifier(scope, specifier);
             }
           }
         },
         ModuleDecl::ExportDefaultDecl(edd) => {
-          self.default_decl(&scope, &edd.decl);
+          self.default_decl(scope, &edd.decl);
         }
         ModuleDecl::ExportDefaultExpr(ede) => {
-          self.expr(&scope, &ede.expr);
+          self.expr(scope, &ede.expr);
         }
         ModuleDecl::ExportAll(_) => {}
         ModuleDecl::TsImportEquals(ts_import_equals) => {
@@ -350,14 +350,14 @@ impl ScopeAnalysis {
         }
       },
       ModuleItem::Stmt(stmt) => {
-        self.stmt(&scope, &stmt);
+        self.stmt(scope, stmt);
       }
     };
   }
 
   fn import_decl(&mut self, scope: &Scope, import_decl: &swc_ecma_ast::ImportDecl) {
     for specifier in &import_decl.specifiers {
-      self.import_specifier(&scope, specifier);
+      self.import_specifier(scope, specifier);
     }
   }
 
@@ -431,7 +431,7 @@ impl ScopeAnalysis {
       }
       Decl::Var(var_decl) => {
         for decl in &var_decl.decls {
-          self.var_declarator(&scope, var_decl.kind, decl);
+          self.var_declarator(scope, decl);
         }
       }
       Decl::TsInterface(_) => {}
@@ -443,7 +443,7 @@ impl ScopeAnalysis {
 
         for member in &ts_enum.members {
           if let Some(init) = &member.init {
-            self.expr(scope, &init);
+            self.expr(scope, init);
           }
         }
       }
@@ -474,8 +474,8 @@ impl ScopeAnalysis {
     }
 
     for body in &function.body {
-      self.function_level_hoists(&child_scope, &body);
-      self.block_stmt(&child_scope, &body);
+      self.function_level_hoists(&child_scope, body);
+      self.block_stmt(&child_scope, body);
     }
   }
 
@@ -492,14 +492,14 @@ impl ScopeAnalysis {
     match module_item {
       ModuleItem::ModuleDecl(module_decl) => match module_decl {
         ModuleDecl::Import(import_decl) => {
-          self.import_decl(&scope, import_decl);
+          self.import_decl(scope, import_decl);
         }
         ModuleDecl::ExportDecl(ed) => match &ed.decl {
           swc_ecma_ast::Decl::Class(class_decl) => {
-            self.insert_pointer_name(&scope, NameType::Class, &class_decl.ident);
+            self.insert_pointer_name(scope, NameType::Class, &class_decl.ident);
           }
           swc_ecma_ast::Decl::Fn(fn_decl) => {
-            self.insert_pointer_name(&scope, NameType::Function, &fn_decl.ident);
+            self.insert_pointer_name(scope, NameType::Function, &fn_decl.ident);
           }
           swc_ecma_ast::Decl::Var(var_decl) => {
             let name_type = match var_decl.kind {
@@ -510,7 +510,7 @@ impl ScopeAnalysis {
 
             for decl in &var_decl.decls {
               for ident in self.get_pat_idents(&decl.name) {
-                self.insert_pointer_name(&scope, name_type, &ident);
+                self.insert_pointer_name(scope, name_type, &ident);
               }
             }
           }
@@ -527,12 +527,12 @@ impl ScopeAnalysis {
         ModuleDecl::ExportDefaultDecl(edd) => match &edd.decl {
           swc_ecma_ast::DefaultDecl::Class(class_decl) => {
             if let Some(ident) = &class_decl.ident {
-              self.insert_pointer_name(&scope, NameType::Class, ident);
+              self.insert_pointer_name(scope, NameType::Class, ident);
             }
           }
           swc_ecma_ast::DefaultDecl::Fn(fn_decl) => {
             if let Some(ident) = &fn_decl.ident {
-              self.insert_pointer_name(&scope, NameType::Function, ident);
+              self.insert_pointer_name(scope, NameType::Function, ident);
             }
           }
           swc_ecma_ast::DefaultDecl::TsInterfaceDecl(_) => {}
@@ -550,8 +550,8 @@ impl ScopeAnalysis {
         }
       },
       ModuleItem::Stmt(stmt) => {
-        self.function_level_hoists_stmt(&scope, stmt);
-        self.block_level_hoists_stmt(&scope, stmt);
+        self.function_level_hoists_stmt(scope, stmt);
+        self.block_level_hoists_stmt(scope, stmt);
       }
     };
   }
@@ -625,41 +625,41 @@ impl ScopeAnalysis {
       Stmt::With(_) => {}
       Stmt::Return(_) => {}
       Stmt::Labeled(labeled_stmt) => {
-        self.function_level_hoists_stmt(&scope, &labeled_stmt.body);
+        self.function_level_hoists_stmt(scope, &labeled_stmt.body);
       }
       Stmt::Break(_) => {}
       Stmt::Continue(_) => {}
       Stmt::If(if_) => {
-        self.function_level_hoists_stmt(&scope, &if_.cons);
+        self.function_level_hoists_stmt(scope, &if_.cons);
 
         for alt in &if_.alt {
-          self.function_level_hoists_stmt(&scope, alt);
+          self.function_level_hoists_stmt(scope, alt);
         }
       }
       Stmt::Switch(switch_) => {
         for case in &switch_.cases {
           for stmt in &case.cons {
-            self.function_level_hoists_stmt(&scope, stmt);
+            self.function_level_hoists_stmt(scope, stmt);
           }
         }
       }
       Stmt::Throw(_) => {}
       Stmt::Try(try_) => {
-        self.function_level_hoists(&scope, &try_.block);
+        self.function_level_hoists(scope, &try_.block);
 
         for catch in &try_.handler {
-          self.function_level_hoists(&scope, &catch.body);
+          self.function_level_hoists(scope, &catch.body);
         }
 
         for finally in &try_.finalizer {
-          self.function_level_hoists(&scope, finally);
+          self.function_level_hoists(scope, finally);
         }
       }
       Stmt::While(while_) => {
-        self.function_level_hoists_stmt(&scope, &while_.body);
+        self.function_level_hoists_stmt(scope, &while_.body);
       }
       Stmt::DoWhile(do_while_) => {
-        self.function_level_hoists_stmt(&scope, &do_while_.body);
+        self.function_level_hoists_stmt(scope, &do_while_.body);
       }
       Stmt::Expr(_) => {}
     }
@@ -740,10 +740,8 @@ impl ScopeAnalysis {
         idents.push(ident.id.clone());
       }
       Pat::Array(array_pat) => {
-        for elem in &array_pat.elems {
-          if let Some(elem) = elem {
-            self.get_pat_idents_impl(idents, elem);
-          }
+        for elem in array_pat.elems.iter().flatten() {
+          self.get_pat_idents_impl(idents, elem);
         }
       }
       Pat::Rest(rest_pat) => {
@@ -785,7 +783,7 @@ impl ScopeAnalysis {
   }
 
   fn arrow(&mut self, scope: &Scope, arrow: &swc_ecma_ast::ArrowExpr) {
-    let child_scope = scope.nest(Some(OwnerId::Span(arrow.span.clone())));
+    let child_scope = scope.nest(Some(OwnerId::Span(arrow.span)));
 
     for param in &arrow.params {
       self.param_pat(&child_scope, param);
@@ -801,16 +799,14 @@ impl ScopeAnalysis {
     }
   }
 
-  fn var_declarator_pat(&mut self, scope: &Scope, type_: NameType, pat: &swc_ecma_ast::Pat) {
+  fn var_declarator_pat(&mut self, scope: &Scope, pat: &swc_ecma_ast::Pat) {
     use swc_ecma_ast::Pat;
 
     match pat {
       Pat::Ident(_) => {}
       Pat::Array(array) => {
-        for elem in &array.elems {
-          if let Some(elem) = elem {
-            self.var_declarator_pat(scope, type_, elem);
-          }
+        for elem in array.elems.iter().flatten() {
+          self.var_declarator_pat(scope, elem);
         }
       }
       Pat::Object(object) => {
@@ -818,7 +814,7 @@ impl ScopeAnalysis {
           match prop {
             swc_ecma_ast::ObjectPatProp::KeyValue(key_value) => {
               self.prop_key(scope, &key_value.key);
-              self.var_declarator_pat(scope, type_, &key_value.value);
+              self.var_declarator_pat(scope, &key_value.value);
             }
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
               if let Some(value) = &assign.value {
@@ -826,16 +822,16 @@ impl ScopeAnalysis {
               }
             }
             swc_ecma_ast::ObjectPatProp::Rest(rest) => {
-              self.var_declarator_pat(scope, type_, &rest.arg);
+              self.var_declarator_pat(scope, &rest.arg);
             }
           }
         }
       }
       Pat::Rest(rest) => {
-        self.var_declarator_pat(scope, type_, &rest.arg);
+        self.var_declarator_pat(scope, &rest.arg);
       }
       Pat::Assign(assign) => {
-        self.var_declarator_pat(scope, type_, &assign.left);
+        self.var_declarator_pat(scope, &assign.left);
         self.expr(scope, &assign.right);
       }
       Pat::Invalid(invalid) => {
@@ -855,19 +851,8 @@ impl ScopeAnalysis {
     }
   }
 
-  fn var_declarator(
-    &mut self,
-    scope: &Scope,
-    kind: swc_ecma_ast::VarDeclKind,
-    var_declarator: &swc_ecma_ast::VarDeclarator,
-  ) {
-    let type_ = match kind {
-      swc_ecma_ast::VarDeclKind::Var => NameType::Var,
-      swc_ecma_ast::VarDeclKind::Let => NameType::Let,
-      swc_ecma_ast::VarDeclKind::Const => NameType::Const,
-    };
-
-    self.var_declarator_pat(scope, type_, &var_declarator.name);
+  fn var_declarator(&mut self, scope: &Scope, var_declarator: &swc_ecma_ast::VarDeclarator) {
+    self.var_declarator_pat(scope, &var_declarator.name);
 
     for init in &var_declarator.init {
       self.expr(scope, init);
@@ -879,10 +864,10 @@ impl ScopeAnalysis {
 
     match &default_decl {
       DefaultDecl::Class(class_expr) => {
-        self.class_(&scope, &class_expr.ident, &class_expr.class);
+        self.class_(scope, &class_expr.ident, &class_expr.class);
       }
       DefaultDecl::Fn(fn_expr) => {
-        self.fn_expr(&scope, fn_expr);
+        self.fn_expr(scope, fn_expr);
       }
       DefaultDecl::TsInterfaceDecl(_) => {}
     }
@@ -965,7 +950,7 @@ impl ScopeAnalysis {
       }
       Empty(_) => {}
       StaticBlock(static_block) => {
-        self.block_stmt(&scope, &static_block.body);
+        self.block_stmt(scope, &static_block.body);
       }
     }
   }
@@ -984,10 +969,8 @@ impl ScopeAnalysis {
       }
       Expr::Lit(_) => {}
       Expr::Array(array) => {
-        for elem in &array.elems {
-          if let Some(elem) = elem {
-            self.expr(scope, &elem.expr);
-          }
+        for elem in array.elems.iter().flatten() {
+          self.expr(scope, &elem.expr);
         }
       }
       Expr::Object(object) => {
@@ -1176,11 +1159,8 @@ impl ScopeAnalysis {
       swc_ecma_ast::Callee::Expr(expr) => {
         self.expr(scope, expr);
 
-        match &**expr {
-          swc_ecma_ast::Expr::Member(member) => {
-            self.mutate_expr(scope, &member.obj, true);
-          }
-          _ => {}
+        if let swc_ecma_ast::Expr::Member(member) = &**expr {
+          self.mutate_expr(scope, &member.obj, true);
         };
       }
     }
@@ -1198,10 +1178,8 @@ impl ScopeAnalysis {
         self.ident(scope, &ident.id);
       }
       Pat::Array(array) => {
-        for elem in &array.elems {
-          if let Some(elem) = elem {
-            self.pat(scope, elem);
-          }
+        for elem in array.elems.iter().flatten() {
+          self.pat(scope, elem);
         }
       }
       Pat::Rest(rest) => {
@@ -1489,10 +1467,8 @@ impl ScopeAnalysis {
         self.mutate_ident(scope, &ident.id, false);
       }
       Pat::Array(array_pat) => {
-        for elem in &array_pat.elems {
-          if let Some(elem) = elem {
-            self.mutate_pat(scope, elem);
-          }
+        for elem in array_pat.elems.iter().flatten() {
+          self.mutate_pat(scope, elem);
         }
       }
       Pat::Rest(rest_pat) => {
@@ -1536,7 +1512,7 @@ impl ScopeAnalysis {
         });
       }
       Pat::Expr(expr) => {
-        self.mutate_expr(&scope, expr, false);
+        self.mutate_expr(scope, expr, false);
       }
     }
   }
@@ -1617,7 +1593,7 @@ impl ScopeAnalysis {
       }
     };
 
-    if &name.owner_id != &scope.borrow().owner_id {
+    if name.owner_id != scope.borrow().owner_id {
       self.insert_capture(&scope.borrow().owner_id, &name_id, ident.span);
     }
   }
@@ -1642,7 +1618,7 @@ impl ScopeAnalysis {
     match prop_or_spread {
       PropOrSpread::Prop(prop) => match &**prop {
         swc_ecma_ast::Prop::Shorthand(ident) => {
-          self.ident(scope, &ident);
+          self.ident(scope, ident);
         }
         swc_ecma_ast::Prop::KeyValue(key_value) => {
           self.prop_key(scope, &key_value.key);
@@ -1652,7 +1628,7 @@ impl ScopeAnalysis {
           self.prop_key(scope, &getter.key);
 
           if let Some(body) = &getter.body {
-            self.block_stmt(&scope, body);
+            self.block_stmt(scope, body);
           }
         }
         swc_ecma_ast::Prop::Setter(setter) => {
@@ -1660,7 +1636,7 @@ impl ScopeAnalysis {
           self.param_pat(scope, &setter.param);
 
           if let Some(body) = &setter.body {
-            self.block_stmt(&scope, body);
+            self.block_stmt(scope, body);
           }
         }
         swc_ecma_ast::Prop::Method(method) => {
@@ -1686,7 +1662,7 @@ impl ScopeAnalysis {
 
     match stmt {
       Stmt::Block(block) => {
-        self.block_stmt(&scope, block);
+        self.block_stmt(scope, block);
       }
       Stmt::Empty(_) => {}
       Stmt::Debugger(_) => {}
@@ -1699,24 +1675,24 @@ impl ScopeAnalysis {
       }
       Stmt::Return(return_) => {
         if let Some(arg) = &return_.arg {
-          self.expr(&scope, arg);
+          self.expr(scope, arg);
         }
       }
       Stmt::Labeled(labeled_stmt) => {
-        self.stmt(&scope, &labeled_stmt.body);
+        self.stmt(scope, &labeled_stmt.body);
       }
       Stmt::Break(_) => {}
       Stmt::Continue(_) => {}
       Stmt::If(if_) => {
-        self.expr(&scope, &if_.test);
-        self.stmt(&scope, &if_.cons);
+        self.expr(scope, &if_.test);
+        self.stmt(scope, &if_.cons);
 
         for alt in &if_.alt {
-          self.stmt(&scope, alt);
+          self.stmt(scope, alt);
         }
       }
       Stmt::Switch(switch_) => {
-        self.expr(&scope, &switch_.discriminant);
+        self.expr(scope, &switch_.discriminant);
         let child_scope = scope.nest(None);
 
         for case in &switch_.cases {
@@ -1730,10 +1706,10 @@ impl ScopeAnalysis {
         }
       }
       Stmt::Throw(throw) => {
-        self.expr(&scope, &throw.arg);
+        self.expr(scope, &throw.arg);
       }
       Stmt::Try(try_) => {
-        self.block_stmt(&scope, &try_.block);
+        self.block_stmt(scope, &try_.block);
 
         for catch in &try_.handler {
           let child_scope = scope.nest(None);
@@ -1747,16 +1723,16 @@ impl ScopeAnalysis {
         }
 
         for finally in &try_.finalizer {
-          self.block_stmt(&scope, finally);
+          self.block_stmt(scope, finally);
         }
       }
       Stmt::While(while_) => {
-        self.expr(&scope, &while_.test);
-        self.stmt(&scope, &while_.body);
+        self.expr(scope, &while_.test);
+        self.stmt(scope, &while_.body);
       }
       Stmt::DoWhile(do_while_) => {
-        self.stmt(&scope, &do_while_.body);
-        self.expr(&scope, &do_while_.test);
+        self.stmt(scope, &do_while_.body);
+        self.expr(scope, &do_while_.test);
       }
       Stmt::For(for_) => {
         let child_scope = scope.nest(None);
@@ -1819,10 +1795,10 @@ impl ScopeAnalysis {
         self.stmt(&child_scope, &for_of.body);
       }
       Stmt::Decl(decl) => {
-        self.decl(&scope, decl);
+        self.decl(scope, decl);
       }
       Stmt::Expr(expr) => {
-        self.expr(&scope, &expr.expr);
+        self.expr(scope, &expr.expr);
       }
     };
   }
@@ -1844,44 +1820,44 @@ impl ScopeAnalysis {
 
     match param_pat {
       Pat::Ident(ident) => {
-        self.insert_reg_name(&scope, NameType::Param, &ident.id, None);
+        self.insert_reg_name(scope, NameType::Param, &ident.id, None);
       }
       Pat::Array(array_pat) => {
         for elem in &array_pat.elems {
           match elem {
-            Some(pat) => self.param_pat(&scope, pat),
+            Some(pat) => self.param_pat(scope, pat),
             None => {}
           }
         }
       }
       Pat::Rest(rest_pat) => {
-        self.param_pat(&scope, &rest_pat.arg);
+        self.param_pat(scope, &rest_pat.arg);
       }
       Pat::Object(object_pat) => {
         for prop in &object_pat.props {
           match prop {
             swc_ecma_ast::ObjectPatProp::KeyValue(key_value) => {
-              self.param_pat(&scope, &key_value.value);
+              self.param_pat(scope, &key_value.value);
             }
             swc_ecma_ast::ObjectPatProp::Assign(assign) => {
-              self.insert_reg_name(&scope, NameType::Param, &assign.key, None);
+              self.insert_reg_name(scope, NameType::Param, &assign.key, None);
 
               if let Some(default) = &assign.value {
-                self.expr(&scope, default);
+                self.expr(scope, default);
               }
             }
             swc_ecma_ast::ObjectPatProp::Rest(rest) => {
-              self.param_pat(&scope, &rest.arg);
+              self.param_pat(scope, &rest.arg);
             }
           }
         }
       }
       Pat::Assign(assign_pat) => {
-        self.param_pat(&scope, &assign_pat.left);
-        self.expr(&scope, &assign_pat.right);
+        self.param_pat(scope, &assign_pat.left);
+        self.expr(scope, &assign_pat.right);
       }
       Pat::Expr(expr) => {
-        self.expr(&scope, &expr);
+        self.expr(scope, expr);
       }
       Pat::Invalid(invalid) => {
         self.diagnostics.push(Diagnostic {
@@ -1895,13 +1871,13 @@ impl ScopeAnalysis {
 
   fn var_decl(&mut self, scope: &Scope, var_decl: &swc_ecma_ast::VarDecl) {
     for decl in &var_decl.decls {
-      self.var_declarator(&scope, var_decl.kind, decl);
+      self.var_declarator(scope, decl);
     }
   }
 
   fn find_capture_mutations(&mut self) {
     for (name_id, name) in &self.names {
-      if name.captures.len() > 0 {
+      if !name.captures.is_empty() {
         if name.type_ == NameType::Let {
           match name_id {
             NameId::Span(span) => {
@@ -1962,7 +1938,7 @@ impl ScopeAnalysis {
   }
 
   fn expand_captures(&mut self) {
-    let captors: Vec<OwnerId> = self.captures.keys().map(|k| k.clone()).collect();
+    let captors: Vec<OwnerId> = self.captures.keys().cloned().collect();
 
     for captor in captors {
       let mut full_captures = HashSet::<NameId>::new();
@@ -1973,12 +1949,7 @@ impl ScopeAnalysis {
 
       let mut owners_processed = HashSet::<OwnerId>::new();
 
-      loop {
-        let owner = match owners_to_process.get(owners_to_process_i) {
-          Some(o) => o,
-          None => break,
-        };
-
+      while let Some(owner) = owners_to_process.get(owners_to_process_i) {
         owners_to_process_i += 1;
 
         let inserted = owners_processed.insert(owner.clone());
@@ -1987,7 +1958,7 @@ impl ScopeAnalysis {
           continue;
         }
 
-        let captures = match self.captures.get(&owner) {
+        let captures = match self.captures.get(owner) {
           Some(captures) => captures.clone(),
           None => continue,
         };
@@ -2022,7 +1993,7 @@ impl ScopeAnalysis {
               let reg = self
                 .reg_allocators
                 .entry(captor.clone())
-                .or_insert_with(|| RegAllocator::default())
+                .or_insert_with(RegAllocator::default)
                 .allocate(&name.sym);
 
               Value::Register(reg)
@@ -2037,7 +2008,7 @@ impl ScopeAnalysis {
   }
 
   fn expand_effectively_const(&mut self) {
-    for (_, name) in &mut self.names {
+    for name in self.names.values_mut() {
       if !name.captures.is_empty() {
         name.effectively_const = true;
       }
@@ -2047,7 +2018,7 @@ impl ScopeAnalysis {
   fn diagnose_const_mutations(&mut self) {
     let mut diagnostics = Vec::<Diagnostic>::new();
 
-    for (_, name) in &self.names {
+    for name in self.names.values() {
       if !name.captures.is_empty() {
         // More specific diagnostics are emitted for these mutations elsewhere
         continue;
@@ -2071,7 +2042,7 @@ impl ScopeAnalysis {
     let mut new_mutations = Vec::<(swc_common::Span, NameId)>::new();
 
     for (span, name_id) in &self.optional_mutations {
-      let name = self.names.get(&name_id).expect("Name not found");
+      let name = self.names.get(name_id).expect("Name not found");
 
       if !name.effectively_const {
         new_mutations.push((*span, name_id.clone()));
@@ -2089,7 +2060,7 @@ impl ScopeAnalysis {
   fn diagnose_tdz_violations(&mut self) {
     let mut diagnostics = Vec::<Diagnostic>::new();
 
-    for (_, ref_) in &self.refs {
+    for ref_ in self.refs.values() {
       let name = self.names.get(&ref_.name_id).expect("Name not found");
 
       if ref_.owner_id != name.owner_id {

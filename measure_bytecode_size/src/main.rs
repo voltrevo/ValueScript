@@ -98,7 +98,5 @@ fn resolve_entry_path(entry_path: &String) -> ResolvedPath {
       .to_string(),
   };
 
-  let resolved_entry_path = resolve_path(&cwd_file, entry_path);
-
-  resolved_entry_path
+  resolve_path(&cwd_file, entry_path)
 }

@@ -4,7 +4,7 @@ use crate::asm::{
 
 pub fn visit_pointers<Visitor>(module: &mut Module, visitor: Visitor)
 where
-  Visitor: FnMut(PointerVisitation) -> (),
+  Visitor: FnMut(PointerVisitation),
 {
   let mut pointer_visitor = VisitPointerImpl::new(visitor);
   pointer_visitor.module(module);
@@ -19,14 +19,14 @@ pub enum PointerVisitation<'a> {
 
 struct VisitPointerImpl<Visitor>
 where
-  Visitor: FnMut(PointerVisitation) -> (),
+  Visitor: FnMut(PointerVisitation),
 {
   visitor: Visitor,
 }
 
 impl<Visitor> VisitPointerImpl<Visitor>
 where
-  Visitor: FnMut(PointerVisitation) -> (),
+  Visitor: FnMut(PointerVisitation),
 {
   fn new(visitor: Visitor) -> Self {
     Self { visitor }

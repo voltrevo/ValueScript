@@ -18,7 +18,7 @@ fn simplify_jumps_fn(fn_: &mut Function) {
 
   for i in 0..fn_.body.len() {
     if let FnLine::Instruction(Instruction::End) = &fn_.body[i] {
-      if next_instruction_index(&fn_.body, i) == None {
+      if next_instruction_index(&fn_.body, i).is_none() {
         // Remove `end` instructions when we're already at the end of the function.
         substitutions.insert(i, FnLine::Comment(fn_.body[i].to_string()));
         continue;
@@ -41,13 +41,10 @@ fn simplify_jumps_fn(fn_: &mut Function) {
 
     // Find matching label
     while j < fn_.body.len() {
-      match &fn_.body[j] {
-        FnLine::Label(label) => {
-          if label.name == label_ref.name {
-            break;
-          }
+      if let FnLine::Label(label) = &fn_.body[j] {
+        if label.name == label_ref.name {
+          break;
         }
-        _ => {}
       }
 
       j += 1;

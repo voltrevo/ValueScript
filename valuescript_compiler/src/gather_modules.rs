@@ -54,12 +54,7 @@ where
     })
     .expect("Failed to add to queue");
 
-  loop {
-    let dependency = match dependencies.remove() {
-      Ok(dependency) => dependency,
-      Err(_) => break,
-    };
-
+  while let Ok(dependency) = dependencies.remove() {
     let file_contents = match read_file(&dependency.path.path) {
       Ok(file_contents) => file_contents,
       Err(err) => {

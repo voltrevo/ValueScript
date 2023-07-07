@@ -282,20 +282,16 @@ static LAST_INDEX_OF: NativeFunction = native_fn(|this, params| {
 static TODO_LOCALE: NativeFunction = native_fn(|this, _params| {
   // TODO: Ok(...)
   match this.get() {
-    Val::String(_string_data) => {
-      return Err("TODO: locale".to_internal_error());
-    }
-    _ => return Err("string indirection".to_internal_error()),
+    Val::String(_string_data) => Err("TODO: locale".to_internal_error()),
+    _ => Err("string indirection".to_internal_error()),
   }
 });
 
 static TODO_REGEXES: NativeFunction = native_fn(|this, _params| {
   // TODO: Ok(...)
   match this.get() {
-    Val::String(_string_data) => {
-      return Err("TODO: regexes".to_internal_error());
-    }
-    _ => return Err("string indirection".to_internal_error()),
+    Val::String(_string_data) => Err("TODO: regexes".to_internal_error()),
+    _ => Err("string indirection".to_internal_error()),
   }
 });
 
@@ -304,9 +300,9 @@ static NORMALIZE: NativeFunction = native_fn(|this, _params| {
   match this.get() {
     Val::String(_string_data) => {
       // Consider https://docs.rs/unicode-normalization/latest/unicode_normalization/
-      return Err("TODO: normalize".to_internal_error());
+      Err("TODO: normalize".to_internal_error())
     }
-    _ => return Err("string indirection".to_internal_error()),
+    _ => Err("string indirection".to_internal_error()),
   }
 });
 
@@ -459,9 +455,8 @@ static SLICE: NativeFunction = native_fn(|this, params| {
       // FIXME: This is a slow way of doing it. Part of the reason is that we're using rust's
       // string type, so we can't just find the relevant byte range and copy it in one go.
       for i in start..end {
-        match unicode_at(string_bytes, end as usize, i as usize) {
-          Some(c) => new_string.push(c),
-          None => {}
+        if let Some(c) = unicode_at(string_bytes, end as usize, i as usize) {
+          new_string.push(c)
         }
       }
 
@@ -603,9 +598,8 @@ static SUBSTRING: NativeFunction = native_fn(|this, params| {
       // FIXME: This is a slow way of doing it. Part of the reason is that we're using rust's
       // string type, so we can't just find the relevant byte range and copy it in one go.
       for i in substring_start..substring_end {
-        match unicode_at(string_bytes, substring_end, i) {
-          Some(c) => new_string.push(c),
-          None => {}
+        if let Some(c) = unicode_at(string_bytes, substring_end, i) {
+          new_string.push(c)
         }
       }
 
@@ -674,7 +668,7 @@ static VALUES: NativeFunction = native_fn(|this, _params| match this.get() {
  * - Successful match: Advances str_chars_param and returns true.
  * - Unsuccessful match: Does not advance str_chars_param and returns false.
  */
-fn match_chars(str_chars_param: &mut Chars, matcher: &String) -> bool {
+fn match_chars(str_chars_param: &mut Chars, matcher: &str) -> bool {
   let mut str_chars = str_chars_param.clone();
   let mut matcher_chars = matcher.chars();
 
@@ -749,12 +743,8 @@ fn last_index_of(string_bytes: &[u8], search_bytes: &[u8], at_least_pos: usize) 
 }
 
 pub fn unicode_at(bytes: &[u8], len: usize, index: usize) -> Option<char> {
-  match code_point_at(bytes, len, index) {
-    Some(code_point) => Some(
-      std::char::from_u32(code_point).expect("Invalid code point"), // TODO: Find out if this is reachable and what to do about it
-    ),
-    None => None,
-  }
+  code_point_at(bytes, len, index)
+    .map(|code_point| std::char::from_u32(code_point).expect("Invalid code point"))
 }
 
 fn code_point_at(bytes: &[u8], len: usize, index: usize) -> Option<u32> {

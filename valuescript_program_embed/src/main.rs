@@ -3,7 +3,7 @@ use std::{process::exit, rc::Rc};
 use valuescript_vm::{Bytecode, VirtualMachine};
 
 pub fn main() {
-  let mut vm = VirtualMachine::new();
+  let mut vm = VirtualMachine::default();
   let result = vm.run(
     Rc::new(Bytecode::new(vec![
       //

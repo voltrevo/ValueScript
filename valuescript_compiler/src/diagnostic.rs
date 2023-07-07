@@ -42,13 +42,13 @@ impl Diagnostic {
       Level::FailureNote => return None,
     };
 
-    return Some(Diagnostic {
+    Some(Diagnostic {
       level,
       message: swc_diagnostic.message(),
       span: swc_diagnostic
         .span
         .primary_span()
         .unwrap_or(swc_common::DUMMY_SP),
-    });
+    })
   }
 }

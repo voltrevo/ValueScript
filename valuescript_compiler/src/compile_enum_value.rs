@@ -20,7 +20,7 @@ pub fn compile_enum_value(
     };
 
     let init_value = match &member.init {
-      Some(init) => match static_eval_expr(&init) {
+      Some(init) => match static_eval_expr(init) {
         Some(init_value) => match init_value {
           Value::Number(Number(n)) => {
             next_default_id = Some(n + 1.0);
@@ -50,7 +50,7 @@ pub fn compile_enum_value(
           None => {
             diagnostics.push(Diagnostic {
               level: DiagnosticLevel::Error,
-              message: format!("Missing required initializer"),
+              message: "Missing required initializer".to_string(),
               span: member.span,
             });
 

@@ -78,7 +78,7 @@ impl<'a> AssemblyParser<'a> {
       }
     }
 
-    return LineCol { line, col };
+    LineCol { line, col }
   }
 
   fn get_lines(&self) -> Vec<&str> {
@@ -116,7 +116,7 @@ impl<'a> AssemblyParser<'a> {
       }
     }
 
-    return true;
+    true
   }
 
   fn parse_whitespace(&mut self) {
@@ -154,9 +154,8 @@ impl<'a> AssemblyParser<'a> {
 
   fn parse_line(&mut self) {
     loop {
-      match self.pos.next() {
-        Some('\n') => return,
-        _ => {}
+      if let Some('\n') = self.pos.next() {
+        return;
       }
     }
   }
@@ -285,12 +284,7 @@ impl<'a> AssemblyParser<'a> {
 
     advance_chars(&mut pos, word.len());
 
-    return match pos.next() {
-      None => true,
-      Some(' ') => true,
-      Some('\n') => true,
-      _ => false,
-    };
+    matches!(pos.next(), None | Some(' ') | Some('\n'))
   }
 
   fn test_identifier(&self) -> Option<String> {
@@ -326,7 +320,7 @@ impl<'a> AssemblyParser<'a> {
       };
     }
 
-    return Some(res);
+    Some(res)
   }
 
   fn parse_identifier(&mut self) -> String {
@@ -339,7 +333,7 @@ impl<'a> AssemblyParser<'a> {
     let identifier = optional_identifier.unwrap();
     advance_chars(&mut self.pos, identifier.len());
 
-    return identifier;
+    identifier
   }
 
   fn parse_exact(&mut self, chars: &str) {
@@ -415,7 +409,7 @@ impl<'a> AssemblyParser<'a> {
       );
     }
 
-    return result;
+    result
   }
 
   fn assemble_function(&mut self) -> Function {
@@ -513,15 +507,10 @@ impl<'a> AssemblyParser<'a> {
 
       let optional_label = self.test_label();
 
-      if optional_label.is_some() {
-        function
-          .body
-          .push(FnLine::Label(self.assemble_label(optional_label.unwrap())));
-      } else {
-        function
-          .body
-          .push(FnLine::Instruction(self.assemble_instruction()));
-      }
+      function.body.push(match optional_label {
+        Some(label) => FnLine::Label(self.assemble_label(label)),
+        None => FnLine::Instruction(self.assemble_instruction()),
+      });
     }
 
     function
@@ -779,7 +768,7 @@ impl<'a> AssemblyParser<'a> {
 
     match self.pos.peek() {
       None => {
-        panic!("{}", self.render_pos(0, &format!("Expected value")));
+        panic!("{}", self.render_pos(0, &"Expected value".to_string()));
       }
       Some('%') => Value::Register(self.assemble_register()),
       Some('@') => {
@@ -844,7 +833,7 @@ impl<'a> AssemblyParser<'a> {
         None => {
           panic!(
             "{}",
-            self.render_pos(0, &format!("Expected value or array end"))
+            self.render_pos(0, &"Expected value or array end".to_string())
           );
         }
         Some(']') => {
@@ -878,7 +867,7 @@ impl<'a> AssemblyParser<'a> {
     let take = self.parse_one_of(&["!", ""]) == "!";
     let name = self.parse_identifier();
 
-    return Register { take, name };
+    Register { take, name }
   }
 
   fn assemble_builtin(&mut self) -> Builtin {
@@ -894,13 +883,7 @@ impl<'a> AssemblyParser<'a> {
   }
 
   fn test_label(&self) -> Option<String> {
-    let optional_identifier = self.test_identifier();
-
-    if optional_identifier.is_none() {
-      return None;
-    }
-
-    let identifier = optional_identifier.unwrap();
+    let identifier = self.test_identifier()?;
 
     let mut pos = self.pos.clone();
     advance_chars(&mut pos, identifier.len());
@@ -909,7 +892,7 @@ impl<'a> AssemblyParser<'a> {
       return Some(identifier);
     }
 
-    return None;
+    None
   }
 
   fn assemble_label(&mut self, name: String) -> Label {
@@ -932,18 +915,11 @@ impl<'a> AssemblyParser<'a> {
 
     let mut num_string = "".to_string();
 
-    loop {
-      match self.pos.peek() {
-        Some('-' | '.' | 'e' | 'n' | '0'..='9') => {
-          num_string.push(self.pos.next().unwrap());
-        }
-        _ => {
-          break;
-        }
-      }
+    while let Some('-' | '.' | 'e' | 'n' | '0'..='9') = self.pos.peek() {
+      num_string.push(self.pos.next().unwrap());
     }
 
-    if num_string.chars().last() == Some('n') {
+    if num_string.ends_with('n') {
       num_string.pop();
 
       match BigInt::parse_bytes(num_string.as_bytes(), 10) {
@@ -953,7 +929,7 @@ impl<'a> AssemblyParser<'a> {
             "{}",
             self.render_pos(
               -(num_string.len() as isize + 1),
-              &format!("Expected valid number")
+              &"Expected valid number".to_string()
             )
           );
         }
@@ -967,7 +943,7 @@ impl<'a> AssemblyParser<'a> {
         "{}",
         self.render_pos(
           -(num_string.len() as isize),
-          &format!("Expected valid number")
+          &"Expected valid number".to_string()
         )
       );
     }
@@ -1031,11 +1007,11 @@ pub fn parse_module(content: &str) -> Module {
 }
 
 fn is_leading_identifier_char(c: char) -> bool {
-  return c == '_' || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+  c == '_' || ('a'..='z').contains(&c) || ('A'..='Z').contains(&c)
 }
 
 fn is_identifier_char(c: char) -> bool {
-  return c == '_' || ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+  c == '_' || ('0'..='9').contains(&c) || ('a'..='z').contains(&c) || ('A'..='Z').contains(&c)
 }
 
 fn advance_chars(iter: &mut std::iter::Peekable<std::str::Chars>, len: usize) {

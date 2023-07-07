@@ -27,10 +27,10 @@ pub struct Generator {
 
 impl Generator {
   pub fn new(frame: StackFrame) -> Generator {
-    return Generator {
+    Generator {
       frame,
       stack: vec![],
-    };
+    }
   }
 }
 
@@ -130,7 +130,7 @@ impl fmt::Display for Generator {
 // needing to copy.
 //
 static NEXT: NativeFrameFunction = NativeFrameFunction {
-  make_frame: || Box::new(GeneratorFrame::default()),
+  make_frame: || Box::<GeneratorFrame>::default(),
 };
 
 #[derive(Clone, Default)]
@@ -151,12 +151,12 @@ impl StackFrameTrait for GeneratorFrame {
       return Err("Cannot call Generator.next on a const generator".to_type_error());
     }
 
-    let mut generator = dynamic_make_mut(&mut dynamic)
+    let generator = dynamic_make_mut(&mut dynamic)
       .as_any_mut()
       .downcast_mut::<Generator>()
       .ok_or_else(|| "Generator.next called on different object".to_type_error())?;
 
-    self.generator = take(&mut generator);
+    self.generator = take(generator);
 
     Ok(())
   }
@@ -217,7 +217,7 @@ impl StackFrameTrait for GeneratorFrame {
         swap(&mut frame, &mut self.generator.frame);
         self.generator.stack.push(frame);
 
-        return Ok(FrameStepOk::Continue);
+        Ok(FrameStepOk::Continue)
       }
     }
   }

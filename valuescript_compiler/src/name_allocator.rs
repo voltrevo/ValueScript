@@ -10,17 +10,14 @@ pub struct NameAllocator {
 
 impl NameAllocator {
   pub fn allocate(&mut self, based_on_name: &String) -> String {
-    match self.released_names.pop() {
-      Some(name) => {
-        // FIXME: When reallocating a register we need to ensure we don't read
-        // the leftover value
-        self.used_names.insert(name.clone());
-        return name;
-      }
-      None => {}
+    if let Some(name) = self.released_names.pop() {
+      // FIXME: When reallocating a register we need to ensure we don't read
+      // the leftover value
+      self.used_names.insert(name.clone());
+      return name;
     };
 
-    return self.allocate_fresh(based_on_name);
+    self.allocate_fresh(based_on_name)
   }
 
   pub fn allocate_fresh(&mut self, based_on_name: &String) -> String {
@@ -29,28 +26,25 @@ impl NameAllocator {
       return based_on_name.clone();
     }
 
-    return self.allocate_numbered(&(based_on_name.clone() + "_"));
+    self.allocate_numbered(&(based_on_name.clone() + "_"))
   }
 
-  pub fn allocate_numbered(&mut self, prefix: &String) -> String {
-    match self.released_names.pop() {
-      Some(name) => {
-        // FIXME: When reallocating a register we need to ensure we don't read
-        // the leftover value
-        self.used_names.insert(name.clone());
-        return name;
-      }
-      None => {}
+  pub fn allocate_numbered(&mut self, prefix: &str) -> String {
+    if let Some(name) = self.released_names.pop() {
+      // FIXME: When reallocating a register we need to ensure we don't read
+      // the leftover value
+      self.used_names.insert(name.clone());
+      return name;
     };
 
-    return self.allocate_numbered_fresh(prefix);
+    self.allocate_numbered_fresh(prefix)
   }
 
-  pub fn allocate_numbered_fresh(&mut self, prefix: &String) -> String {
+  pub fn allocate_numbered_fresh(&mut self, prefix: &str) -> String {
     let mut i = 0_u64;
 
     loop {
-      let candidate = prefix.clone() + &i.to_string();
+      let candidate = prefix.to_string() + &i.to_string();
 
       if !self.used_names.contains(&candidate) {
         self.used_names.insert(candidate.clone());
@@ -61,8 +55,8 @@ impl NameAllocator {
     }
   }
 
-  pub fn mark_used(&mut self, name: &String) {
-    self.used_names.insert(name.clone());
+  pub fn mark_used(&mut self, name: &str) {
+    self.used_names.insert(name.to_string());
   }
 
   pub fn release(&mut self, name: &String) {
@@ -138,12 +132,12 @@ impl RegAllocator {
   }
 
   pub fn allocate_numbered(&mut self, prefix: &str) -> Register {
-    let name = self.alloc.allocate_numbered(&prefix.to_string());
+    let name = self.alloc.allocate_numbered(prefix);
     Register::named(name)
   }
 
   pub fn allocate_numbered_fresh(&mut self, prefix: &str) -> Register {
-    let name = self.alloc.allocate_numbered_fresh(&prefix.to_string());
+    let name = self.alloc.allocate_numbered_fresh(prefix);
     Register::named(name)
   }
 

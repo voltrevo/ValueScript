@@ -105,7 +105,7 @@ impl<'a> RegisterVisitMut<'a> {
 impl Instruction {
   pub fn visit_fields_mut<F>(&mut self, visit: &mut F)
   where
-    F: FnMut(InstructionFieldMut) -> (),
+    F: FnMut(InstructionFieldMut),
   {
     use Instruction::*;
 
@@ -222,7 +222,7 @@ impl Instruction {
 
   pub fn visit_registers_mut_rev<F>(&mut self, visit: &mut F)
   where
-    F: FnMut(RegisterVisitMut) -> (),
+    F: FnMut(RegisterVisitMut),
   {
     use Instruction::*;
 

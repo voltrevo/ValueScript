@@ -26,9 +26,8 @@ struct DiagnosticCollector {
 
 impl Emitter for DiagnosticCollector {
   fn emit(&mut self, db: &DiagnosticBuilder<'_>) {
-    match Diagnostic::from_swc(&**db) {
-      Some(diagnostic) => self.diagnostics.lock().unwrap().push(diagnostic),
-      None => {}
+    if let Some(diagnostic) = Diagnostic::from_swc(db) {
+      self.diagnostics.lock().unwrap().push(diagnostic)
     }
   }
 }
@@ -62,7 +61,7 @@ pub fn parse(source: &str) -> (Option<swc_ecma_ast::Program>, Vec<Diagnostic>) {
   let mut diagnostics = Vec::<Diagnostic>::new();
   std::mem::swap(&mut diagnostics, &mut *diagnostics_arc.lock().unwrap());
 
-  return (result.ok(), diagnostics);
+  (result.ok(), diagnostics)
 }
 
 #[derive(Default)]
@@ -72,12 +71,12 @@ pub struct CompilerOutput {
 }
 
 pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
-  let compiler = ModuleCompiler::compile_program(&program);
+  let compiler = ModuleCompiler::compile_program(program);
 
-  return CompilerOutput {
+  CompilerOutput {
     diagnostics: compiler.diagnostics,
     module: compiler.module,
-  };
+  }
 }
 
 pub fn compile_module(source: &str) -> CompilerOutput {
@@ -91,7 +90,7 @@ pub fn compile_module(source: &str) -> CompilerOutput {
   diagnostics.append(&mut compiler_output.diagnostics);
   compiler_output.diagnostics = diagnostics;
 
-  return compiler_output;
+  compiler_output
 }
 
 #[derive(Default)]
@@ -134,7 +133,7 @@ impl ModuleCompiler {
     let allocated_name = self
       .definition_allocator
       .borrow_mut()
-      .allocate_numbered(&name.to_string());
+      .allocate_numbered(name);
 
     Pointer {
       name: allocated_name,
@@ -202,10 +201,10 @@ impl ModuleCompiler {
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
       ExportDefaultExpr(ede) => {
         let value = match &*ede.expr {
-          swc_ecma_ast::Expr::Ident(ident) => match self.scope_analysis.lookup(ident) {
-            Some(name) => Some(name.value.clone()),
-            None => None,
-          },
+          swc_ecma_ast::Expr::Ident(ident) => self
+            .scope_analysis
+            .lookup(ident)
+            .map(|name| name.value.clone()),
           expr => static_eval_expr(expr),
         };
 
@@ -290,7 +289,7 @@ impl ModuleCompiler {
             _ => {
               self.diagnostics.push(Diagnostic {
                 level: DiagnosticLevel::Error,
-                message: format!("const variable without initializer"),
+                message: "const variable without initializer".to_string(),
                 span: decl.init.span(),
               });
 
@@ -298,50 +297,47 @@ impl ModuleCompiler {
             }
           };
 
-          match (ident, init) {
-            (Some(ident), Some(init)) => {
-              let value = match static_eval_expr(init) {
-                Some(value) => value,
-                None => {
-                  self.todo(
-                    init.span(),
-                    "Determine whether initializer can be statically evaluated",
-                  );
+          if let (Some(ident), Some(init)) = (ident, init) {
+            let value = match static_eval_expr(init) {
+              Some(value) => value,
+              None => {
+                self.todo(
+                  init.span(),
+                  "Determine whether initializer can be statically evaluated",
+                );
 
-                  Value::String("(Static eval failed)".to_string())
-                }
-              };
+                Value::String("(Static eval failed)".to_string())
+              }
+            };
 
-              let pointer = match self.scope_analysis.lookup(ident) {
-                Some(name) => match &name.value {
-                  Value::Pointer(p) => p.clone(),
-                  _ => {
-                    self.diagnostics.push(Diagnostic {
-                      level: DiagnosticLevel::InternalError,
-                      message: "Expected pointer for module constant".to_string(),
-                      span: ident.span(),
-                    });
-
-                    continue;
-                  }
-                },
-                None => {
+            let pointer = match self.scope_analysis.lookup(ident) {
+              Some(name) => match &name.value {
+                Value::Pointer(p) => p.clone(),
+                _ => {
                   self.diagnostics.push(Diagnostic {
                     level: DiagnosticLevel::InternalError,
-                    message: "Failed to lookup name".to_string(),
+                    message: "Expected pointer for module constant".to_string(),
                     span: ident.span(),
                   });
 
                   continue;
                 }
-              };
+              },
+              None => {
+                self.diagnostics.push(Diagnostic {
+                  level: DiagnosticLevel::InternalError,
+                  message: "Failed to lookup name".to_string(),
+                  span: ident.span(),
+                });
 
-              self.module.definitions.push(Definition {
-                pointer,
-                content: DefinitionContent::Value(value),
-              });
-            }
-            _ => {}
+                continue;
+              }
+            };
+
+            self.module.definitions.push(Definition {
+              pointer,
+              content: DefinitionContent::Value(value),
+            });
           }
         }
       }
@@ -472,7 +468,7 @@ impl ModuleCompiler {
     match &ed.decl {
       Decl::Class(class) => {
         let class_name = class.ident.sym.to_string();
-        self.compile_class(Some(class_name.clone()), Some(&class.ident), &class.class);
+        self.compile_class(Some(class_name), Some(&class.ident), &class.class);
       }
       Decl::Fn(fn_) => self.compile_fn_decl(true, fn_),
       Decl::Var(var_decl) => {
@@ -558,7 +554,7 @@ impl ModuleCompiler {
             }
             None => match self
               .scope_analysis
-              .lookup_value(&OwnerId::Module, &orig_name)
+              .lookup_value(&OwnerId::Module, orig_name)
             {
               Some(Value::Pointer(p)) => Some(p),
               lookup_result => {
@@ -881,34 +877,31 @@ impl ModuleCompiler {
     let mut has_constructor = false;
 
     for class_member in &class.body {
-      match class_member {
-        swc_ecma_ast::ClassMember::Constructor(ctor) => {
-          has_constructor = true;
+      if let swc_ecma_ast::ClassMember::Constructor(ctor) = class_member {
+        has_constructor = true;
 
-          let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
+        let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
 
-          dependent_definitions.append(&mut self.compile_fn(
-            ctor_defn_name.clone(),
-            None,
-            Functionish::Constructor(
-              member_initializers_assembly.clone(),
-              class.span,
-              ctor.clone(),
-            ),
-          ));
+        dependent_definitions.append(&mut self.compile_fn(
+          ctor_defn_name.clone(),
+          None,
+          Functionish::Constructor(
+            member_initializers_assembly.clone(),
+            class.span,
+            ctor.clone(),
+          ),
+        ));
 
-          constructor = Value::Pointer(ctor_defn_name);
-        }
-        _ => {}
+        constructor = Value::Pointer(ctor_defn_name);
       }
     }
 
-    if member_initializers_assembly.len() > 0 && !has_constructor {
+    if !member_initializers_assembly.is_empty() && !has_constructor {
       let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
 
       constructor = Value::Pointer(ctor_defn_name.clone());
       dependent_definitions.push(Definition {
-        pointer: ctor_defn_name.clone(),
+        pointer: ctor_defn_name,
         content: DefinitionContent::Function(Function {
           is_generator: false,
           parameters: vec![],
@@ -941,11 +934,8 @@ impl ModuleCompiler {
             }
           };
 
-          let method_defn_name = self.allocate_defn(&ident_from_str(&format!(
-            "{}_{}",
-            defn_name.name,
-            name.to_string()
-          )));
+          let method_defn_name =
+            self.allocate_defn(&ident_from_str(&format!("{}_{}", defn_name.name, name)));
 
           dependent_definitions.append(&mut self.compile_fn(
             method_defn_name.clone(),

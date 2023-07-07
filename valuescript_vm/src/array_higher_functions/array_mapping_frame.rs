@@ -34,15 +34,15 @@ pub struct ArrayMappingFrame {
 
 impl ArrayMappingFrame {
   pub fn new(state: Box<dyn ArrayMappingState>) -> ArrayMappingFrame {
-    return ArrayMappingFrame {
-      state: state,
+    ArrayMappingFrame {
+      state,
       early_exit: None,
       this: None,
       array_i: 0,
       mapper: Val::Void,
       this_arg: Val::Undefined,
       param_i: 0,
-    };
+    }
   }
 }
 
@@ -139,7 +139,7 @@ impl StackFrameTrait for ArrayMappingFrame {
     self.early_exit = self
       .state
       .process(array_i, element, call_result.return_)
-      .map(|v| Ok(v));
+      .map(Ok);
   }
 
   fn get_call_result(&mut self) -> CallResult {

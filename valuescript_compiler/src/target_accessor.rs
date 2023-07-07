@@ -101,15 +101,15 @@ impl TargetAccessor {
   }
 
   pub fn compile_ident(ec: &mut ExpressionCompiler, ident: &swc_ecma_ast::Ident) -> TargetAccessor {
-    return TargetAccessor::Register(ec.get_register_for_ident_mutation(ident));
+    TargetAccessor::Register(ec.get_register_for_ident_mutation(ident))
   }
 
   pub fn make_bad(ec: &mut ExpressionCompiler) -> TargetAccessor {
-    return TargetAccessor::Register(ec.fnc.allocate_numbered_reg(&"_bad_lvalue".to_string()));
+    TargetAccessor::Register(ec.fnc.allocate_numbered_reg("_bad_lvalue"))
   }
 
   pub fn make_todo(ec: &mut ExpressionCompiler) -> TargetAccessor {
-    return TargetAccessor::Register(ec.fnc.allocate_numbered_reg(&"_todo_lvalue".to_string()));
+    TargetAccessor::Register(ec.fnc.allocate_numbered_reg("_todo_lvalue"))
   }
 
   pub fn assign_and_packup(
@@ -154,7 +154,7 @@ impl TargetAccessor {
   pub fn read(&self, ec: &mut ExpressionCompiler) -> Register {
     use TargetAccessor::*;
 
-    return match self {
+    match self {
       Register(reg) => reg.clone(),
       Nested(nta) => {
         ec.fnc.push(Instruction::Sub(
@@ -165,25 +165,21 @@ impl TargetAccessor {
 
         nta.register.clone()
       }
-    };
+    }
   }
 
   pub fn register(&self) -> Register {
-    use TargetAccessor::*;
-
-    return match self {
-      Register(reg) => reg.clone(),
-      Nested(nta) => nta.register.clone(),
-    };
+    match self {
+      TargetAccessor::Register(reg) => reg.clone(),
+      TargetAccessor::Nested(nta) => nta.register.clone(),
+    }
   }
 
   pub fn direct_register(&self) -> Option<Register> {
-    use TargetAccessor::*;
-
-    return match self {
-      Register(reg) => Some(reg.clone()),
-      Nested(_) => None,
-    };
+    match self {
+      TargetAccessor::Register(reg) => Some(reg.clone()),
+      TargetAccessor::Nested(_) => None,
+    }
   }
 
   pub fn packup(&mut self, ec: &mut ExpressionCompiler, uses_this_subcall: bool) {
@@ -213,17 +209,17 @@ impl TargetAccessor {
   }
 
   pub fn targets_this(&self) -> bool {
-    return match self {
+    match self {
       TargetAccessor::Register(reg) => reg == &Register::this(),
       TargetAccessor::Nested(nta) => nta.obj.targets_this(),
-    };
+    }
   }
 }
 
 pub fn get_expr_type_str(expr: &swc_ecma_ast::Expr) -> &'static str {
   use swc_ecma_ast::Expr::*;
 
-  return match expr {
+  match expr {
     This(_) => "This",
     Ident(_) => "Ident",
     Array(_) => "Array",
@@ -261,5 +257,5 @@ pub fn get_expr_type_str(expr: &swc_ecma_ast::Expr) -> &'static str {
     JSXElement(_) => "JSXElement",
     JSXFragment(_) => "JSXFragment",
     TsInstantiation(_) => "TsInstantiation",
-  };
+  }
 }

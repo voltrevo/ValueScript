@@ -85,7 +85,7 @@ pub fn handle_diagnostics_cli(file_path: &String, diagnostics: &Vec<Diagnostic>)
   }
 }
 
-fn pos_to_line_col(text: &String, pos: u32) -> (u32, u32) {
+fn pos_to_line_col(text: &str, pos: u32) -> (u32, u32) {
   let mut line = 1u32;
   let mut col = 1u32;
 

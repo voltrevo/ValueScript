@@ -69,7 +69,7 @@ fn remove_unused_registers_fn(fn_: &mut Function) {
       }
 
       for param in &fn_.parameters {
-        if &param.name == &single_return_dep {
+        if param.name == single_return_dep {
           break 'b;
         }
       }
@@ -113,7 +113,7 @@ fn reg_is_always_returned(body: &mut Vec<FnLine>, reg: &String) -> bool {
   last_was_return_reg
 }
 
-fn rename_register_in_body(body: &mut Vec<FnLine>, from: &String, to: &String) {
+fn rename_register_in_body(body: &mut Vec<FnLine>, from: &String, to: &str) {
   // Note: This only does the rename in the body and basically assumes that %from is not a
   // parameter.
 
@@ -127,7 +127,7 @@ fn rename_register_in_body(body: &mut Vec<FnLine>, from: &String, to: &String) {
       if &rvm.register.name == from {
         // TODO: Preserving `.take=true` can cause problems. Is just using `.take=false` the right
         // solution?
-        *rvm.register = Register::named(to.clone());
+        *rvm.register = Register::named(to.to_owned());
       }
     });
   }

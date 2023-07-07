@@ -34,14 +34,14 @@ impl ReleaseChecker {
 impl CompiledExpression {
   pub fn empty() -> CompiledExpression {
     CompiledExpression {
-      value: Value::Void, // TODO: Allocate register instead (why?)
+      value: Value::Void,
       nested_registers: vec![],
       release_checker: ReleaseChecker::new(false),
     }
   }
 
   pub fn new(value: Value, nested_registers: Vec<Register>) -> CompiledExpression {
-    let has_unreleased_registers = nested_registers.len() > 0;
+    let has_unreleased_registers = !nested_registers.is_empty();
 
     CompiledExpression {
       value,
@@ -86,147 +86,107 @@ impl<'a> ExpressionCompiler<'a> {
     use swc_ecma_ast::Expr::*;
 
     match expr {
-      This(_) => {
-        return Value::Register(Register::this()).to_ce();
-      }
-      Array(array_exp) => {
-        return self.array_expression(array_exp, target_register);
-      }
-      Object(object_exp) => {
-        return self.object_expression(object_exp, target_register);
-      }
-      Fn(fn_) => {
-        return self.fn_expression(fn_, target_register);
-      }
-      Unary(un_exp) => {
-        return self.unary_expression(un_exp, target_register);
-      }
-      Update(update_exp) => {
-        return self.update_expression(update_exp, target_register);
-      }
-      Bin(bin_exp) => {
-        return self.binary_expression(bin_exp, target_register);
-      }
-      Assign(assign_exp) => {
-        return self.assign_expression(assign_exp, false, target_register);
-      }
-      Member(member_exp) => {
-        return self.member_expression(member_exp, target_register);
-      }
+      This(_) => Value::Register(Register::this()).to_ce(),
+      Array(array_exp) => self.array_expression(array_exp, target_register),
+      Object(object_exp) => self.object_expression(object_exp, target_register),
+      Fn(fn_) => self.fn_expression(fn_, target_register),
+      Unary(un_exp) => self.unary_expression(un_exp, target_register),
+      Update(update_exp) => self.update_expression(update_exp, target_register),
+      Bin(bin_exp) => self.binary_expression(bin_exp, target_register),
+      Assign(assign_exp) => self.assign_expression(assign_exp, false, target_register),
+      Member(member_exp) => self.member_expression(member_exp, target_register),
       SuperProp(super_prop) => {
         self.fnc.todo(super_prop.span, "SuperProp expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
-      Cond(cond_exp) => {
-        return self.cond_expression(cond_exp, target_register);
-      }
-      Call(call_exp) => {
-        return match &call_exp.callee {
-          swc_ecma_ast::Callee::Expr(callee_expr) => match &**callee_expr {
-            swc_ecma_ast::Expr::Member(member_expr) => {
-              self.method_call_expression(&member_expr, &call_exp.args, target_register)
-            }
-            _ => self.call_expression(call_exp, target_register),
-          },
-          _ => {
-            self
-              .fnc
-              .todo(call_exp.callee.span(), "non-expression callee");
-
-            CompiledExpression::empty()
+      Cond(cond_exp) => self.cond_expression(cond_exp, target_register),
+      Call(call_exp) => match &call_exp.callee {
+        swc_ecma_ast::Callee::Expr(callee_expr) => match &**callee_expr {
+          swc_ecma_ast::Expr::Member(member_expr) => {
+            self.method_call_expression(member_expr, &call_exp.args, target_register)
           }
-        };
-      }
-      New(new_exp) => {
-        return self.new_expression(new_exp, target_register);
-      }
+          _ => self.call_expression(call_exp, target_register),
+        },
+        _ => {
+          self
+            .fnc
+            .todo(call_exp.callee.span(), "non-expression callee");
+
+          CompiledExpression::empty()
+        }
+      },
+      New(new_exp) => self.new_expression(new_exp, target_register),
       Seq(seq_exp) => {
         for i in 0..(seq_exp.exprs.len() - 1) {
           self.compile_into(&seq_exp.exprs[i], Register::ignore());
         }
 
-        return self.compile(seq_exp.exprs.last().unwrap(), target_register);
+        self.compile(seq_exp.exprs.last().unwrap(), target_register)
       }
-      Ident(ident) => {
-        return self.identifier(ident, target_register);
-      }
-      Lit(lit) => {
-        return self.compile_literal(lit).to_ce();
-      }
-      Tpl(tpl) => {
-        return self.template_literal(tpl, target_register);
-      }
+      Ident(ident) => self.identifier(ident, target_register),
+      Lit(lit) => self.compile_literal(lit).to_ce(),
+      Tpl(tpl) => self.template_literal(tpl, target_register),
       TaggedTpl(tagged_tpl) => {
         self.fnc.todo(tagged_tpl.span, "TaggedTpl expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
-      Arrow(arrow) => return self.arrow_expression(arrow, target_register),
+      Arrow(arrow) => self.arrow_expression(arrow, target_register),
       Class(class_exp) => {
         self.fnc.todo(class_exp.span(), "Class expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
-      Yield(yield_expr) => {
-        return self.yield_expr(yield_expr, target_register);
-      }
+      Yield(yield_expr) => self.yield_expr(yield_expr, target_register),
       MetaProp(meta_prop) => {
         self.fnc.todo(meta_prop.span, "MetaProp expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
       Await(await_exp) => {
         self.fnc.todo(await_exp.span, "Await expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
-      Paren(p) => {
-        return self.compile(&*p.expr, target_register);
-      }
+      Paren(p) => self.compile(&p.expr, target_register),
       JSXMember(jsx_member) => {
         self.fnc.todo(jsx_member.span(), "JSXMember expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
       JSXNamespacedName(jsx_namespaced_name) => {
         self
           .fnc
           .todo(jsx_namespaced_name.span(), "JSXNamespacedName expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
       JSXEmpty(jsx_empty) => {
         self.fnc.todo(jsx_empty.span(), "JSXEmpty expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
       JSXElement(jsx_element) => {
         self.fnc.todo(jsx_element.span(), "JSXElement expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
       JSXFragment(jsx_fragment) => {
         self.fnc.todo(jsx_fragment.span(), "JSXFragment expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
-      TsTypeAssertion(ts_type_assertion) => {
-        return self.compile(&ts_type_assertion.expr, target_register);
-      }
+      TsTypeAssertion(ts_type_assertion) => self.compile(&ts_type_assertion.expr, target_register),
       TsConstAssertion(ts_const_assertion) => {
-        return self.compile(&ts_const_assertion.expr, target_register);
+        self.compile(&ts_const_assertion.expr, target_register)
       }
-      TsNonNull(ts_non_null_exp) => {
-        return self.compile(&ts_non_null_exp.expr, target_register);
-      }
-      TsAs(ts_as_exp) => {
-        return self.compile(&ts_as_exp.expr, target_register);
-      }
+      TsNonNull(ts_non_null_exp) => self.compile(&ts_non_null_exp.expr, target_register),
+      TsAs(ts_as_exp) => self.compile(&ts_as_exp.expr, target_register),
       TsInstantiation(ts_instantiation) => {
         self
           .fnc
           .todo(ts_instantiation.span, "TsInstantiation expression");
 
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
       PrivateName(private_name) => {
         self.fnc.todo(private_name.span, "PrivateName expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
       OptChain(opt_chain) => {
         self.fnc.todo(opt_chain.span, "OptChain expression");
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
       Invalid(invalid) => {
         self.fnc.diagnostics.push(Diagnostic {
@@ -235,9 +195,9 @@ impl<'a> ExpressionCompiler<'a> {
           span: invalid.span,
         });
 
-        return CompiledExpression::empty();
+        CompiledExpression::empty()
       }
-    };
+    }
   }
 
   pub fn compile_into(&mut self, expr: &swc_ecma_ast::Expr, target_register: Register) {
@@ -294,7 +254,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.release_ce(arg);
 
-    return CompiledExpression::new(Value::Register(target), nested_registers);
+    CompiledExpression::new(Value::Register(target), nested_registers)
   }
 
   pub fn binary_expression(
@@ -329,7 +289,7 @@ impl<'a> ExpressionCompiler<'a> {
     self.fnc.release_ce(left);
     self.fnc.release_ce(right);
 
-    return CompiledExpression::new(Value::Register(target), nested_registers);
+    CompiledExpression::new(Value::Register(target), nested_registers)
   }
 
   pub fn get_register_for_ident_mutation(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
@@ -339,8 +299,7 @@ impl<'a> ExpressionCompiler<'a> {
         None,
         Some(format!(
           "Invalid: Can't mutate {} because its lookup result is {:?}",
-          ident.sym.to_string(),
-          lookup_result,
+          ident.sym, lookup_result,
         )),
       ),
     };
@@ -348,7 +307,7 @@ impl<'a> ExpressionCompiler<'a> {
     if let Some(err_msg) = err_msg {
       self.fnc.diagnostics.push(Diagnostic {
         level: DiagnosticLevel::Error,
-        message: err_msg.to_string(),
+        message: err_msg,
         span: ident.span,
       });
     }
@@ -402,10 +361,7 @@ impl<'a> ExpressionCompiler<'a> {
       false => self.compile(&assign_expr.right, None),
     };
 
-    let at_is_register = match &at {
-      TargetAccessor::Register(_) => true,
-      _ => false,
-    };
+    let at_is_register = matches!(&at, TargetAccessor::Register(_));
 
     if is_top_level && at_is_register {
       // at is already assigned by compiling directly into at.direct_register()
@@ -452,7 +408,7 @@ impl<'a> ExpressionCompiler<'a> {
     use swc_ecma_ast::PatOrExpr;
 
     let mut target = match &assign_expr.left {
-      PatOrExpr::Expr(expr) => TargetAccessor::compile(self, &expr, true),
+      PatOrExpr::Expr(expr) => TargetAccessor::compile(self, expr, true),
       PatOrExpr::Pat(pat) => match &**pat {
         Pat::Ident(ident) => {
           TargetAccessor::Register(self.get_register_for_ident_mutation(&ident.id))
@@ -464,7 +420,7 @@ impl<'a> ExpressionCompiler<'a> {
             span: pat.span(),
           });
 
-          let bad_reg = self.fnc.allocate_numbered_reg(&"_bad_lvalue".to_string());
+          let bad_reg = self.fnc.allocate_numbered_reg("_bad_lvalue");
 
           TargetAccessor::Register(bad_reg)
         }
@@ -504,7 +460,7 @@ impl<'a> ExpressionCompiler<'a> {
       ));
     }
 
-    target.assign_and_packup(self, &Value::Register(target_read.clone()), false);
+    target.assign_and_packup(self, &Value::Register(target_read), false);
 
     CompiledExpression::new(Value::Register(rhs_reg), nested_registers)
   }
@@ -569,7 +525,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     }
 
-    return match target_register {
+    match target_register {
       None => CompiledExpression::new(Value::Object(Box::new(object_asm)), sub_nested_registers),
       Some(tr) => {
         self.fnc.push(Instruction::Mov(
@@ -583,7 +539,7 @@ impl<'a> ExpressionCompiler<'a> {
 
         CompiledExpression::new(Value::Register(tr), vec![])
       }
-    };
+    }
   }
 
   pub fn prop_name(&mut self, prop_name: &swc_ecma_ast::PropName) -> CompiledExpression {
@@ -620,7 +576,7 @@ impl<'a> ExpressionCompiler<'a> {
     member_prop: &swc_ecma_ast::MemberProp,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    return match member_prop {
+    match member_prop {
       swc_ecma_ast::MemberProp::Ident(ident) => Value::String(ident.sym.to_string()).to_ce(),
       swc_ecma_ast::MemberProp::Computed(computed) => self.compile(&computed.expr, target_register),
       swc_ecma_ast::MemberProp::PrivateName(private_name) => {
@@ -630,7 +586,7 @@ impl<'a> ExpressionCompiler<'a> {
 
         CompiledExpression::empty()
       }
-    };
+    }
   }
 
   pub fn member_expression(
@@ -683,17 +639,11 @@ impl<'a> ExpressionCompiler<'a> {
     self.compile_into(&cond_exp.test, dst.clone());
 
     let true_label = Label {
-      name: self
-        .fnc
-        .label_allocator
-        .allocate_numbered(&"cond_true".to_string()),
+      name: self.fnc.label_allocator.allocate_numbered("cond_true"),
     };
 
     let cond_end_label = Label {
-      name: self
-        .fnc
-        .label_allocator
-        .allocate_numbered(&"cond_end".to_string()),
+      name: self.fnc.label_allocator.allocate_numbered("cond_end"),
     };
 
     self.fnc.push(Instruction::JmpIf(
@@ -800,7 +750,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     target.assign_and_packup(self, &Value::Register(target_read), false);
 
-    return res;
+    res
   }
 
   pub fn call_expression(
@@ -811,7 +761,7 @@ impl<'a> ExpressionCompiler<'a> {
     let mut nested_registers = Vec::<Register>::new();
 
     let callee = match &call_exp.callee {
-      swc_ecma_ast::Callee::Expr(expr) => self.compile(&*expr, None),
+      swc_ecma_ast::Callee::Expr(expr) => self.compile(expr, None),
       _ => {
         self
           .fnc
@@ -821,7 +771,7 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
-    let args = call_exp.args.iter().map(|x| Some(x));
+    let args = call_exp.args.iter().map(Some);
     let compiled_args = self.args(args, None);
 
     let dest = match target_register {
@@ -858,9 +808,9 @@ impl<'a> ExpressionCompiler<'a> {
     let callee = self.compile(&new_exp.callee, None);
 
     let compiled_args = match &new_exp.args {
-      None => CompiledExpression::new(Value::Array(Box::new(Array::default())), vec![]),
+      None => CompiledExpression::new(Value::Array(Box::default()), vec![]),
       Some(new_exp_args) => {
-        let args = new_exp_args.iter().map(|x| Some(x));
+        let args = new_exp_args.iter().map(Some);
         self.args(args, None)
       }
     };
@@ -890,7 +840,7 @@ impl<'a> ExpressionCompiler<'a> {
   pub fn method_call_expression(
     &mut self,
     callee_expr: &swc_ecma_ast::MemberExpr,
-    args: &Vec<swc_ecma_ast::ExprOrSpread>,
+    args: &[swc_ecma_ast::ExprOrSpread],
     target_register: Option<Register>,
   ) -> CompiledExpression {
     let mut nested_registers = Vec::<Register>::new();
@@ -923,7 +873,7 @@ impl<'a> ExpressionCompiler<'a> {
     sub_nested_registers.append(&mut prop.nested_registers);
 
     let compiled_args = {
-      let args_iter = args.iter().map(|x| Some(x));
+      let args_iter = args.iter().map(Some);
       self.args(args_iter, None)
     };
 
@@ -982,7 +932,7 @@ impl<'a> ExpressionCompiler<'a> {
       self.fnc.release_reg(&reg);
     }
 
-    CompiledExpression::new(Value::Register(dest.clone()), nested_registers)
+    CompiledExpression::new(Value::Register(dest), nested_registers)
   }
 
   pub fn fn_expression(
@@ -990,14 +940,11 @@ impl<'a> ExpressionCompiler<'a> {
     fn_: &swc_ecma_ast::FnExpr,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let fn_name = fn_
-      .ident
-      .clone()
-      .and_then(|ident| Some(ident.sym.to_string()));
+    let fn_name = fn_.ident.clone().map(|ident| ident.sym.to_string());
 
     let definition_pointer = match &fn_name {
-      Some(name) => self.fnc.allocate_defn(&name),
-      None => self.fnc.allocate_defn_numbered(&"_anon".to_string()),
+      Some(name) => self.fnc.allocate_defn(name),
+      None => self.fnc.allocate_defn_numbered("_anon"),
     };
 
     let capture_params = self
@@ -1035,7 +982,7 @@ impl<'a> ExpressionCompiler<'a> {
     arrow_expr: &swc_ecma_ast::ArrowExpr,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let definition_pointer = self.fnc.allocate_defn_numbered(&"_anon".to_string());
+    let definition_pointer = self.fnc.allocate_defn_numbered("_anon");
 
     let capture_params = self
       .fnc
@@ -1077,15 +1024,15 @@ impl<'a> ExpressionCompiler<'a> {
     let reg = match target_register {
       None => {
         let alloc_reg = match &fn_name {
-          Some(name) => self.fnc.allocate_reg(&name),
-          None => self.fnc.allocate_numbered_reg(&"_anon".to_string()),
+          Some(name) => self.fnc.allocate_reg(name),
+          None => self.fnc.allocate_numbered_reg("_anon"),
         };
 
         nested_registers.push(alloc_reg.clone());
 
         alloc_reg
       }
-      Some(tr) => tr.clone(),
+      Some(tr) => tr,
     };
 
     let mut bind_values = Array::default();
@@ -1180,7 +1127,7 @@ impl<'a> ExpressionCompiler<'a> {
       reg.clone(),
     ));
 
-    return CompiledExpression::new(Value::Register(reg), nested_registers);
+    CompiledExpression::new(Value::Register(reg), nested_registers)
   }
 
   pub fn template_literal(
@@ -1235,7 +1182,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let last_str = tpl.quasis[len].raw.to_string();
 
-    if last_str != "" {
+    if !last_str.is_empty() {
       self.fnc.push(Instruction::OpPlus(
         Value::Register(acc_reg.clone()),
         Value::String(last_str),
@@ -1243,7 +1190,7 @@ impl<'a> ExpressionCompiler<'a> {
       ));
     }
 
-    return CompiledExpression::new(Value::Register(acc_reg), nested_registers);
+    CompiledExpression::new(Value::Register(acc_reg), nested_registers)
   }
 
   pub fn yield_expr(
@@ -1274,7 +1221,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     self.fnc.release_ce(arg_compiled);
 
-    return CompiledExpression::new(Value::Register(dst), nested_registers);
+    CompiledExpression::new(Value::Register(dst), nested_registers)
   }
 
   pub fn identifier(
@@ -1338,10 +1285,9 @@ impl<'a> ExpressionCompiler<'a> {
           // Otherwise, we need to capture the current value for the result of the expression
           let new_reg = self.fnc.allocate_tmp();
 
-          self.fnc.push(Instruction::Mov(
-            Value::Register(reg.clone()),
-            new_reg.clone(),
-          ));
+          self
+            .fnc
+            .push(Instruction::Mov(Value::Register(reg), new_reg.clone()));
 
           CompiledExpression::new(Value::Register(new_reg.clone()), vec![new_reg])
         }
@@ -1355,7 +1301,7 @@ impl<'a> ExpressionCompiler<'a> {
       Ok(value) => value,
       Err(err) => {
         self.fnc.todo(lit.span(), err);
-        return Value::Register(self.fnc.allocate_numbered_reg("_todo_unsupported_literal"));
+        Value::Register(self.fnc.allocate_numbered_reg("_todo_unsupported_literal"))
       }
     }
   }
@@ -1372,9 +1318,7 @@ impl<'a> ExpressionCompiler<'a> {
             level: DiagnosticLevel::InternalError,
             message: format!(
               "Register mismatch for parameter {} (expected {}, got {})",
-              ident.id.sym.to_string(),
-              ident_reg,
-              register
+              ident.id.sym, ident_reg, register
             ),
             span: pat.span(),
           });
@@ -1537,7 +1481,7 @@ impl<'a> ExpressionCompiler<'a> {
         })));
       }
 
-      let mut compiled_elem = self.compile(&*arg.expr, None);
+      let mut compiled_elem = self.compile(&arg.expr, None);
 
       if arg.spread.is_some() {
         segments.push(compiled_elem.value);
@@ -1601,7 +1545,7 @@ impl<'a> ExpressionCompiler<'a> {
 pub fn make_unary_op(op: swc_ecma_ast::UnaryOp, arg: Value, dst: Register) -> Option<Instruction> {
   use swc_ecma_ast::UnaryOp::*;
 
-  return match op {
+  match op {
     Minus => Some(Instruction::UnaryMinus(arg, dst)),
     Plus => Some(Instruction::UnaryPlus(arg, dst)),
     Bang => Some(Instruction::OpNot(arg, dst)),
@@ -1609,7 +1553,7 @@ pub fn make_unary_op(op: swc_ecma_ast::UnaryOp, arg: Value, dst: Register) -> Op
     TypeOf => Some(Instruction::TypeOf(arg, dst)),
     Void => None,   // TODO
     Delete => None, // TODO
-  };
+  }
 }
 
 pub fn make_binary_op(
@@ -1655,7 +1599,7 @@ pub fn get_binary_op_for_assign_op(
   use swc_ecma_ast::AssignOp;
   use swc_ecma_ast::BinaryOp;
 
-  return match assign_op {
+  match assign_op {
     AssignOp::Assign => None,
     AssignOp::AddAssign => Some(BinaryOp::Add),
     AssignOp::SubAssign => Some(BinaryOp::Sub),
@@ -1672,7 +1616,7 @@ pub fn get_binary_op_for_assign_op(
     AssignOp::AndAssign => Some(BinaryOp::LogicalAnd),
     AssignOp::OrAssign => Some(BinaryOp::LogicalOr),
     AssignOp::NullishAssign => Some(BinaryOp::NullishCoalescing),
-  };
+  }
 }
 
 pub fn make_update_op(op: swc_ecma_ast::UpdateOp, register: Register) -> Instruction {

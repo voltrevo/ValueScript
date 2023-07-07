@@ -18,10 +18,9 @@ pub struct Module {
 impl Module {
   pub fn as_lines(&self) -> Vec<String> {
     let assembly_str = self.to_string();
-    let assembly_lines = assembly_str.split("\n");
-    let assembly_lines_vec = assembly_lines.map(|s| s.to_string()).collect();
+    let assembly_lines = assembly_str.split('\n');
 
-    return assembly_lines_vec;
+    assembly_lines.map(|s| s.to_string()).collect()
   }
 }
 
@@ -37,13 +36,13 @@ impl Default for Module {
 
 impl std::fmt::Display for Module {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    if self.export_star.properties.len() == 0 {
+    if self.export_star.properties.is_empty() {
       write!(f, "export {} {}", self.export_default, self.export_star)?;
     } else {
-      write!(f, "export {} {{\n", self.export_default)?;
+      writeln!(f, "export {} {{", self.export_default)?;
 
       for (name, value) in &self.export_star.properties {
-        write!(f, "    {}: {},\n", name, value)?;
+        writeln!(f, "    {}: {},", name, value)?;
       }
 
       write!(f, "}}")?;
@@ -53,7 +52,7 @@ impl std::fmt::Display for Module {
       write!(f, "\n\n{}", definition)?;
     }
 
-    return Ok(());
+    Ok(())
   }
 }
 
@@ -138,14 +137,14 @@ impl std::fmt::Display for Function {
       }
       write!(f, "{}", parameter)?;
     }
-    write!(f, ") {{\n")?;
+    writeln!(f, ") {{")?;
     for fn_line in &self.body {
       match fn_line {
-        FnLine::Instruction(instruction) => write!(f, "    {}\n", instruction)?,
-        FnLine::Label(label) => write!(f, "  {}\n", label)?,
-        FnLine::Empty => write!(f, "\n")?,
-        FnLine::Comment(message) => write!(f, "    // {}\n", message)?,
-        FnLine::Release(reg) => write!(f, "    (release {})\n", reg)?,
+        FnLine::Instruction(instruction) => writeln!(f, "    {}", instruction)?,
+        FnLine::Label(label) => writeln!(f, "  {}", label)?,
+        FnLine::Empty => writeln!(f)?,
+        FnLine::Comment(message) => writeln!(f, "    // {}", message)?,
+        FnLine::Release(reg) => writeln!(f, "    (release {})", reg)?,
       }
     }
     write!(f, "}}")
@@ -169,12 +168,12 @@ impl std::fmt::Display for Class {
 
     match &self.prototype {
       Value::Object(object) => {
-        if object.properties.len() == 0 {
+        if object.properties.is_empty() {
           writeln!(f, "{{}},")?;
         } else {
-          write!(f, "{{\n")?;
+          writeln!(f, "{{")?;
           for (name, method) in &object.properties {
-            write!(f, "        {}: {},\n", name, method)?;
+            writeln!(f, "        {}: {},", name, method)?;
           }
           writeln!(f, "    }},")?;
         }
@@ -188,12 +187,12 @@ impl std::fmt::Display for Class {
 
     match &self.static_ {
       Value::Object(object) => {
-        if object.properties.len() == 0 {
+        if object.properties.is_empty() {
           writeln!(f, "{{}},")?;
         } else {
-          write!(f, "{{\n")?;
+          writeln!(f, "{{")?;
           for (name, method) in &object.properties {
-            write!(f, "        {}: {},\n", name, method)?;
+            writeln!(f, "        {}: {},", name, method)?;
           }
           writeln!(f, "    }},")?;
         }
@@ -205,7 +204,7 @@ impl std::fmt::Display for Class {
 
     write!(f, "}}")?;
 
-    return Ok(());
+    Ok(())
   }
 }
 
@@ -256,26 +255,23 @@ impl Register {
   }
 
   pub fn is_return(&self) -> bool {
-    return self.name == "return";
+    self.name == "return"
   }
 
   pub fn is_this(&self) -> bool {
-    return self.name == "this";
+    self.name == "this"
   }
 
   pub fn is_named(&self) -> bool {
-    match self.name.as_str() {
-      "return" | "this" | "ignore" => false,
-      _ => true,
-    }
+    !matches!(self.name.as_str(), "return" | "this" | "ignore")
   }
 
   pub fn is_ignore(&self) -> bool {
-    return self.name == "ignore";
+    self.name == "ignore"
   }
 
   pub fn is_special(&self) -> bool {
-    return self.is_return() || self.is_this() || self.is_ignore();
+    self.is_return() || self.is_this() || self.is_ignore()
   }
 
   pub fn value_type(&self) -> ValueType {
@@ -398,7 +394,7 @@ impl Value {
 
   pub fn visit_values_mut<F>(&mut self, visit: &mut F)
   where
-    F: FnMut(&mut Value) -> (),
+    F: FnMut(&mut Value),
   {
     visit(self);
 
@@ -429,7 +425,7 @@ impl Value {
 
   pub fn visit_registers_mut_rev<F>(&mut self, visit: &mut F)
   where
-    F: FnMut(RegisterVisitMut) -> (),
+    F: FnMut(RegisterVisitMut),
   {
     match self {
       Value::Array(array) => {
@@ -499,15 +495,15 @@ pub struct Lazy {
 
 impl std::fmt::Display for Lazy {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "lazy {{\n")?;
+    writeln!(f, "lazy {{")?;
 
     for fn_line in &self.body {
       match fn_line {
-        FnLine::Instruction(instruction) => write!(f, "    {}\n", instruction)?,
-        FnLine::Label(label) => write!(f, "  {}\n", label)?,
-        FnLine::Empty => write!(f, "\n")?,
-        FnLine::Comment(message) => write!(f, "    // {}\n", message)?,
-        FnLine::Release(reg) => write!(f, "    (release {})\n", reg)?,
+        FnLine::Instruction(instruction) => writeln!(f, "    {}", instruction)?,
+        FnLine::Label(label) => writeln!(f, "  {}", label)?,
+        FnLine::Empty => writeln!(f)?,
+        FnLine::Comment(message) => writeln!(f, "    // {}", message)?,
+        FnLine::Release(reg) => writeln!(f, "    (release {})", reg)?,
       }
     }
 
@@ -551,7 +547,7 @@ pub struct Object {
 
 impl std::fmt::Display for Object {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    if self.properties.len() == 0 {
+    if self.properties.is_empty() {
       return write!(f, "{{}}");
     }
 
