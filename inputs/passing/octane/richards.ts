@@ -327,8 +327,8 @@ const STATE_SUSPENDED = 2;
  */
 const STATE_HELD = 4;
 
-const STATE_SUSPENDED_RUNNABLE = 3 /* STATE_SUSPENDED | STATE_RUNNABLE */;
-const STATE_NOT_HELD = ~4 /* Equal: [-5, ~4, ~STATE_HELD, STATE_NOT_HELD] */;
+const STATE_SUSPENDED_RUNNABLE = 3 /* TODO: STATE_SUSPENDED | STATE_RUNNABLE */;
+const STATE_NOT_HELD = ~STATE_HELD;
 
 /**
  * A task control block manages a task and the queue of work packages associated
