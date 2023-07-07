@@ -438,6 +438,8 @@ not the subset of ValueScript that has actually been implemented.
   - `{} === {} -> true`
   - JS: `-> false`
   - This is a value semantics thing - objects don't have identity
+- TypeScript enums
+- TypeScript parameter properties
 - Many unusual JS things:
   - `[] + [] -> ""`
   - `[10, 1, 3].sort() -> [1, 10, 3]`
@@ -476,7 +478,6 @@ not the subset of ValueScript that has actually been implemented.
 - Object spreading
 - Rest params
 - Async functions
-- TypeScript enums
 - TypeScript namespaces
 - Capturing `this` in arrow functions
 - `export * from`
