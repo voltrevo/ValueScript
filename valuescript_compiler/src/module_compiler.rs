@@ -205,7 +205,7 @@ impl ModuleCompiler {
             .scope_analysis
             .lookup(ident)
             .map(|name| name.value.clone()),
-          expr => static_eval_expr(expr),
+          expr => static_eval_expr(&self.scope_analysis, expr),
         };
 
         match value {
@@ -298,7 +298,7 @@ impl ModuleCompiler {
           };
 
           if let (Some(ident), Some(init)) = (ident, init) {
-            let value = match static_eval_expr(init) {
+            let value = match static_eval_expr(&self.scope_analysis, init) {
               Some(value) => value,
               None => {
                 self.todo(
@@ -407,7 +407,7 @@ impl ModuleCompiler {
       ));
     }
 
-    let enum_value = compile_enum_value(ts_enum, &mut self.diagnostics);
+    let enum_value = compile_enum_value(&self.scope_analysis, ts_enum, &mut self.diagnostics);
 
     self.module.definitions.push(Definition {
       pointer,
@@ -918,16 +918,18 @@ impl ModuleCompiler {
         Method(method) => {
           let name = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
-            swc_ecma_ast::PropName::Computed(computed) => match static_eval_expr(&computed.expr) {
-              None => {
-                self.todo(
-                  computed.span,
-                  "Couldn't statically evaluate computed prop name",
-                );
-                continue;
+            swc_ecma_ast::PropName::Computed(computed) => {
+              match static_eval_expr(&self.scope_analysis, &computed.expr) {
+                None => {
+                  self.todo(
+                    computed.span,
+                    "Couldn't statically evaluate computed prop name",
+                  );
+                  continue;
+                }
+                Some(value) => value,
               }
-              Some(value) => value,
-            },
+            }
             _ => {
               self.todo(method.span, "Non-identifier method name");
               continue;

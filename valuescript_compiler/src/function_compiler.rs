@@ -1253,7 +1253,7 @@ impl FunctionCompiler {
           }
         };
 
-        let enum_value = compile_enum_value(ts_enum, &mut self.diagnostics);
+        let enum_value = compile_enum_value(&self.scope_analysis, ts_enum, &mut self.diagnostics);
 
         self.definitions.push(Definition {
           pointer,
