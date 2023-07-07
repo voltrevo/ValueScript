@@ -157,8 +157,28 @@ export default class Range<T = never> implements Iterable<T> {
     return new Range(res());
   }
 
-  // TODO: Negative indexes
   at(n: number) {
+    if (n < 0) {
+      if (n === -1) {
+        return this.last();
+      }
+
+      let buf: T[] = [];
+      let len = -n;
+      let i = 0;
+
+      for (const x of this.iterable) {
+        buf[i % len] = x;
+        i++;
+      }
+
+      if (buf.length < len) {
+        return undefined;
+      }
+
+      return buf[i % len];
+    }
+
     let i = 0;
 
     for (const x of this.iterable) {
@@ -345,12 +365,11 @@ export default class Range<T = never> implements Iterable<T> {
       return new Range(iter());
     }
 
-    // TODO: `in` operator
-    if (hasKey(iter, Symbol.iterator)) {
+    if (Symbol.iterator in iter) {
       return new Range(iter);
     }
 
-    if (hasKey(iter, "next")) {
+    if ("next" in iter) {
       return Range.fromIterator(iter);
     }
 
@@ -386,13 +405,6 @@ export default class Range<T = never> implements Iterable<T> {
   static primes() {
     return new Range(primes());
   }
-}
-
-function hasKey<Obj, K extends string | symbol>(
-  obj: unknown,
-  key: K,
-): obj is Obj & Record<K, unknown> {
-  return (obj as Record<K, unknown>)[key] !== undefined;
 }
 
 function never(x: never): never {
