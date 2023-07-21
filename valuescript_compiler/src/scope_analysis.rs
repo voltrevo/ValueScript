@@ -295,6 +295,18 @@ impl ScopeAnalysis {
     );
   }
 
+  fn handle_capture_chain(&mut self, scope: &Scope, name: &Name, ref_: swc_common::Span) {
+    if scope.borrow().owner_id == name.owner_id {
+      return;
+    }
+
+    self.insert_capture(&scope.borrow().owner_id, &name.id, ref_);
+
+    if let Some(parent_scope) = &scope.borrow().parent {
+      self.handle_capture_chain(parent_scope, name, ref_);
+    }
+  }
+
   fn insert_capture(&mut self, captor_id: &OwnerId, name_id: &NameId, ref_: swc_common::Span) {
     let name = match self.names.get_mut(name_id) {
       Some(name) => name,
@@ -1629,7 +1641,7 @@ impl ScopeAnalysis {
     );
 
     let name = match self.names.get(&name_id) {
-      Some(name) => name,
+      Some(name) => name.clone(),
       None => {
         self.diagnostics.push(Diagnostic {
           level: DiagnosticLevel::InternalError,
@@ -1640,9 +1652,7 @@ impl ScopeAnalysis {
       }
     };
 
-    if name.owner_id != scope.borrow().owner_id {
-      self.insert_capture(&scope.borrow().owner_id, &name_id, ident.span);
-    }
+    self.handle_capture_chain(scope, &name, ident.span);
   }
 
   fn prop_key(&mut self, scope: &Scope, prop_name: &swc_ecma_ast::PropName) {
