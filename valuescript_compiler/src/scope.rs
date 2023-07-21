@@ -9,7 +9,8 @@ use crate::{asm::Builtin, constants::CONSTANTS};
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub enum NameId {
-  Span(swc_common::Span),
+  Span(swc_common::Span), // Original identifier
+  This(swc_common::Span), // owner id span
   Builtin(Builtin),
   Constant(&'static str),
 }
@@ -17,7 +18,7 @@ pub enum NameId {
 impl Spanned for NameId {
   fn span(&self) -> swc_common::Span {
     match self {
-      NameId::Span(span) => *span,
+      NameId::Span(span) | NameId::This(span) => *span,
       NameId::Builtin(_) => swc_common::DUMMY_SP,
       NameId::Constant(_) => swc_common::DUMMY_SP,
     }
@@ -73,18 +74,21 @@ impl ScopeTrait for Scope {
     if old_mapping.is_some() {
       diagnostics.push(Diagnostic {
         level: DiagnosticLevel::Error,
-        message: "Scope overwrite occurred (TODO: being permissive about this)".to_string(),
+        message: format!(
+          "Scope overwrite of `{}` occurred (TODO: being permissive about this)",
+          name
+        ),
         span,
       });
     }
   }
 
   fn nest(&self, name_owner_location: Option<OwnerId>) -> Rc<RefCell<ScopeData>> {
-    return Rc::new(RefCell::new(ScopeData {
+    Rc::new(RefCell::new(ScopeData {
       owner_id: name_owner_location.unwrap_or(self.borrow().owner_id.clone()),
       name_map: Default::default(),
       parent: Some(self.clone()),
-    }));
+    }))
   }
 }
 

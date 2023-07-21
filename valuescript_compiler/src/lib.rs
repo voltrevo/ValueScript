@@ -8,6 +8,7 @@ mod diagnostic;
 mod expression_compiler;
 mod function_compiler;
 mod gather_modules;
+mod ident;
 mod import_pattern;
 mod instruction;
 mod link_module;
