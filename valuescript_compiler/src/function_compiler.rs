@@ -849,10 +849,6 @@ impl FunctionCompiler {
       let snap_registers = self.get_mutated_registers(try_.block.span);
 
       for reg in snap_registers {
-        if !reg.is_named() {
-          continue;
-        }
-
         let snap_reg = self.allocate_reg_fresh(&format!("snap_{}", reg.name));
 
         self.push(Instruction::Mov(

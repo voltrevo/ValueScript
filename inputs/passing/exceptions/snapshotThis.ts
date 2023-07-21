@@ -1,5 +1,4 @@
-//! test_output(1)
-// (Should be 0.)
+//! test_output(0)
 
 export default function main() {
   let foo = new Foo();
