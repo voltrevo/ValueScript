@@ -3,6 +3,7 @@ use std::mem::take;
 use crate::{
   asm::{Instruction, Register, Value},
   expression_compiler::{CompiledExpression, ExpressionCompiler},
+  ident::Ident as CrateIdent,
   Diagnostic, DiagnosticLevel,
 };
 use swc_common::Spanned;
@@ -23,7 +24,7 @@ impl TargetAccessor {
     use swc_ecma_ast::Expr::*;
 
     return match expr {
-      Ident(ident) => match ec.fnc.lookup(ident) {
+      Ident(ident) => match ec.fnc.lookup(&crate::ident::Ident::from_swc_ident(ident)) {
         Some(name) => !name.effectively_const,
         _ => false, // TODO: InternalError?
       },
@@ -56,8 +57,8 @@ impl TargetAccessor {
     use swc_ecma_ast::Expr::*;
 
     return match expr {
-      Ident(ident) => TargetAccessor::compile_ident(ec, ident),
-      This(_) => TargetAccessor::Register(Register::this()),
+      Ident(ident) => TargetAccessor::compile_ident(ec, &CrateIdent::from_swc_ident(ident)),
+      This(this) => TargetAccessor::compile_ident(ec, &CrateIdent::this(this.span)),
       Member(member) => {
         let obj = TargetAccessor::compile(ec, &member.obj, false);
         let subscript = ec.member_prop(&member.prop, None);
@@ -100,7 +101,7 @@ impl TargetAccessor {
     };
   }
 
-  pub fn compile_ident(ec: &mut ExpressionCompiler, ident: &swc_ecma_ast::Ident) -> TargetAccessor {
+  pub fn compile_ident(ec: &mut ExpressionCompiler, ident: &CrateIdent) -> TargetAccessor {
     TargetAccessor::Register(ec.get_register_for_ident_mutation(ident))
   }
 

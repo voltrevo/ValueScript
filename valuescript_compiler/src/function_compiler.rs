@@ -14,6 +14,7 @@ use crate::compile_enum_value::compile_enum_value;
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
+use crate::ident::Ident;
 use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, Name, ScopeAnalysis};
@@ -132,7 +133,7 @@ impl FunctionCompiler {
     self.current.body.push(FnLine::Comment(message));
   }
 
-  pub fn lookup(&mut self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
+  pub fn lookup(&mut self, ident: &Ident) -> Option<&Name> {
     let name = self.scope_analysis.lookup(ident);
 
     if name.is_none() {
@@ -146,7 +147,7 @@ impl FunctionCompiler {
     name
   }
 
-  pub fn lookup_value(&self, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+  pub fn lookup_value(&self, ident: &Ident) -> Option<Value> {
     self.scope_analysis.lookup_value(&self.owner_id, ident)
   }
 
@@ -404,7 +405,7 @@ impl FunctionCompiler {
                 swc_ecma_ast::TsParamPropParam::Ident(ident) => {
                   match ident.id.sym.to_string().as_str() {
                     "this" => None,
-                    _ => Some(self.get_variable_register(&ident.id)),
+                    _ => Some(self.get_variable_register(&Ident::from_swc_ident(&ident.id))),
                   }
                 }
                 swc_ecma_ast::TsParamPropParam::Assign(assign) => {
@@ -431,7 +432,7 @@ impl FunctionCompiler {
     Some(match param_pat {
       Pat::Ident(ident) => match ident.id.sym.to_string().as_str() {
         "this" => return None,
-        _ => self.get_variable_register(&ident.id),
+        _ => self.get_variable_register(&Ident::from_swc_ident(&ident.id)),
       },
       Pat::Assign(assign) => return self.get_pattern_register_opt(&assign.left),
       Pat::Array(_) => self.allocate_numbered_reg("_array_pat"),
@@ -452,7 +453,7 @@ impl FunctionCompiler {
     }
   }
 
-  pub fn get_variable_register(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
+  pub fn get_variable_register(&mut self, ident: &Ident) -> Register {
     match self.scope_analysis.lookup_value(&self.owner_id, ident) {
       Some(Value::Register(reg)) => reg,
       lookup_result => {
@@ -462,7 +463,7 @@ impl FunctionCompiler {
             "Register should have been allocated for variable {}, instead: {:?}",
             ident.sym, lookup_result,
           ),
-          span: ident.span(),
+          span: ident.span,
         });
 
         self.allocate_numbered_reg("_error_variable_without_register")
@@ -1220,7 +1221,7 @@ impl FunctionCompiler {
         self
           .queue
           .add(QueuedFunction {
-            definition_pointer: match self.lookup_value(&fn_decl.ident) {
+            definition_pointer: match self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident)) {
               Some(Value::Pointer(p)) => p,
               _ => {
                 self.diagnostics.push(Diagnostic {
@@ -1228,7 +1229,7 @@ impl FunctionCompiler {
                   message: format!(
                     "Lookup of function {} was not a pointer, lookup_result: {:?}",
                     fn_decl.ident.sym,
-                    self.lookup_value(&fn_decl.ident)
+                    self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident))
                   ),
                   span: fn_decl.ident.span,
                 });
@@ -1247,7 +1248,7 @@ impl FunctionCompiler {
       TsEnum(ts_enum) => {
         let pointer = match self
           .scope_analysis
-          .lookup_value(&OwnerId::Module, &ts_enum.id)
+          .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(&ts_enum.id))
         {
           Some(Value::Pointer(p)) => p,
           _ => {

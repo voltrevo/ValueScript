@@ -16,6 +16,7 @@ use crate::compile_enum_value::compile_enum_value;
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
 use crate::function_compiler::{FunctionCompiler, Functionish};
+use crate::ident::Ident;
 use crate::name_allocator::{ident_from_str, NameAllocator};
 use crate::scope::OwnerId;
 use crate::scope_analysis::ScopeAnalysis;
@@ -205,7 +206,7 @@ impl ModuleCompiler {
         let value = match &*ede.expr {
           swc_ecma_ast::Expr::Ident(ident) => self
             .scope_analysis
-            .lookup(ident)
+            .lookup(&Ident::from_swc_ident(ident))
             .map(|name| name.value.clone()),
           expr => static_eval_expr(&self.scope_analysis, &self.constants_map.borrow(), expr),
         };
@@ -315,7 +316,7 @@ impl ModuleCompiler {
               }
             };
 
-            let pointer = match self.scope_analysis.lookup(ident) {
+            let pointer = match self.scope_analysis.lookup(&Ident::from_swc_ident(ident)) {
               Some(name) => match &name.value {
                 Value::Pointer(p) => p.clone(),
                 _ => {
@@ -363,7 +364,7 @@ impl ModuleCompiler {
 
     let pointer = match self
       .scope_analysis
-      .lookup_value(&OwnerId::Module, &fn_.ident)
+      .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(&fn_.ident))
     {
       Some(Value::Pointer(p)) => p,
       _ => {
@@ -396,7 +397,7 @@ impl ModuleCompiler {
   fn compile_enum_decl(&mut self, export: bool, ts_enum: &swc_ecma_ast::TsEnumDecl) {
     let pointer = match self
       .scope_analysis
-      .lookup_value(&OwnerId::Module, &ts_enum.id)
+      .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(&ts_enum.id))
     {
       Some(Value::Pointer(p)) => p,
       _ => {
@@ -443,7 +444,10 @@ impl ModuleCompiler {
           Some(ident) => {
             let fn_name = ident.sym.to_string();
 
-            let defn = match self.scope_analysis.lookup_value(&OwnerId::Module, ident) {
+            let defn = match self
+              .scope_analysis
+              .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(ident))
+            {
               Some(Value::Pointer(p)) => p,
               _ => {
                 self.diagnostics.push(Diagnostic {
@@ -569,7 +573,7 @@ impl ModuleCompiler {
             }
             None => match self
               .scope_analysis
-              .lookup_value(&OwnerId::Module, orig_name)
+              .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(orig_name))
             {
               Some(Value::Pointer(p)) => Some(p),
               lookup_result => {
@@ -694,7 +698,7 @@ impl ModuleCompiler {
 
           let pointer = match self
             .scope_analysis
-            .lookup_value(&OwnerId::Module, &named.local)
+            .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(&named.local))
           {
             Some(Value::Pointer(p)) => p,
             _ => {
@@ -730,7 +734,7 @@ impl ModuleCompiler {
 
           let pointer = match self
             .scope_analysis
-            .lookup_value(&OwnerId::Module, &default.local)
+            .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(&default.local))
           {
             Some(Value::Pointer(p)) => p,
             _ => {
@@ -759,7 +763,7 @@ impl ModuleCompiler {
 
           let pointer = match self
             .scope_analysis
-            .lookup_value(&OwnerId::Module, &namespace.local)
+            .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(&namespace.local))
           {
             Some(Value::Pointer(p)) => p,
             _ => {
@@ -819,7 +823,10 @@ impl ModuleCompiler {
     let mut dependent_definitions: Vec<Definition>;
 
     let defn_name = match ident {
-      Some(ident) => match self.scope_analysis.lookup_value(&OwnerId::Module, ident) {
+      Some(ident) => match self
+        .scope_analysis
+        .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(ident))
+      {
         Some(Value::Pointer(p)) => p,
         _ => {
           self.diagnostics.push(Diagnostic {

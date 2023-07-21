@@ -6,6 +6,7 @@ use swc_common::Spanned;
 use crate::asm::{Array, Instruction, Label, Number, Object, Register, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
+use crate::ident::Ident as CrateIdent;
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, NameType};
 use crate::target_accessor::TargetAccessor;
@@ -86,7 +87,7 @@ impl<'a> ExpressionCompiler<'a> {
     use swc_ecma_ast::Expr::*;
 
     match expr {
-      This(_) => Value::Register(Register::this()).to_ce(),
+      This(this) => self.ident(&CrateIdent::this(this.span), target_register),
       Array(array_exp) => self.array_expression(array_exp, target_register),
       Object(object_exp) => self.object_expression(object_exp, target_register),
       Fn(fn_) => self.fn_expression(fn_, target_register),
@@ -123,7 +124,7 @@ impl<'a> ExpressionCompiler<'a> {
 
         self.compile(seq_exp.exprs.last().unwrap(), target_register)
       }
-      Ident(ident) => self.identifier(ident, target_register),
+      Ident(ident) => self.ident(&CrateIdent::from_swc_ident(ident), target_register),
       Lit(lit) => self.compile_literal(lit).to_ce(),
       Tpl(tpl) => self.template_literal(tpl, target_register),
       TaggedTpl(tagged_tpl) => {
@@ -292,7 +293,7 @@ impl<'a> ExpressionCompiler<'a> {
     CompiledExpression::new(Value::Register(target), nested_registers)
   }
 
-  pub fn get_register_for_ident_mutation(&mut self, ident: &swc_ecma_ast::Ident) -> Register {
+  pub fn get_register_for_ident_mutation(&mut self, ident: &CrateIdent) -> Register {
     let (reg, err_msg) = match self.fnc.lookup_value(ident) {
       Some(Value::Register(reg)) => (Some(reg), None),
       lookup_result => (
@@ -343,7 +344,9 @@ impl<'a> ExpressionCompiler<'a> {
   ) -> CompiledExpression {
     let mut at = match &assign_expr.left {
       swc_ecma_ast::PatOrExpr::Pat(pat) => match &**pat {
-        swc_ecma_ast::Pat::Ident(ident) => TargetAccessor::compile_ident(self, &ident.id),
+        swc_ecma_ast::Pat::Ident(ident) => {
+          TargetAccessor::compile_ident(self, &CrateIdent::from_swc_ident(&ident.id))
+        }
         swc_ecma_ast::Pat::Expr(expr) => TargetAccessor::compile(self, expr, true),
         _ => return self.assign_pat_eq(pat, &assign_expr.right, target_register),
       },
@@ -410,9 +413,9 @@ impl<'a> ExpressionCompiler<'a> {
     let mut target = match &assign_expr.left {
       PatOrExpr::Expr(expr) => TargetAccessor::compile(self, expr, true),
       PatOrExpr::Pat(pat) => match &**pat {
-        Pat::Ident(ident) => {
-          TargetAccessor::Register(self.get_register_for_ident_mutation(&ident.id))
-        }
+        Pat::Ident(ident) => TargetAccessor::Register(
+          self.get_register_for_ident_mutation(&CrateIdent::from_swc_ident(&ident.id)),
+        ),
         _ => {
           self.fnc.diagnostics.push(Diagnostic {
             level: DiagnosticLevel::Error,
@@ -496,7 +499,7 @@ impl<'a> ExpressionCompiler<'a> {
           Prop::Shorthand(ident) => {
             let prop_key = Value::String(ident.sym.to_string());
 
-            let mut compiled_value = self.identifier(ident, None);
+            let mut compiled_value = self.ident(&CrateIdent::from_swc_ident(ident), None);
             sub_nested_registers.append(&mut compiled_value.nested_registers);
             compiled_value.release_checker.has_unreleased_registers = false;
             let prop_value = compiled_value.value;
@@ -1224,9 +1227,9 @@ impl<'a> ExpressionCompiler<'a> {
     CompiledExpression::new(Value::Register(dst), nested_registers)
   }
 
-  pub fn identifier(
+  pub fn ident(
     &mut self,
-    ident: &swc_ecma_ast::Ident,
+    ident: &CrateIdent,
     target_register: Option<Register>,
   ) -> CompiledExpression {
     let fn_as_owner_id = match self.fnc.scope_analysis.lookup(ident) {
@@ -1251,14 +1254,14 @@ impl<'a> ExpressionCompiler<'a> {
       }
     };
 
+    let value = self.fnc.lookup_value(ident).unwrap_or_default();
+
     let name = match self.fnc.lookup(ident) {
       Some(v) => v,
       None => {
         return Value::Undefined.to_ce();
       }
     };
-
-    let value = name.value.clone();
 
     match fn_as_owner_id {
       Some(owner_id) => {
@@ -1376,7 +1379,9 @@ impl<'a> ExpressionCompiler<'a> {
             }
             ObjectPatProp::Assign(assign) => {
               let key = assign.key.sym.to_string();
-              let reg = self.fnc.get_variable_register(&assign.key);
+              let reg = self
+                .fnc
+                .get_variable_register(&CrateIdent::from_swc_ident(&assign.key));
 
               self.fnc.push(Instruction::Sub(
                 Value::Register(register.clone()),

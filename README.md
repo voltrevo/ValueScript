@@ -440,6 +440,7 @@ not the subset of ValueScript that has actually been implemented.
   - This is a value semantics thing - objects don't have identity
 - TypeScript enums
 - TypeScript parameter properties
+- Capturing `this` in arrow functions
 - Many unusual JS things:
   - `[] + [] -> ""`
   - `[10, 1, 3].sort() -> [1, 10, 3]`
@@ -479,7 +480,6 @@ not the subset of ValueScript that has actually been implemented.
 - Rest params
 - Async functions
 - TypeScript namespaces
-- Capturing `this` in arrow functions
 - `export * from`
   - (`export { name } from` _does_ work)
 - `import.meta`

@@ -5,6 +5,7 @@ use valuescript_vm::operations::to_i32;
 use crate::{
   asm::{Array, Builtin, Number, Object, Pointer, Value},
   expression_compiler::value_from_literal,
+  ident::Ident,
   scope_analysis::ScopeAnalysis,
 };
 
@@ -84,7 +85,10 @@ pub fn static_eval_expr(
     swc_ecma_ast::Expr::SuperProp(_) => None,
     swc_ecma_ast::Expr::Call(_) => None,
     swc_ecma_ast::Expr::New(_) => None,
-    swc_ecma_ast::Expr::Ident(ident) => match sa.lookup(ident).map(|name| name.value.clone()) {
+    swc_ecma_ast::Expr::Ident(ident) => match sa
+      .lookup(&Ident::from_swc_ident(ident))
+      .map(|name| name.value.clone())
+    {
       Some(Value::Pointer(p)) => cm.get(&p).cloned(),
       Some(value) => Some(value),
       None => None,

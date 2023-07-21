@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Ident {
   pub sym: swc_atoms::JsWord,
   pub span: swc_common::Span,

@@ -136,12 +136,12 @@ impl ScopeAnalysis {
     sa
   }
 
-  pub fn lookup(&self, ident: &swc_ecma_ast::Ident) -> Option<&Name> {
+  pub fn lookup(&self, ident: &Ident) -> Option<&Name> {
     let name_id = &self.refs.get(&ident.span)?.name_id;
     self.names.get(name_id)
   }
 
-  pub fn lookup_value(&self, scope: &OwnerId, ident: &swc_ecma_ast::Ident) -> Option<Value> {
+  pub fn lookup_value(&self, scope: &OwnerId, ident: &Ident) -> Option<Value> {
     let name_id = &self.refs.get(&ident.span)?.name_id;
     self.lookup_by_name_id(scope, name_id)
   }
