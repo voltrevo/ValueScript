@@ -1772,7 +1772,6 @@ impl ScopeAnalysis {
           let child_scope = scope.nest(None);
 
           for param in &catch.param {
-            // TODO: Associate the catch param with the catch block
             self.param_pat(&child_scope, param);
           }
 
