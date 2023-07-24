@@ -508,7 +508,37 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
           Prop::Assign(assign) => self.todo(assign.span(), "Assign prop"),
           Prop::Getter(getter) => self.todo(getter.span(), "Getter prop"),
           Prop::Setter(setter) => self.todo(setter.span(), "Setter prop"),
-          Prop::Method(method) => self.todo(method.span(), "Method prop"),
+          Prop::Method(method) => {
+            let mut compiled_key = self.prop_name(&method.key);
+            compiled_key.release_checker.has_unreleased_registers = false;
+            sub_nested_registers.append(&mut compiled_key.nested_registers);
+
+            let prop_key = compiled_key.value;
+
+            let fn_ident = match &method.key {
+              swc_ecma_ast::PropName::Ident(ident) => Some(ident.clone()),
+              _ => None,
+            };
+
+            let fn_name = fn_ident.clone().map(|ident| ident.sym.to_string());
+
+            let p = match &fn_name {
+              Some(name) => self.fnc.allocate_defn(name),
+              None => self.fnc.allocate_defn_numbered("_anon"),
+            };
+
+            self
+              .fnc
+              .queue
+              .add(QueuedFunction {
+                definition_pointer: p.clone(),
+                fn_name: fn_name.clone(),
+                functionish: Functionish::Fn(fn_ident, method.function.clone()),
+              })
+              .expect("Failed to queue function");
+
+            object_asm.properties.push((prop_key, Value::Pointer(p)));
+          }
         },
       }
     }
