@@ -1007,10 +1007,40 @@ impl ModuleCompiler {
               }
               swc_ecma_ast::Prop::Assign(_)
               | swc_ecma_ast::Prop::Getter(_)
-              | swc_ecma_ast::Prop::Setter(_)
-              | swc_ecma_ast::Prop::Method(_) => {
+              | swc_ecma_ast::Prop::Setter(_) => {
                 self.todo(prop.span(), "This type of static prop");
                 return Value::String("(error)".to_string());
+              }
+              swc_ecma_ast::Prop::Method(method) => {
+                let key = match &method.key {
+                  swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
+                  _ => {
+                    self.todo(method.key.span(), "Static non-ident prop names");
+                    Value::String("(error)".to_string())
+                  }
+                };
+
+                let fn_ident = match &method.key {
+                  swc_ecma_ast::PropName::Ident(ident) => Some(ident.clone()),
+                  _ => None,
+                };
+
+                let fn_name = fn_ident.clone().map(|ident| ident.sym.to_string());
+
+                let p = match &fn_name {
+                  Some(name) => self.allocate_defn(name),
+                  None => self.allocate_defn_numbered("_anon"),
+                };
+
+                let mut nested_defns = self.compile_fn(
+                  p.clone(),
+                  fn_name.clone(),
+                  Functionish::Fn(fn_ident, method.function.clone()),
+                );
+
+                self.module.definitions.append(&mut nested_defns);
+
+                (key, Value::Pointer(p))
               }
             },
           };
