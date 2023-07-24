@@ -267,96 +267,106 @@ impl ModuleCompiler {
       }
       Fn(fn_) => self.compile_fn_decl(false, fn_),
       Var(var_decl) => {
-        if var_decl.declare {
-          // Uses the `declare` typescript keyword. Nothing needed to support this.
-          return;
-        }
-
-        if var_decl.kind != swc_ecma_ast::VarDeclKind::Const {
-          // Only `const` variables in the global area. They cannot be mutated, so might as well
-          // insist they are `const` for clarity.
-          self.not_supported(var_decl.span, "non-const module level variable");
-        }
-
-        for decl in &var_decl.decls {
-          let ident = match &decl.name {
-            swc_ecma_ast::Pat::Ident(bi) => Some(&bi.id),
-            _ => {
-              self.todo(decl.name.span(), "Module level destructuring");
-              None
-            }
-          };
-
-          let init = match &decl.init {
-            Some(_) => &decl.init,
-            _ => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::Error,
-                message: "const variable without initializer".to_string(),
-                span: decl.init.span(),
-              });
-
-              &None
-            }
-          };
-
-          if let (Some(ident), Some(init)) = (ident, init) {
-            let value_opt =
-              static_eval_expr(&self.scope_analysis, &self.constants_map.borrow(), init);
-
-            let value = match value_opt {
-              Some(value) => value,
-              None => {
-                self.todo(
-                  init.span(),
-                  "Determine whether initializer can be statically evaluated",
-                );
-
-                Value::String("(Static eval failed)".to_string())
-              }
-            };
-
-            let pointer = match self.scope_analysis.lookup(&Ident::from_swc_ident(ident)) {
-              Some(name) => match &name.value {
-                Value::Pointer(p) => p.clone(),
-                _ => {
-                  self.diagnostics.push(Diagnostic {
-                    level: DiagnosticLevel::InternalError,
-                    message: "Expected pointer for module constant".to_string(),
-                    span: ident.span(),
-                  });
-
-                  continue;
-                }
-              },
-              None => {
-                self.diagnostics.push(Diagnostic {
-                  level: DiagnosticLevel::InternalError,
-                  message: "Failed to lookup name".to_string(),
-                  span: ident.span(),
-                });
-
-                continue;
-              }
-            };
-
-            self
-              .constants_map
-              .borrow_mut()
-              .insert(pointer.clone(), value.clone());
-
-            self.module.definitions.push(Definition {
-              pointer,
-              content: DefinitionContent::Value(value),
-            });
-          }
-        }
+        self.compile_var_decl(var_decl, false);
       }
       TsInterface(_) => {}
       TsTypeAlias(_) => {}
       TsEnum(ts_enum) => self.compile_enum_decl(false, ts_enum),
       TsModule(ts_module) => self.todo(ts_module.span, "TsModule declaration"),
     };
+  }
+
+  fn compile_var_decl(&mut self, var_decl: &swc_ecma_ast::VarDecl, export: bool) {
+    if var_decl.declare {
+      // Uses the `declare` typescript keyword. Nothing needed to support this.
+      return;
+    }
+
+    if var_decl.kind != swc_ecma_ast::VarDeclKind::Const {
+      // Only `const` variables in the global area. They cannot be mutated, so might as well
+      // insist they are `const` for clarity.
+      self.not_supported(var_decl.span, "non-const module level variable");
+    }
+
+    for decl in &var_decl.decls {
+      let ident = match &decl.name {
+        swc_ecma_ast::Pat::Ident(bi) => Some(&bi.id),
+        _ => {
+          self.todo(decl.name.span(), "Module level destructuring");
+          None
+        }
+      };
+
+      let init = match &decl.init {
+        Some(_) => &decl.init,
+        _ => {
+          self.diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: "const variable without initializer".to_string(),
+            span: decl.init.span(),
+          });
+
+          &None
+        }
+      };
+
+      if let (Some(ident), Some(init)) = (ident, init) {
+        let value_opt = static_eval_expr(&self.scope_analysis, &self.constants_map.borrow(), init);
+
+        let value = match value_opt {
+          Some(value) => value,
+          None => {
+            self.todo(
+              init.span(),
+              "Determine whether initializer can be statically evaluated",
+            );
+
+            Value::String("(Static eval failed)".to_string())
+          }
+        };
+
+        let pointer = match self.scope_analysis.lookup(&Ident::from_swc_ident(ident)) {
+          Some(name) => match &name.value {
+            Value::Pointer(p) => p.clone(),
+            _ => {
+              self.diagnostics.push(Diagnostic {
+                level: DiagnosticLevel::InternalError,
+                message: "Expected pointer for module constant".to_string(),
+                span: ident.span(),
+              });
+
+              continue;
+            }
+          },
+          None => {
+            self.diagnostics.push(Diagnostic {
+              level: DiagnosticLevel::InternalError,
+              message: "Failed to lookup name".to_string(),
+              span: ident.span(),
+            });
+
+            continue;
+          }
+        };
+
+        self
+          .constants_map
+          .borrow_mut()
+          .insert(pointer.clone(), value.clone());
+
+        self.module.definitions.push(Definition {
+          pointer: pointer.clone(),
+          content: DefinitionContent::Value(value),
+        });
+
+        if export {
+          self.module.export_star.properties.push((
+            Value::String(ident.sym.to_string()),
+            Value::Pointer(pointer),
+          ));
+        }
+      }
+    }
   }
 
   fn compile_fn_decl(&mut self, export: bool, fn_: &swc_ecma_ast::FnDecl) {
@@ -491,12 +501,7 @@ impl ModuleCompiler {
       }
       Decl::Fn(fn_) => self.compile_fn_decl(true, fn_),
       Decl::Var(var_decl) => {
-        if !var_decl.declare {
-          self.todo(
-            var_decl.span,
-            "non-declare module level var declaration in export",
-          );
-        }
+        self.compile_var_decl(var_decl, true);
       }
       Decl::TsInterface(_) => {}
       Decl::TsTypeAlias(_) => {}
@@ -523,12 +528,7 @@ impl ModuleCompiler {
           let orig_name = match &named.orig {
             ModuleExportName::Ident(ident) => ident,
             ModuleExportName::Str(_) => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "exporting a non-identifier".to_string(),
-                span: named.span,
-              });
-
+              self.todo(named.span, "exporting a non-identifier");
               continue;
             }
           };
