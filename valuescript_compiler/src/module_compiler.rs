@@ -178,28 +178,7 @@ impl ModuleCompiler {
       ExportDecl(ed) => self.compile_export_decl(ed),
       ExportNamed(en) => self.compile_named_export(en),
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
-      ExportDefaultExpr(ede) => {
-        let value = match &*ede.expr {
-          // TODO: Just do identifiers in compile_expr
-          swc_ecma_ast::Expr::Ident(ident) => self
-            .scope_analysis
-            .lookup(&Ident::from_swc_ident(ident))
-            .map(|name| name.value.clone()),
-          expr => Some(self.compile_expr(expr)),
-        };
-
-        match value {
-          Some(value) => {
-            self.module.export_default = value;
-          }
-          None => {
-            self.todo(
-              module_decl.span(),
-              "Failed to evaluate export default expression",
-            );
-          }
-        };
-      }
+      ExportDefaultExpr(ede) => self.module.export_default = self.compile_expr(&ede.expr),
       ExportAll(_) => self.todo(module_decl.span(), "ExportAll declaration"),
       TsImportEquals(_) => self.not_supported(module_decl.span(), "TsImportEquals declaration"),
       TsExportAssignment(_) => {
