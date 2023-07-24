@@ -94,13 +94,7 @@ impl<'a> StaticExpressionCompiler<'a> {
                 return Value::String("(error)".to_string());
               }
               swc_ecma_ast::Prop::Method(method) => {
-                let key = match &method.key {
-                  swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
-                  _ => {
-                    self.todo(method.key.span(), "Static non-ident prop names");
-                    Value::String("(error)".to_string())
-                  }
-                };
+                let key = self.prop_name(&method.key);
 
                 let fn_ident = match &method.key {
                   swc_ecma_ast::PropName::Ident(ident) => Some(ident.clone()),
@@ -274,6 +268,16 @@ impl<'a> StaticExpressionCompiler<'a> {
       swc_ecma_ast::Expr::TsConstAssertion(tca) => self.expr(&tca.expr),
       swc_ecma_ast::Expr::TsNonNull(tnn) => self.expr(&tnn.expr),
       swc_ecma_ast::Expr::TsAs(ta) => self.expr(&ta.expr),
+    }
+  }
+
+  fn prop_name(&mut self, prop_name: &swc_ecma_ast::PropName) -> Value {
+    match prop_name {
+      swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
+      swc_ecma_ast::PropName::Str(str) => Value::String(str.value.to_string()),
+      swc_ecma_ast::PropName::Num(num) => Value::String(num.value.to_string()),
+      swc_ecma_ast::PropName::Computed(computed) => self.expr(&computed.expr),
+      swc_ecma_ast::PropName::BigInt(bi) => Value::String(bi.value.to_string()),
     }
   }
 }
