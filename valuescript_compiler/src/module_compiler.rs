@@ -1046,8 +1046,14 @@ impl ModuleCompiler {
           Value::String("(error)".to_string())
         }
       },
+      swc_ecma_ast::Expr::Arrow(arrow) => {
+        let p = self.allocate_defn_numbered("_anon");
+        let mut fn_defns = self.compile_fn(p.clone(), None, Functionish::Arrow(arrow.clone()));
+        self.module.definitions.append(&mut fn_defns);
+
+        Value::Pointer(p)
+      }
       swc_ecma_ast::Expr::TaggedTpl(_)
-      | swc_ecma_ast::Expr::Arrow(_)
       | swc_ecma_ast::Expr::Class(_)
       | swc_ecma_ast::Expr::Yield(_)
       | swc_ecma_ast::Expr::MetaProp(_)
