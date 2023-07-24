@@ -1021,7 +1021,6 @@ impl ModuleCompiler {
         Value::Object(Box::new(Object { properties }))
       }
       swc_ecma_ast::Expr::This(_)
-      | swc_ecma_ast::Expr::Fn(_)
       | swc_ecma_ast::Expr::Update(_)
       | swc_ecma_ast::Expr::Assign(_)
       | swc_ecma_ast::Expr::SuperProp(_)
@@ -1046,6 +1045,24 @@ impl ModuleCompiler {
           Value::String("(error)".to_string())
         }
       },
+      swc_ecma_ast::Expr::Fn(fn_) => {
+        let fn_name = fn_.ident.clone().map(|ident| ident.sym.to_string());
+
+        let p = match &fn_name {
+          Some(name) => self.allocate_defn(name),
+          None => self.allocate_defn_numbered("_anon"),
+        };
+
+        let mut fn_defns = self.compile_fn(
+          p.clone(),
+          fn_name,
+          Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
+        );
+
+        self.module.definitions.append(&mut fn_defns);
+
+        Value::Pointer(p)
+      }
       swc_ecma_ast::Expr::Arrow(arrow) => {
         let p = self.allocate_defn_numbered("_anon");
         let mut fn_defns = self.compile_fn(p.clone(), None, Functionish::Arrow(arrow.clone()));
@@ -1053,8 +1070,10 @@ impl ModuleCompiler {
 
         Value::Pointer(p)
       }
+      swc_ecma_ast::Expr::Class(class) => {
+        Value::Pointer(self.compile_class(None, class.ident.as_ref(), &class.class))
+      }
       swc_ecma_ast::Expr::TaggedTpl(_)
-      | swc_ecma_ast::Expr::Class(_)
       | swc_ecma_ast::Expr::Yield(_)
       | swc_ecma_ast::Expr::MetaProp(_)
       | swc_ecma_ast::Expr::Await(_)
