@@ -61,11 +61,11 @@ impl Drop for ReleaseChecker {
   }
 }
 
-pub struct ExpressionCompiler<'a> {
-  pub fnc: &'a mut FunctionCompiler,
+pub struct ExpressionCompiler<'a, 'fnc> {
+  pub fnc: &'a mut FunctionCompiler<'fnc>,
 }
 
-impl<'a> ExpressionCompiler<'a> {
+impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
   pub fn compile_top_level(
     &mut self,
     expr: &swc_ecma_ast::Expr,
@@ -952,6 +952,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let capture_params = self
       .fnc
+      .mc
       .scope_analysis
       .get_register_captures(&fn_to_owner_id(&fn_.ident, &fn_.function));
 
@@ -989,6 +990,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     let capture_params = self
       .fnc
+      .mc
       .scope_analysis
       .get_register_captures(&OwnerId::Span(arrow_expr.span));
 
@@ -1075,6 +1077,7 @@ impl<'a> ExpressionCompiler<'a> {
       if !is_param {
         let cap_name = self
           .fnc
+          .mc
           .scope_analysis
           .names
           .get(cap)
@@ -1232,7 +1235,7 @@ impl<'a> ExpressionCompiler<'a> {
     ident: &CrateIdent,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let fn_as_owner_id = match self.fnc.scope_analysis.lookup(ident) {
+    let fn_as_owner_id = match self.fnc.mc.scope_analysis.lookup(ident) {
       Some(name) => match name.type_ == NameType::Function {
         true => match name.id {
           // TODO: This is a bit of a hack, it might break...
@@ -1265,7 +1268,7 @@ impl<'a> ExpressionCompiler<'a> {
 
     match fn_as_owner_id {
       Some(owner_id) => {
-        let capture_params = self.fnc.scope_analysis.get_register_captures(&owner_id);
+        let capture_params = self.fnc.mc.scope_analysis.get_register_captures(&owner_id);
 
         match capture_params.len() {
           0 => value.to_ce(),

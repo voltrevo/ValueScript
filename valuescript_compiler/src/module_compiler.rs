@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use swc_common::errors::{DiagnosticBuilder, Emitter};
@@ -96,12 +94,12 @@ pub fn compile_module(source: &str) -> CompilerOutput {
 }
 
 #[derive(Default)]
-struct ModuleCompiler {
-  diagnostics: Vec<Diagnostic>,
-  definition_allocator: Rc<RefCell<NameAllocator>>,
-  scope_analysis: Rc<ScopeAnalysis>,
-  constants_map: Rc<RefCell<HashMap<Pointer, Value>>>,
-  module: Module,
+pub struct ModuleCompiler {
+  pub diagnostics: Vec<Diagnostic>,
+  pub definition_allocator: NameAllocator,
+  pub scope_analysis: ScopeAnalysis,
+  pub constants_map: HashMap<Pointer, Value>,
+  pub module: Module,
 }
 
 impl ModuleCompiler {
@@ -122,10 +120,7 @@ impl ModuleCompiler {
   }
 
   fn allocate_defn(&mut self, name: &str) -> Pointer {
-    let allocated_name = self
-      .definition_allocator
-      .borrow_mut()
-      .allocate(&name.to_string());
+    let allocated_name = self.definition_allocator.allocate(&name.to_string());
 
     Pointer {
       name: allocated_name,
@@ -133,10 +128,7 @@ impl ModuleCompiler {
   }
 
   fn allocate_defn_numbered(&mut self, name: &str) -> Pointer {
-    let allocated_name = self
-      .definition_allocator
-      .borrow_mut()
-      .allocate_numbered(name);
+    let allocated_name = self.definition_allocator.allocate_numbered(name);
 
     Pointer {
       name: allocated_name,
@@ -169,7 +161,7 @@ impl ModuleCompiler {
     );
 
     let mut self_ = Self {
-      scope_analysis: Rc::new(scope_analysis),
+      scope_analysis,
       diagnostics: scope_analysis_diagnostics,
       ..Default::default()
     };
@@ -208,7 +200,7 @@ impl ModuleCompiler {
             .scope_analysis
             .lookup(&Ident::from_swc_ident(ident))
             .map(|name| name.value.clone()),
-          expr => static_eval_expr(&self.scope_analysis, &self.constants_map.borrow(), expr),
+          expr => static_eval_expr(&self.scope_analysis, &self.constants_map, expr),
         };
 
         match value {
@@ -311,7 +303,7 @@ impl ModuleCompiler {
       };
 
       if let (Some(ident), Some(init)) = (ident, init) {
-        let value_opt = static_eval_expr(&self.scope_analysis, &self.constants_map.borrow(), init);
+        let value_opt = static_eval_expr(&self.scope_analysis, &self.constants_map, init);
 
         let value = match value_opt {
           Some(value) => value,
@@ -349,10 +341,7 @@ impl ModuleCompiler {
           }
         };
 
-        self
-          .constants_map
-          .borrow_mut()
-          .insert(pointer.clone(), value.clone());
+        self.constants_map.insert(pointer.clone(), value.clone());
 
         self.module.definitions.push(Definition {
           pointer: pointer.clone(),
@@ -430,7 +419,7 @@ impl ModuleCompiler {
 
     let enum_value = compile_enum_value(
       &self.scope_analysis,
-      &self.constants_map.borrow(),
+      &self.constants_map,
       ts_enum,
       &mut self.diagnostics,
     );
@@ -797,14 +786,8 @@ impl ModuleCompiler {
     fn_name: Option<String>,
     functionish: Functionish,
   ) -> Vec<Definition> {
-    let (defn, mut diagnostics) = FunctionCompiler::compile(
-      defn_pointer,
-      fn_name,
-      functionish,
-      &self.scope_analysis,
-      &self.constants_map,
-      self.definition_allocator.clone(),
-    );
+    let (defn, mut diagnostics) =
+      FunctionCompiler::compile(self, defn_pointer, fn_name, functionish);
 
     self.diagnostics.append(&mut diagnostics);
 
@@ -848,18 +831,13 @@ impl ModuleCompiler {
       ));
     }
 
-    let mut member_initializers_fnc = FunctionCompiler::new(
-      &self.scope_analysis,
-      &self.constants_map,
-      OwnerId::Span(class.span),
-      self.definition_allocator.clone(),
-    );
+    let mut member_initializers_fnc = FunctionCompiler::new(self, OwnerId::Span(class.span));
 
     for class_member in &class.body {
       match class_member {
         swc_ecma_ast::ClassMember::ClassProp(class_prop) => {
           if class_prop.is_static {
-            self.todo(class_prop.span, "static props");
+            member_initializers_fnc.todo(class_prop.span, "static props");
 
             continue;
           }
@@ -885,7 +863,7 @@ impl ModuleCompiler {
           ec.fnc.release_ce(compiled_value);
         }
         swc_ecma_ast::ClassMember::PrivateProp(private_prop) => {
-          self.todo(private_prop.span, "private props")
+          member_initializers_fnc.todo(private_prop.span, "private props")
         }
         _ => {}
       }
@@ -943,11 +921,8 @@ impl ModuleCompiler {
           let name = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
             swc_ecma_ast::PropName::Computed(computed) => {
-              let value_opt = static_eval_expr(
-                &self.scope_analysis,
-                &self.constants_map.borrow(),
-                &computed.expr,
-              );
+              let value_opt =
+                static_eval_expr(&self.scope_analysis, &self.constants_map, &computed.expr);
 
               match value_opt {
                 None => {

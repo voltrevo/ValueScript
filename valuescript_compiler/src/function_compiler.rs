@@ -1,8 +1,6 @@
 use queues::*;
-use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::mem::take;
-use std::rc::Rc;
 
 use swc_common::Spanned;
 
@@ -15,9 +13,10 @@ use crate::diagnostic::{Diagnostic, DiagnosticLevel};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
 use crate::ident::Ident;
+use crate::module_compiler::ModuleCompiler;
 use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::{NameId, OwnerId};
-use crate::scope_analysis::{fn_to_owner_id, Name, ScopeAnalysis};
+use crate::scope_analysis::{fn_to_owner_id, Name};
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
@@ -62,13 +61,11 @@ pub struct CatchSetting {
   pub reg: Register,
 }
 
-pub struct FunctionCompiler {
+pub struct FunctionCompiler<'a> {
+  pub mc: &'a mut ModuleCompiler,
   pub current: Function,
   pub definitions: Vec<Definition>,
   pub owner_id: OwnerId,
-  pub scope_analysis: Rc<ScopeAnalysis>,
-  pub constants_map: Rc<RefCell<HashMap<Pointer, Value>>>,
-  pub definition_allocator: Rc<RefCell<NameAllocator>>,
   pub reg_allocator: RegAllocator,
   pub label_allocator: NameAllocator,
   pub queue: Queue<QueuedFunction>,
@@ -81,25 +78,18 @@ pub struct FunctionCompiler {
   pub diagnostics: Vec<Diagnostic>,
 }
 
-impl FunctionCompiler {
-  pub fn new(
-    scope_analysis: &Rc<ScopeAnalysis>,
-    constants_map: &Rc<RefCell<HashMap<Pointer, Value>>>,
-    owner_id: OwnerId,
-    definition_allocator: Rc<RefCell<NameAllocator>>,
-  ) -> FunctionCompiler {
-    let reg_allocator = match scope_analysis.reg_allocators.get(&owner_id) {
+impl<'a> FunctionCompiler<'a> {
+  pub fn new(mc: &'a mut ModuleCompiler, owner_id: OwnerId) -> Self {
+    let reg_allocator = match mc.scope_analysis.reg_allocators.get(&owner_id) {
       Some(reg_allocator) => reg_allocator.clone(),
       None => RegAllocator::default(),
     };
 
     FunctionCompiler {
+      mc,
       current: Function::default(),
       definitions: vec![],
       owner_id,
-      scope_analysis: scope_analysis.clone(),
-      constants_map: constants_map.clone(),
-      definition_allocator,
       reg_allocator,
       label_allocator: NameAllocator::default(),
       queue: Queue::new(),
@@ -134,7 +124,7 @@ impl FunctionCompiler {
   }
 
   pub fn lookup(&mut self, ident: &Ident) -> Option<&Name> {
-    let name = self.scope_analysis.lookup(ident);
+    let name = self.mc.scope_analysis.lookup(ident);
 
     if name.is_none() {
       self.diagnostics.push(Diagnostic {
@@ -148,11 +138,12 @@ impl FunctionCompiler {
   }
 
   pub fn lookup_value(&self, ident: &Ident) -> Option<Value> {
-    self.scope_analysis.lookup_value(&self.owner_id, ident)
+    self.mc.scope_analysis.lookup_value(&self.owner_id, ident)
   }
 
   pub fn lookup_by_name_id(&self, name_id: &NameId) -> Option<Value> {
     self
+      .mc
       .scope_analysis
       .lookup_by_name_id(&self.owner_id, name_id)
   }
@@ -182,10 +173,7 @@ impl FunctionCompiler {
   }
 
   pub fn allocate_defn(&mut self, name: &str) -> Pointer {
-    let allocated_name = self
-      .definition_allocator
-      .borrow_mut()
-      .allocate(&name.to_string());
+    let allocated_name = self.mc.definition_allocator.allocate(&name.to_string());
 
     Pointer {
       name: allocated_name,
@@ -193,10 +181,7 @@ impl FunctionCompiler {
   }
 
   pub fn allocate_defn_numbered(&mut self, name: &str) -> Pointer {
-    let allocated_name = self
-      .definition_allocator
-      .borrow_mut()
-      .allocate_numbered(name);
+    let allocated_name = self.mc.definition_allocator.allocate_numbered(name);
 
     Pointer {
       name: allocated_name,
@@ -240,19 +225,12 @@ impl FunctionCompiler {
   }
 
   pub fn compile(
+    mc: &'a mut ModuleCompiler,
     definition_pointer: Pointer,
     fn_name: Option<String>,
     functionish: Functionish,
-    scope_analysis: &Rc<ScopeAnalysis>,
-    constants_map: &Rc<RefCell<HashMap<Pointer, Value>>>,
-    definition_allocator: Rc<RefCell<NameAllocator>>,
   ) -> (Vec<Definition>, Vec<Diagnostic>) {
-    let mut self_ = FunctionCompiler::new(
-      scope_analysis,
-      constants_map,
-      functionish.owner_id(),
-      definition_allocator,
-    );
+    let mut self_ = FunctionCompiler::new(mc, functionish.owner_id());
 
     self_
       .queue
@@ -287,6 +265,7 @@ impl FunctionCompiler {
 
     // TODO: Use a new FunctionCompiler per function instead of this hack
     self.reg_allocator = match self
+      .mc
       .scope_analysis
       .reg_allocators
       .get(&functionish.owner_id())
@@ -298,11 +277,13 @@ impl FunctionCompiler {
     self.owner_id = functionish.owner_id();
 
     let capture_params = self
+      .mc
       .scope_analysis
       .get_register_captures(&functionish.owner_id());
 
     for cap_param in capture_params {
       let reg = match self
+        .mc
         .scope_analysis
         .lookup_capture(&self.owner_id, &cap_param)
       {
@@ -454,7 +435,7 @@ impl FunctionCompiler {
   }
 
   pub fn get_variable_register(&mut self, ident: &Ident) -> Register {
-    match self.scope_analysis.lookup_value(&self.owner_id, ident) {
+    match self.mc.scope_analysis.lookup_value(&self.owner_id, ident) {
       Some(Value::Register(reg)) => reg,
       lookup_result => {
         self.diagnostics.push(Diagnostic {
@@ -1243,6 +1224,7 @@ impl FunctionCompiler {
       TsTypeAlias(_) => {}
       TsEnum(ts_enum) => {
         let pointer = match self
+          .mc
           .scope_analysis
           .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(&ts_enum.id))
         {
@@ -1259,8 +1241,8 @@ impl FunctionCompiler {
         };
 
         let enum_value = compile_enum_value(
-          &self.scope_analysis,
-          &self.constants_map.borrow(),
+          &self.mc.scope_analysis,
+          &self.mc.constants_map,
           ts_enum,
           &mut self.diagnostics,
         );
@@ -1333,7 +1315,7 @@ impl FunctionCompiler {
 
     let mut mutated_registers = BTreeSet::<Register>::new();
 
-    for (_span, mutated_name_id) in self.scope_analysis.mutations.range(start..end) {
+    for (_span, mutated_name_id) in self.mc.scope_analysis.mutations.range(start..end) {
       if let Some(Value::Register(reg)) = self.lookup_by_name_id(mutated_name_id) {
         mutated_registers.insert(reg);
       }
@@ -1342,7 +1324,7 @@ impl FunctionCompiler {
     // TODO: Avoid doing this. This is a workaround to include mutations of variables that are
     // supposed to be const, because we don't yet protect these variables from mutation that occurs
     // via method calls. Once that is implemented, this shouldn't be needed.
-    for (_span, mutated_name_id) in self.scope_analysis.optional_mutations.range(start..end) {
+    for (_span, mutated_name_id) in self.mc.scope_analysis.optional_mutations.range(start..end) {
       if let Some(Value::Register(reg)) = self.lookup_by_name_id(mutated_name_id) {
         mutated_registers.insert(reg);
       }
