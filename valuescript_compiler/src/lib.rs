@@ -2,7 +2,6 @@ pub mod asm;
 mod assembler;
 pub mod assembly_parser;
 mod compile;
-mod compile_enum_value;
 mod constants;
 mod diagnostic;
 mod expression_compiler;
@@ -18,7 +17,6 @@ mod optimization;
 mod resolve_path;
 mod scope;
 mod scope_analysis;
-mod static_eval_expr;
 mod target_accessor;
 mod visit_pointers;
 

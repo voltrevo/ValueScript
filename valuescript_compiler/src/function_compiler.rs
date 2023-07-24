@@ -8,7 +8,6 @@ use crate::asm::{
   Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Pointer, Register,
   Value,
 };
-use crate::compile_enum_value::compile_enum_value;
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticLevel, DiagnosticReporter};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
@@ -1203,7 +1202,7 @@ impl<'a> FunctionCompiler<'a> {
           }
         };
 
-        let enum_value = compile_enum_value(self.mc, ts_enum);
+        let enum_value = self.mc.compile_enum_value(ts_enum);
 
         self.definitions.push(Definition {
           pointer,
