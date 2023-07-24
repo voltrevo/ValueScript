@@ -17,6 +17,7 @@ mod optimization;
 mod resolve_path;
 mod scope;
 mod scope_analysis;
+mod static_expression_compiler;
 mod target_accessor;
 mod visit_pointers;
 
