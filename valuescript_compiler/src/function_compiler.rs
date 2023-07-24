@@ -1240,12 +1240,7 @@ impl<'a> FunctionCompiler<'a> {
           }
         };
 
-        let enum_value = compile_enum_value(
-          &self.mc.scope_analysis,
-          &self.mc.constants_map,
-          ts_enum,
-          &mut self.diagnostics,
-        );
+        let enum_value = compile_enum_value(self.mc, ts_enum);
 
         self.definitions.push(Definition {
           pointer,

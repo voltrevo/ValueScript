@@ -200,7 +200,7 @@ impl ModuleCompiler {
             .scope_analysis
             .lookup(&Ident::from_swc_ident(ident))
             .map(|name| name.value.clone()),
-          expr => static_eval_expr(&self.scope_analysis, &self.constants_map, expr),
+          expr => static_eval_expr(self, expr),
         };
 
         match value {
@@ -303,7 +303,7 @@ impl ModuleCompiler {
       };
 
       if let (Some(ident), Some(init)) = (ident, init) {
-        let value_opt = static_eval_expr(&self.scope_analysis, &self.constants_map, init);
+        let value_opt = static_eval_expr(self, init);
 
         let value = match value_opt {
           Some(value) => value,
@@ -417,12 +417,7 @@ impl ModuleCompiler {
       ));
     }
 
-    let enum_value = compile_enum_value(
-      &self.scope_analysis,
-      &self.constants_map,
-      ts_enum,
-      &mut self.diagnostics,
-    );
+    let enum_value = compile_enum_value(self, ts_enum);
 
     self.module.definitions.push(Definition {
       pointer,
@@ -921,8 +916,7 @@ impl ModuleCompiler {
           let name = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
             swc_ecma_ast::PropName::Computed(computed) => {
-              let value_opt =
-                static_eval_expr(&self.scope_analysis, &self.constants_map, &computed.expr);
+              let value_opt = static_eval_expr(self, &computed.expr);
 
               match value_opt {
                 None => {
