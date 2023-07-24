@@ -2,9 +2,9 @@ use swc_common::Spanned;
 
 use crate::{
   asm::{Number, Object, Value},
+  diagnostic::DiagnosticReporter,
   module_compiler::ModuleCompiler,
   static_eval_expr::static_eval_expr,
-  Diagnostic, DiagnosticLevel,
 };
 
 pub fn compile_enum_value(mc: &mut ModuleCompiler, ts_enum: &swc_ecma_ast::TsEnumDecl) -> Value {
@@ -28,11 +28,7 @@ pub fn compile_enum_value(mc: &mut ModuleCompiler, ts_enum: &swc_ecma_ast::TsEnu
           _ => None,
         },
         None => {
-          mc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: Static eval failed".to_string(),
-            span: init.span(),
-          });
+          mc.internal_error(init.span(), "Static eval failed");
 
           None
         }
@@ -46,11 +42,7 @@ pub fn compile_enum_value(mc: &mut ModuleCompiler, ts_enum: &swc_ecma_ast::TsEnu
         let id = match next_default_id {
           Some(id) => id,
           None => {
-            mc.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: "Missing required initializer".to_string(),
-              span: member.span,
-            });
+            mc.error(member.span, "Missing required initializer");
 
             0.0
           }

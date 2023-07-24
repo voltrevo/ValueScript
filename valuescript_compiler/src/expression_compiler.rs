@@ -4,7 +4,7 @@ use queues::*;
 use swc_common::Spanned;
 
 use crate::asm::{Array, Instruction, Label, Number, Object, Register, Value};
-use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
 use crate::ident::Ident as CrateIdent;
 use crate::scope::{NameId, OwnerId};
@@ -65,6 +65,12 @@ pub struct ExpressionCompiler<'a, 'fnc> {
   pub fnc: &'a mut FunctionCompiler<'fnc>,
 }
 
+impl<'a, 'fnc> DiagnosticContainer for ExpressionCompiler<'a, 'fnc> {
+  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
+    self.fnc.diagnostics_mut()
+  }
+}
+
 impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
   pub fn compile_top_level(
     &mut self,
@@ -97,7 +103,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       Assign(assign_exp) => self.assign_expression(assign_exp, false, target_register),
       Member(member_exp) => self.member_expression(member_exp, target_register),
       SuperProp(super_prop) => {
-        self.fnc.todo(super_prop.span, "SuperProp expression");
+        self.todo(super_prop.span, "SuperProp expression");
         CompiledExpression::empty()
       }
       Cond(cond_exp) => self.cond_expression(cond_exp, target_register),
@@ -109,9 +115,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
           _ => self.call_expression(call_exp, target_register),
         },
         _ => {
-          self
-            .fnc
-            .todo(call_exp.callee.span(), "non-expression callee");
+          self.todo(call_exp.callee.span(), "non-expression callee");
 
           CompiledExpression::empty()
         }
@@ -128,44 +132,42 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       Lit(lit) => self.compile_literal(lit).to_ce(),
       Tpl(tpl) => self.template_literal(tpl, target_register),
       TaggedTpl(tagged_tpl) => {
-        self.fnc.todo(tagged_tpl.span, "TaggedTpl expression");
+        self.todo(tagged_tpl.span, "TaggedTpl expression");
         CompiledExpression::empty()
       }
       Arrow(arrow) => self.arrow_expression(arrow, target_register),
       Class(class_exp) => {
-        self.fnc.todo(class_exp.span(), "Class expression");
+        self.todo(class_exp.span(), "Class expression");
         CompiledExpression::empty()
       }
       Yield(yield_expr) => self.yield_expr(yield_expr, target_register),
       MetaProp(meta_prop) => {
-        self.fnc.todo(meta_prop.span, "MetaProp expression");
+        self.todo(meta_prop.span, "MetaProp expression");
         CompiledExpression::empty()
       }
       Await(await_exp) => {
-        self.fnc.todo(await_exp.span, "Await expression");
+        self.todo(await_exp.span, "Await expression");
         CompiledExpression::empty()
       }
       Paren(p) => self.compile(&p.expr, target_register),
       JSXMember(jsx_member) => {
-        self.fnc.todo(jsx_member.span(), "JSXMember expression");
+        self.todo(jsx_member.span(), "JSXMember expression");
         CompiledExpression::empty()
       }
       JSXNamespacedName(jsx_namespaced_name) => {
-        self
-          .fnc
-          .todo(jsx_namespaced_name.span(), "JSXNamespacedName expression");
+        self.todo(jsx_namespaced_name.span(), "JSXNamespacedName expression");
         CompiledExpression::empty()
       }
       JSXEmpty(jsx_empty) => {
-        self.fnc.todo(jsx_empty.span(), "JSXEmpty expression");
+        self.todo(jsx_empty.span(), "JSXEmpty expression");
         CompiledExpression::empty()
       }
       JSXElement(jsx_element) => {
-        self.fnc.todo(jsx_element.span(), "JSXElement expression");
+        self.todo(jsx_element.span(), "JSXElement expression");
         CompiledExpression::empty()
       }
       JSXFragment(jsx_fragment) => {
-        self.fnc.todo(jsx_fragment.span(), "JSXFragment expression");
+        self.todo(jsx_fragment.span(), "JSXFragment expression");
         CompiledExpression::empty()
       }
       TsTypeAssertion(ts_type_assertion) => self.compile(&ts_type_assertion.expr, target_register),
@@ -175,26 +177,20 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       TsNonNull(ts_non_null_exp) => self.compile(&ts_non_null_exp.expr, target_register),
       TsAs(ts_as_exp) => self.compile(&ts_as_exp.expr, target_register),
       TsInstantiation(ts_instantiation) => {
-        self
-          .fnc
-          .todo(ts_instantiation.span, "TsInstantiation expression");
+        self.todo(ts_instantiation.span, "TsInstantiation expression");
 
         CompiledExpression::empty()
       }
       PrivateName(private_name) => {
-        self.fnc.todo(private_name.span, "PrivateName expression");
+        self.todo(private_name.span, "PrivateName expression");
         CompiledExpression::empty()
       }
       OptChain(opt_chain) => {
-        self.fnc.todo(opt_chain.span, "OptChain expression");
+        self.todo(opt_chain.span, "OptChain expression");
         CompiledExpression::empty()
       }
       Invalid(invalid) => {
-        self.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid expression".to_string(),
-          span: invalid.span,
-        });
+        self.error(invalid.span, "Invalid expression");
 
         CompiledExpression::empty()
       }
@@ -244,9 +240,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       match make_unary_op(un_exp.op, arg.value.clone(), target.clone()) {
         Some(i) => i,
         None => {
-          self
-            .fnc
-            .todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
+          self.todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
 
           return CompiledExpression::empty();
         }
@@ -306,11 +300,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
     };
 
     if let Some(err_msg) = err_msg {
-      self.fnc.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::Error,
-        message: err_msg,
-        span: ident.span,
-      });
+      self.error(ident.span, &err_msg);
     }
 
     if let Some(reg) = reg {
@@ -417,12 +407,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
           self.get_register_for_ident_mutation(&CrateIdent::from_swc_ident(&ident.id)),
         ),
         _ => {
-          self.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: "Invalid lvalue expression".to_string(),
-            span: pat.span(),
-          });
-
+          self.error(pat.span(), "Invalid lvalue expression");
           let bad_reg = self.fnc.allocate_numbered_reg("_bad_lvalue");
 
           TargetAccessor::Register(bad_reg)
@@ -493,7 +478,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
 
       match &object_exp.props[i] {
         PropOrSpread::Spread(spread) => {
-          self.fnc.todo(spread.span(), "spread expression");
+          self.todo(spread.span(), "spread expression");
         }
         PropOrSpread::Prop(prop) => match &**prop {
           Prop::Shorthand(ident) => {
@@ -520,10 +505,10 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
 
             object_asm.properties.push((prop_key, prop_value));
           }
-          Prop::Assign(assign) => self.fnc.todo(assign.span(), "Assign prop"),
-          Prop::Getter(getter) => self.fnc.todo(getter.span(), "Getter prop"),
-          Prop::Setter(setter) => self.fnc.todo(setter.span(), "Setter prop"),
-          Prop::Method(method) => self.fnc.todo(method.span(), "Method prop"),
+          Prop::Assign(assign) => self.todo(assign.span(), "Assign prop"),
+          Prop::Getter(getter) => self.todo(getter.span(), "Getter prop"),
+          Prop::Setter(setter) => self.todo(setter.span(), "Setter prop"),
+          Prop::Method(method) => self.todo(method.span(), "Method prop"),
         },
       }
     }
@@ -583,9 +568,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       swc_ecma_ast::MemberProp::Ident(ident) => Value::String(ident.sym.to_string()).to_ce(),
       swc_ecma_ast::MemberProp::Computed(computed) => self.compile(&computed.expr, target_register),
       swc_ecma_ast::MemberProp::PrivateName(private_name) => {
-        self
-          .fnc
-          .todo(private_name.span(), "private name member property");
+        self.todo(private_name.span(), "private name member property");
 
         CompiledExpression::empty()
       }
@@ -766,9 +749,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
     let callee = match &call_exp.callee {
       swc_ecma_ast::Callee::Expr(expr) => self.compile(expr, None),
       _ => {
-        self
-          .fnc
-          .todo(call_exp.callee.span(), "non-expression callee");
+        self.todo(call_exp.callee.span(), "non-expression callee");
 
         CompiledExpression::empty()
       }
@@ -1049,14 +1030,13 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
           _ => continue,
         },
         None => {
-          self.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!(
+          self.internal_error(
+            cap.span(),
+            &format!(
               "Failed to find capture {:?} for scope {:?}",
               cap, self.fnc.owner_id
             ),
-            span: cap.span(),
-          });
+          );
 
           continue;
         }
@@ -1085,22 +1065,21 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
 
         if let Some(tdz_end) = cap_name.tdz_end {
           if span.lo() <= tdz_end {
-            self.fnc.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: match &fn_name {
+            self.error(
+              span,
+              &match &fn_name {
                 Some(name) => format!(
                   "Referencing {} is invalid because it binds {} before its declaration (temporal \
-                    dead zone)",
+                  dead zone)",
                   name, cap_name.sym,
                 ),
                 None => format!(
                   "Expression is invalid because capturing {} binds its value before its \
-                    declaration (temporal dead zone)",
+                  declaration (temporal dead zone)",
                   cap_name.sym,
                 ),
               },
-              span,
-            });
+            );
           }
         }
       }
@@ -1113,14 +1092,13 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
             _ => continue,
           },
           None => {
-            self.fnc.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: format!(
+            self.internal_error(
+              cap.span(),
+              &format!(
                 "Failed to find capture {:?} for scope {:?}",
                 cap, self.fnc.owner_id
               ),
-              span: cap.span(),
-            });
+            );
 
             continue;
           }
@@ -1247,11 +1225,10 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
         false => None,
       },
       _ => {
-        self.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!("Failed to lookup identifier `{}`", ident.sym),
-          span: ident.span,
-        });
+        self.internal_error(
+          ident.span,
+          &format!("Failed to lookup identifier `{}`", ident.sym),
+        );
 
         None
       }
@@ -1306,7 +1283,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
     match value_from_literal(lit) {
       Ok(value) => value,
       Err(err) => {
-        self.fnc.todo(lit.span(), err);
+        self.todo(lit.span(), err);
         Value::Register(self.fnc.allocate_numbered_reg("_todo_unsupported_literal"))
       }
     }
@@ -1320,14 +1297,13 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
         let ident_reg = self.fnc.get_pattern_register(pat);
 
         if register != &ident_reg {
-          self.fnc.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!(
+          self.internal_error(
+            pat.span(),
+            &format!(
               "Register mismatch for parameter {} (expected {}, got {})",
               ident.id.sym, ident_reg, register
             ),
-            span: pat.span(),
-          });
+          );
 
           // Note: We still have this sensible interpretation, so emitting it
           // may help troubleshooting the error above. Hopefully it never
@@ -1397,9 +1373,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
               }
             }
             ObjectPatProp::Rest(rest) => {
-              self
-                .fnc
-                .todo(rest.span, "Rest pattern in object destructuring");
+              self.todo(rest.span, "Rest pattern in object destructuring");
             }
           }
         }

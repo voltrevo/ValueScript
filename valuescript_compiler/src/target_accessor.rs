@@ -2,9 +2,9 @@ use std::mem::take;
 
 use crate::{
   asm::{Instruction, Register, Value},
+  diagnostic::DiagnosticReporter,
   expression_compiler::{CompiledExpression, ExpressionCompiler},
   ident::Ident as CrateIdent,
-  Diagnostic, DiagnosticLevel,
 };
 use swc_common::Spanned;
 
@@ -90,11 +90,10 @@ impl TargetAccessor {
         TargetAccessor::make_todo(ec)
       }
       _ => {
-        ec.fnc.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          span: expr.span(),
-          message: format!("Invalid target {}", get_expr_type_str(expr)),
-        });
+        ec.error(
+          expr.span(),
+          &format!("Invalid target {}", get_expr_type_str(expr)),
+        );
 
         TargetAccessor::make_bad(ec)
       }

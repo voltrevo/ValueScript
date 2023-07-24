@@ -9,12 +9,13 @@ use valuescript_common::BUILTIN_NAMES;
 use crate::{
   asm::{Builtin, Register, Value},
   constants::CONSTANTS,
+  diagnostic::{DiagnosticContainer, DiagnosticReporter},
   ident::Ident,
   name_allocator::{PointerAllocator, RegAllocator},
   scope::{init_std_scope, NameId, OwnerId, Scope, ScopeTrait},
 };
 
-use super::diagnostic::{Diagnostic, DiagnosticLevel};
+use super::diagnostic::Diagnostic;
 
 // TODO: Find a use for these or remove them
 #[derive(Clone, Debug)]
@@ -73,6 +74,12 @@ pub struct ScopeAnalysis {
   pub diagnostics: Vec<Diagnostic>,
   pub pointer_allocator: PointerAllocator,
   pub reg_allocators: HashMap<OwnerId, RegAllocator>,
+}
+
+impl DiagnosticContainer for ScopeAnalysis {
+  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
+    &mut self.diagnostics
+  }
 }
 
 impl ScopeAnalysis {
@@ -311,11 +318,7 @@ impl ScopeAnalysis {
     let name = match self.names.get_mut(name_id) {
       Some(name) => name,
       None => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!("Expected name_id in names: {:?}", name_id),
-          span: ref_,
-        });
+        self.internal_error(ref_, &format!("Expected name_id in names: {:?}", name_id));
         return;
       }
     };
@@ -375,25 +378,13 @@ impl ScopeAnalysis {
         }
         ModuleDecl::ExportAll(_) => {}
         ModuleDecl::TsImportEquals(ts_import_equals) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: "TsImportEquals is not supported".to_string(),
-            span: ts_import_equals.span,
-          });
+          self.not_supported(ts_import_equals.span, "TsImportEquals");
         }
         ModuleDecl::TsExportAssignment(ts_export_assignment) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: "TsExportAssignment is not supported".to_string(),
-            span: ts_export_assignment.span,
-          });
+          self.not_supported(ts_export_assignment.span, "TsExportAssignment");
         }
         ModuleDecl::TsNamespaceExport(ts_namespace_export) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: "TsNamespaceExport is not supported".to_string(),
-            span: ts_namespace_export.span,
-          });
+          self.not_supported(ts_namespace_export.span, "TsNamespaceExport");
         }
       },
       ModuleItem::Stmt(stmt) => {
@@ -440,11 +431,7 @@ impl ScopeAnalysis {
 
         match &named_specifier.orig {
           ModuleExportName::Ident(ident) => self.ident(scope, &Ident::from_swc_ident(ident)),
-          ModuleExportName::Str(_) => self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: ModuleExportName::Str".to_string(),
-            span: export_specifier.span(),
-          }),
+          ModuleExportName::Str(_) => self.todo(export_specifier.span(), "ModuleExportName::Str"),
         }
       }
       Default(default_specifier) => {
@@ -452,11 +439,7 @@ impl ScopeAnalysis {
       }
       Namespace(namespace_specifier) => match &namespace_specifier.name {
         ModuleExportName::Ident(ident) => self.ident(scope, &Ident::from_swc_ident(ident)),
-        ModuleExportName::Str(_) => self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: ModuleExportName::Str".to_string(),
-          span: export_specifier.span(),
-        }),
+        ModuleExportName::Str(_) => self.todo(export_specifier.span(), "ModuleExportName::Str"),
       },
     }
   }
@@ -473,11 +456,9 @@ impl ScopeAnalysis {
 
     match decl {
       Decl::Class(class_decl) => {
-        self.class_(scope, &Some(class_decl.ident.clone()), &class_decl.class);
+        self.class_(scope, &Some(class_decl.ident.clone()), &class_decl.class)
       }
-      Decl::Fn(fn_decl) => {
-        self.function(scope, &Some(fn_decl.ident.clone()), &fn_decl.function);
-      }
+      Decl::Fn(fn_decl) => self.function(scope, &Some(fn_decl.ident.clone()), &fn_decl.function),
       Decl::Var(var_decl) => {
         for decl in &var_decl.decls {
           self.var_declarator(scope, decl);
@@ -496,13 +477,7 @@ impl ScopeAnalysis {
           }
         }
       }
-      Decl::TsModule(ts_module) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "TsModule declaration is not supported".to_string(),
-          span: ts_module.span,
-        });
-      }
+      Decl::TsModule(ts_module) => self.not_supported(ts_module.span, "TsModule declaration"),
     }
   }
 
@@ -821,20 +796,11 @@ impl ScopeAnalysis {
       Pat::Assign(assign_pat) => {
         self.get_pat_idents_impl(idents, &assign_pat.left);
       }
-      Pat::Expr(expr) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Pattern expression not expected in this context".to_string(),
-          span: expr.span(),
-        });
-      }
-      Pat::Invalid(invalid) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid pattern".to_string(),
-          span: invalid.span,
-        });
-      }
+      Pat::Expr(expr) => self.internal_error(
+        expr.span(),
+        "Pattern expression not expected in this context",
+      ),
+      Pat::Invalid(invalid) => self.error(invalid.span, "Invalid pattern"),
     }
   }
 
@@ -890,19 +856,9 @@ impl ScopeAnalysis {
         self.var_declarator_pat(scope, &assign.left);
         self.expr(scope, &assign.right);
       }
-      Pat::Invalid(invalid) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid pattern".to_string(),
-          span: invalid.span,
-        });
-      }
+      Pat::Invalid(invalid) => self.error(invalid.span, "Invalid pattern"),
       Pat::Expr(expr) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Pattern expression not expected in declarator".to_string(),
-          span: expr.span(),
-        });
+        self.internal_error(expr.span(), "Pattern expression not expected in declarator")
       }
     }
   }
@@ -1092,13 +1048,7 @@ impl ScopeAnalysis {
           self.expr(scope, arg);
         }
       }
-      Expr::Await(await_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "await is not supported".to_string(),
-          span: await_.span,
-        });
-      }
+      Expr::Await(await_) => self.todo(await_.span, "async/await"),
       Expr::Member(member) => self.member(scope, member),
       Expr::Call(call) => self.call(scope, call),
       Expr::New(new) => {
@@ -1145,56 +1095,16 @@ impl ScopeAnalysis {
           OptChainBase::Member(member) => self.member(scope, member),
         }
       }
-      Expr::SuperProp(super_prop) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: super_prop".to_string(),
-          span: super_prop.span,
-        });
-      }
-      Expr::JSXMember(_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: jsx_member".to_string(),
-          span: expr.span(),
-        });
-      }
-      Expr::JSXNamespacedName(_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: jsx_namespaced_name".to_string(),
-          span: expr.span(),
-        });
-      }
+      Expr::SuperProp(super_prop) => self.todo(super_prop.span, "super_prop"),
       Expr::JSXEmpty(_) => {}
-      Expr::JSXElement(jsx_element) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: jsx_element".to_string(),
-          span: jsx_element.span,
-        });
-      }
-      Expr::JSXFragment(jsx_fragment) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: jsx_fragment".to_string(),
-          span: jsx_fragment.span,
-        });
-      }
+      Expr::JSXNamespacedName(_)
+      | Expr::JSXElement(_)
+      | Expr::JSXFragment(_)
+      | Expr::JSXMember(_) => self.todo(expr.span(), "JSX"),
       Expr::TsInstantiation(ts_instantiation) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: ts_instantiation".to_string(),
-          span: ts_instantiation.span,
-        });
+        self.todo(ts_instantiation.span, "TsInstantiation")
       }
-      Expr::PrivateName(private_name) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: private_name".to_string(),
-          span: private_name.span,
-        });
-      }
+      Expr::PrivateName(private_name) => self.todo(private_name.span, "PrivateName"),
     }
   }
 
@@ -1288,63 +1198,52 @@ impl ScopeAnalysis {
         self.mutate_expr(scope, &member.obj, optional);
       }
       Expr::Call(call) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Call expressions cannot be mutated".to_string(),
-          span: call.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          call.span,
+          "Call expressions cannot be mutated",
+        ));
       }
       Expr::New(new) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "New expressions cannot be mutated".to_string(),
-          span: new.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          new.span,
+          "New expressions cannot be mutated",
+        ));
       }
-      Expr::Paren(paren) => {
-        self.mutate_expr(scope, &paren.expr, optional);
-      }
+      Expr::Paren(paren) => self.mutate_expr(scope, &paren.expr, optional),
       Expr::Tpl(tpl) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Template literals cannot be mutated".to_string(),
-          span: tpl.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          tpl.span,
+          "Template literals cannot be mutated",
+        ));
       }
       Expr::TaggedTpl(tagged_tpl) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Tagged template literals cannot be mutated".to_string(),
-          span: tagged_tpl.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          tagged_tpl.span,
+          "Tagged template literals cannot be mutated",
+        ));
       }
       Expr::Arrow(arrow) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Arrow functions cannot be mutated".to_string(),
-          span: arrow.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          arrow.span,
+          "Arrow functions cannot be mutated",
+        ));
       }
       Expr::Class(class) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Class expressions cannot be mutated".to_string(),
-          span: class.class.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          class.class.span,
+          "Class expressions cannot be mutated",
+        ));
       }
       Expr::MetaProp(meta_prop) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Meta properties cannot be mutated".to_string(),
-          span: meta_prop.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          meta_prop.span,
+          "Meta properties cannot be mutated",
+        ));
       }
       Expr::Invalid(invalid) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid expression".to_string(),
-          span: invalid.span,
-        });
+        self
+          .diagnostics
+          .push(Diagnostic::error(invalid.span, "Invalid expression"));
       }
       Expr::TsTypeAssertion(ts_type_assertion) => {
         self.mutate_expr(scope, &ts_type_assertion.expr, optional);
@@ -1359,156 +1258,53 @@ impl ScopeAnalysis {
         self.mutate_expr(scope, &as_expr.expr, optional);
       }
       Expr::OptChain(opt_chain) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Optional property accesses (a?.b) cannot be mutated".to_string(),
-          span: opt_chain.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          opt_chain.span,
+          "Optional property accesses (a?.b) cannot be mutated",
+        ));
       }
 
       Expr::This(this) => {
         self.mutate_ident(scope, &Ident::this(this.span), optional);
       }
       Expr::Array(array) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Mutating a (non-pattern) array expression is not valid. \
-            This is an unusual case that can occur with things like [a,b]+=c."
-            .to_string(),
-          span: array.span,
-        });
+        diagnostic = Some(Diagnostic::error(
+          array.span,
+          "Mutating a (non-pattern) array expression is not valid. This is an unusual case that \
+            can occur with things like [a,b]+=c.",
+        ));
       }
       Expr::Object(object) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Mutating a (non-pattern) object expression is not valid. \
-            This is an unusual case - it's not clear whether SWC ever emit it. \
+        diagnostic = Some(Diagnostic::error(
+          object.span,
+          "Mutating a (non-pattern) object expression is not valid. \
+            This is an unusual case - it's not clear whether SWC ever emits it. \
             Please consider creating an issue: \
-            https://github.com/ValueScript/issues/new."
-            .to_string(),
-          span: object.span,
-        });
+            https://github.com/ValueScript/issues/new.",
+        ));
       }
-      Expr::Fn(fn_) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate fn".to_string(),
-          span: fn_.function.span,
-        });
-      }
-      Expr::Unary(unary) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate unary".to_string(),
-          span: unary.span,
-        });
-      }
-      Expr::Update(update) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate update".to_string(),
-          span: update.span,
-        });
-      }
-      Expr::Bin(bin) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate binary exp".to_string(),
-          span: bin.span,
-        });
-      }
-      Expr::Assign(assign) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate assignment".to_string(),
-          span: assign.span,
-        });
-      }
+      Expr::Fn(fn_) => diagnostic = Some(Diagnostic::todo(fn_.span(), "mutate fn")),
+      Expr::Unary(unary) => diagnostic = Some(Diagnostic::todo(unary.span, "mutate unary")),
+      Expr::Update(update) => diagnostic = Some(Diagnostic::todo(update.span, "mutate update")),
+      Expr::Bin(bin) => diagnostic = Some(Diagnostic::todo(bin.span, "mutate binary exp")),
+      Expr::Assign(assign) => diagnostic = Some(Diagnostic::todo(assign.span, "mutate assignment")),
       Expr::SuperProp(super_prop) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate super_prop".to_string(),
-          span: super_prop.span,
-        });
+        diagnostic = Some(Diagnostic::todo(super_prop.span, "mutate super_prop"))
       }
-      Expr::Cond(cond) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate cond".to_string(),
-          span: cond.span,
-        });
-      }
-      Expr::Seq(seq) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate seq".to_string(),
-          span: seq.span,
-        });
-      }
-      Expr::Lit(_) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate lit".to_string(),
-          span: expr.span(),
-        });
-      }
-      Expr::Yield(yield_) => {
-        diagnostic = Some(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate yield".to_string(),
-          span: yield_.span,
-        });
-      }
-      Expr::Await(await_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "TODO: mutate await".to_string(),
-          span: await_.span,
-        });
-      }
-      Expr::JSXMember(_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate jsx_member".to_string(),
-          span: expr.span(),
-        });
-      }
-      Expr::JSXNamespacedName(_) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate jsx_namespaced_name".to_string(),
-          span: expr.span(),
-        });
-      }
+      Expr::Cond(cond) => diagnostic = Some(Diagnostic::todo(cond.span, "mutate cond")),
+      Expr::Seq(seq) => diagnostic = Some(Diagnostic::todo(seq.span, "mutate seq")),
+      Expr::Lit(_) => diagnostic = Some(Diagnostic::todo(expr.span(), "mutate lit")),
+      Expr::Yield(yield_) => diagnostic = Some(Diagnostic::todo(yield_.span, "mutate yield")),
+      Expr::Await(await_) => self.todo(await_.span, "mutate await"),
+      Expr::JSXMember(_) => self.todo(expr.span(), "mutate jsx_member"),
+      Expr::JSXNamespacedName(_) => self.todo(expr.span(), "mutate jsx_namespaced_name"),
       Expr::JSXEmpty(_) => {}
-      Expr::JSXElement(jsx_element) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate jsx_element".to_string(),
-          span: jsx_element.span,
-        });
-      }
-      Expr::JSXFragment(jsx_fragment) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate jsx_fragment".to_string(),
-          span: jsx_fragment.span,
-        });
-      }
+      Expr::JSXElement(jsx_element) => self.todo(jsx_element.span, "mutate jsx_element"),
+      Expr::JSXFragment(jsx_fragment) => self.todo(jsx_fragment.span, "mutate jsx_fragment"),
       Expr::TsInstantiation(ts_instantiation) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate ts_instantiation".to_string(),
-          span: ts_instantiation.span,
-        });
+        self.todo(ts_instantiation.span, "mutate ts_instantiation")
       }
-      Expr::PrivateName(private_name) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "TODO: mutate private_name".to_string(),
-          span: private_name.span,
-        });
-      }
+      Expr::PrivateName(private_name) => self.todo(private_name.span, "mutate private_name"),
     }
 
     if !optional {
@@ -1563,16 +1359,8 @@ impl ScopeAnalysis {
         self.mutate_pat(scope, &assign_pat.left);
         self.expr(scope, &assign_pat.right);
       }
-      Pat::Invalid(invalid) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid pattern".to_string(),
-          span: invalid.span,
-        });
-      }
-      Pat::Expr(expr) => {
-        self.mutate_expr(scope, expr, false);
-      }
+      Pat::Invalid(invalid) => self.error(invalid.span, "Invalid pattern"),
+      Pat::Expr(expr) => self.mutate_expr(scope, expr, false),
     }
   }
 
@@ -1580,11 +1368,7 @@ impl ScopeAnalysis {
     let name_id = match scope.get(&ident.sym) {
       Some(name_id) => name_id,
       None => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Unresolved reference".to_string(),
-          span: ident.span,
-        });
+        self.error(ident.span, "Unresolved reference");
         return;
       }
     };
@@ -1592,11 +1376,7 @@ impl ScopeAnalysis {
     let name = match self.names.get_mut(&name_id) {
       Some(name) => name,
       None => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Expected name_id in names".to_string(),
-          span: ident.span,
-        });
+        self.internal_error(ident.span, "Expected name_id in names");
         return;
       }
     };
@@ -1622,11 +1402,7 @@ impl ScopeAnalysis {
     let name_id = match scope.get(&ident.sym) {
       Some(name_id) => name_id,
       None => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Unresolved reference".to_string(),
-          span: ident.span,
-        });
+        self.error(ident.span, "Unresolved reference");
         return;
       }
     };
@@ -1643,11 +1419,7 @@ impl ScopeAnalysis {
     let name = match self.names.get(&name_id) {
       Some(name) => name.clone(),
       None => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "Expected name_id in names".to_string(),
-          span: ident.span,
-        });
+        self.internal_error(ident.span, "Expected name_id in names");
         return;
       }
     };
@@ -1701,11 +1473,10 @@ impl ScopeAnalysis {
           self.function(scope, &None, &method.function);
         }
         swc_ecma_ast::Prop::Assign(assign) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "TODO: implement property assignments (what are these?)".to_string(),
-            span: assign.key.span, // TODO: Proper span of assign
-          });
+          self.todo(
+            assign.key.span, // TODO: Proper span of assign
+            "implement property assignments (what are these?)",
+          );
         }
       },
       PropOrSpread::Spread(spread) => {
@@ -1723,13 +1494,7 @@ impl ScopeAnalysis {
       }
       Stmt::Empty(_) => {}
       Stmt::Debugger(_) => {}
-      Stmt::With(with) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Not supported: with statement".to_string(),
-          span: with.span,
-        });
-      }
+      Stmt::With(with) => self.not_supported(with.span, "with statements"),
       Stmt::Return(return_) => {
         if let Some(arg) = &return_.arg {
           self.expr(scope, arg);
@@ -1915,13 +1680,7 @@ impl ScopeAnalysis {
       Pat::Expr(expr) => {
         self.expr(scope, expr);
       }
-      Pat::Invalid(invalid) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Invalid pattern".to_string(),
-          span: invalid.span,
-        });
-      }
+      Pat::Invalid(invalid) => self.error(invalid.span, "Invalid pattern"),
     }
   }
 
@@ -1937,32 +1696,29 @@ impl ScopeAnalysis {
         if name.type_ == NameType::Let {
           match name_id {
             NameId::Span(span) => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::Lint,
-                message: format!(
+              self.diagnostics.push(Diagnostic::lint(
+                *span,
+                &format!(
                   "`{}` should be declared using `const` because it is implicitly \
                   const due to capture",
                   name.sym
                 ),
-                span: *span,
-              });
+              ));
             }
             NameId::This(_) | NameId::Builtin(_) | NameId::Constant(_) => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "Builtin/constant/this should not have type_ let".to_string(),
-                span: swc_common::DUMMY_SP,
-              });
+              self.diagnostics.push(Diagnostic::internal_error(
+                swc_common::DUMMY_SP,
+                "Builtin/constant/this should not have type_ let",
+              ));
             }
           }
         }
 
         for mutation in &name.mutations {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: format!("Cannot mutate captured variable `{}`", name.sym),
-            span: *mutation,
-          });
+          self.diagnostics.push(Diagnostic::error(
+            *mutation,
+            &format!("Cannot mutate captured variable `{}`", name.sym),
+          ));
         }
       }
     }
@@ -1973,11 +1729,10 @@ impl ScopeAnalysis {
       Some(name) => name,
       None => {
         // TODO: Add a name lookup helper that does this diagnostic
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: "NameId not found".to_string(),
-          span: swc_common::DUMMY_SP,
-        });
+        self.diagnostics.push(Diagnostic::internal_error(
+          swc_common::DUMMY_SP,
+          "NameId not found",
+        ));
 
         return None;
       }
@@ -1987,11 +1742,10 @@ impl ScopeAnalysis {
       match name_id {
         NameId::Span(span) => Some(OwnerId::Span(*span)),
         NameId::This(_) => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: "NameId::This should not be associated with NameType::Function".to_string(),
-            span: swc_common::DUMMY_SP,
-          });
+          self.diagnostics.push(Diagnostic::internal_error(
+            swc_common::DUMMY_SP,
+            "NameId::This should not be associated with NameType::Function",
+          ));
 
           None
         }
@@ -2091,11 +1845,10 @@ impl ScopeAnalysis {
 
       if name.effectively_const {
         for mutation in &name.mutations {
-          diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: format!("Cannot mutate const {}", name.sym),
-            span: *mutation,
-          });
+          diagnostics.push(Diagnostic::error(
+            *mutation,
+            &format!("Cannot mutate const {}", name.sym),
+          ));
         }
       }
     }
@@ -2156,14 +1909,13 @@ impl ScopeAnalysis {
         continue;
       }
 
-      diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::Error,
-        message: format!(
+      diagnostics.push(Diagnostic::error(
+        ref_.span,
+        &format!(
           "Referencing {} is invalid before its declaration (temporal dead zone)",
           name.sym,
         ),
-        span: ref_.span,
-      });
+      ));
     }
 
     self.diagnostics.append(&mut diagnostics);

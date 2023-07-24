@@ -4,7 +4,7 @@ use swc_common::Spanned;
 
 use valuescript_common::BUILTIN_NAMES;
 
-use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::diagnostic::Diagnostic;
 use crate::{asm::Builtin, constants::CONSTANTS};
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
@@ -72,14 +72,13 @@ impl ScopeTrait for Scope {
     let old_mapping = self.borrow_mut().name_map.insert(name.clone(), name_id);
 
     if old_mapping.is_some() {
-      diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::Error,
-        message: format!(
+      diagnostics.push(Diagnostic::error(
+        span,
+        &format!(
           "Scope overwrite of `{}` occurred (TODO: being permissive about this)",
           name
         ),
-        span,
-      });
+      ));
     }
   }
 

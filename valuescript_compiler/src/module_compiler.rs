@@ -11,7 +11,7 @@ use crate::asm::{
   Pointer, Register, Value,
 };
 use crate::compile_enum_value::compile_enum_value;
-use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
 use crate::function_compiler::{FunctionCompiler, Functionish};
 use crate::ident::Ident;
@@ -102,23 +102,13 @@ pub struct ModuleCompiler {
   pub module: Module,
 }
 
+impl DiagnosticContainer for ModuleCompiler {
+  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
+    &mut self.diagnostics
+  }
+}
+
 impl ModuleCompiler {
-  fn todo(&mut self, span: swc_common::Span, message: &str) {
-    self.diagnostics.push(Diagnostic {
-      level: DiagnosticLevel::InternalError,
-      message: format!("TODO: {}", message),
-      span,
-    });
-  }
-
-  fn not_supported(&mut self, span: swc_common::Span, message: &str) {
-    self.diagnostics.push(Diagnostic {
-      level: DiagnosticLevel::Error,
-      message: format!("Not supported: {}", message),
-      span,
-    });
-  }
-
   fn allocate_defn(&mut self, name: &str) -> Pointer {
     let allocated_name = self.definition_allocator.allocate(&name.to_string());
 
@@ -142,12 +132,7 @@ impl ModuleCompiler {
       Module(module) => module,
       Script(script) => {
         let mut self_ = Self::default();
-
-        self_.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Scripts are not supported".to_string(),
-          span: script.span,
-        });
+        self_.error(script.span, "Scripts are not supported");
 
         return self_;
       }
@@ -292,11 +277,7 @@ impl ModuleCompiler {
       let init = match &decl.init {
         Some(_) => &decl.init,
         _ => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::Error,
-            message: "const variable without initializer".to_string(),
-            span: decl.init.span(),
-          });
+          self.error(decl.init.span(), "const variable without initializer");
 
           &None
         }
@@ -321,22 +302,12 @@ impl ModuleCompiler {
           Some(name) => match &name.value {
             Value::Pointer(p) => p.clone(),
             _ => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "Expected pointer for module constant".to_string(),
-                span: ident.span(),
-              });
-
+              self.internal_error(ident.span(), "Expected pointer for module constant");
               continue;
             }
           },
           None => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "Failed to lookup name".to_string(),
-              span: ident.span(),
-            });
-
+            self.internal_error(ident.span(), "Failed to lookup name");
             continue;
           }
         };
@@ -367,11 +338,10 @@ impl ModuleCompiler {
     {
       Some(Value::Pointer(p)) => p,
       _ => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!("Pointer for {} should have been in scope", fn_name),
-          span: fn_.ident.span,
-        });
+        self.internal_error(
+          fn_.ident.span,
+          &format!("Pointer for {} should have been in scope", fn_name),
+        );
 
         return;
       }
@@ -400,11 +370,10 @@ impl ModuleCompiler {
     {
       Some(Value::Pointer(p)) => p,
       _ => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!("Pointer for {} should have been in scope", ts_enum.id.sym),
-          span: ts_enum.id.span,
-        });
+        self.internal_error(
+          ts_enum.id.span,
+          &format!("Pointer for {} should have been in scope", ts_enum.id.sym),
+        );
 
         return;
       }
@@ -444,11 +413,10 @@ impl ModuleCompiler {
             {
               Some(Value::Pointer(p)) => p,
               _ => {
-                self.diagnostics.push(Diagnostic {
-                  level: DiagnosticLevel::InternalError,
-                  message: format!("Definition for {} should have been in scope", fn_name),
-                  span: ident.span,
-                });
+                self.internal_error(
+                  ident.span,
+                  &format!("Definition for {} should have been in scope", fn_name),
+                );
 
                 return;
               }
@@ -561,16 +529,15 @@ impl ModuleCompiler {
             {
               Some(Value::Pointer(p)) => Some(p),
               lookup_result => {
-                self.diagnostics.push(Diagnostic {
-                  level: DiagnosticLevel::InternalError,
-                  message: format!(
+                self.internal_error(
+                  named.orig.span(),
+                  &format!(
                     "{} should have been a pointer, but it was {:?}, ref: {:?}",
                     orig_name,
                     lookup_result,
                     self.scope_analysis.refs.get(&orig_name.span)
                   ),
-                  span: named.orig.span(),
-                });
+                );
 
                 None
               }
@@ -599,12 +566,7 @@ impl ModuleCompiler {
           let namespace_name = match &namespace.name {
             ModuleExportName::Ident(ident) => ident.sym.to_string(),
             ModuleExportName::Str(_) => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "exporting a non-identifier".to_string(),
-                span: namespace.span,
-              });
-
+              self.internal_error(namespace.span, "exporting a non-identifier");
               "_todo_export_non_ident".to_string()
             }
           };
@@ -614,12 +576,7 @@ impl ModuleCompiler {
           let src = match &en.src {
             Some(src) => src.value.to_string(),
             None => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: "exporting a namespace without a source".to_string(),
-                span: namespace.span,
-              });
-
+              self.internal_error(namespace.span, "exporting a namespace without a source");
               "_error_export_namespace_without_src".to_string()
             }
           };
@@ -686,11 +643,10 @@ impl ModuleCompiler {
           {
             Some(Value::Pointer(p)) => p,
             _ => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: format!("Imported name {} should have been a pointer", local_name),
-                span: named.span,
-              });
+              self.internal_error(
+                named.span,
+                &format!("Imported name {} should have been a pointer", local_name),
+              );
 
               self.allocate_defn(local_name.as_str())
             }
@@ -722,11 +678,10 @@ impl ModuleCompiler {
           {
             Some(Value::Pointer(p)) => p,
             _ => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: format!("Imported name {} should have been a pointer", local_name),
-                span: default.span,
-              });
+              self.internal_error(
+                default.span,
+                &format!("Imported name {} should have been a pointer", local_name),
+              );
 
               self.allocate_defn(local_name.as_str())
             }
@@ -751,11 +706,10 @@ impl ModuleCompiler {
           {
             Some(Value::Pointer(p)) => p,
             _ => {
-              self.diagnostics.push(Diagnostic {
-                level: DiagnosticLevel::InternalError,
-                message: format!("Imported name {} should have been a pointer", local_name),
-                span: namespace.span,
-              });
+              self.internal_error(
+                namespace.span,
+                &format!("Imported name {} should have been a pointer", local_name),
+              );
 
               self.allocate_defn(local_name.as_str())
             }
@@ -807,11 +761,10 @@ impl ModuleCompiler {
       {
         Some(Value::Pointer(p)) => p,
         _ => {
-          self.diagnostics.push(Diagnostic {
-            level: DiagnosticLevel::InternalError,
-            message: format!("Definition for {} should have been in scope", ident.sym),
-            span: class.span, // FIXME: make class_name ident and use that span
-          });
+          self.internal_error(
+            class.span, // FIXME: make class_name ident and use that span
+            &format!("Definition for {} should have been in scope", ident.sym),
+          );
 
           self.allocate_defn_numbered("_scope_error")
         }

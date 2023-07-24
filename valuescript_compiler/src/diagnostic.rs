@@ -51,4 +51,87 @@ impl Diagnostic {
         .unwrap_or(swc_common::DUMMY_SP),
     })
   }
+
+  pub fn todo(span: swc_common::Span, message: &str) -> Self {
+    Diagnostic {
+      level: DiagnosticLevel::InternalError,
+      message: format!("TODO: {}", message),
+      span,
+    }
+  }
+
+  pub fn error(span: swc_common::Span, message: &str) -> Self {
+    Diagnostic {
+      level: DiagnosticLevel::Error,
+      message: message.to_string(),
+      span,
+    }
+  }
+
+  pub fn internal_error(span: swc_common::Span, message: &str) -> Self {
+    Diagnostic {
+      level: DiagnosticLevel::InternalError,
+      message: message.to_string(),
+      span,
+    }
+  }
+
+  pub fn not_supported(span: swc_common::Span, message: &str) -> Self {
+    Diagnostic {
+      level: DiagnosticLevel::Error,
+      message: format!("Not supported: {}", message),
+      span,
+    }
+  }
+
+  pub fn lint(span: swc_common::Span, message: &str) -> Self {
+    Diagnostic {
+      level: DiagnosticLevel::Lint,
+      message: message.to_string(),
+      span,
+    }
+  }
+}
+
+pub trait DiagnosticContainer {
+  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic>;
+}
+
+pub trait DiagnosticReporter {
+  fn todo(&mut self, span: swc_common::Span, message: &str);
+  fn error(&mut self, span: swc_common::Span, message: &str);
+  fn internal_error(&mut self, span: swc_common::Span, message: &str);
+  fn not_supported(&mut self, span: swc_common::Span, message: &str);
+  fn lint(&mut self, span: swc_common::Span, message: &str);
+}
+
+impl<T> DiagnosticReporter for T
+where
+  T: DiagnosticContainer,
+{
+  fn todo(&mut self, span: swc_common::Span, message: &str) {
+    self.diagnostics_mut().push(Diagnostic::todo(span, message));
+  }
+
+  fn error(&mut self, span: swc_common::Span, message: &str) {
+    self
+      .diagnostics_mut()
+      .push(Diagnostic::error(span, message));
+  }
+
+  fn internal_error(&mut self, span: swc_common::Span, message: &str) {
+    self
+      .diagnostics_mut()
+      .push(Diagnostic::internal_error(span, message));
+  }
+
+  fn not_supported(&mut self, span: swc_common::Span, message: &str) {
+    self
+      .diagnostics_mut()
+      .push(Diagnostic::not_supported(span, message));
+  }
+
+  fn lint(&mut self, span: swc_common::Span, message: &str) {
+    self.diagnostics_mut().push(Diagnostic::lint(span, message));
+  }
 }

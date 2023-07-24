@@ -9,7 +9,7 @@ use crate::asm::{
   Value,
 };
 use crate::compile_enum_value::compile_enum_value;
-use crate::diagnostic::{Diagnostic, DiagnosticLevel};
+use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticLevel, DiagnosticReporter};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
 use crate::ident::Ident;
@@ -76,6 +76,12 @@ pub struct FunctionCompiler<'a> {
   pub finally_labels: Vec<Label>,
 
   pub diagnostics: Vec<Diagnostic>,
+}
+
+impl<'a> DiagnosticContainer for FunctionCompiler<'a> {
+  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
+    &mut self.diagnostics
+  }
 }
 
 impl<'a> FunctionCompiler<'a> {
@@ -146,30 +152,6 @@ impl<'a> FunctionCompiler<'a> {
       .mc
       .scope_analysis
       .lookup_by_name_id(&self.owner_id, name_id)
-  }
-
-  pub fn todo(&mut self, span: swc_common::Span, message: &str) {
-    self.diagnostics.push(Diagnostic {
-      level: DiagnosticLevel::InternalError,
-      message: format!("TODO: {}", message),
-      span,
-    });
-  }
-
-  pub fn error(&mut self, span: swc_common::Span, message: &str) {
-    self.diagnostics.push(Diagnostic {
-      level: DiagnosticLevel::Error,
-      message: message.to_string(),
-      span,
-    });
-  }
-
-  pub fn internal_error(&mut self, span: swc_common::Span, message: &str) {
-    self.diagnostics.push(Diagnostic {
-      level: DiagnosticLevel::InternalError,
-      message: message.to_string(),
-      span,
-    });
   }
 
   pub fn allocate_defn(&mut self, name: &str) -> Pointer {
@@ -438,14 +420,13 @@ impl<'a> FunctionCompiler<'a> {
     match self.mc.scope_analysis.lookup_value(&self.owner_id, ident) {
       Some(Value::Register(reg)) => reg,
       lookup_result => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::InternalError,
-          message: format!(
+        self.internal_error(
+          ident.span,
+          &format!(
             "Register should have been allocated for variable {}, instead: {:?}",
             ident.sym, lookup_result,
           ),
-          span: ident.span,
-        });
+        );
 
         self.allocate_numbered_reg("_error_variable_without_register")
       }
@@ -519,11 +500,7 @@ impl<'a> FunctionCompiler<'a> {
       Empty(_) => {}
       Debugger(debugger) => self.todo(debugger.span, "Debugger statement"),
       With(with) => {
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "Not supported: With statement".to_string(),
-          span: with.span,
-        });
+        self.not_supported(with.span, "With statement");
       }
 
       Return(ret_stmt) => {
@@ -571,11 +548,7 @@ impl<'a> FunctionCompiler<'a> {
             self.push(Instruction::Jmp(loop_labels.break_.ref_()));
           }
           None => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: "break statement outside loop".to_string(),
-              span: break_.span,
-            });
+            self.error(break_.span, "break statement outside loop");
           }
         }
       }
@@ -596,11 +569,7 @@ impl<'a> FunctionCompiler<'a> {
           }
         }
 
-        self.diagnostics.push(Diagnostic {
-          level: DiagnosticLevel::Error,
-          message: "continue statement outside loop".to_string(),
-          span: continue_.span,
-        });
+        self.error(continue_.span, "continue statement outside loop");
       }
       If(if_) => {
         self.if_(if_);
@@ -734,11 +703,7 @@ impl<'a> FunctionCompiler<'a> {
         // default:
         None => {
           if default_i.is_some() {
-            ec.fnc.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::Error,
-              message: "A switch can only have one default".to_string(),
-              span: case.span,
-            });
+            ec.error(case.span, "A switch can only have one default");
           }
 
           default_i = Some(i);
@@ -1201,15 +1166,14 @@ impl<'a> FunctionCompiler<'a> {
             definition_pointer: match self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident)) {
               Some(Value::Pointer(p)) => p,
               _ => {
-                self.diagnostics.push(Diagnostic {
-                  level: DiagnosticLevel::InternalError,
-                  message: format!(
+                self.internal_error(
+                  fn_decl.ident.span,
+                  &format!(
                     "Lookup of function {} was not a pointer, lookup_result: {:?}",
                     fn_decl.ident.sym,
                     self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident))
                   ),
-                  span: fn_decl.ident.span,
-                });
+                );
 
                 return;
               }
@@ -1230,11 +1194,10 @@ impl<'a> FunctionCompiler<'a> {
         {
           Some(Value::Pointer(p)) => p,
           _ => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: format!("Pointer for {} should have been in scope", ts_enum.id.sym),
-              span: ts_enum.id.span,
-            });
+            self.internal_error(
+              ts_enum.id.span,
+              &format!("Pointer for {} should have been in scope", ts_enum.id.sym),
+            );
 
             return;
           }
@@ -1267,13 +1230,11 @@ impl<'a> FunctionCompiler<'a> {
             // undefined
           }
           _ => {
-            self.diagnostics.push(Diagnostic {
-              level: DiagnosticLevel::InternalError,
-              message: "Expected destructuring declaration without initializer \
-                to be caught in the parser. Pattern has not been compiled."
-                .to_string(),
-              span: decl.span(),
-            });
+            self.internal_error(
+              decl.span(),
+              "Expected destructuring declaration without initializer to be caught in the parser. \
+                Pattern has not been compiled.",
+            );
           }
         },
       }
