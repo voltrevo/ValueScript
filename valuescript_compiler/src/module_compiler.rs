@@ -185,7 +185,7 @@ impl ModuleCompiler {
             .scope_analysis
             .lookup(&Ident::from_swc_ident(ident))
             .map(|name| name.value.clone()),
-          expr => self.compile_expr(expr),
+          expr => Some(self.compile_expr(expr)),
         };
 
         match value {
@@ -284,19 +284,7 @@ impl ModuleCompiler {
       };
 
       if let (Some(ident), Some(init)) = (ident, init) {
-        let value_opt = self.compile_expr(init);
-
-        let value = match value_opt {
-          Some(value) => value,
-          None => {
-            self.todo(
-              init.span(),
-              "Determine whether initializer can be statically evaluated",
-            );
-
-            Value::String("(Static eval failed)".to_string())
-          }
-        };
+        let value = self.compile_expr(init);
 
         let pointer = match self.scope_analysis.lookup(&Ident::from_swc_ident(ident)) {
           Some(name) => match &name.value {
@@ -868,20 +856,7 @@ impl ModuleCompiler {
         Method(method) => {
           let name = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
-            swc_ecma_ast::PropName::Computed(computed) => {
-              let value_opt = self.compile_expr(&computed.expr);
-
-              match value_opt {
-                None => {
-                  self.todo(
-                    computed.span,
-                    "Couldn't statically evaluate computed prop name",
-                  );
-                  continue;
-                }
-                Some(value) => value,
-              }
-            }
+            swc_ecma_ast::PropName::Computed(computed) => self.compile_expr(&computed.expr),
             _ => {
               self.todo(method.span, "Non-identifier method name");
               continue;
@@ -950,20 +925,18 @@ impl ModuleCompiler {
       };
 
       let init_value = match &member.init {
-        Some(init) => match self.compile_expr(init) {
-          Some(init_value) => match init_value {
+        Some(init) => {
+          let init_value = self.compile_expr(init);
+
+          match self.compile_expr(init) {
             Value::Number(Number(n)) => {
               next_default_id = Some(n + 1.0);
               Some(Value::Number(Number(n)))
             }
             Value::String(_) => Some(init_value),
             _ => None,
-          },
-          None => {
-            self.internal_error(init.span(), "Static eval failed");
-            None
           }
-        },
+        }
         None => None,
       };
 
@@ -992,17 +965,20 @@ impl ModuleCompiler {
     Value::Object(Box::new(Object { properties }))
   }
 
-  pub fn compile_expr(&mut self, expr: &swc_ecma_ast::Expr) -> Option<Value> {
+  pub fn compile_expr(&mut self, expr: &swc_ecma_ast::Expr) -> Value {
     let symbol_iterator_opt = as_symbol_iterator(expr);
 
-    if symbol_iterator_opt.is_some() {
-      return symbol_iterator_opt;
+    if let Some(symbol_iterator) = symbol_iterator_opt {
+      return symbol_iterator;
     }
 
     match expr {
       swc_ecma_ast::Expr::Lit(lit) => match value_from_literal(lit) {
-        Ok(value) => Some(value),
-        _ => None,
+        Ok(value) => value,
+        Err(msg) => {
+          self.internal_error(expr.span(), &format!("Failed to compile literal: {}", msg));
+          Value::String("(error)".to_string())
+        }
       },
       swc_ecma_ast::Expr::Array(array) => {
         let mut values = Vec::<Value>::new();
@@ -1011,125 +987,166 @@ impl ModuleCompiler {
           values.push(match item {
             Some(item) => {
               if item.spread.is_some() {
-                return None;
+                self.todo(expr.span(), "item.spread in static expression");
+                return Value::String("(error)".to_string());
               }
 
-              self.compile_expr(&item.expr)?
+              self.compile_expr(&item.expr)
             }
             None => Value::Void,
           });
         }
 
-        Some(Value::Array(Box::new(Array { values })))
+        Value::Array(Box::new(Array { values }))
       }
       swc_ecma_ast::Expr::Object(object) => {
         let mut properties = Vec::<(Value, Value)>::new();
 
         for prop in &object.props {
           let (key, value) = match prop {
-            swc_ecma_ast::PropOrSpread::Spread(_) => return None,
+            swc_ecma_ast::PropOrSpread::Spread(_) => {
+              self.todo(prop.span(), "Static spread");
+              return Value::String("(error)".to_string());
+            }
             swc_ecma_ast::PropOrSpread::Prop(prop) => match &**prop {
-              swc_ecma_ast::Prop::Shorthand(_) => return None,
+              swc_ecma_ast::Prop::Shorthand(_) => {
+                self.todo(prop.span(), "Static object shorthand");
+                return Value::String("(error)".to_string());
+              }
               swc_ecma_ast::Prop::KeyValue(kv) => {
                 let key = match &kv.key {
                   swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
                   swc_ecma_ast::PropName::Str(str) => Value::String(str.value.to_string()),
                   swc_ecma_ast::PropName::Num(num) => Value::Number(Number(num.value)),
-                  swc_ecma_ast::PropName::Computed(computed) => {
-                    self.compile_expr(&computed.expr)?
-                  }
+                  swc_ecma_ast::PropName::Computed(computed) => self.compile_expr(&computed.expr),
                   swc_ecma_ast::PropName::BigInt(bi) => Value::BigInt(bi.value.clone()),
                 };
 
-                let value = self.compile_expr(&kv.value)?;
+                let value = self.compile_expr(&kv.value);
 
                 (key, value)
               }
-              swc_ecma_ast::Prop::Assign(_) => return None,
-              swc_ecma_ast::Prop::Getter(_) => return None,
-              swc_ecma_ast::Prop::Setter(_) => return None,
-              swc_ecma_ast::Prop::Method(_) => return None,
+              swc_ecma_ast::Prop::Assign(_)
+              | swc_ecma_ast::Prop::Getter(_)
+              | swc_ecma_ast::Prop::Setter(_)
+              | swc_ecma_ast::Prop::Method(_) => {
+                self.todo(prop.span(), "This type of static prop");
+                return Value::String("(error)".to_string());
+              }
             },
           };
 
           properties.push((key, value));
         }
 
-        Some(Value::Object(Box::new(Object { properties })))
+        Value::Object(Box::new(Object { properties }))
       }
-      swc_ecma_ast::Expr::This(_) => None,
-      swc_ecma_ast::Expr::Fn(_) => None,
-      swc_ecma_ast::Expr::Update(_) => None,
-      swc_ecma_ast::Expr::Assign(_) => None,
-      swc_ecma_ast::Expr::SuperProp(_) => None,
-      swc_ecma_ast::Expr::Call(_) => None,
-      swc_ecma_ast::Expr::New(_) => None,
+      swc_ecma_ast::Expr::This(_)
+      | swc_ecma_ast::Expr::Fn(_)
+      | swc_ecma_ast::Expr::Update(_)
+      | swc_ecma_ast::Expr::Assign(_)
+      | swc_ecma_ast::Expr::SuperProp(_)
+      | swc_ecma_ast::Expr::Call(_)
+      | swc_ecma_ast::Expr::New(_) => {
+        self.todo(expr.span(), "This type of static expr");
+        Value::String("(error)".to_string())
+      }
       swc_ecma_ast::Expr::Ident(ident) => match self
         .scope_analysis
         .lookup(&Ident::from_swc_ident(ident))
         .map(|name| name.value.clone())
       {
-        Some(Value::Pointer(p)) => self.constants_map.get(&p).cloned(),
-        Some(value) => Some(value),
-        None => None,
+        // TODO: Why not just let this fall through to `Some(value) => value`?
+        Some(Value::Pointer(p)) => self.constants_map.get(&p).cloned().unwrap_or_else(|| {
+          self.internal_error(ident.span, "Constant not found");
+          Value::String("(error)".to_string())
+        }),
+
+        Some(value) => value,
+        None => {
+          self.internal_error(ident.span, "Identifier not found");
+          Value::String("(error)".to_string())
+        }
       },
-      swc_ecma_ast::Expr::TaggedTpl(_) => None,
-      swc_ecma_ast::Expr::Arrow(_) => None,
-      swc_ecma_ast::Expr::Class(_) => None,
-      swc_ecma_ast::Expr::Yield(_) => None,
-      swc_ecma_ast::Expr::MetaProp(_) => None,
-      swc_ecma_ast::Expr::Await(_) => None,
-      swc_ecma_ast::Expr::JSXMember(_) => None,
-      swc_ecma_ast::Expr::JSXNamespacedName(_) => None,
-      swc_ecma_ast::Expr::JSXEmpty(_) => None,
-      swc_ecma_ast::Expr::JSXElement(_) => None,
-      swc_ecma_ast::Expr::JSXFragment(_) => None,
-      swc_ecma_ast::Expr::TsInstantiation(_) => None,
-      swc_ecma_ast::Expr::PrivateName(_) => None,
-      swc_ecma_ast::Expr::OptChain(_) => None,
-      swc_ecma_ast::Expr::Invalid(_) => None,
-      swc_ecma_ast::Expr::Member(_) => None,
-      swc_ecma_ast::Expr::Cond(_) => None,
+      swc_ecma_ast::Expr::TaggedTpl(_)
+      | swc_ecma_ast::Expr::Arrow(_)
+      | swc_ecma_ast::Expr::Class(_)
+      | swc_ecma_ast::Expr::Yield(_)
+      | swc_ecma_ast::Expr::MetaProp(_)
+      | swc_ecma_ast::Expr::Await(_)
+      | swc_ecma_ast::Expr::JSXMember(_)
+      | swc_ecma_ast::Expr::JSXNamespacedName(_)
+      | swc_ecma_ast::Expr::JSXEmpty(_)
+      | swc_ecma_ast::Expr::JSXElement(_)
+      | swc_ecma_ast::Expr::JSXFragment(_)
+      | swc_ecma_ast::Expr::TsInstantiation(_)
+      | swc_ecma_ast::Expr::PrivateName(_)
+      | swc_ecma_ast::Expr::OptChain(_)
+      | swc_ecma_ast::Expr::Invalid(_)
+      | swc_ecma_ast::Expr::Member(_)
+      | swc_ecma_ast::Expr::Cond(_) => {
+        self.todo(expr.span(), "This type of static expr");
+        Value::String("(error)".to_string())
+      }
       swc_ecma_ast::Expr::Unary(unary) => match unary.op {
-        swc_ecma_ast::UnaryOp::Minus => match self.compile_expr(&unary.arg)? {
-          Value::Number(Number(x)) => Some(Value::Number(Number(-x))),
-          Value::BigInt(bi) => Some(Value::BigInt(-bi)),
-          _ => None,
+        swc_ecma_ast::UnaryOp::Minus => match self.compile_expr(&unary.arg) {
+          Value::Number(Number(x)) => Value::Number(Number(-x)),
+          Value::BigInt(bi) => Value::BigInt(-bi),
+          _ => {
+            self.todo(unary.span, "Static eval for this case");
+            Value::String("(error)".to_string())
+          }
         },
-        swc_ecma_ast::UnaryOp::Plus => match self.compile_expr(&unary.arg)? {
-          Value::Number(Number(x)) => Some(Value::Number(Number(x))),
-          Value::BigInt(bi) => Some(Value::BigInt(bi)),
-          _ => None,
+        swc_ecma_ast::UnaryOp::Plus => match self.compile_expr(&unary.arg) {
+          Value::Number(Number(x)) => Value::Number(Number(x)),
+          Value::BigInt(bi) => Value::BigInt(bi),
+          _ => {
+            self.todo(unary.span, "Static eval for this case");
+            Value::String("(error)".to_string())
+          }
         },
-        swc_ecma_ast::UnaryOp::Bang => None,
-        swc_ecma_ast::UnaryOp::Tilde => match self.compile_expr(&unary.arg)? {
-          Value::Number(Number(x)) => Some(Value::Number(Number(!to_i32(x) as f64))),
-          Value::BigInt(bi) => Some(Value::BigInt(!bi)),
-          _ => None,
+        swc_ecma_ast::UnaryOp::Bang => {
+          self.todo(expr.span(), "Static eval of ! operator");
+          Value::String("(error)".to_string())
+        }
+        swc_ecma_ast::UnaryOp::Tilde => match self.compile_expr(&unary.arg) {
+          Value::Number(Number(x)) => Value::Number(Number(!to_i32(x) as f64)),
+          Value::BigInt(bi) => Value::BigInt(!bi),
+          _ => {
+            self.todo(unary.span, "Static eval for this case");
+            Value::String("(error)".to_string())
+          }
         },
-        swc_ecma_ast::UnaryOp::TypeOf => None,
-        swc_ecma_ast::UnaryOp::Void => None,
-        swc_ecma_ast::UnaryOp::Delete => None,
+        swc_ecma_ast::UnaryOp::TypeOf
+        | swc_ecma_ast::UnaryOp::Void
+        | swc_ecma_ast::UnaryOp::Delete => {
+          self.todo(unary.span, "Static eval for this case");
+          Value::String("(error)".to_string())
+        }
       },
-      swc_ecma_ast::Expr::Bin(_) => None,
+      swc_ecma_ast::Expr::Bin(_) => {
+        self.todo(expr.span(), "Static eval of binary operator");
+        Value::String("(error)".to_string())
+      }
       swc_ecma_ast::Expr::Seq(seq) => {
         let mut last = Value::Void;
 
         for expr in &seq.exprs {
-          last = self.compile_expr(expr)?;
+          last = self.compile_expr(expr);
         }
 
-        Some(last)
+        last
       }
       swc_ecma_ast::Expr::Tpl(tpl) => 'b: {
         let len = tpl.exprs.len();
         assert_eq!(tpl.quasis.len(), len + 1);
 
         if len == 0 {
-          break 'b Some(Value::String(tpl.quasis[0].raw.to_string()));
+          break 'b Value::String(tpl.quasis[0].raw.to_string());
         }
 
-        None // TODO
+        self.todo(tpl.span, "Static eval of template literal");
+        Value::String("(error)".to_string())
       }
       swc_ecma_ast::Expr::Paren(paren) => self.compile_expr(&paren.expr),
       swc_ecma_ast::Expr::TsTypeAssertion(tta) => self.compile_expr(&tta.expr),
