@@ -178,7 +178,7 @@ impl ModuleCompiler {
       ExportDecl(ed) => self.compile_export_decl(ed),
       ExportNamed(en) => self.compile_named_export(en),
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
-      ExportDefaultExpr(ede) => self.module.export_default = self.compile_expr(&ede.expr),
+      ExportDefaultExpr(ede) => self.module.export_default = self.static_ec().expr(&ede.expr),
       ExportAll(_) => self.todo(module_decl.span(), "ExportAll declaration"),
       TsImportEquals(_) => self.not_supported(module_decl.span(), "TsImportEquals declaration"),
       TsExportAssignment(_) => {
@@ -263,7 +263,7 @@ impl ModuleCompiler {
       };
 
       if let (Some(ident), Some(init)) = (ident, init) {
-        let value = self.compile_expr(init);
+        let value = self.static_ec().expr(init);
 
         let pointer = match self.scope_analysis.lookup(&Ident::from_swc_ident(ident)) {
           Some(name) => match &name.value {
@@ -746,50 +746,54 @@ impl ModuleCompiler {
       ));
     }
 
-    let mut member_initializers_fnc = FunctionCompiler::new(self, OwnerId::Span(class.span));
+    // member initializers function compiler
+    let mut mi_fnc = FunctionCompiler::new(self, OwnerId::Span(class.span));
 
     for class_member in &class.body {
       match class_member {
         swc_ecma_ast::ClassMember::ClassProp(class_prop) => {
           if class_prop.is_static {
-            member_initializers_fnc.todo(class_prop.span, "static props");
+            let key = mi_fnc.mc.static_ec().prop_name(&class_prop.key);
 
-            continue;
+            let value = match &class_prop.value {
+              Some(expr) => mi_fnc.mc.static_ec().expr(expr),
+              None => Value::Undefined,
+            };
+
+            static_.properties.push((key, value));
+          } else {
+            let mut ec = ExpressionCompiler { fnc: &mut mi_fnc };
+
+            let compiled_key = ec.prop_name(&class_prop.key);
+
+            let compiled_value = match &class_prop.value {
+              None => CompiledExpression::new(Value::Undefined, vec![]),
+              Some(expr) => ec.compile(expr, None),
+            };
+
+            ec.fnc.push(Instruction::SubMov(
+              compiled_key.value.clone(),
+              compiled_value.value.clone(),
+              Register::this(),
+            ));
+
+            ec.fnc.release_ce(compiled_key);
+            ec.fnc.release_ce(compiled_value);
           }
-
-          let mut ec = ExpressionCompiler {
-            fnc: &mut member_initializers_fnc,
-          };
-
-          let compiled_key = ec.prop_name(&class_prop.key);
-
-          let compiled_value = match &class_prop.value {
-            None => CompiledExpression::new(Value::Undefined, vec![]),
-            Some(expr) => ec.compile(expr, None),
-          };
-
-          ec.fnc.push(Instruction::SubMov(
-            compiled_key.value.clone(),
-            compiled_value.value.clone(),
-            Register::this(),
-          ));
-
-          ec.fnc.release_ce(compiled_key);
-          ec.fnc.release_ce(compiled_value);
         }
         swc_ecma_ast::ClassMember::PrivateProp(private_prop) => {
-          member_initializers_fnc.todo(private_prop.span, "private props")
+          mi_fnc.todo(private_prop.span, "private props")
         }
         _ => {}
       }
     }
 
     let mut member_initializers_assembly = Vec::<FnLine>::new();
-    member_initializers_assembly.append(&mut member_initializers_fnc.current.body);
+    member_initializers_assembly.append(&mut mi_fnc.current.body);
 
     // Include any other definitions that were created by the member initializers
-    member_initializers_fnc.process_queue();
-    dependent_definitions = std::mem::take(&mut member_initializers_fnc.definitions);
+    mi_fnc.process_queue();
+    dependent_definitions = std::mem::take(&mut mi_fnc.definitions);
 
     let mut has_constructor = false;
 
@@ -835,7 +839,7 @@ impl ModuleCompiler {
         Method(method) => {
           let name = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
-            swc_ecma_ast::PropName::Computed(computed) => self.compile_expr(&computed.expr),
+            swc_ecma_ast::PropName::Computed(computed) => self.static_ec().expr(&computed.expr),
             _ => {
               self.todo(method.span, "Non-identifier method name");
               continue;
@@ -905,9 +909,9 @@ impl ModuleCompiler {
 
       let init_value = match &member.init {
         Some(init) => {
-          let init_value = self.compile_expr(init);
+          let init_value = self.static_ec().expr(init);
 
-          match self.compile_expr(init) {
+          match self.static_ec().expr(init) {
             Value::Number(Number(n)) => {
               next_default_id = Some(n + 1.0);
               Some(Value::Number(Number(n)))
@@ -944,7 +948,7 @@ impl ModuleCompiler {
     Value::Object(Box::new(Object { properties }))
   }
 
-  pub fn compile_expr(&mut self, expr: &swc_ecma_ast::Expr) -> Value {
-    StaticExpressionCompiler::new(self).expr(expr)
+  pub fn static_ec(&mut self) -> StaticExpressionCompiler {
+    StaticExpressionCompiler { mc: self }
   }
 }

@@ -271,7 +271,7 @@ impl<'a> StaticExpressionCompiler<'a> {
     }
   }
 
-  fn prop_name(&mut self, prop_name: &swc_ecma_ast::PropName) -> Value {
+  pub fn prop_name(&mut self, prop_name: &swc_ecma_ast::PropName) -> Value {
     match prop_name {
       swc_ecma_ast::PropName::Ident(ident) => Value::String(ident.sym.to_string()),
       swc_ecma_ast::PropName::Str(str) => Value::String(str.value.to_string()),
