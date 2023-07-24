@@ -33,8 +33,9 @@ use super::try_to_kal::TryToKal;
  * change program behavior due to believing false things), whereas sometimes type systems (notably
  * TypeScript) are not.
  */
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum Kal {
+  #[default]
   Unknown,
   Void,
   Undefined,
@@ -48,12 +49,6 @@ pub enum Kal {
   Register(Register),
   Pointer(Pointer),
   Builtin(Builtin),
-}
-
-impl Default for Kal {
-  fn default() -> Self {
-    Kal::Unknown
-  }
 }
 
 #[derive(Clone)]

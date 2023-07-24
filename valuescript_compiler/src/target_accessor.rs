@@ -56,7 +56,7 @@ impl TargetAccessor {
   ) -> TargetAccessor {
     use swc_ecma_ast::Expr::*;
 
-    return match expr {
+    match expr {
       Ident(ident) => TargetAccessor::compile_ident(ec, &CrateIdent::from_swc_ident(ident)),
       This(this) => TargetAccessor::compile_ident(ec, &CrateIdent::this(this.span)),
       Member(member) => {
@@ -98,7 +98,7 @@ impl TargetAccessor {
 
         TargetAccessor::make_bad(ec)
       }
-    };
+    }
   }
 
   pub fn compile_ident(ec: &mut ExpressionCompiler, ident: &CrateIdent) -> TargetAccessor {

@@ -98,7 +98,7 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_val(&mut self, registers: &mut Vec<Val>) -> Val {
-    return match self.decode_type() {
+    match self.decode_type() {
       BytecodeType::End => panic!("Cannot decode end"),
       BytecodeType::Void => Val::Void,
       BytecodeType::Undefined => Val::Undefined,
@@ -153,7 +153,7 @@ impl BytecodeDecoder {
       BytecodeType::BigInt => self.decode_bigint().to_val(),
       BytecodeType::GeneratorFunction => self.decode_function(true),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
-    };
+    }
   }
 
   pub fn decode_vec_val(&mut self, registers: &mut Vec<Val>) -> Vec<Val> {

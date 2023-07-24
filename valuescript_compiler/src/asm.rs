@@ -336,8 +336,9 @@ impl std::fmt::Display for LabelRef {
   }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Value {
+  #[default]
   Void,
   Undefined,
   Null,
@@ -350,12 +351,6 @@ pub enum Value {
   Register(Register),
   Pointer(Pointer),
   Builtin(Builtin),
-}
-
-impl Default for Value {
-  fn default() -> Self {
-    Value::Void
-  }
 }
 
 #[derive(Debug, Clone)]

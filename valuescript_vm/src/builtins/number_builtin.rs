@@ -123,7 +123,7 @@ pub static PARSE_INT: NativeFunction = native_fn(|_this, params| {
     let string_value = value.to_string().trim_start().to_string();
     let radix = params.get(1).and_then(|v| v.to_index()).unwrap_or(10);
 
-    if radix < 2 || radix > 36 {
+    if !(2..=36).contains(&radix) {
       return Ok(Val::Number(f64::NAN));
     }
 

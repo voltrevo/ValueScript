@@ -42,7 +42,7 @@ static TO_FIXED: NativeFunction = native_fn(|this, params| {
 
       precision = f64::floor(precision);
 
-      if precision < 1.0 || precision > 100.0 {
+      if !(1.0..=100.0).contains(&precision) {
         return Err("precision must be between 1 and 100".to_range_error());
       }
 
@@ -59,7 +59,7 @@ static TO_EXPONENTIAL: NativeFunction = native_fn(|this, params| {
         let mut precision = p.to_number();
         precision = f64::floor(precision);
 
-        if precision < 0.0 || precision > 100.0 {
+        if !(0.0..=100.0).contains(&precision) {
           return Err("precision must be between 0 and 100".to_range_error());
         }
 

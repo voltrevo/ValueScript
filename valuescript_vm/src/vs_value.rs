@@ -18,8 +18,9 @@ use crate::vs_function::VsFunction;
 use crate::vs_object::VsObject;
 use crate::vs_symbol::{symbol_to_name, VsSymbol};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum Val {
+  #[default]
   Void,
   Undefined,
   Null,
@@ -35,12 +36,6 @@ pub enum Val {
   Static(&'static dyn ValTrait),
   Dynamic(Rc<dyn DynValTrait>),
   CopyCounter(Box<CopyCounter>),
-}
-
-impl Default for Val {
-  fn default() -> Self {
-    Val::Void
-  }
 }
 
 #[derive(PartialEq, Debug)]
@@ -222,7 +217,7 @@ impl ValTrait for Val {
   fn to_index(&self) -> Option<usize> {
     use Val::*;
 
-    return match self {
+    match self {
       Void => panic!("Shouldn't happen"),
       Undefined => None,
       Null => None,
@@ -241,7 +236,7 @@ impl ValTrait for Val {
       Static(val) => val.to_index(),
       Dynamic(val) => val.to_index(),
       CopyCounter(_) => None,
-    };
+    }
   }
 
   fn is_primitive(&self) -> bool {
@@ -291,7 +286,7 @@ impl ValTrait for Val {
   fn is_nullish(&self) -> bool {
     use Val::*;
 
-    return match self {
+    match self {
       Void => panic!("Shouldn't happen"), // TODO: Or just true?
       Undefined => true,
       Null => true,
@@ -307,7 +302,7 @@ impl ValTrait for Val {
       Static(_) => false,
       Dynamic(val) => val.is_nullish(),
       CopyCounter(_) => false,
-    };
+    }
   }
 
   fn bind(&self, params: Vec<Val>) -> Option<Val> {

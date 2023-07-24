@@ -64,7 +64,7 @@ impl InstructionByte {
   pub fn from_byte(byte: u8) -> InstructionByte {
     use InstructionByte::*;
 
-    return match byte {
+    match byte {
       0x00 => End,
       0x01 => Mov,
       0x02 => OpInc,
@@ -125,6 +125,6 @@ impl InstructionByte {
       0x39 => YieldStar,
 
       _ => panic!("Unrecognized instruction: {}", byte),
-    };
+    }
   }
 }

@@ -77,7 +77,7 @@ fn format_from_path(file_path: &String) -> RunFormat {
     .and_then(OsStr::to_str)
     .unwrap_or("");
 
-  return match ext {
+  match ext {
     "ts" => RunFormat::TypeScript,
     "mts" => RunFormat::TypeScript,
     "js" => RunFormat::TypeScript,
@@ -85,7 +85,7 @@ fn format_from_path(file_path: &String) -> RunFormat {
     "vsm" => RunFormat::Assembly,
     "vsb" => RunFormat::Bytecode,
     _ => std::panic!("Unrecognized file extension \"{}\"", ext),
-  };
+  }
 }
 
 fn to_bytecode(format: RunFormat, file_path: &String) -> Bytecode {

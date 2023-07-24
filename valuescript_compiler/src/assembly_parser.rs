@@ -1007,11 +1007,11 @@ pub fn parse_module(content: &str) -> Module {
 }
 
 fn is_leading_identifier_char(c: char) -> bool {
-  c == '_' || ('a'..='z').contains(&c) || ('A'..='Z').contains(&c)
+  c == '_' || c.is_ascii_alphabetic()
 }
 
 fn is_identifier_char(c: char) -> bool {
-  c == '_' || ('0'..='9').contains(&c) || ('a'..='z').contains(&c) || ('A'..='Z').contains(&c)
+  c == '_' || c.is_ascii_alphanumeric()
 }
 
 fn advance_chars(iter: &mut std::iter::Peekable<std::str::Chars>, len: usize) {
