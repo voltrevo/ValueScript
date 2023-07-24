@@ -1056,12 +1056,11 @@ impl ModuleCompiler {
         .lookup(&Ident::from_swc_ident(ident))
         .map(|name| name.value.clone())
       {
-        // TODO: Why not just let this fall through to `Some(value) => value`?
-        Some(Value::Pointer(p)) => self.constants_map.get(&p).cloned().unwrap_or_else(|| {
-          self.internal_error(ident.span, "Constant not found");
-          Value::String("(error)".to_string())
-        }),
-
+        Some(Value::Pointer(p)) => self
+          .constants_map
+          .get(&p)
+          .cloned()
+          .unwrap_or_else(|| Value::Pointer(p)),
         Some(value) => value,
         None => {
           self.internal_error(ident.span, "Identifier not found");
