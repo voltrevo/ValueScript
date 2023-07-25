@@ -136,8 +136,13 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       }
       Arrow(arrow) => self.arrow_expression(arrow, target_register),
       Class(class_exp) => {
-        self.todo(class_exp.span(), "Class expression");
-        CompiledExpression::empty()
+        // TODO: Handle captures
+        let p = self
+          .fnc
+          .mc
+          .compile_class(None, class_exp.ident.as_ref(), &class_exp.class);
+
+        CompiledExpression::new(Value::Pointer(p), vec![])
       }
       Yield(yield_expr) => self.yield_expr(yield_expr, target_register),
       MetaProp(meta_prop) => {

@@ -62,7 +62,7 @@ pub struct Ref {
   pub span: swc_common::Span,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ScopeAnalysis {
   pub names: HashMap<NameId, Name>,
   pub owners: HashMap<OwnerId, HashSet<swc_common::Span>>,

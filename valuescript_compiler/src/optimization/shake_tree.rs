@@ -61,7 +61,14 @@ pub fn shake_tree(module: &mut Module) {
 
   for pointer in &ordered_pointers {
     if required_pointers.contains(pointer) {
-      let defn = new_definitions_map.get_mut(pointer).unwrap();
+      let defn = match new_definitions_map.get_mut(pointer) {
+        Some(defn) => defn,
+        None => {
+          // This can happen due to errors in the input program. Ideally we should ensure there are
+          // error diagnostics when we hit this case (TODO).
+          continue;
+        }
+      };
 
       // First include pointers that are allowed to be circular
       match &defn.content {
@@ -75,7 +82,14 @@ pub fn shake_tree(module: &mut Module) {
 
   for pointer in ordered_pointers {
     if required_pointers.contains(&pointer) {
-      let defn = new_definitions_map.get_mut(&pointer).unwrap();
+      let defn = match new_definitions_map.get_mut(&pointer) {
+        Some(defn) => defn,
+        None => {
+          // This can happen due to errors in the input program. Ideally we should ensure there are
+          // error diagnostics when we hit this case (TODO).
+          continue;
+        }
+      };
 
       if defn.pointer.name.is_empty() {
         // "" isn't a valid pointer name - this happens when `take` has already been used on the

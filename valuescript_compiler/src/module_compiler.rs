@@ -7,8 +7,8 @@ use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
 use crate::asm::{
-  Class, Definition, DefinitionContent, FnLine, Function, Instruction, Lazy, Module, Number,
-  Object, Pointer, Register, Value,
+  Class, Definition, DefinitionContent, FnLine, Instruction, Lazy, Module, Number, Object, Pointer,
+  Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
@@ -769,39 +769,34 @@ impl ModuleCompiler {
     let mut member_initializers_assembly = Vec::<FnLine>::new();
     member_initializers_assembly.append(&mut mi_fnc.fn_.body);
 
-    let mut has_constructor = false;
+    let mut ctor = swc_ecma_ast::Constructor {
+      span: class.span,
+      key: swc_ecma_ast::PropName::Str(swc_ecma_ast::Str {
+        span: class.span,
+        value: swc_atoms::JsWord::from(""),
+        raw: None,
+      }),
+      params: vec![],
+      body: None,
+      accessibility: None,
+      is_optional: false,
+    };
 
     for class_member in &class.body {
-      if let swc_ecma_ast::ClassMember::Constructor(ctor) = class_member {
-        has_constructor = true;
-
-        let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
-
-        self.compile_fn(
-          ctor_defn_name.clone(),
-          Functionish::Constructor(
-            member_initializers_assembly.clone(),
-            class.span,
-            ctor.clone(),
-          ),
-        );
-
-        constructor = Value::Pointer(ctor_defn_name);
+      if let swc_ecma_ast::ClassMember::Constructor(concrete_ctor) = class_member {
+        ctor = concrete_ctor.clone();
       }
     }
 
-    if !member_initializers_assembly.is_empty() && !has_constructor {
+    if !member_initializers_assembly.is_empty() || ctor.body.is_some() {
       let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
 
-      constructor = Value::Pointer(ctor_defn_name.clone());
-      self.module.definitions.push(Definition {
-        pointer: ctor_defn_name,
-        content: DefinitionContent::Function(Function {
-          is_generator: false,
-          parameters: vec![],
-          body: member_initializers_assembly,
-        }),
-      });
+      self.compile_fn(
+        ctor_defn_name.clone(),
+        Functionish::Constructor(member_initializers_assembly.clone(), class.span, ctor),
+      );
+
+      constructor = Value::Pointer(ctor_defn_name);
     }
 
     for class_member in &class.body {
@@ -855,14 +850,18 @@ impl ModuleCompiler {
       }
     }
 
+    let class_value = Value::Class(Box::new(Class {
+      constructor,
+      prototype: Value::Object(Box::new(prototype)),
+      static_: Value::Object(Box::new(static_)),
+    }));
+
     self.module.definitions.push(Definition {
       pointer: defn_name.clone(),
-      content: DefinitionContent::Value(Value::Class(Box::new(Class {
-        constructor,
-        prototype: Value::Object(Box::new(prototype)),
-        static_: Value::Object(Box::new(static_)),
-      }))),
+      content: DefinitionContent::Value(class_value.clone()),
     });
+
+    self.constants_map.insert(defn_name.clone(), class_value);
 
     defn_name
   }

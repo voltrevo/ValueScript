@@ -275,7 +275,11 @@ impl<'a> FunctionCompiler<'a> {
           Some(block) => {
             self.handle_block_body(block);
           }
-          None => self.todo(constructor.span(), "constructor without body"),
+
+          // This case is constructed artificially when there is no explicit constructor but there
+          // are member initializer expressions which need to be compiled into a constructor. I'm
+          // not sure whether SWC ever produces this case.
+          None => {}
         };
       }
     };
@@ -1113,7 +1117,12 @@ impl<'a> FunctionCompiler<'a> {
     use swc_ecma_ast::Decl::*;
 
     match decl {
-      Class(class) => self.todo(class.span(), "Class declaration"),
+      Class(class) => {
+        // TODO: Handle captures
+        self
+          .mc
+          .compile_class(None, Some(&class.ident), &class.class);
+      }
       Fn(fn_decl) => {
         let p = match self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident)) {
           Some(Value::Pointer(p)) => p,
