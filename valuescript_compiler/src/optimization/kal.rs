@@ -315,6 +315,7 @@ impl Kal {
 
         Kal::Undefined
       }
+      Kal::Class(class) => class.static_.sub(key),
       _ => Kal::Unknown, // TODO: Implement more cases
     }
   }
