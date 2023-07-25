@@ -55,9 +55,6 @@ impl Assembler {
       DefinitionContent::Function(function) => {
         self.function(function);
       }
-      DefinitionContent::Class(class) => {
-        self.class(class);
-      }
       DefinitionContent::Value(value) => {
         self.value(value);
       }

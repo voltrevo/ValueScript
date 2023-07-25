@@ -18,7 +18,6 @@ pub fn simplify(module: &mut Module, take_registers: bool) {
       DefinitionContent::Function(fn_) => {
         simplify_fn(FnState::new(fn_, pointer_kals.clone()), fn_, take_registers)
       }
-      DefinitionContent::Class(_) => {}
       DefinitionContent::Value(_) => {}
       DefinitionContent::Lazy(_) => {}
     }

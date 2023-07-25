@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::mem::take;
 
-use crate::asm::Module;
 use crate::asm::{Definition, DefinitionContent, Pointer};
+use crate::asm::{Module, Value};
 use crate::visit_pointers::{visit_pointers, PointerVisitation};
 
 pub fn shake_tree(module: &mut Module) {
@@ -65,7 +65,7 @@ pub fn shake_tree(module: &mut Module) {
 
       // First include pointers that are allowed to be circular
       match &defn.content {
-        DefinitionContent::Function(..) | DefinitionContent::Class(..) => {}
+        DefinitionContent::Function(..) | DefinitionContent::Value(Value::Class(..)) => {}
         DefinitionContent::Value(..) | DefinitionContent::Lazy(..) => continue,
       }
 

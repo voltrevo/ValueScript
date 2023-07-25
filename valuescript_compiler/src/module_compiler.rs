@@ -885,11 +885,11 @@ impl ModuleCompiler {
 
     self.module.definitions.push(Definition {
       pointer: defn_name.clone(),
-      content: DefinitionContent::Class(Class {
+      content: DefinitionContent::Value(Value::Class(Box::new(Class {
         constructor,
         prototype: Value::Object(Box::new(prototype)),
         static_: Value::Object(Box::new(static_)),
-      }),
+      }))),
     });
 
     self.module.definitions.append(&mut dependent_definitions);

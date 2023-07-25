@@ -184,7 +184,6 @@ impl<'a> AssemblyParser<'a> {
 
     let content = match c {
       'f' => DefinitionContent::Function(self.assemble_function()),
-      'c' => DefinitionContent::Class(self.assemble_class()),
       _ => DefinitionContent::Value(self.assemble_value()),
     };
 
@@ -781,6 +780,7 @@ impl<'a> AssemblyParser<'a> {
       Some('-' | '.' | '0'..='9') => self.assemble_number(),
       Some('"') => Value::String(self.parse_string_literal()),
       Some('{') => Value::Object(Box::new(self.assemble_object())),
+      Some('c') => Value::Class(Box::new(self.assemble_class())),
       Some(ref_c) => {
         let c = *ref_c;
 

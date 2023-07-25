@@ -72,7 +72,6 @@ impl std::fmt::Display for Definition {
 #[derive(Debug, Clone)]
 pub enum DefinitionContent {
   Function(Function),
-  Class(Class),
   Value(Value),
   Lazy(Lazy),
 }
@@ -82,9 +81,6 @@ impl std::fmt::Display for DefinitionContent {
     match self {
       DefinitionContent::Function(function) => {
         write!(f, "{}", function)
-      }
-      DefinitionContent::Class(class) => {
-        write!(f, "{}", class)
       }
       DefinitionContent::Value(value) => {
         write!(f, "{}", value)
