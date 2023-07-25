@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::asm::{Pointer, Register};
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct NameAllocator {
   used_names: BTreeSet<String>,
   released_names: Vec<String>,
@@ -102,7 +102,7 @@ pub fn ident_from_str(str: &str) -> String {
   }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct PointerAllocator {
   alloc: NameAllocator,
 }
@@ -115,7 +115,7 @@ impl PointerAllocator {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RegAllocator {
   pub alloc: NameAllocator,
 }

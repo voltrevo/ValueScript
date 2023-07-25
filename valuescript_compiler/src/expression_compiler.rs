@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::mem::take;
 
 use swc_common::Spanned;
@@ -65,7 +66,7 @@ pub struct ExpressionCompiler<'a, 'fnc> {
 }
 
 impl<'a, 'fnc> DiagnosticContainer for ExpressionCompiler<'a, 'fnc> {
-  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
+  fn diagnostics_mut(&self) -> &RefCell<Vec<Diagnostic>> {
     self.fnc.diagnostics_mut()
   }
 }
@@ -136,8 +137,13 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       }
       Arrow(arrow) => self.arrow_expression(arrow, target_register),
       Class(class_exp) => {
-        self.todo(class_exp.span(), "Class expression");
-        CompiledExpression::empty()
+        // TODO: Handle captures
+        let p = self
+          .fnc
+          .mc
+          .compile_class(None, class_exp.ident.as_ref(), &class_exp.class);
+
+        CompiledExpression::new(Value::Pointer(p), vec![])
       }
       Yield(yield_expr) => self.yield_expr(yield_expr, target_register),
       MetaProp(meta_prop) => {

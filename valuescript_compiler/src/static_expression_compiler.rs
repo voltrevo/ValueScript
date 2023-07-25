@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use swc_common::Spanned;
 use valuescript_vm::operations::to_i32;
 
@@ -16,7 +18,7 @@ pub struct StaticExpressionCompiler<'a> {
 }
 
 impl<'a> DiagnosticContainer for StaticExpressionCompiler<'a> {
-  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
+  fn diagnostics_mut(&self) -> &RefCell<Vec<Diagnostic>> {
     self.mc.diagnostics_mut()
   }
 }

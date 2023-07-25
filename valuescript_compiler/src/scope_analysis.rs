@@ -1,4 +1,5 @@
 use std::{
+  cell::RefCell,
   collections::HashMap,
   collections::{BTreeMap, HashSet},
 };
@@ -62,7 +63,7 @@ pub struct Ref {
   pub span: swc_common::Span,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ScopeAnalysis {
   pub names: HashMap<NameId, Name>,
   pub owners: HashMap<OwnerId, HashSet<swc_common::Span>>,
@@ -71,14 +72,14 @@ pub struct ScopeAnalysis {
   pub mutations: BTreeMap<swc_common::Span, NameId>,
   pub optional_mutations: BTreeMap<swc_common::Span, NameId>,
   pub refs: HashMap<swc_common::Span, Ref>,
-  pub diagnostics: Vec<Diagnostic>,
+  pub diagnostics: RefCell<Vec<Diagnostic>>,
   pub pointer_allocator: PointerAllocator,
   pub reg_allocators: HashMap<OwnerId, RegAllocator>,
 }
 
 impl DiagnosticContainer for ScopeAnalysis {
-  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
-    &mut self.diagnostics
+  fn diagnostics_mut(&self) -> &RefCell<Vec<Diagnostic>> {
+    &self.diagnostics
   }
 }
 
@@ -139,6 +140,8 @@ impl ScopeAnalysis {
     sa.process_optional_mutations();
 
     sa.diagnose_tdz_violations();
+
+    sa.class_capture_todos();
 
     sa
   }
@@ -236,7 +239,7 @@ impl ScopeAnalysis {
       &origin_ident.sym,
       name.id,
       origin_ident.span,
-      &mut self.diagnostics,
+      &mut self.diagnostics_mut().borrow_mut(),
     );
   }
 
@@ -891,8 +894,13 @@ impl ScopeAnalysis {
     ident: &Option<swc_ecma_ast::Ident>,
     class_: &swc_ecma_ast::Class,
   ) {
-    let child_scope = scope.nest(Some(OwnerId::Span(class_.span)));
-    self.insert_this_name(&child_scope, class_.span);
+    let owner_span = match ident {
+      Some(ident) => ident.span,
+      None => class_.span,
+    };
+
+    let child_scope = scope.nest(Some(OwnerId::Span(owner_span)));
+    self.insert_this_name(&child_scope, owner_span);
 
     if let Some(ident) = ident {
       self.insert_pointer_name(&child_scope, NameType::Class, ident);
@@ -1242,7 +1250,8 @@ impl ScopeAnalysis {
       }
       Expr::Invalid(invalid) => {
         self
-          .diagnostics
+          .diagnostics_mut()
+          .borrow_mut()
           .push(Diagnostic::error(invalid.span, "Invalid expression"));
       }
       Expr::TsTypeAssertion(ts_type_assertion) => {
@@ -1309,7 +1318,7 @@ impl ScopeAnalysis {
 
     if !optional {
       if let Some(diagnostic) = diagnostic {
-        self.diagnostics.push(diagnostic);
+        self.diagnostics_mut().borrow_mut().push(diagnostic);
       }
     }
   }
@@ -1696,7 +1705,7 @@ impl ScopeAnalysis {
         if name.type_ == NameType::Let {
           match name_id {
             NameId::Span(span) => {
-              self.diagnostics.push(Diagnostic::lint(
+              self.diagnostics_mut().borrow_mut().push(Diagnostic::lint(
                 *span,
                 &format!(
                   "`{}` should be declared using `const` because it is implicitly \
@@ -1706,16 +1715,19 @@ impl ScopeAnalysis {
               ));
             }
             NameId::This(_) | NameId::Builtin(_) | NameId::Constant(_) => {
-              self.diagnostics.push(Diagnostic::internal_error(
-                swc_common::DUMMY_SP,
-                "Builtin/constant/this should not have type_ let",
-              ));
+              self
+                .diagnostics_mut()
+                .borrow_mut()
+                .push(Diagnostic::internal_error(
+                  swc_common::DUMMY_SP,
+                  "Builtin/constant/this should not have type_ let",
+                ));
             }
           }
         }
 
         for mutation in &name.mutations {
-          self.diagnostics.push(Diagnostic::error(
+          self.diagnostics_mut().borrow_mut().push(Diagnostic::error(
             *mutation,
             &format!("Cannot mutate captured variable `{}`", name.sym),
           ));
@@ -1724,28 +1736,34 @@ impl ScopeAnalysis {
     }
   }
 
-  pub fn name_id_to_owner_id(&mut self, name_id: &NameId) -> Option<OwnerId> {
+  pub fn name_id_to_owner_id(&self, name_id: &NameId) -> Option<OwnerId> {
     let name = match self.names.get(name_id) {
       Some(name) => name,
       None => {
         // TODO: Add a name lookup helper that does this diagnostic
-        self.diagnostics.push(Diagnostic::internal_error(
-          swc_common::DUMMY_SP,
-          "NameId not found",
-        ));
+        self
+          .diagnostics_mut()
+          .borrow_mut()
+          .push(Diagnostic::internal_error(
+            swc_common::DUMMY_SP,
+            "NameId not found",
+          ));
 
         return None;
       }
     };
 
-    if name.type_ == NameType::Function {
+    if let NameType::Function | NameType::Class = name.type_ {
       match name_id {
         NameId::Span(span) => Some(OwnerId::Span(*span)),
         NameId::This(_) => {
-          self.diagnostics.push(Diagnostic::internal_error(
-            swc_common::DUMMY_SP,
-            "NameId::This should not be associated with NameType::Function",
-          ));
+          self
+            .diagnostics_mut()
+            .borrow_mut()
+            .push(Diagnostic::internal_error(
+              swc_common::DUMMY_SP,
+              "NameId::This should not be associated with NameType::Function/Class",
+            ));
 
           None
         }
@@ -1853,7 +1871,7 @@ impl ScopeAnalysis {
       }
     }
 
-    self.diagnostics.append(&mut diagnostics);
+    self.diagnostics_mut().borrow_mut().append(&mut diagnostics);
   }
 
   fn process_optional_mutations(&mut self) {
@@ -1918,7 +1936,43 @@ impl ScopeAnalysis {
       ));
     }
 
-    self.diagnostics.append(&mut diagnostics);
+    self.diagnostics_mut().borrow_mut().append(&mut diagnostics);
+  }
+
+  fn class_capture_todos(&mut self) {
+    for name in self.names.values() {
+      if name.type_ != NameType::Class {
+        continue;
+      }
+
+      let owner_id = match self.name_id_to_owner_id(&name.id) {
+        Some(owner_id) => owner_id,
+        None => continue,
+      };
+
+      let captures = match self.captures.get(&owner_id) {
+        Some(captures) => captures,
+        None => continue,
+      };
+
+      for cap in captures {
+        match self.lookup_capture(&owner_id, cap) {
+          Some(Value::Register(_)) => {}
+          _ => continue,
+        };
+
+        let span = match cap {
+          NameId::Span(span) => span,
+          NameId::This(span) => span,
+          NameId::Builtin(_) | NameId::Constant(_) => {
+            self.internal_error(swc_common::DUMMY_SP, "Invalid capture");
+            continue;
+          }
+        };
+
+        self.todo(*span, "Capturing this variable inside a class");
+      }
+    }
   }
 
   pub fn get_register_captures(&self, captor_id: &OwnerId) -> Vec<NameId> {
@@ -1977,6 +2031,23 @@ pub fn fn_to_owner_id(
   function: &swc_ecma_ast::Function,
 ) -> OwnerId {
   OwnerId::Span(fn_owner_span(name, function))
+}
+
+pub fn class_owner_span(
+  name: Option<&swc_ecma_ast::Ident>,
+  class: &swc_ecma_ast::Class,
+) -> swc_common::Span {
+  match name {
+    Some(name) => name.span,
+    None => class.span,
+  }
+}
+
+pub fn class_to_owner_id(
+  name: Option<&swc_ecma_ast::Ident>,
+  class: &swc_ecma_ast::Class,
+) -> OwnerId {
+  OwnerId::Span(class_owner_span(name, class))
 }
 
 fn is_this_pat(pat: &swc_ecma_ast::Pat) -> bool {

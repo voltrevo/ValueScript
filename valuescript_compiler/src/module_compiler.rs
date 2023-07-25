@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -7,8 +8,8 @@ use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
 use crate::asm::{
-  Class, Definition, DefinitionContent, FnLine, Function, Instruction, Lazy, Module, Number,
-  Object, Pointer, Register, Value,
+  Class, Definition, DefinitionContent, FnLine, Instruction, Lazy, Module, Number, Object, Pointer,
+  Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
@@ -16,7 +17,7 @@ use crate::function_compiler::{FunctionCompiler, Functionish};
 use crate::ident::Ident;
 use crate::name_allocator::{ident_from_str, NameAllocator};
 use crate::scope::OwnerId;
-use crate::scope_analysis::ScopeAnalysis;
+use crate::scope_analysis::{class_to_owner_id, ScopeAnalysis};
 use crate::static_expression_compiler::StaticExpressionCompiler;
 
 struct DiagnosticCollector {
@@ -73,7 +74,7 @@ pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
   let compiler = ModuleCompiler::compile_program(program);
 
   CompilerOutput {
-    diagnostics: compiler.diagnostics,
+    diagnostics: compiler.diagnostics.take(),
     module: compiler.module,
   }
 }
@@ -94,7 +95,7 @@ pub fn compile_module(source: &str) -> CompilerOutput {
 
 #[derive(Default)]
 pub struct ModuleCompiler {
-  pub diagnostics: Vec<Diagnostic>,
+  pub diagnostics: RefCell<Vec<Diagnostic>>,
   pub definition_allocator: NameAllocator,
   pub scope_analysis: ScopeAnalysis,
   pub constants_map: HashMap<Pointer, Value>,
@@ -102,8 +103,8 @@ pub struct ModuleCompiler {
 }
 
 impl DiagnosticContainer for ModuleCompiler {
-  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
-    &mut self.diagnostics
+  fn diagnostics_mut(&self) -> &RefCell<Vec<Diagnostic>> {
+    &self.diagnostics
   }
 }
 
@@ -130,23 +131,23 @@ impl ModuleCompiler {
     let module = match program {
       Module(module) => module,
       Script(script) => {
-        let mut self_ = Self::default();
+        let self_ = Self::default();
         self_.error(script.span, "Scripts are not supported");
 
         return self_;
       }
     };
 
-    let mut scope_analysis = ScopeAnalysis::run(module);
+    let scope_analysis = ScopeAnalysis::run(module);
     let mut scope_analysis_diagnostics = Vec::<Diagnostic>::new();
     std::mem::swap(
       &mut scope_analysis_diagnostics,
-      &mut scope_analysis.diagnostics,
+      &mut scope_analysis.diagnostics_mut().borrow_mut(),
     );
 
     let mut self_ = Self {
       scope_analysis,
-      diagnostics: scope_analysis_diagnostics,
+      diagnostics: RefCell::new(scope_analysis_diagnostics),
       ..Default::default()
     };
 
@@ -769,39 +770,38 @@ impl ModuleCompiler {
     let mut member_initializers_assembly = Vec::<FnLine>::new();
     member_initializers_assembly.append(&mut mi_fnc.fn_.body);
 
-    let mut has_constructor = false;
+    let mut ctor = swc_ecma_ast::Constructor {
+      span: class.span,
+      key: swc_ecma_ast::PropName::Str(swc_ecma_ast::Str {
+        span: class.span,
+        value: swc_atoms::JsWord::from(""),
+        raw: None,
+      }),
+      params: vec![],
+      body: None,
+      accessibility: None,
+      is_optional: false,
+    };
 
     for class_member in &class.body {
-      if let swc_ecma_ast::ClassMember::Constructor(ctor) = class_member {
-        has_constructor = true;
-
-        let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
-
-        self.compile_fn(
-          ctor_defn_name.clone(),
-          Functionish::Constructor(
-            member_initializers_assembly.clone(),
-            class.span,
-            ctor.clone(),
-          ),
-        );
-
-        constructor = Value::Pointer(ctor_defn_name);
+      if let swc_ecma_ast::ClassMember::Constructor(concrete_ctor) = class_member {
+        ctor = concrete_ctor.clone();
       }
     }
 
-    if !member_initializers_assembly.is_empty() && !has_constructor {
+    if !member_initializers_assembly.is_empty() || ctor.body.is_some() {
       let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
 
-      constructor = Value::Pointer(ctor_defn_name.clone());
-      self.module.definitions.push(Definition {
-        pointer: ctor_defn_name,
-        content: DefinitionContent::Function(Function {
-          is_generator: false,
-          parameters: vec![],
-          body: member_initializers_assembly,
-        }),
-      });
+      self.compile_fn(
+        ctor_defn_name.clone(),
+        Functionish::Constructor(
+          member_initializers_assembly.clone(),
+          class_to_owner_id(ident, class),
+          ctor,
+        ),
+      );
+
+      constructor = Value::Pointer(ctor_defn_name);
     }
 
     for class_member in &class.body {
@@ -855,14 +855,18 @@ impl ModuleCompiler {
       }
     }
 
+    let class_value = Value::Class(Box::new(Class {
+      constructor,
+      prototype: Value::Object(Box::new(prototype)),
+      static_: Value::Object(Box::new(static_)),
+    }));
+
     self.module.definitions.push(Definition {
       pointer: defn_name.clone(),
-      content: DefinitionContent::Value(Value::Class(Box::new(Class {
-        constructor,
-        prototype: Value::Object(Box::new(prototype)),
-        static_: Value::Object(Box::new(static_)),
-      }))),
+      content: DefinitionContent::Value(class_value.clone()),
     });
+
+    self.constants_map.insert(defn_name.clone(), class_value);
 
     defn_name
   }

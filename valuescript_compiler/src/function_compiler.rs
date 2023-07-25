@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::mem::take;
 
@@ -20,24 +21,15 @@ use crate::scope_analysis::{fn_to_owner_id, Name};
 pub enum Functionish {
   Fn(Option<swc_ecma_ast::Ident>, swc_ecma_ast::Function),
   Arrow(swc_ecma_ast::ArrowExpr),
-  Constructor(Vec<FnLine>, swc_common::Span, swc_ecma_ast::Constructor),
-}
-
-impl Spanned for Functionish {
-  fn span(&self) -> swc_common::Span {
-    match self {
-      Functionish::Fn(_, fn_) => fn_.span,
-      Functionish::Arrow(arrow) => arrow.span,
-      Functionish::Constructor(_, class_span, _) => *class_span,
-    }
-  }
+  Constructor(Vec<FnLine>, OwnerId, swc_ecma_ast::Constructor),
 }
 
 impl Functionish {
   pub fn owner_id(&self) -> OwnerId {
     match self {
       Functionish::Fn(ident, fn_) => fn_to_owner_id(ident, fn_),
-      _ => OwnerId::Span(self.span()),
+      Functionish::Arrow(arrow) => OwnerId::Span(arrow.span),
+      Functionish::Constructor(_, owner_id, _) => owner_id.clone(),
     }
   }
 }
@@ -73,8 +65,8 @@ pub struct FunctionCompiler<'a> {
 }
 
 impl<'a> DiagnosticContainer for FunctionCompiler<'a> {
-  fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
-    &mut self.mc.diagnostics
+  fn diagnostics_mut(&self) -> &RefCell<Vec<Diagnostic>> {
+    self.mc.diagnostics_mut()
   }
 }
 
@@ -119,10 +111,14 @@ impl<'a> FunctionCompiler<'a> {
     let name = self.mc.scope_analysis.lookup(ident);
 
     if name.is_none() {
-      self.mc.diagnostics.push(Diagnostic::internal_error(
-        ident.span,
-        &format!("Could not find name for ident {:?}", ident),
-      ));
+      self
+        .mc
+        .diagnostics_mut()
+        .borrow_mut()
+        .push(Diagnostic::internal_error(
+          ident.span,
+          &format!("Could not find name for ident {:?}", ident),
+        ));
     }
 
     name
@@ -275,7 +271,11 @@ impl<'a> FunctionCompiler<'a> {
           Some(block) => {
             self.handle_block_body(block);
           }
-          None => self.todo(constructor.span(), "constructor without body"),
+
+          // This case is constructed artificially when there is no explicit constructor but there
+          // are member initializer expressions which need to be compiled into a constructor. I'm
+          // not sure whether SWC ever produces this case.
+          None => {}
         };
       }
     };
@@ -1113,7 +1113,12 @@ impl<'a> FunctionCompiler<'a> {
     use swc_ecma_ast::Decl::*;
 
     match decl {
-      Class(class) => self.todo(class.span(), "Class declaration"),
+      Class(class) => {
+        // TODO: Handle captures
+        self
+          .mc
+          .compile_class(None, Some(&class.ident), &class.class);
+      }
       Fn(fn_decl) => {
         let p = match self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident)) {
           Some(Value::Pointer(p)) => p,
