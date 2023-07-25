@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use valuescript_vm::{
+  vs_class::VsClass,
   vs_object::VsObject,
   vs_value::{ToVal, Val},
 };
@@ -43,6 +44,12 @@ impl TryToVal for Value {
         }
         .to_val()
       }
+      Value::Class(class) => VsClass {
+        constructor: class.constructor.try_to_val()?,
+        prototype: class.prototype.try_to_val()?,
+        static_: class.static_.try_to_val()?,
+      }
+      .to_val(),
 
       Value::Void | Value::Register(..) | Value::Pointer(..) | Value::Builtin(..) => {
         return Err("Invalid argument".to_val());

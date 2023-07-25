@@ -100,6 +100,7 @@ fn should_extract_value_as_constant(value: &Value) -> Option<String> {
         None
       }
     }
+    Value::Class(_) => Some("class".to_string()),
   }
 }
 
@@ -120,6 +121,11 @@ fn is_constant(value: &Value) -> bool {
       .properties
       .iter()
       .all(|(k, v)| is_constant(k) && is_constant(v)),
+    Value::Class(class) => {
+      is_constant(&class.constructor)
+        && is_constant(&class.prototype)
+        && is_constant(&class.static_)
+    }
   }
 }
 

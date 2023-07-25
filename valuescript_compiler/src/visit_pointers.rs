@@ -87,6 +87,11 @@ where
       Object(object) => {
         self.object(owner, object);
       }
+      Class(class) => {
+        self.value(owner, &mut class.constructor);
+        self.value(owner, &mut class.prototype);
+        self.value(owner, &mut class.static_);
+      }
       Pointer(pointer) => {
         (self.visitor)(match owner {
           Some(owner) => PointerVisitation::Reference(owner, pointer),

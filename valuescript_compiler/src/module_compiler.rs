@@ -949,6 +949,6 @@ impl ModuleCompiler {
   }
 
   pub fn static_ec(&mut self) -> StaticExpressionCompiler {
-    StaticExpressionCompiler { mc: self }
+    StaticExpressionCompiler::new(self)
   }
 }

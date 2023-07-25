@@ -1,6 +1,7 @@
 use num_bigint::BigInt;
 use valuescript_vm::{
   operations, unicode_at,
+  vs_class::VsClass,
   vs_object::VsObject,
   vs_value::{number_to_index, ToVal, Val},
 };
@@ -46,6 +47,7 @@ pub enum Kal {
   String(String),
   Array(Box<Array>),
   Object(Box<Object>),
+  Class(Box<Class>),
   Register(Register),
   Pointer(Pointer),
   Builtin(Builtin),
@@ -59,6 +61,13 @@ pub struct Array {
 #[derive(Clone)]
 pub struct Object {
   pub properties: Vec<(Kal, Kal)>,
+}
+
+#[derive(Clone)]
+pub struct Class {
+  pub constructor: Kal,
+  pub prototype: Kal,
+  pub static_: Kal,
 }
 
 impl Kal {
@@ -79,6 +88,11 @@ impl Kal {
           k.visit_kals_mut(visit);
           v.visit_kals_mut(visit);
         }
+      }
+      Kal::Class(class) => {
+        class.constructor.visit_kals_mut(visit);
+        class.prototype.visit_kals_mut(visit);
+        class.static_.visit_kals_mut(visit);
       }
       Kal::Unknown => {}
       Kal::Void => {}
@@ -112,6 +126,11 @@ impl Kal {
           .iter()
           .map(|(k, v)| (Kal::from_value(k), Kal::from_value(v)))
           .collect(),
+      })),
+      Value::Class(class) => Kal::Class(Box::new(Class {
+        constructor: Kal::from_value(&class.constructor),
+        prototype: Kal::from_value(&class.prototype),
+        static_: Kal::from_value(&class.static_),
       })),
       Value::Register(reg) => Kal::Register(reg.clone()),
       Value::Pointer(p) => Kal::Pointer(p.clone()),
@@ -164,6 +183,11 @@ impl Kal {
           properties
         },
       }))),
+      Kal::Class(class) => Some(Value::Class(Box::new(asm::Class {
+        constructor: class.constructor.try_to_value()?,
+        prototype: class.prototype.try_to_value()?,
+        static_: class.static_.try_to_value()?,
+      }))),
       Kal::Register(x) => Some(Value::Register(x.clone())),
       Kal::Pointer(x) => Some(Value::Pointer(x.clone())),
       Kal::Builtin(x) => Some(Value::Builtin(x.clone())),
@@ -202,6 +226,12 @@ impl Kal {
         }
         .to_val()
       }
+      Kal::Class(class) => VsClass {
+        constructor: class.constructor.try_to_val()?,
+        prototype: class.prototype.try_to_val()?,
+        static_: class.static_.try_to_val()?,
+      }
+      .to_val(),
 
       Kal::Void | Kal::Register(..) | Kal::Pointer(..) | Kal::Builtin(..) => {
         return None;
@@ -222,6 +252,7 @@ impl Kal {
       Kal::String(s) => Some(s.clone()),
       Kal::Array(_) => None,
       Kal::Object(_) => None,
+      Kal::Class(_) => None,
       Kal::Register(_) => None,
       Kal::Pointer(_) => None,
       Kal::Builtin(_) => None,
@@ -641,6 +672,11 @@ impl FnState {
 
         Kal::Object(Box::new(Object { properties }))
       }
+      Value::Class(class) => Kal::Class(Box::new(Class {
+        constructor: self.eval_arg(&mut class.constructor),
+        prototype: self.eval_arg(&mut class.prototype),
+        static_: self.eval_arg(&mut class.static_),
+      })),
       Value::Register(reg) => {
         let kal = self.get(reg.name.clone()).clone();
 

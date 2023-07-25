@@ -141,7 +141,7 @@ impl std::fmt::Display for Function {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Class {
   pub constructor: Value,
   pub prototype: Value,
@@ -348,6 +348,7 @@ pub enum Value {
   String(String),
   Array(Box<Array>),
   Object(Box<Object>),
+  Class(Box<Class>),
   Register(Register),
   Pointer(Pointer),
   Builtin(Builtin),
@@ -395,6 +396,11 @@ impl Value {
           v.visit_values_mut(visit);
         }
       }
+      Value::Class(class) => {
+        class.constructor.visit_values_mut(visit);
+        class.prototype.visit_values_mut(visit);
+        class.static_.visit_values_mut(visit);
+      }
       Value::Void => {}
       Value::Undefined => {}
       Value::Null => {}
@@ -423,6 +429,11 @@ impl Value {
           v.visit_registers_mut_rev(visit);
           k.visit_registers_mut_rev(visit);
         }
+      }
+      Value::Class(class) => {
+        class.constructor.visit_registers_mut_rev(visit);
+        class.prototype.visit_registers_mut_rev(visit);
+        class.static_.visit_registers_mut_rev(visit);
       }
       Value::Void => {}
       Value::Undefined => {}
@@ -466,6 +477,7 @@ impl std::fmt::Display for Value {
       ),
       Value::Array(value) => write!(f, "{}", value),
       Value::Object(value) => write!(f, "{}", value),
+      Value::Class(class) => write!(f, "{}", class),
       Value::Register(value) => write!(f, "{}", value),
       Value::Pointer(value) => write!(f, "{}", value),
       Value::Builtin(value) => write!(f, "{}", value),

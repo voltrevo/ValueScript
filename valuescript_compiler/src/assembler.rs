@@ -288,6 +288,7 @@ impl Assembler {
       Value::Undefined => self.output.push(ValueType::Undefined as u8),
       Value::Array(array) => self.array(array),
       Value::Object(object) => self.object(object),
+      Value::Class(class) => self.class(class),
       Value::Pointer(pointer) => self.pointer(pointer),
       Value::Builtin(builtin) => self.builtin(builtin),
     }

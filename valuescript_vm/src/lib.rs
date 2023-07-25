@@ -21,7 +21,7 @@ mod string_methods;
 mod todo_fn;
 mod virtual_machine;
 pub mod vs_array;
-mod vs_class;
+pub mod vs_class;
 mod vs_function;
 pub mod vs_object;
 mod vs_symbol;
