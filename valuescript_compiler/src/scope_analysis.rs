@@ -7,7 +7,7 @@ use swc_common::Spanned;
 use valuescript_common::BUILTIN_NAMES;
 
 use crate::{
-  asm::{Builtin, Register, Value},
+  asm::{Builtin, Pointer, Register, Value},
   constants::CONSTANTS,
   diagnostic::{DiagnosticContainer, DiagnosticReporter},
   ident::Ident,
@@ -74,6 +74,7 @@ pub struct ScopeAnalysis {
   pub diagnostics: Vec<Diagnostic>,
   pub pointer_allocator: PointerAllocator,
   pub reg_allocators: HashMap<OwnerId, RegAllocator>,
+  pub pointer_to_name_id: HashMap<Pointer, NameId>,
 }
 
 impl DiagnosticContainer for ScopeAnalysis {
@@ -189,6 +190,11 @@ impl ScopeAnalysis {
     origin_ident: &Ident,
     tdz_end: Option<swc_common::BytePos>,
   ) {
+    let pointer = match &value {
+      Value::Pointer(p) => Some(p.clone()),
+      _ => None,
+    };
+
     let name = Name {
       id: match type_ {
         NameType::This => NameId::This(origin_ident.span),
@@ -234,10 +240,33 @@ impl ScopeAnalysis {
 
     scope.set(
       &origin_ident.sym,
-      name.id,
+      name.id.clone(),
       origin_ident.span,
       &mut self.diagnostics,
     );
+
+    if let Some(pointer) = pointer {
+      self.pointer_to_name_id.insert(pointer, name.id);
+    }
+  }
+
+  fn get_captures_for_value(&mut self, value: &Value) -> Vec<NameId> {
+    let p = match value {
+      Value::Pointer(p) => p,
+      _ => return vec![],
+    };
+
+    let name_id = match self.pointer_to_name_id.get(p) {
+      Some(name_id) => name_id.clone(),
+      None => return vec![],
+    };
+
+    let owner_id = match self.name_id_to_owner_id(&name_id) {
+      Some(owner_id) => owner_id,
+      None => return vec![],
+    };
+
+    self.get_register_captures(&owner_id)
   }
 
   fn insert_pointer_name(
@@ -1738,13 +1767,13 @@ impl ScopeAnalysis {
       }
     };
 
-    if name.type_ == NameType::Function {
+    if let NameType::Function | NameType::Class = name.type_ {
       match name_id {
         NameId::Span(span) => Some(OwnerId::Span(*span)),
         NameId::This(_) => {
           self.diagnostics.push(Diagnostic::internal_error(
             swc_common::DUMMY_SP,
-            "NameId::This should not be associated with NameType::Function",
+            "NameId::This should not be associated with NameType::Function/Class",
           ));
 
           None

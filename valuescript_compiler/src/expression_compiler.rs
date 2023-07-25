@@ -2,7 +2,7 @@ use std::mem::take;
 
 use swc_common::Spanned;
 
-use crate::asm::{Array, Instruction, Label, Number, Object, Register, Value};
+use crate::asm::{Array, Class, Instruction, Label, Number, Object, Register, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::function_compiler::{FunctionCompiler, Functionish};
 use crate::ident::Ident as CrateIdent;
@@ -1232,38 +1232,31 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
     ident: &CrateIdent,
     target_register: Option<Register>,
   ) -> CompiledExpression {
-    let fn_as_owner_id = match self.fnc.mc.scope_analysis.lookup(ident) {
-      Some(name) => match name.type_ == NameType::Function {
-        true => match name.id {
-          // TODO: This is a bit of a hack, it might break...
-          // functions have an owner id, and the name id should
-          // have the same span... at least it does now
-          NameId::Span(span) => Some(OwnerId::Span(span)),
-          _ => None, // Internal error?
-        },
-        false => None,
-      },
+    let name = match self.fnc.mc.scope_analysis.lookup(ident) {
+      Some(name) => name,
       _ => {
         self.internal_error(
           ident.span,
           &format!("Failed to lookup identifier `{}`", ident.sym),
         );
 
-        None
+        return self.simple_ident(ident);
       }
     };
 
-    let value = self.fnc.lookup_value(ident).unwrap_or_default();
+    match name.type_ {
+      NameType::Function => {
+        let owner_id = match name.id {
+          // TODO: This is a bit of a hack, it might break...
+          // functions have an owner id, and the name id should
+          // have the same span... at least it does now
+          NameId::Span(span) => OwnerId::Span(span),
+          _ => return self.simple_ident(ident), // Internal error?
+        };
 
-    let name = match self.fnc.lookup(ident) {
-      Some(v) => v,
-      None => {
-        return Value::Undefined.to_ce();
-      }
-    };
+        let value = name.value.clone();
 
-    match fn_as_owner_id {
-      Some(owner_id) => {
+        // TODO: name.captures?
         let capture_params = self.fnc.mc.scope_analysis.get_register_captures(&owner_id);
 
         match capture_params.len() {
@@ -1277,24 +1270,78 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
           ),
         }
       }
-      None => match value {
-        Value::Register(reg) => {
-          if name.mutations.is_empty() {
-            // Just use the register for the variable if it's not mutated
-            return Value::Register(reg).to_ce();
-          }
+      // NameType::Class => {
+      //   let owner_id = match name.id {
+      //     // TODO: This is a bit of a hack, it might break...
+      //     // classes have an owner id, and the name id should
+      //     // have the same span... at least it does now
+      //     NameId::Span(span) => OwnerId::Span(span),
+      //     _ => return self.simple_ident(ident), // Internal error?
+      //   };
 
-          // Otherwise, we need to capture the current value for the result of the expression
-          let new_reg = self.fnc.allocate_tmp();
+      //   let value = name.value.clone();
+      //   let ctor_captures = self.fnc.mc.scope_analysis.get_register_captures(&owner_id);
 
-          self
-            .fnc
-            .push(Instruction::Mov(Value::Register(reg), new_reg.clone()));
+      //   if ctor_captures.is_empty() {
+      //     // Note: We're relying on the fact that all captures in the class will get included on the
+      //     // constructor here. This is a bit conceptually inaccurate, but it arises because of the
+      //     // confusion between the identity of the class and its constructor.
+      //     return value.to_ce();
+      //   }
 
-          CompiledExpression::new(Value::Register(new_reg.clone()), vec![new_reg])
+      //   let mut nested_registers = Vec::<Register>::new();
+
+      //   let mut ctor = self.capturing_fn_ref(
+      //     ident.span,
+      //     Some(ident.sym.to_string()),
+      //     &value,
+      //     &ctor_captures,
+      //     target_register,
+      //   );
+
+      //   ctor.release_checker.has_unreleased_registers = false;
+      //   nested_registers.append(&mut ctor.nested_registers);
+
+      //   let class = Class {
+      //     constructor: ctor.value,
+      //     prototype: todo!(),
+      //     static_: todo!(),
+      //   };
+
+      //   CompiledExpression::new(Value::Class(Box::new(class)), nested_registers)
+      // }
+      _ => self.simple_ident(ident),
+    }
+  }
+
+  // Here 'simple' means 'not capturing'
+  pub fn simple_ident(&mut self, ident: &CrateIdent) -> CompiledExpression {
+    let value = self.fnc.lookup_value(ident).unwrap_or_default();
+
+    let name = match self.fnc.lookup(ident) {
+      Some(v) => v,
+      None => {
+        return Value::Undefined.to_ce();
+      }
+    };
+
+    match value {
+      Value::Register(reg) => {
+        if name.mutations.is_empty() {
+          // Just use the register for the variable if it's not mutated
+          return Value::Register(reg).to_ce();
         }
-        _ => value.to_ce(),
-      },
+
+        // Otherwise, we need to capture the current value for the result of the expression
+        let new_reg = self.fnc.allocate_tmp();
+
+        self
+          .fnc
+          .push(Instruction::Mov(Value::Register(reg), new_reg.clone()));
+
+        CompiledExpression::new(Value::Register(new_reg.clone()), vec![new_reg])
+      }
+      _ => value.to_ce(),
     }
   }
 
