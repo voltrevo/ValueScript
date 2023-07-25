@@ -756,17 +756,13 @@ impl ScopeAnalysis {
     }
   }
 
-  fn get_pat_idents(&mut self, pat: &swc_ecma_ast::Pat) -> Vec<swc_ecma_ast::Ident> {
+  fn get_pat_idents(&self, pat: &swc_ecma_ast::Pat) -> Vec<swc_ecma_ast::Ident> {
     let mut idents = Vec::new();
     self.get_pat_idents_impl(&mut idents, pat);
     idents
   }
 
-  fn get_pat_idents_impl(
-    &mut self,
-    idents: &mut Vec<swc_ecma_ast::Ident>,
-    pat: &swc_ecma_ast::Pat,
-  ) {
+  fn get_pat_idents_impl(&self, idents: &mut Vec<swc_ecma_ast::Ident>, pat: &swc_ecma_ast::Pat) {
     use swc_ecma_ast::Pat;
 
     match pat {
@@ -1913,7 +1909,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn class_capture_todos(&mut self) {
+  fn class_capture_todos(&self) {
     for name in self.names.values() {
       if name.type_ != NameType::Class {
         continue;
