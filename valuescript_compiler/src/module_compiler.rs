@@ -321,13 +321,11 @@ impl ModuleCompiler {
       ));
     }
 
-    let mut fn_defns = self.compile_fn(
+    self.compile_fn(
       pointer,
       Some(fn_name),
       Functionish::Fn(Some(fn_.ident.clone()), fn_.function.clone()),
     );
-
-    self.module.definitions.append(&mut fn_defns);
   }
 
   fn compile_enum_decl(&mut self, export: bool, ts_enum: &swc_ecma_ast::TsEnumDecl) {
@@ -396,13 +394,11 @@ impl ModuleCompiler {
 
         self.module.export_default = Value::Pointer(defn.clone());
 
-        let mut fn_defns = self.compile_fn(
+        self.compile_fn(
           defn,
           fn_name,
           Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
         );
-
-        self.module.definitions.append(&mut fn_defns);
       }
       DefaultDecl::TsInterfaceDecl(_) => {
         // Nothing to do
@@ -701,13 +697,8 @@ impl ModuleCompiler {
     defn_pointer: Pointer,
     fn_name: Option<String>,
     functionish: Functionish,
-  ) -> Vec<Definition> {
-    let (defn, mut diagnostics) =
-      FunctionCompiler::compile(self, defn_pointer, fn_name, functionish);
-
-    self.diagnostics.append(&mut diagnostics);
-
-    defn
+  ) {
+    FunctionCompiler::compile(self, defn_pointer, fn_name, functionish);
   }
 
   pub fn compile_class(
@@ -719,7 +710,6 @@ impl ModuleCompiler {
     let mut constructor: Value = Value::Void;
     let mut prototype: Object = Object::default();
     let mut static_: Object = Object::default();
-    let mut dependent_definitions: Vec<Definition>;
 
     let defn_name = match ident {
       Some(ident) => match self
@@ -793,7 +783,6 @@ impl ModuleCompiler {
 
     // Include any other definitions that were created by the member initializers
     mi_fnc.process_queue();
-    dependent_definitions = std::mem::take(&mut mi_fnc.definitions);
 
     let mut has_constructor = false;
 
@@ -803,7 +792,7 @@ impl ModuleCompiler {
 
         let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
 
-        dependent_definitions.append(&mut self.compile_fn(
+        self.compile_fn(
           ctor_defn_name.clone(),
           None,
           Functionish::Constructor(
@@ -811,7 +800,7 @@ impl ModuleCompiler {
             class.span,
             ctor.clone(),
           ),
-        ));
+        );
 
         constructor = Value::Pointer(ctor_defn_name);
       }
@@ -821,7 +810,7 @@ impl ModuleCompiler {
       let ctor_defn_name = self.allocate_defn(&format!("{}_constructor", defn_name.name));
 
       constructor = Value::Pointer(ctor_defn_name.clone());
-      dependent_definitions.push(Definition {
+      self.module.definitions.push(Definition {
         pointer: ctor_defn_name,
         content: DefinitionContent::Function(Function {
           is_generator: false,
@@ -849,11 +838,11 @@ impl ModuleCompiler {
           let method_defn_name =
             self.allocate_defn(&ident_from_str(&format!("{}_{}", defn_name.name, name)));
 
-          dependent_definitions.append(&mut self.compile_fn(
+          self.compile_fn(
             method_defn_name.clone(),
             None,
             Functionish::Fn(None, method.function.clone()),
-          ));
+          );
 
           let dst = match method.is_static {
             false => &mut prototype,
@@ -891,8 +880,6 @@ impl ModuleCompiler {
         static_: Value::Object(Box::new(static_)),
       }))),
     });
-
-    self.module.definitions.append(&mut dependent_definitions);
 
     defn_name
   }

@@ -108,13 +108,11 @@ impl<'a> StaticExpressionCompiler<'a> {
                   None => self.mc.allocate_defn_numbered("_anon"),
                 };
 
-                let mut nested_defns = self.mc.compile_fn(
+                self.mc.compile_fn(
                   p.clone(),
                   fn_name.clone(),
                   Functionish::Fn(fn_ident, method.function.clone()),
                 );
-
-                self.mc.module.definitions.append(&mut nested_defns);
 
                 (key, Value::Pointer(p))
               }
@@ -161,22 +159,20 @@ impl<'a> StaticExpressionCompiler<'a> {
           None => self.mc.allocate_defn_numbered("_anon"),
         };
 
-        let mut fn_defns = self.mc.compile_fn(
+        self.mc.compile_fn(
           p.clone(),
           fn_name,
           Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
         );
 
-        self.mc.module.definitions.append(&mut fn_defns);
-
         Value::Pointer(p)
       }
       swc_ecma_ast::Expr::Arrow(arrow) => {
         let p = self.mc.allocate_defn_numbered("_anon");
-        let mut fn_defns = self
+
+        self
           .mc
           .compile_fn(p.clone(), None, Functionish::Arrow(arrow.clone()));
-        self.mc.module.definitions.append(&mut fn_defns);
 
         Value::Pointer(p)
       }

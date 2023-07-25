@@ -8,7 +8,7 @@ use crate::asm::{
   Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Pointer, Register,
   Value,
 };
-use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticLevel, DiagnosticReporter};
+use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::CompiledExpression;
 use crate::expression_compiler::ExpressionCompiler;
 use crate::ident::Ident;
@@ -63,7 +63,6 @@ pub struct CatchSetting {
 pub struct FunctionCompiler<'a> {
   pub mc: &'a mut ModuleCompiler,
   pub current: Function,
-  pub definitions: Vec<Definition>,
   pub owner_id: OwnerId,
   pub reg_allocator: RegAllocator,
   pub label_allocator: NameAllocator,
@@ -73,13 +72,11 @@ pub struct FunctionCompiler<'a> {
   pub end_label: Option<Label>,
   pub is_returning_register: Option<Register>,
   pub finally_labels: Vec<Label>,
-
-  pub diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a> DiagnosticContainer for FunctionCompiler<'a> {
   fn diagnostics_mut(&mut self) -> &mut Vec<Diagnostic> {
-    &mut self.diagnostics
+    &mut self.mc.diagnostics
   }
 }
 
@@ -93,7 +90,6 @@ impl<'a> FunctionCompiler<'a> {
     FunctionCompiler {
       mc,
       current: Function::default(),
-      definitions: vec![],
       owner_id,
       reg_allocator,
       label_allocator: NameAllocator::default(),
@@ -103,7 +99,6 @@ impl<'a> FunctionCompiler<'a> {
       end_label: None,
       is_returning_register: None,
       finally_labels: vec![],
-      diagnostics: vec![],
     }
   }
 
@@ -132,11 +127,10 @@ impl<'a> FunctionCompiler<'a> {
     let name = self.mc.scope_analysis.lookup(ident);
 
     if name.is_none() {
-      self.diagnostics.push(Diagnostic {
-        level: DiagnosticLevel::InternalError,
-        message: format!("Could not find name for ident {:?}", ident),
-        span: ident.span,
-      });
+      self.mc.diagnostics.push(Diagnostic::internal_error(
+        ident.span,
+        &format!("Could not find name for ident {:?}", ident),
+      ));
     }
 
     name
@@ -210,7 +204,7 @@ impl<'a> FunctionCompiler<'a> {
     definition_pointer: Pointer,
     fn_name: Option<String>,
     functionish: Functionish,
-  ) -> (Vec<Definition>, Vec<Diagnostic>) {
+  ) {
     let mut self_ = FunctionCompiler::new(mc, functionish.owner_id());
 
     self_
@@ -223,8 +217,6 @@ impl<'a> FunctionCompiler<'a> {
       .expect("Failed to queue function");
 
     self_.process_queue();
-
-    (self_.definitions, self_.diagnostics)
   }
 
   pub fn process_queue(&mut self) {
@@ -333,7 +325,7 @@ impl<'a> FunctionCompiler<'a> {
       self.is_returning_register = None;
     }
 
-    self.definitions.push(Definition {
+    self.mc.module.definitions.push(Definition {
       pointer: definition_pointer,
       content: DefinitionContent::Function(take(&mut self.current)),
     });
@@ -1204,7 +1196,7 @@ impl<'a> FunctionCompiler<'a> {
 
         let enum_value = self.mc.compile_enum_value(ts_enum);
 
-        self.definitions.push(Definition {
+        self.mc.module.definitions.push(Definition {
           pointer,
           content: DefinitionContent::Value(enum_value),
         });
