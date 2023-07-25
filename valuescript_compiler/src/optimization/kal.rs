@@ -258,6 +258,66 @@ impl Kal {
       Kal::Builtin(_) => None,
     }
   }
+
+  fn sub(&self, key: &Kal) -> Kal {
+    match self {
+      Kal::String(string) => match key {
+        Kal::Number(Number(i)) => match number_to_index(*i) {
+          Some(i) => 'b: {
+            let string_bytes = string.as_bytes();
+
+            if i >= string_bytes.len() {
+              break 'b Kal::Undefined;
+            }
+
+            match unicode_at(string_bytes, string_bytes.len(), i) {
+              Some(char) => Kal::String(char.to_string()),
+              None => Kal::String("".to_string()),
+            }
+          }
+          None => Kal::Undefined,
+        },
+        Kal::String(key) => match key.as_str() {
+          "length" => Kal::Number(Number(string.len() as f64)),
+          _ => Kal::Unknown,
+        },
+        _ => Kal::Unknown,
+      },
+      Kal::Array(array) => match key {
+        Kal::Number(Number(i)) => match number_to_index(*i) {
+          Some(i) => match array.values.get(i) {
+            Some(item) => item.clone(),
+            None => Kal::Undefined,
+          },
+          None => Kal::Undefined,
+        },
+        _ => Kal::Unknown, // TODO: Implement more cases
+      },
+      Kal::Object(object) => 'b: {
+        let key_str = match key.to_known_string() {
+          Some(s) => s,
+          None => break 'b Kal::Unknown,
+        };
+
+        for (k, v) in object.properties.iter().rev() {
+          match k.to_known_string() {
+            Some(k) => {
+              if k == key_str {
+                break 'b v.clone();
+              }
+            }
+            None => break 'b Kal::Unknown,
+          }
+        }
+
+        // TODO: Prototypes (currently anything with a prototype should be Kal::Unknown, but
+        // when this changes Kal::Undefined could be wrong)
+
+        Kal::Undefined
+      }
+      _ => Kal::Unknown, // TODO: Implement more cases
+    }
+  }
 }
 
 #[derive(Default)]
@@ -460,63 +520,7 @@ impl FnState {
         let obj = self.eval_arg(obj);
         let key = self.eval_arg(key);
 
-        let item = match obj {
-          Kal::String(string) => match key {
-            Kal::Number(Number(i)) => match number_to_index(i) {
-              Some(i) => 'b: {
-                let string_bytes = string.as_bytes();
-
-                if i >= string_bytes.len() {
-                  break 'b Kal::Undefined;
-                }
-
-                match unicode_at(string_bytes, string_bytes.len(), i) {
-                  Some(char) => Kal::String(char.to_string()),
-                  None => Kal::String("".to_string()),
-                }
-              }
-              None => Kal::Undefined,
-            },
-            Kal::String(key) => match key.as_str() {
-              "length" => Kal::Number(Number(string.len() as f64)),
-              _ => Kal::Unknown,
-            },
-            _ => Kal::Unknown,
-          },
-          Kal::Array(array) => match key {
-            Kal::Number(Number(i)) => match number_to_index(i) {
-              Some(i) => match array.values.get(i) {
-                Some(item) => item.clone(),
-                None => Kal::Undefined,
-              },
-              None => Kal::Undefined,
-            },
-            _ => Kal::Unknown, // TODO: Implement more cases
-          },
-          Kal::Object(object) => 'b: {
-            let key_str = match key.to_known_string() {
-              Some(s) => s,
-              None => break 'b Kal::Unknown,
-            };
-
-            for (k, v) in object.properties.iter().rev() {
-              match k.to_known_string() {
-                Some(k) => {
-                  if k == key_str {
-                    break 'b v.clone();
-                  }
-                }
-                None => break 'b Kal::Unknown,
-              }
-            }
-
-            // TODO: Prototypes (currently anything with a prototype should be Kal::Unknown, but
-            // when this changes Kal::Undefined could be wrong)
-
-            Kal::Undefined
-          }
-          _ => Kal::Unknown, // TODO: Implement more cases
-        };
+        let item = obj.sub(&key);
 
         self.set(dst.name.clone(), item);
       }
