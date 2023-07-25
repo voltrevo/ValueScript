@@ -20,7 +20,7 @@ pub enum TargetAccessor {
 }
 
 impl TargetAccessor {
-  pub fn is_eligible_expr(ec: &mut ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> bool {
+  pub fn is_eligible_expr(ec: &ExpressionCompiler, expr: &swc_ecma_ast::Expr) -> bool {
     use swc_ecma_ast::Expr::*;
 
     return match expr {

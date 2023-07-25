@@ -1249,10 +1249,7 @@ impl ScopeAnalysis {
         ));
       }
       Expr::Invalid(invalid) => {
-        self
-          .diagnostics_mut()
-          .borrow_mut()
-          .push(Diagnostic::error(invalid.span, "Invalid expression"));
+        self.error(invalid.span, "Invalid expression");
       }
       Expr::TsTypeAssertion(ts_type_assertion) => {
         self.mutate_expr(scope, &ts_type_assertion.expr, optional);
@@ -1699,38 +1696,35 @@ impl ScopeAnalysis {
     }
   }
 
-  fn find_capture_mutations(&mut self) {
+  fn find_capture_mutations(&self) {
     for (name_id, name) in &self.names {
       if !name.captures.is_empty() {
         if name.type_ == NameType::Let {
           match name_id {
             NameId::Span(span) => {
-              self.diagnostics_mut().borrow_mut().push(Diagnostic::lint(
+              self.lint(
                 *span,
                 &format!(
                   "`{}` should be declared using `const` because it is implicitly \
                   const due to capture",
                   name.sym
                 ),
-              ));
+              );
             }
             NameId::This(_) | NameId::Builtin(_) | NameId::Constant(_) => {
-              self
-                .diagnostics_mut()
-                .borrow_mut()
-                .push(Diagnostic::internal_error(
-                  swc_common::DUMMY_SP,
-                  "Builtin/constant/this should not have type_ let",
-                ));
+              self.internal_error(
+                swc_common::DUMMY_SP,
+                "Builtin/constant/this should not have type_ let",
+              );
             }
           }
         }
 
         for mutation in &name.mutations {
-          self.diagnostics_mut().borrow_mut().push(Diagnostic::error(
+          self.error(
             *mutation,
             &format!("Cannot mutate captured variable `{}`", name.sym),
-          ));
+          );
         }
       }
     }
@@ -1741,13 +1735,7 @@ impl ScopeAnalysis {
       Some(name) => name,
       None => {
         // TODO: Add a name lookup helper that does this diagnostic
-        self
-          .diagnostics_mut()
-          .borrow_mut()
-          .push(Diagnostic::internal_error(
-            swc_common::DUMMY_SP,
-            "NameId not found",
-          ));
+        self.internal_error(swc_common::DUMMY_SP, "NameId not found");
 
         return None;
       }
@@ -1757,13 +1745,10 @@ impl ScopeAnalysis {
       match name_id {
         NameId::Span(span) => Some(OwnerId::Span(*span)),
         NameId::This(_) => {
-          self
-            .diagnostics_mut()
-            .borrow_mut()
-            .push(Diagnostic::internal_error(
-              swc_common::DUMMY_SP,
-              "NameId::This should not be associated with NameType::Function/Class",
-            ));
+          self.internal_error(
+            swc_common::DUMMY_SP,
+            "NameId::This should not be associated with NameType::Function/Class",
+          );
 
           None
         }
@@ -1852,9 +1837,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn diagnose_const_mutations(&mut self) {
-    let mut diagnostics = Vec::<Diagnostic>::new();
-
+  fn diagnose_const_mutations(&self) {
     for name in self.names.values() {
       if !name.captures.is_empty() {
         // More specific diagnostics are emitted for these mutations elsewhere
@@ -1863,15 +1846,10 @@ impl ScopeAnalysis {
 
       if name.effectively_const {
         for mutation in &name.mutations {
-          diagnostics.push(Diagnostic::error(
-            *mutation,
-            &format!("Cannot mutate const {}", name.sym),
-          ));
+          self.error(*mutation, &format!("Cannot mutate const {}", name.sym));
         }
       }
     }
-
-    self.diagnostics_mut().borrow_mut().append(&mut diagnostics);
   }
 
   fn process_optional_mutations(&mut self) {
@@ -1893,9 +1871,7 @@ impl ScopeAnalysis {
     }
   }
 
-  fn diagnose_tdz_violations(&mut self) {
-    let mut diagnostics = Vec::<Diagnostic>::new();
-
+  fn diagnose_tdz_violations(&self) {
     for ref_ in self.refs.values() {
       let name = self.names.get(&ref_.name_id).expect("Name not found");
 
@@ -1927,16 +1903,14 @@ impl ScopeAnalysis {
         continue;
       }
 
-      diagnostics.push(Diagnostic::error(
+      self.error(
         ref_.span,
         &format!(
           "Referencing {} is invalid before its declaration (temporal dead zone)",
           name.sym,
         ),
-      ));
+      );
     }
-
-    self.diagnostics_mut().borrow_mut().append(&mut diagnostics);
   }
 
   fn class_capture_todos(&mut self) {

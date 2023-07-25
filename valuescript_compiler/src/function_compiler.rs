@@ -107,18 +107,14 @@ impl<'a> FunctionCompiler<'a> {
     self.fn_.body.push(FnLine::Comment(message));
   }
 
-  pub fn lookup(&mut self, ident: &Ident) -> Option<&Name> {
+  pub fn lookup(&self, ident: &Ident) -> Option<&Name> {
     let name = self.mc.scope_analysis.lookup(ident);
 
     if name.is_none() {
-      self
-        .mc
-        .diagnostics_mut()
-        .borrow_mut()
-        .push(Diagnostic::internal_error(
-          ident.span,
-          &format!("Could not find name for ident {:?}", ident),
-        ));
+      self.internal_error(
+        ident.span,
+        &format!("Could not find name for ident {:?}", ident),
+      );
     }
 
     name

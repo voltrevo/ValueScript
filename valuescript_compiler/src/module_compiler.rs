@@ -139,15 +139,11 @@ impl ModuleCompiler {
     };
 
     let scope_analysis = ScopeAnalysis::run(module);
-    let mut scope_analysis_diagnostics = Vec::<Diagnostic>::new();
-    std::mem::swap(
-      &mut scope_analysis_diagnostics,
-      &mut scope_analysis.diagnostics_mut().borrow_mut(),
-    );
+    let diagnostics = scope_analysis.diagnostics.take();
 
     let mut self_ = Self {
       scope_analysis,
-      diagnostics: RefCell::new(scope_analysis_diagnostics),
+      diagnostics: RefCell::new(diagnostics),
       ..Default::default()
     };
 
