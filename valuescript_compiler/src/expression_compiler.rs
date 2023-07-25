@@ -1,11 +1,10 @@
 use std::mem::take;
 
-use queues::*;
 use swc_common::Spanned;
 
 use crate::asm::{Array, Instruction, Label, Number, Object, Register, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
-use crate::function_compiler::{FunctionCompiler, Functionish, QueuedFunction};
+use crate::function_compiler::{FunctionCompiler, Functionish};
 use crate::ident::Ident as CrateIdent;
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, NameType};
@@ -527,15 +526,10 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
               None => self.fnc.allocate_defn_numbered("_anon"),
             };
 
-            self
-              .fnc
-              .queue
-              .add(QueuedFunction {
-                definition_pointer: p.clone(),
-                fn_name: fn_name.clone(),
-                functionish: Functionish::Fn(fn_ident, method.function.clone()),
-              })
-              .expect("Failed to queue function");
+            FunctionCompiler::new(self.fnc.mc).compile(
+              p.clone(),
+              Functionish::Fn(fn_ident, method.function.clone()),
+            );
 
             object_asm.properties.push((prop_key, Value::Pointer(p)));
           }
@@ -967,15 +961,10 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       .scope_analysis
       .get_register_captures(&fn_to_owner_id(&fn_.ident, &fn_.function));
 
-    self
-      .fnc
-      .queue
-      .add(QueuedFunction {
-        definition_pointer: definition_pointer.clone(),
-        fn_name: fn_name.clone(),
-        functionish: Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
-      })
-      .expect("Failed to queue function");
+    FunctionCompiler::new(self.fnc.mc).compile(
+      definition_pointer.clone(),
+      Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
+    );
 
     match capture_params.len() {
       0 => Value::Pointer(definition_pointer).to_ce(),
@@ -1005,15 +994,10 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       .scope_analysis
       .get_register_captures(&OwnerId::Span(arrow_expr.span));
 
-    self
-      .fnc
-      .queue
-      .add(QueuedFunction {
-        definition_pointer: definition_pointer.clone(),
-        fn_name: None,
-        functionish: Functionish::Arrow(arrow_expr.clone()),
-      })
-      .expect("Failed to queue function");
+    FunctionCompiler::new(self.fnc.mc).compile(
+      definition_pointer.clone(),
+      Functionish::Arrow(arrow_expr.clone()),
+    );
 
     match capture_params.len() {
       0 => Value::Pointer(definition_pointer).to_ce(),
@@ -1078,7 +1062,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       // produce incorrect results, see captureShadowed.ts).
       let mut is_param = false;
 
-      for p in &self.fnc.current.parameters {
+      for p in &self.fnc.fn_.parameters {
         if p == &cap_reg {
           is_param = true;
         }

@@ -110,7 +110,6 @@ impl<'a> StaticExpressionCompiler<'a> {
 
                 self.mc.compile_fn(
                   p.clone(),
-                  fn_name.clone(),
                   Functionish::Fn(fn_ident, method.function.clone()),
                 );
 
@@ -161,7 +160,6 @@ impl<'a> StaticExpressionCompiler<'a> {
 
         self.mc.compile_fn(
           p.clone(),
-          fn_name,
           Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
         );
 
@@ -172,7 +170,7 @@ impl<'a> StaticExpressionCompiler<'a> {
 
         self
           .mc
-          .compile_fn(p.clone(), None, Functionish::Arrow(arrow.clone()));
+          .compile_fn(p.clone(), Functionish::Arrow(arrow.clone()));
 
         Value::Pointer(p)
       }

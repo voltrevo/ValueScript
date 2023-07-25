@@ -323,7 +323,6 @@ impl ModuleCompiler {
 
     self.compile_fn(
       pointer,
-      Some(fn_name),
       Functionish::Fn(Some(fn_.ident.clone()), fn_.function.clone()),
     );
   }
@@ -368,35 +367,28 @@ impl ModuleCompiler {
         self.module.export_default = Value::Pointer(pointer);
       }
       DefaultDecl::Fn(fn_) => {
-        let (fn_name, defn) = match &fn_.ident {
-          Some(ident) => {
-            let fn_name = ident.sym.to_string();
+        let defn = match &fn_.ident {
+          Some(ident) => match self
+            .scope_analysis
+            .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(ident))
+          {
+            Some(Value::Pointer(p)) => p,
+            _ => {
+              self.internal_error(
+                ident.span,
+                &format!("Definition for {} should have been in scope", ident.sym),
+              );
 
-            let defn = match self
-              .scope_analysis
-              .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(ident))
-            {
-              Some(Value::Pointer(p)) => p,
-              _ => {
-                self.internal_error(
-                  ident.span,
-                  &format!("Definition for {} should have been in scope", fn_name),
-                );
-
-                return;
-              }
-            };
-
-            (Some(fn_name), defn)
-          }
-          None => (None, self.allocate_defn_numbered("_anon")),
+              return;
+            }
+          },
+          None => self.allocate_defn_numbered("_anon"),
         };
 
         self.module.export_default = Value::Pointer(defn.clone());
 
         self.compile_fn(
           defn,
-          fn_name,
           Functionish::Fn(fn_.ident.clone(), fn_.function.clone()),
         );
       }
@@ -692,13 +684,8 @@ impl ModuleCompiler {
     }
   }
 
-  pub fn compile_fn(
-    &mut self,
-    defn_pointer: Pointer,
-    fn_name: Option<String>,
-    functionish: Functionish,
-  ) {
-    FunctionCompiler::compile(self, defn_pointer, fn_name, functionish);
+  pub fn compile_fn(&mut self, defn_pointer: Pointer, functionish: Functionish) {
+    FunctionCompiler::new(self).compile(defn_pointer, functionish);
   }
 
   pub fn compile_class(
@@ -737,7 +724,8 @@ impl ModuleCompiler {
     }
 
     // member initializers function compiler
-    let mut mi_fnc = FunctionCompiler::new(self, OwnerId::Span(class.span));
+    let mut mi_fnc = FunctionCompiler::new(self);
+    mi_fnc.set_owner_id(OwnerId::Span(class.span));
 
     for class_member in &class.body {
       match class_member {
@@ -779,10 +767,7 @@ impl ModuleCompiler {
     }
 
     let mut member_initializers_assembly = Vec::<FnLine>::new();
-    member_initializers_assembly.append(&mut mi_fnc.current.body);
-
-    // Include any other definitions that were created by the member initializers
-    mi_fnc.process_queue();
+    member_initializers_assembly.append(&mut mi_fnc.fn_.body);
 
     let mut has_constructor = false;
 
@@ -794,7 +779,6 @@ impl ModuleCompiler {
 
         self.compile_fn(
           ctor_defn_name.clone(),
-          None,
           Functionish::Constructor(
             member_initializers_assembly.clone(),
             class.span,
@@ -840,7 +824,6 @@ impl ModuleCompiler {
 
           self.compile_fn(
             method_defn_name.clone(),
-            None,
             Functionish::Fn(None, method.function.clone()),
           );
 

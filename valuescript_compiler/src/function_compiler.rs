@@ -1,4 +1,3 @@
-use queues::*;
 use std::collections::BTreeSet;
 use std::mem::take;
 
@@ -62,11 +61,10 @@ pub struct CatchSetting {
 
 pub struct FunctionCompiler<'a> {
   pub mc: &'a mut ModuleCompiler,
-  pub current: Function,
+  pub fn_: Function,
   pub owner_id: OwnerId,
   pub reg_allocator: RegAllocator,
   pub label_allocator: NameAllocator,
-  pub queue: Queue<QueuedFunction>,
   pub loop_labels: Vec<LoopLabels>,
   pub catch_settings: Vec<CatchSetting>,
   pub end_label: Option<Label>,
@@ -81,19 +79,13 @@ impl<'a> DiagnosticContainer for FunctionCompiler<'a> {
 }
 
 impl<'a> FunctionCompiler<'a> {
-  pub fn new(mc: &'a mut ModuleCompiler, owner_id: OwnerId) -> Self {
-    let reg_allocator = match mc.scope_analysis.reg_allocators.get(&owner_id) {
-      Some(reg_allocator) => reg_allocator.clone(),
-      None => RegAllocator::default(),
-    };
-
+  pub fn new(mc: &'a mut ModuleCompiler) -> Self {
     FunctionCompiler {
       mc,
-      current: Function::default(),
-      owner_id,
-      reg_allocator,
+      fn_: Function::default(),
+      owner_id: OwnerId::Span(swc_common::DUMMY_SP),
+      reg_allocator: RegAllocator::default(),
       label_allocator: NameAllocator::default(),
-      queue: Queue::new(),
       loop_labels: vec![],
       catch_settings: vec![],
       end_label: None,
@@ -111,16 +103,16 @@ impl<'a> FunctionCompiler<'a> {
   }
 
   pub fn push_raw(&mut self, instruction: Instruction) {
-    self.current.body.push(FnLine::Instruction(instruction));
+    self.fn_.body.push(FnLine::Instruction(instruction));
   }
 
   pub fn label(&mut self, label: Label) {
-    self.current.body.push(FnLine::Label(label));
+    self.fn_.body.push(FnLine::Label(label));
   }
 
   #[allow(dead_code)]
   pub fn comment(&mut self, message: String) {
-    self.current.body.push(FnLine::Comment(message));
+    self.fn_.body.push(FnLine::Comment(message));
   }
 
   pub fn lookup(&mut self, ident: &Ident) -> Option<&Name> {
@@ -188,45 +180,28 @@ impl<'a> FunctionCompiler<'a> {
     // `NameAllocator::release` for more information.
     // self.reg_allocator.release(reg);
 
-    self.current.body.push(FnLine::Release(reg.clone()));
+    self.fn_.body.push(FnLine::Release(reg.clone()));
   }
 
   pub fn insert_all_releases(&mut self) {
     for reg in self.reg_allocator.all_used() {
       if !reg.is_special() {
-        self.current.body.push(FnLine::Release(reg));
+        self.fn_.body.push(FnLine::Release(reg));
       }
     }
   }
 
-  pub fn compile(
-    mc: &'a mut ModuleCompiler,
-    definition_pointer: Pointer,
-    fn_name: Option<String>,
-    functionish: Functionish,
-  ) {
-    let mut self_ = FunctionCompiler::new(mc, functionish.owner_id());
+  pub fn set_owner_id(&mut self, owner_id: OwnerId) {
+    self.reg_allocator = match self.mc.scope_analysis.reg_allocators.get(&owner_id) {
+      Some(reg_allocator) => reg_allocator.clone(),
+      None => RegAllocator::default(),
+    };
 
-    self_
-      .queue
-      .add(QueuedFunction {
-        definition_pointer,
-        fn_name,
-        functionish,
-      })
-      .expect("Failed to queue function");
-
-    self_.process_queue();
+    self.owner_id = owner_id;
   }
 
-  pub fn process_queue(&mut self) {
-    while let Ok(qfn) = self.queue.remove() {
-      self.compile_functionish(qfn.definition_pointer, &qfn.functionish);
-    }
-  }
-
-  fn compile_functionish(&mut self, definition_pointer: Pointer, functionish: &Functionish) {
-    self.current.is_generator = match functionish {
+  pub fn compile(&mut self, definition_pointer: Pointer, functionish: Functionish) {
+    self.fn_.is_generator = match &functionish {
       Functionish::Fn(_, fn_) => fn_.is_generator,
 
       // Note: It isn't currently possible to have an arrow generator, but SWC includes the
@@ -236,18 +211,7 @@ impl<'a> FunctionCompiler<'a> {
       Functionish::Constructor(..) => false,
     };
 
-    // TODO: Use a new FunctionCompiler per function instead of this hack
-    self.reg_allocator = match self
-      .mc
-      .scope_analysis
-      .reg_allocators
-      .get(&functionish.owner_id())
-    {
-      Some(reg_allocator) => reg_allocator.clone(),
-      None => RegAllocator::default(),
-    };
-
-    self.owner_id = functionish.owner_id();
+    self.set_owner_id(functionish.owner_id());
 
     let capture_params = self
       .mc
@@ -270,16 +234,16 @@ impl<'a> FunctionCompiler<'a> {
         }
       };
 
-      self.current.parameters.push(reg.clone());
+      self.fn_.parameters.push(reg.clone());
     }
 
-    let param_registers = self.get_param_registers(functionish);
+    let param_registers = self.get_param_registers(&functionish);
 
     for reg in param_registers.iter().flatten() {
-      self.current.parameters.push(reg.clone());
+      self.fn_.parameters.push(reg.clone());
     }
 
-    self.add_param_code(functionish, &param_registers);
+    self.add_param_code(&functionish, &param_registers);
 
     match functionish {
       Functionish::Fn(_, fn_) => {
@@ -305,7 +269,7 @@ impl<'a> FunctionCompiler<'a> {
       },
       Functionish::Constructor(member_initializers_assembly, _class_span, constructor) => {
         let mut mia_copy = member_initializers_assembly.clone();
-        self.current.body.append(&mut mia_copy);
+        self.fn_.body.append(&mut mia_copy);
 
         match &constructor.body {
           Some(block) => {
@@ -319,7 +283,7 @@ impl<'a> FunctionCompiler<'a> {
     self.insert_all_releases();
 
     if let Some(end_label) = self.end_label.as_ref() {
-      self.current.body.push(FnLine::Label(end_label.clone()));
+      self.fn_.body.push(FnLine::Label(end_label.clone()));
 
       self.end_label = None;
       self.is_returning_register = None;
@@ -327,7 +291,7 @@ impl<'a> FunctionCompiler<'a> {
 
     self.mc.module.definitions.push(Definition {
       pointer: definition_pointer,
-      content: DefinitionContent::Function(take(&mut self.current)),
+      content: DefinitionContent::Function(take(&mut self.fn_)),
     });
   }
 
@@ -1151,28 +1115,26 @@ impl<'a> FunctionCompiler<'a> {
     match decl {
       Class(class) => self.todo(class.span(), "Class declaration"),
       Fn(fn_decl) => {
-        self
-          .queue
-          .add(QueuedFunction {
-            definition_pointer: match self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident)) {
-              Some(Value::Pointer(p)) => p,
-              _ => {
-                self.internal_error(
-                  fn_decl.ident.span,
-                  &format!(
-                    "Lookup of function {} was not a pointer, lookup_result: {:?}",
-                    fn_decl.ident.sym,
-                    self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident))
-                  ),
-                );
+        let p = match self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident)) {
+          Some(Value::Pointer(p)) => p,
+          _ => {
+            self.internal_error(
+              fn_decl.ident.span,
+              &format!(
+                "Lookup of function {} was not a pointer, lookup_result: {:?}",
+                fn_decl.ident.sym,
+                self.lookup_value(&Ident::from_swc_ident(&fn_decl.ident))
+              ),
+            );
 
-                return;
-              }
-            },
-            fn_name: Some(fn_decl.ident.sym.to_string()),
-            functionish: Functionish::Fn(Some(fn_decl.ident.clone()), fn_decl.function.clone()),
-          })
-          .expect("Failed to add function to queue");
+            return;
+          }
+        };
+
+        FunctionCompiler::new(self.mc).compile(
+          p,
+          Functionish::Fn(Some(fn_decl.ident.clone()), fn_decl.function.clone()),
+        );
       }
       Var(var_decl) => self.var_declaration(var_decl),
       TsInterface(interface_decl) => self.todo(interface_decl.span, "TsInterface declaration"),
