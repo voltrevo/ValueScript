@@ -66,6 +66,7 @@ pub struct Object {
 
 #[derive(Clone)]
 pub struct KFunction {
+  pub pointer: Pointer,
   pub uses_this: bool,
 }
 
@@ -145,7 +146,7 @@ impl Kal {
     }
   }
 
-  pub fn from_function(fn_: &mut Function) -> Kal {
+  pub fn from_function(pointer: Pointer, fn_: &mut Function) -> Kal {
     let mut uses_this = false;
 
     for line in &mut fn_.body {
@@ -158,7 +159,7 @@ impl Kal {
       }
     }
 
-    Kal::Function(KFunction { uses_this })
+    Kal::Function(KFunction { pointer, uses_this })
   }
 
   fn try_to_value(&self) -> Option<Value> {
@@ -558,21 +559,98 @@ impl FnState {
         self.set(dst.name.clone(), Kal::Unknown);
       }
 
-      Apply(a, this, a3, dst) | SubCall(this, a, a3, dst) | ThisSubCall(this, a, a3, dst) => {
-        // TODO: Consider ordering here (only .take consideration (?))
-        self.eval_arg(a);
-        self.eval_arg(a3);
+      SubCall(this, key, args, dst) => {
+        let k_key = self.eval_arg(key);
+        self.eval_arg(args);
+
+        let k_this = self.get(this.name.clone());
+
+        let k_fn = k_this.sub(&k_key);
 
         self.set(this.name.clone(), Kal::Unknown);
         self.set(dst.name.clone(), Kal::Unknown);
+
+        if let Kal::Function(fn_) = k_fn {
+          if fn_.uses_this {
+            *instr = Instruction::Apply(
+              Value::Pointer(fn_.pointer),
+              this.clone(),
+              args.clone(),
+              dst.clone(),
+            );
+          } else {
+            *instr = Instruction::Call(Value::Pointer(fn_.pointer), args.clone(), dst.clone());
+          }
+        }
       }
 
-      ConstSubCall(a1, a2, a3, dst) | ConstApply(a1, a2, a3, dst) => {
-        self.eval_arg(a1);
-        self.eval_arg(a2);
-        self.eval_arg(a3);
+      ConstSubCall(this, key, args, dst) => {
+        let k_this = self.eval_arg(this);
+        let k_key = self.eval_arg(key);
+        self.eval_arg(args);
+
+        let k_fn = k_this.sub(&k_key);
 
         self.set(dst.name.clone(), Kal::Unknown);
+
+        if let Kal::Function(fn_) = k_fn {
+          if fn_.uses_this {
+            *instr = Instruction::ConstApply(
+              Value::Pointer(fn_.pointer),
+              this.clone(),
+              args.clone(),
+              dst.clone(),
+            );
+          } else {
+            *instr = Instruction::Call(Value::Pointer(fn_.pointer), args.clone(), dst.clone());
+          }
+        }
+      }
+
+      ThisSubCall(this, key, args, dst) => {
+        let k_key = self.eval_arg(key);
+        self.eval_arg(args);
+
+        let k_this = self.get(this.name.clone());
+
+        let k_fn = k_this.sub(&k_key);
+
+        self.set(this.name.clone(), Kal::Unknown);
+        self.set(dst.name.clone(), Kal::Unknown);
+
+        if let Kal::Function(fn_) = k_fn {
+          if !fn_.uses_this {
+            *instr = Instruction::Call(Value::Pointer(fn_.pointer), args.clone(), dst.clone());
+          }
+        }
+      }
+
+      Apply(fn_, this, args, dst) => {
+        let k_fn = self.eval_arg(fn_);
+        self.eval_arg(args);
+
+        self.set(this.name.clone(), Kal::Unknown);
+        self.set(dst.name.clone(), Kal::Unknown);
+
+        if let Kal::Function(fn_) = k_fn {
+          if !fn_.uses_this {
+            *instr = Instruction::Call(Value::Pointer(fn_.pointer), args.clone(), dst.clone());
+          }
+        }
+      }
+
+      ConstApply(fn_, this, args, dst) => {
+        let k_fn = self.eval_arg(fn_);
+        self.eval_arg(this);
+        self.eval_arg(args);
+
+        self.set(dst.name.clone(), Kal::Unknown);
+
+        if let Kal::Function(fn_) = k_fn {
+          if !fn_.uses_this {
+            *instr = Instruction::Call(Value::Pointer(fn_.pointer), args.clone(), dst.clone());
+          }
+        }
       }
 
       JmpIf(a1, _) | JmpIfNot(a1, _) => {

@@ -10,7 +10,10 @@ pub fn simplify(module: &mut Module, take_registers: bool) {
   for defn in &mut module.definitions {
     match &mut defn.content {
       DefinitionContent::Function(fn_) => {
-        pointer_kals.insert(defn.pointer.clone(), Kal::from_function(fn_));
+        pointer_kals.insert(
+          defn.pointer.clone(),
+          Kal::from_function(defn.pointer.clone(), fn_),
+        );
       }
       DefinitionContent::Value(value) => {
         pointer_kals.insert(defn.pointer.clone(), Kal::from_value(value));
