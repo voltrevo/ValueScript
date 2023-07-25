@@ -12,7 +12,7 @@ use std::{
 };
 
 use crate::{
-  asm::{self, Builtin, Function, Number, Pointer, Register, Value},
+  asm::{self, Builtin, FnLine, Function, Number, Pointer, Register, Value},
   instruction::Instruction,
   name_allocator::RegAllocator,
 };
@@ -47,6 +47,7 @@ pub enum Kal {
   String(String),
   Array(Box<Array>),
   Object(Box<Object>),
+  Function(KFunction),
   Class(Box<Class>),
   Register(Register),
   Pointer(Pointer),
@@ -61,6 +62,11 @@ pub struct Array {
 #[derive(Clone)]
 pub struct Object {
   pub properties: Vec<(Kal, Kal)>,
+}
+
+#[derive(Clone)]
+pub struct KFunction {
+  pub uses_this: bool,
 }
 
 #[derive(Clone)]
@@ -89,6 +95,7 @@ impl Kal {
           v.visit_kals_mut(visit);
         }
       }
+      Kal::Function(_) => {}
       Kal::Class(class) => {
         class.constructor.visit_kals_mut(visit);
         class.prototype.visit_kals_mut(visit);
@@ -138,6 +145,22 @@ impl Kal {
     }
   }
 
+  pub fn from_function(fn_: &mut Function) -> Kal {
+    let mut uses_this = false;
+
+    for line in &mut fn_.body {
+      if let FnLine::Instruction(instr) = line {
+        instr.visit_registers_mut_rev(&mut |rvm| {
+          if rvm.register.is_this() {
+            uses_this = true;
+          }
+        });
+      }
+    }
+
+    Kal::Function(KFunction { uses_this })
+  }
+
   fn try_to_value(&self) -> Option<Value> {
     match self {
       Kal::Unknown => None,
@@ -183,6 +206,7 @@ impl Kal {
           properties
         },
       }))),
+      Kal::Function(_) => None,
       Kal::Class(class) => Some(Value::Class(Box::new(asm::Class {
         constructor: class.constructor.try_to_value()?,
         prototype: class.prototype.try_to_value()?,
@@ -226,6 +250,7 @@ impl Kal {
         }
         .to_val()
       }
+      Kal::Function(_) => return None,
       Kal::Class(class) => VsClass {
         constructor: class.constructor.try_to_val()?,
         prototype: class.prototype.try_to_val()?,
@@ -252,6 +277,7 @@ impl Kal {
       Kal::String(s) => Some(s.clone()),
       Kal::Array(_) => None,
       Kal::Object(_) => None,
+      Kal::Function(_) => None,
       Kal::Class(_) => None,
       Kal::Register(_) => None,
       Kal::Pointer(_) => None,

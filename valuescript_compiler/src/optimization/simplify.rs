@@ -8,8 +8,14 @@ pub fn simplify(module: &mut Module, take_registers: bool) {
   let mut pointer_kals = HashMap::<Pointer, Kal>::new();
 
   for defn in &mut module.definitions {
-    if let DefinitionContent::Value(value) = &defn.content {
-      pointer_kals.insert(defn.pointer.clone(), Kal::from_value(value));
+    match &mut defn.content {
+      DefinitionContent::Function(fn_) => {
+        pointer_kals.insert(defn.pointer.clone(), Kal::from_function(fn_));
+      }
+      DefinitionContent::Value(value) => {
+        pointer_kals.insert(defn.pointer.clone(), Kal::from_value(value));
+      }
+      DefinitionContent::Lazy(_) => {}
     }
   }
 
