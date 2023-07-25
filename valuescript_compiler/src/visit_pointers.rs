@@ -154,6 +154,11 @@ where
         self.value(Some(owner), fn_);
         self.value(Some(owner), args);
       }
+      ConstApply(fn_, this, args, _) => {
+        self.value(Some(owner), fn_);
+        self.value(Some(owner), this);
+        self.value(Some(owner), args);
+      }
       ConstSubCall(this, key, args, _) => {
         self.value(Some(owner), this);
         self.value(Some(owner), key);

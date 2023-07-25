@@ -25,8 +25,8 @@ fn reduce(instr: Instruction) -> Option<Instruction> {
   use Instruction::*;
 
   match &instr {
-    End | OpInc(..) | OpDec(..) | Call(..) | Apply(..) | SubCall(..) | Jmp(..) | New(..)
-    | Throw(..) | SetCatch(..) | UnsetCatch | ConstSubCall(..) | RequireMutableThis
+    End | OpInc(..) | OpDec(..) | Call(..) | Apply(..) | ConstApply(..) | SubCall(..) | Jmp(..)
+    | New(..) | Throw(..) | SetCatch(..) | UnsetCatch | ConstSubCall(..) | RequireMutableThis
     | ThisSubCall(..) | Next(..) | Yield(..) | YieldStar(..) => Some(instr),
 
     Mov(arg, dst) => 'b: {

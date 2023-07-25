@@ -39,6 +39,7 @@ pub enum Instruction {
   In(Value, Value, Register),
   Call(Value, Value, Register),
   Apply(Value, Register, Value, Register),
+  ConstApply(Value, Value, Value, Register),
   Bind(Value, Value, Register),
   Sub(Value, Value, Register),
   SubMov(Value, Value, Register),
@@ -173,7 +174,7 @@ impl Instruction {
         visit(InstructionFieldMut::Register(dst));
       }
 
-      ConstSubCall(a1, a2, a3, dst) => {
+      ConstSubCall(a1, a2, a3, dst) | ConstApply(a1, a2, a3, dst) => {
         visit(InstructionFieldMut::Value(a1));
         visit(InstructionFieldMut::Value(a2));
         visit(InstructionFieldMut::Value(a3));
@@ -298,7 +299,7 @@ impl Instruction {
         fn_.visit_registers_mut_rev(visit);
       }
 
-      ConstSubCall(a1, a2, a3, dst) => {
+      ConstSubCall(a1, a2, a3, dst) | ConstApply(a1, a2, a3, dst) => {
         visit(RegisterVisitMut::write(dst));
         a3.visit_registers_mut_rev(visit);
         a2.visit_registers_mut_rev(visit);
@@ -393,6 +394,7 @@ impl Instruction {
       In(..) => InstructionByte::In,
       Call(..) => InstructionByte::Call,
       Apply(..) => InstructionByte::Apply,
+      ConstApply(..) => InstructionByte::ConstApply,
       Bind(..) => InstructionByte::Bind,
       Sub(..) => InstructionByte::Sub,
       SubMov(..) => InstructionByte::SubMov,
@@ -521,6 +523,9 @@ impl std::fmt::Display for Instruction {
       }
       Instruction::Apply(value, this, args, register) => {
         write!(f, "apply {} {} {} {}", value, this, args, register)
+      }
+      Instruction::ConstApply(value, this, args, register) => {
+        write!(f, "const_apply {} {} {} {}", value, this, args, register)
       }
       Instruction::Bind(value, args, register) => {
         write!(f, "bind {} {} {}", value, args, register)

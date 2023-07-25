@@ -217,6 +217,12 @@ impl Assembler {
         self.value(args);
         self.register(dst);
       }
+      ConstApply(fn_, this, args, dst) => {
+        self.value(fn_);
+        self.value(this);
+        self.value(args);
+        self.register(dst);
+      }
       ConstSubCall(this, key, args, dst) => {
         self.value(this);
         self.value(key);

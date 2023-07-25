@@ -230,6 +230,7 @@ impl<'a> AssemblyParser<'a> {
       ("in", InstructionByte::In),
       ("call", InstructionByte::Call),
       ("apply", InstructionByte::Apply),
+      ("const_apply", InstructionByte::Apply),
       ("bind", InstructionByte::Bind),
       ("sub", InstructionByte::Sub),
       ("submov", InstructionByte::SubMov),
@@ -694,6 +695,12 @@ impl<'a> AssemblyParser<'a> {
       Apply => Instruction::Apply(
         self.assemble_value(),
         self.assemble_register(),
+        self.assemble_value(),
+        self.assemble_register(),
+      ),
+      ConstApply => Instruction::ConstApply(
+        self.assemble_value(),
+        self.assemble_value(),
         self.assemble_value(),
         self.assemble_register(),
       ),

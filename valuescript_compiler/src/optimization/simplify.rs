@@ -211,6 +211,7 @@ fn is_jmp_instr(instr: &Instruction) -> bool {
     | Instruction::In(..)
     | Instruction::Call(..)
     | Instruction::Apply(..)
+    | Instruction::ConstApply(..)
     | Instruction::Bind(..)
     | Instruction::Sub(..)
     | Instruction::SubMov(..)

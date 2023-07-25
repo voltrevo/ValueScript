@@ -567,7 +567,7 @@ impl FnState {
         self.set(dst.name.clone(), Kal::Unknown);
       }
 
-      ConstSubCall(a1, a2, a3, dst) => {
+      ConstSubCall(a1, a2, a3, dst) | ConstApply(a1, a2, a3, dst) => {
         self.eval_arg(a1);
         self.eval_arg(a2);
         self.eval_arg(a3);
@@ -640,6 +640,7 @@ impl FnState {
       | OpOptionalChain(_, _, _)
       | Call(_, _, _)
       | Apply(_, _, _, _)
+      | ConstApply(_, _, _, _)
       | Bind(_, _, _)
       | SubMov(_, _, _)
       | SubCall(_, _, _, _)

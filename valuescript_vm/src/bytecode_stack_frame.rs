@@ -239,7 +239,7 @@ impl StackFrameTrait for BytecodeStackFrame {
         };
       }
 
-      Apply => {
+      Apply | ConstApply => {
         let fn_ = self.decoder.decode_val(&mut self.registers);
 
         match fn_.load_function() {
@@ -251,7 +251,10 @@ impl StackFrameTrait for BytecodeStackFrame {
             self.this_target = this_target;
 
             if this_target.is_some() {
-              new_frame.write_this(false, self.registers[this_target.unwrap()].clone())?;
+              new_frame.write_this(
+                instruction_byte == ConstApply,
+                self.registers[this_target.unwrap()].clone(),
+              )?;
             }
 
             self.transfer_parameters(&mut new_frame);
