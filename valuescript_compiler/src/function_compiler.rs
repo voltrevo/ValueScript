@@ -27,7 +27,7 @@ pub enum Functionish {
 impl Functionish {
   pub fn owner_id(&self) -> OwnerId {
     match self {
-      Functionish::Fn(ident, fn_) => fn_to_owner_id(ident, fn_),
+      Functionish::Fn(ident, fn_) => fn_to_owner_id(ident.as_ref(), fn_),
       Functionish::Arrow(arrow) => OwnerId::Span(arrow.span),
       Functionish::Constructor(_, owner_id, _) => owner_id.clone(),
     }

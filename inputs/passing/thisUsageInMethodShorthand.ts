@@ -1,3 +1,5 @@
+//! test_output(["baz","baz"])
+
 export default function main() {
   let stuff = {
     foo() {

@@ -965,7 +965,7 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       .fnc
       .mc
       .scope_analysis
-      .get_register_captures(&fn_to_owner_id(&fn_.ident, &fn_.function));
+      .get_register_captures(&fn_to_owner_id(fn_.ident.as_ref(), &fn_.function));
 
     FunctionCompiler::new(self.fnc.mc).compile(
       definition_pointer.clone(),

@@ -818,9 +818,14 @@ impl ModuleCompiler {
           let method_defn_name =
             self.allocate_defn(&ident_from_str(&format!("{}_{}", defn_name.name, name)));
 
+          let method_id = match &method.key {
+            swc_ecma_ast::PropName::Ident(ident) => Some(ident.clone()),
+            _ => None,
+          };
+
           self.compile_fn(
             method_defn_name.clone(),
-            Functionish::Fn(None, method.function.clone()),
+            Functionish::Fn(method_id, method.function.clone()),
           );
 
           let dst = match method.is_static {

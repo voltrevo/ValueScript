@@ -461,7 +461,7 @@ impl ScopeAnalysis {
       Decl::Class(class_decl) => {
         self.class_(scope, &Some(class_decl.ident.clone()), &class_decl.class)
       }
-      Decl::Fn(fn_decl) => self.function(scope, &Some(fn_decl.ident.clone()), &fn_decl.function),
+      Decl::Fn(fn_decl) => self.function(scope, Some(&fn_decl.ident), &fn_decl.function),
       Decl::Var(var_decl) => {
         for decl in &var_decl.decls {
           self.var_declarator(scope, decl);
@@ -487,7 +487,7 @@ impl ScopeAnalysis {
   fn function(
     &mut self,
     scope: &Scope,
-    name: &Option<swc_ecma_ast::Ident>,
+    name: Option<&swc_ecma_ast::Ident>,
     function: &swc_ecma_ast::Function,
   ) {
     let owner_span = fn_owner_span(name, function);
@@ -938,7 +938,12 @@ impl ScopeAnalysis {
         }
       }
       Method(method) => {
-        self.function(scope, &None, &method.function);
+        let method_id = match &method.key {
+          swc_ecma_ast::PropName::Ident(ident) => Some(ident),
+          _ => None,
+        };
+
+        self.function(scope, method_id, &method.function);
       }
       ClassProp(class_prop) => {
         self.prop_key(scope, &class_prop.key);
@@ -955,7 +960,11 @@ impl ScopeAnalysis {
         // The .key of a private method can only be an identifier, so .prop_key
         // is not needed.
 
-        self.function(scope, &None, &private_method.function);
+        self.function(
+          scope,
+          Some(&private_method.key.id),
+          &private_method.function,
+        );
       }
       PrivateProp(private_prop) => {
         // The .key of a private prop can only be an identifier, so .prop_key
@@ -973,7 +982,7 @@ impl ScopeAnalysis {
   }
 
   fn fn_expr(&mut self, scope: &Scope, fn_expr: &swc_ecma_ast::FnExpr) {
-    self.function(scope, &fn_expr.ident, &fn_expr.function);
+    self.function(scope, fn_expr.ident.as_ref(), &fn_expr.function);
   }
 
   fn expr(&mut self, scope: &Scope, expr: &swc_ecma_ast::Expr) {
@@ -1472,7 +1481,13 @@ impl ScopeAnalysis {
         }
         swc_ecma_ast::Prop::Method(method) => {
           self.prop_key(scope, &method.key);
-          self.function(scope, &None, &method.function);
+
+          let method_ident = match &method.key {
+            swc_ecma_ast::PropName::Ident(ident) => Some(ident),
+            _ => None,
+          };
+
+          self.function(scope, method_ident, &method.function);
         }
         swc_ecma_ast::Prop::Assign(assign) => {
           self.todo(
@@ -1987,7 +2002,7 @@ fn is_declare(decl: &swc_ecma_ast::Decl) -> bool {
 }
 
 pub fn fn_owner_span(
-  name: &Option<swc_ecma_ast::Ident>,
+  name: Option<&swc_ecma_ast::Ident>,
   function: &swc_ecma_ast::Function,
 ) -> swc_common::Span {
   match name {
@@ -1997,7 +2012,7 @@ pub fn fn_owner_span(
 }
 
 pub fn fn_to_owner_id(
-  name: &Option<swc_ecma_ast::Ident>,
+  name: Option<&swc_ecma_ast::Ident>,
   function: &swc_ecma_ast::Function,
 ) -> OwnerId {
   OwnerId::Span(fn_owner_span(name, function))
