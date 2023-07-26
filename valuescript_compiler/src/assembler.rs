@@ -36,7 +36,14 @@ struct Assembler {
 impl Assembler {
   fn module(&mut self, module: &Module) {
     self.value(&module.export_default);
-    self.object(&module.export_star);
+    self.output.push(ValueType::ExportStar as u8);
+    self.varsize_uint(module.export_star.includes.len());
+
+    for p in &module.export_star.includes {
+      self.pointer(p);
+    }
+
+    self.object(&module.export_star.local);
 
     for definition in &module.definitions {
       self.definition(definition);
@@ -448,6 +455,7 @@ pub enum ValueType {
   Lazy = 0x12,
   BigInt = 0x13,
   GeneratorFunction = 0x14,
+  ExportStar = 0x15,
   // External = TBD,
 }
 

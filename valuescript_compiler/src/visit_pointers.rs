@@ -1,5 +1,6 @@
 use crate::asm::{
-  Array, Definition, DefinitionContent, FnLine, Instruction, Module, Object, Pointer, Value,
+  Array, Definition, DefinitionContent, ExportStar, FnLine, Instruction, Module, Object, Pointer,
+  Value,
 };
 
 pub fn visit_pointers<Visitor>(module: &mut Module, visitor: Visitor)
@@ -34,7 +35,7 @@ where
 
   pub fn module(&mut self, module: &mut Module) {
     self.value(None, &mut module.export_default);
-    self.object(None, &mut module.export_star);
+    self.export_star(None, &mut module.export_star);
 
     for definition in &mut module.definitions {
       self.definition(definition);
@@ -70,6 +71,14 @@ where
     }
   }
 
+  fn export_star(&mut self, owner: Option<&Pointer>, export_star: &mut ExportStar) {
+    for p in &mut export_star.includes {
+      self.pointer(owner, p);
+    }
+
+    self.object(owner, &mut export_star.local);
+  }
+
   fn value(&mut self, owner: Option<&Pointer>, value: &mut Value) {
     use Value::*;
 
@@ -88,12 +97,16 @@ where
         self.value(owner, &mut class.static_);
       }
       Pointer(pointer) => {
-        (self.visitor)(match owner {
-          Some(owner) => PointerVisitation::Reference(owner, pointer),
-          None => PointerVisitation::Export(pointer),
-        });
+        self.pointer(owner, pointer);
       }
     }
+  }
+
+  fn pointer(&mut self, owner: Option<&Pointer>, pointer: &mut Pointer) {
+    (self.visitor)(match owner {
+      Some(owner) => PointerVisitation::Reference(owner, pointer),
+      None => PointerVisitation::Export(pointer),
+    });
   }
 
   fn instruction(&mut self, owner: &Pointer, instruction: &mut Instruction) {

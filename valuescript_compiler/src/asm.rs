@@ -11,8 +11,34 @@ pub use crate::instruction::{Instruction, InstructionFieldMut};
 #[derive(Debug, Clone, Default)]
 pub struct Module {
   pub export_default: Value,
-  pub export_star: Object,
+  pub export_star: ExportStar,
   pub definitions: Vec<Definition>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ExportStar {
+  pub includes: Vec<Pointer>,
+  pub local: Object,
+}
+
+impl std::fmt::Display for ExportStar {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    if self.local.properties.is_empty() && self.includes.is_empty() {
+      return write!(f, "{{}}");
+    }
+
+    writeln!(f, "{{")?;
+
+    for p in &self.includes {
+      writeln!(f, "    include {},", p)?;
+    }
+
+    for (name, value) in &self.local.properties {
+      writeln!(f, "    {}: {},", name, value)?;
+    }
+
+    write!(f, "}}")
+  }
 }
 
 impl Module {
@@ -26,17 +52,7 @@ impl Module {
 
 impl std::fmt::Display for Module {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    if self.export_star.properties.is_empty() {
-      write!(f, "export {} {}", self.export_default, self.export_star)?;
-    } else {
-      writeln!(f, "export {} {{", self.export_default)?;
-
-      for (name, value) in &self.export_star.properties {
-        writeln!(f, "    {}: {},", name, value)?;
-      }
-
-      write!(f, "}}")?;
-    }
+    write!(f, "export {} {}", self.export_default, self.export_star)?;
 
     for definition in &self.definitions {
       write!(f, "\n\n{}", definition)?;

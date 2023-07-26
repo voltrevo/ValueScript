@@ -284,7 +284,7 @@ impl ModuleCompiler {
         });
 
         if export {
-          self.module.export_star.properties.push((
+          self.module.export_star.local.properties.push((
             Value::String(ident.sym.to_string()),
             Value::Pointer(pointer),
           ));
@@ -312,7 +312,7 @@ impl ModuleCompiler {
     };
 
     if export {
-      self.module.export_star.properties.push((
+      self.module.export_star.local.properties.push((
         Value::String(fn_name.clone()),
         Value::Pointer(pointer.clone()),
       ));
@@ -341,7 +341,7 @@ impl ModuleCompiler {
     };
 
     if export {
-      self.module.export_star.properties.push((
+      self.module.export_star.local.properties.push((
         Value::String(ts_enum.id.sym.to_string()),
         Value::Pointer(pointer.clone()),
       ));
@@ -503,6 +503,7 @@ impl ModuleCompiler {
               self
                 .module
                 .export_star
+                .local
                 .properties
                 .push((Value::String(export_name), Value::Pointer(defn)));
             }
@@ -549,6 +550,7 @@ impl ModuleCompiler {
             self
               .module
               .export_star
+              .local
               .properties
               .push((Value::String(namespace_name), Value::Pointer(defn)));
           }
@@ -714,7 +716,7 @@ impl ModuleCompiler {
     };
 
     if let Some(export_name) = export_name {
-      self.module.export_star.properties.push((
+      self.module.export_star.local.properties.push((
         Value::String(export_name),
         Value::Pointer(defn_name.clone()),
       ));

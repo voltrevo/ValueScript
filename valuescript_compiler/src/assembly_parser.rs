@@ -5,8 +5,8 @@ use num_bigint::BigInt;
 use valuescript_common::{InstructionByte, BUILTIN_NAMES};
 
 use crate::asm::{
-  Array, Builtin, Class, Definition, DefinitionContent, FnLine, Function, Instruction, Label,
-  LabelRef, Module, Number, Object, Pointer, Register, Value,
+  Array, Builtin, Class, Definition, DefinitionContent, ExportStar, FnLine, Function, Instruction,
+  Label, LabelRef, Module, Number, Object, Pointer, Register, Value,
 };
 
 pub struct AssemblyParser<'a> {
@@ -22,7 +22,7 @@ impl<'a> AssemblyParser<'a> {
     let export_default = self.assemble_value();
     self.parse_whitespace();
 
-    let export_star = self.assemble_object();
+    let export_star = self.assemble_export_star();
     self.parse_whitespace();
 
     let mut definitions = Vec::<Definition>::new();
@@ -777,11 +777,7 @@ impl<'a> AssemblyParser<'a> {
         panic!("{}", self.render_pos(0, &"Expected value".to_string()));
       }
       Some('%') => Value::Register(self.assemble_register()),
-      Some('@') => {
-        self.parse_exact("@");
-        let name = self.parse_identifier();
-        Value::Pointer(Pointer { name })
-      }
+      Some('@') => Value::Pointer(self.assemble_pointer()),
       Some('$') => Value::Builtin(self.assemble_builtin()),
       Some('[') => Value::Array(Box::new(self.assemble_array())),
       Some('-' | '.' | '0'..='9') => self.assemble_number(),
@@ -824,6 +820,12 @@ impl<'a> AssemblyParser<'a> {
         }
       }
     }
+  }
+
+  fn assemble_pointer(&mut self) -> Pointer {
+    self.parse_exact("@");
+    let name = self.parse_identifier();
+    Pointer { name }
   }
 
   fn assemble_array(&mut self) -> Array {
@@ -964,26 +966,14 @@ impl<'a> AssemblyParser<'a> {
     self.parse_exact("{");
 
     loop {
-      self.parse_optional_whitespace();
-      let mut c = *self.pos.peek().expect("Expected object content or end");
-
-      let key = match c {
-        '}' => {
-          self.pos.next();
-          break object;
-        }
-        _ => self.assemble_value(),
+      match self.assemble_object_kv() {
+        None => break object,
+        Some(kv) => object.properties.push(kv),
       };
 
       self.parse_optional_whitespace();
-      self.parse_exact(":");
-      let value = self.assemble_value();
 
-      object.properties.push((key, value));
-
-      self.parse_optional_whitespace();
-
-      c = *self.pos.peek().expect("Expected comma or object end");
+      let c = *self.pos.peek().expect("Expected comma or object end");
 
       match c {
         ',' => {
@@ -992,6 +982,87 @@ impl<'a> AssemblyParser<'a> {
         '}' => {
           self.pos.next();
           break object;
+        }
+        _ => {
+          panic!(
+            "{}",
+            self.render_pos(0, &format!("Unexpected character {}", c))
+          );
+        }
+      }
+    }
+  }
+
+  fn assemble_object_kv(&mut self) -> Option<(Value, Value)> {
+    self.parse_optional_whitespace();
+    let c = *self.pos.peek().expect("Expected object content or end");
+
+    let key = match c {
+      '}' => {
+        self.pos.next();
+        return None;
+      }
+      _ => self.assemble_value(),
+    };
+
+    self.parse_optional_whitespace();
+    self.parse_exact(":");
+    let value = self.assemble_value();
+
+    Some((key, value))
+  }
+
+  fn assemble_export_star(&mut self) -> ExportStar {
+    let mut export_star = ExportStar::default();
+
+    self.parse_exact("{");
+
+    loop {
+      self.parse_optional_whitespace();
+
+      if self.parse_one_of(&["include ", ""]) == "" {
+        break;
+      }
+
+      export_star.includes.push(self.assemble_pointer());
+      self.parse_optional_whitespace();
+
+      let c = *self.pos.peek().expect("Expected comma or object end");
+
+      match c {
+        ',' => {
+          self.pos.next();
+        }
+        '}' => {
+          self.pos.next();
+          return export_star;
+        }
+        _ => {
+          panic!(
+            "{}",
+            self.render_pos(0, &format!("Unexpected character {}", c))
+          );
+        }
+      }
+    }
+
+    loop {
+      match self.assemble_object_kv() {
+        None => break export_star,
+        Some(kv) => export_star.local.properties.push(kv),
+      };
+
+      self.parse_optional_whitespace();
+
+      let c = *self.pos.peek().expect("Expected comma or object end");
+
+      match c {
+        ',' => {
+          self.pos.next();
+        }
+        '}' => {
+          self.pos.next();
+          break export_star;
         }
         _ => {
           panic!(

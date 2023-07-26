@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::asm::{Definition, DefinitionContent, FnLine, Instruction, Object, Pointer, Value};
+use crate::asm::{Definition, DefinitionContent, ExportStar, FnLine, Instruction, Pointer, Value};
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
 use crate::name_allocator::NameAllocator;
@@ -25,7 +25,7 @@ pub fn link_module(
   };
 
   let mut pointer_allocator = NameAllocator::default();
-  let mut included_modules = HashMap::<ResolvedPath, (Value, Object)>::new();
+  let mut included_modules = HashMap::<ResolvedPath, (Value, ExportStar)>::new();
 
   let mut path_and_module = match modules.get(&entry_point.clone()) {
     Some(path_and_module) => path_and_module.clone(),
@@ -171,7 +171,7 @@ fn resolve_and_rewrite_import_patterns(path_and_module: &mut PathAndModule) -> V
 
 fn link_import_patterns(
   module: &mut Module,
-  included_modules: &HashMap<ResolvedPath, (Value, Object)>,
+  included_modules: &HashMap<ResolvedPath, (Value, ExportStar)>,
   diagnostics: &mut Vec<Diagnostic>,
 ) {
   for definition in &mut module.definitions {
@@ -194,10 +194,15 @@ fn link_import_patterns(
       pointer: import_pattern.pointer,
       content: match import_pattern.kind {
         ImportKind::Default => DefinitionContent::Value(default.clone()),
-        ImportKind::Star => DefinitionContent::Value(Value::Object(Box::new(namespace.clone()))),
-        ImportKind::Name(name) => match namespace.try_resolve_key(&name) {
+        ImportKind::Star => {
+          // TODO: namespace.includes
+          DefinitionContent::Value(Value::Object(Box::new(namespace.local.clone())))
+        }
+        ImportKind::Name(name) => match namespace.local.try_resolve_key(&name) {
           Some(value) => DefinitionContent::Value(value.clone()),
           None => {
+            // TODO: namespace.includes
+
             diagnostics.push(Diagnostic {
               level: DiagnosticLevel::Error,
               message: format!(
