@@ -12,6 +12,7 @@ use super::vs_value::Val;
 #[derive(Debug, Clone)]
 pub struct VsFunction {
   pub bytecode: Rc<Bytecode>,
+  pub hash: [u8; 32],
   pub is_generator: bool,
   pub register_count: usize,
   pub parameter_count: usize,
@@ -29,6 +30,7 @@ impl VsFunction {
 
     VsFunction {
       bytecode: self.bytecode.clone(),
+      hash: self.hash,
       is_generator: self.is_generator,
       register_count: self.register_count,
       parameter_count: self.parameter_count,

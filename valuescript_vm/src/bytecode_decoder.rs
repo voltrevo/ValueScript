@@ -281,12 +281,18 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_function(&mut self, is_generator: bool) -> Val {
+    // TODO: Use actual content hash
+    let mut hash = [0u8; 32];
+    hash[0] = (self.pos & 0xff) as u8;
+    hash[1] = ((self.pos >> 8) & 0xff) as u8;
+
     // TODO: Support >256
     let register_count = self.decode_byte() as usize;
     let parameter_count = self.decode_byte() as usize;
 
     VsFunction {
       bytecode: self.bytecode.clone(),
+      hash,
       is_generator,
       register_count,
       parameter_count,

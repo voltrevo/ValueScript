@@ -146,6 +146,17 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
       true
     }
     (Val::Object(left_object), Val::Object(right_object)) => 'b: {
+      match (&left_object.prototype, &right_object.prototype) {
+        (None, None) => {}
+        (None, Some(_)) => return Ok(false),
+        (Some(_), None) => return Ok(false),
+        (Some(ref left_proto), Some(ref right_proto)) => {
+          if !op_eq_impl(left_proto, right_proto)? {
+            return Ok(false);
+          }
+        }
+      }
+
       if left_object.prototype.is_some() || right_object.prototype.is_some() {
         return Err("TODO: class instance comparison".to_internal_error());
       }
@@ -171,6 +182,19 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
       }
 
       true
+    }
+    (Val::Function(left), Val::Function(right)) => {
+      if left.binds.len() != right.binds.len() {
+        return Ok(false);
+      }
+
+      for i in 0..left.binds.len() {
+        if !op_eq_impl(&left.binds[i], &right.binds[i])? {
+          return Ok(false);
+        }
+      }
+
+      left.hash == right.hash
     }
     _ => {
       if left.is_truthy() != right.is_truthy() {
@@ -248,8 +272,15 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
       true
     }
     (Val::Object(left_object), Val::Object(right_object)) => 'b: {
-      if left_object.prototype.is_some() || right_object.prototype.is_some() {
-        return Err("TODO: class instance comparison".to_internal_error());
+      match (&left_object.prototype, &right_object.prototype) {
+        (None, None) => {}
+        (None, Some(_)) => return Ok(false),
+        (Some(_), None) => return Ok(false),
+        (Some(ref left_proto), Some(ref right_proto)) => {
+          if !op_triple_eq_impl(left_proto, right_proto)? {
+            return Ok(false);
+          }
+        }
       }
 
       if std::ptr::eq(&**left_object, &**right_object) {
@@ -273,6 +304,19 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
       }
 
       true
+    }
+    (Val::Function(left), Val::Function(right)) => {
+      if left.binds.len() != right.binds.len() {
+        return Ok(false);
+      }
+
+      for i in 0..left.binds.len() {
+        if !op_triple_eq_impl(&left.binds[i], &right.binds[i])? {
+          return Ok(false);
+        }
+      }
+
+      left.hash == right.hash
     }
     (Val::Static(..) | Val::Dynamic(..) | Val::CopyCounter(..), _)
     | (_, Val::Static(..) | Val::Dynamic(..) | Val::CopyCounter(..)) => {
