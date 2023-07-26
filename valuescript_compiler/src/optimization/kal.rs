@@ -34,7 +34,7 @@ use super::try_to_kal::TryToKal;
  * change program behavior due to believing false things), whereas sometimes type systems (notably
  * TypeScript) are not.
  */
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub enum Kal {
   #[default]
   Unknown,
@@ -54,23 +54,23 @@ pub enum Kal {
   Builtin(Builtin),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Array {
   pub values: Vec<Kal>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Object {
   pub properties: Vec<(Kal, Kal)>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct KFunction {
   pub pointer: Pointer,
   pub uses_this: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Class {
   pub constructor: Kal,
   pub prototype: Kal,
@@ -796,21 +796,19 @@ impl FnState {
           self.set(reg.name.clone(), Kal::Void);
         }
 
-        match kal.try_to_value() {
-          Some(v) => {
-            // Note: if `reg.take` was true, then we're removing that take operation from the
-            // register here. This should be ok because well-formed programs should never read from
-            // a taken register, but we might need to revise this in the future. It definitely means
-            // it's possible for the optimizer to break hand-written assembly.
-            *arg = v;
-
-            kal
-          }
-          None => match is_take {
-            true => Kal::Unknown,
-            false => Kal::Register(reg.clone()),
-          },
+        if let Kal::Unknown = &kal {
+          return Kal::Register(reg.clone());
         }
+
+        if let Some(v) = kal.try_to_value() {
+          // Note: if `reg.take` was true, then we're removing that take operation from the
+          // register here. This should be ok because well-formed programs should never read from
+          // a taken register, but we might need to revise this in the future. It definitely means
+          // it's possible for the optimizer to break hand-written assembly.
+          *arg = v;
+        }
+
+        kal
       }
     }
   }
