@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::mem::swap;
 
-use crate::asm::{Definition, DefinitionContent, ExportStar, FnLine, Instruction, Pointer, Value};
+use crate::asm::{
+  Definition, DefinitionContent, ExportStar, FnLine, Instruction, Object, Pointer, Value,
+};
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
 use crate::name_allocator::NameAllocator;
@@ -174,7 +177,14 @@ fn link_import_patterns(
   included_modules: &HashMap<ResolvedPath, (Value, ExportStar)>,
   diagnostics: &mut Vec<Diagnostic>,
 ) {
-  for definition in &mut module.definitions {
+  module.export_star = ExportStar {
+    includes: vec![],
+    local: flatten_export_star(&module.export_star, &*module, included_modules, diagnostics),
+  };
+
+  let mut new_definitions = HashMap::<Pointer, Definition>::new();
+
+  for definition in &module.definitions {
     let import_pattern = match ImportPattern::decode(definition) {
       Some(import_pattern) => import_pattern,
       None => continue,
@@ -185,24 +195,21 @@ fn link_import_patterns(
       path: import_pattern.path.clone(),
     };
 
-    let (default, namespace) = match included_modules.get(&resolved_path) {
+    let (default, export_star) = match included_modules.get(&resolved_path) {
       Some(el) => el,
       None => continue,
     };
 
+    let export_star = flatten_export_star(export_star, module, included_modules, diagnostics);
+
     let new_definition = Definition {
-      pointer: import_pattern.pointer,
+      pointer: import_pattern.pointer.clone(),
       content: match import_pattern.kind {
         ImportKind::Default => DefinitionContent::Value(default.clone()),
-        ImportKind::Star => {
-          // TODO: namespace.includes
-          DefinitionContent::Value(Value::Object(Box::new(namespace.local.clone())))
-        }
-        ImportKind::Name(name) => match namespace.local.try_resolve_key(&name) {
+        ImportKind::Star => DefinitionContent::Value(Value::Object(Box::new(export_star.clone()))),
+        ImportKind::Name(name) => match export_star.try_resolve_key(&name) {
           Some(value) => DefinitionContent::Value(value.clone()),
           None => {
-            // TODO: namespace.includes
-
             diagnostics.push(Diagnostic {
               level: DiagnosticLevel::Error,
               message: format!(
@@ -218,6 +225,124 @@ fn link_import_patterns(
       },
     };
 
-    *definition = new_definition;
+    new_definitions.insert(import_pattern.pointer, new_definition);
   }
+
+  for definition in &mut module.definitions {
+    if let Some(new_definition) = new_definitions.get_mut(&definition.pointer) {
+      swap(definition, new_definition);
+    }
+  }
+}
+
+fn flatten_export_star(
+  export_star: &ExportStar,
+  module: &Module,
+  included_modules: &HashMap<ResolvedPath, (Value, ExportStar)>,
+  diagnostics: &mut Vec<Diagnostic>,
+) -> Object {
+  let mut include_pointers_to_process = export_star.includes.clone();
+  let mut include_map = BTreeMap::<String, Value>::new();
+  let mut processed_includes = HashSet::<ResolvedPath>::new();
+
+  let mut i = 0;
+
+  while i < include_pointers_to_process.len() {
+    let include_p = include_pointers_to_process[i].clone();
+    i += 1;
+    let mut matched = false;
+
+    for defn in &module.definitions {
+      if defn.pointer == include_p {
+        matched = true;
+
+        let ip = match ImportPattern::decode(defn) {
+          Some(ip) => ip,
+          None => {
+            diagnostics.push(Diagnostic::internal_error(
+              swc_common::DUMMY_SP,
+              "Expected import pattern",
+            ));
+
+            break;
+          }
+        };
+
+        if ip.kind != ImportKind::Star {
+          diagnostics.push(Diagnostic::internal_error(
+            swc_common::DUMMY_SP,
+            "Expected import star pattern",
+          ));
+
+          break;
+        }
+
+        let path = ResolvedPath::from(ip.path);
+
+        let inserted = processed_includes.insert(path.clone());
+
+        if !inserted {
+          break;
+        }
+
+        let matched_export_star = match included_modules.get(&path) {
+          Some((_, es)) => es,
+          None => {
+            diagnostics.push(Diagnostic::internal_error(
+              swc_common::DUMMY_SP,
+              "Missing module",
+            ));
+
+            break;
+          }
+        };
+
+        for (k, v) in &matched_export_star.local.properties {
+          let k_string = match k {
+            Value::String(k_string) => k_string.clone(),
+            _ => {
+              diagnostics.push(Diagnostic::internal_error(
+                swc_common::DUMMY_SP,
+                "Expected exported name to be a string",
+              ));
+
+              continue;
+            }
+          };
+
+          let old_value = include_map.insert(k_string.clone(), v.clone());
+
+          if old_value.is_some() {
+            diagnostics.push(Diagnostic::error(
+              swc_common::DUMMY_SP,
+              &format!("Conflicting export {}", k_string),
+            ));
+          }
+        }
+
+        include_pointers_to_process.append(&mut matched_export_star.includes.clone());
+
+        break;
+      }
+    }
+
+    if !matched {
+      diagnostics.push(Diagnostic::internal_error(
+        swc_common::DUMMY_SP,
+        "Failed to match export* pointer",
+      ));
+    }
+  }
+
+  let mut obj = Object::default();
+
+  for (key, value) in include_map {
+    obj.properties.push((Value::String(key), value));
+  }
+
+  obj
+    .properties
+    .append(&mut export_star.local.properties.clone());
+
+  obj
 }

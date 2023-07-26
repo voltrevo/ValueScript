@@ -176,7 +176,7 @@ impl ModuleCompiler {
       ExportNamed(en) => self.compile_named_export(en),
       ExportDefaultDecl(edd) => self.compile_export_default_decl(edd),
       ExportDefaultExpr(ede) => self.module.export_default = self.static_ec().expr(&ede.expr),
-      ExportAll(_) => self.todo(module_decl.span(), "ExportAll declaration"),
+      ExportAll(ea) => self.compile_export_all(ea),
       TsImportEquals(_) => self.not_supported(module_decl.span(), "TsImportEquals declaration"),
       TsExportAssignment(_) => {
         self.not_supported(module_decl.span(), "TsExportAssignment declaration")
@@ -557,6 +557,22 @@ impl ModuleCompiler {
         }
       }
     }
+  }
+
+  fn compile_export_all(&mut self, ea: &swc_ecma_ast::ExportAll) {
+    let defn = self.allocate_defn(&format!("{}_export_star", ident_from_str(&ea.src.value)));
+
+    self.module.definitions.push(Definition {
+      pointer: defn.clone(),
+      content: DefinitionContent::Lazy(Lazy {
+        body: vec![FnLine::Instruction(Instruction::ImportStar(
+          Value::String(ea.src.value.to_string()),
+          Register::return_(),
+        ))],
+      }),
+    });
+
+    self.module.export_star.includes.push(defn);
   }
 
   fn compile_import(&mut self, import: &swc_ecma_ast::ImportDecl) {

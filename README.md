@@ -420,6 +420,7 @@ not the subset of ValueScript that has actually been implemented.
 - Enforcing `const`
 - Temporal dead zones
 - Local imports
+  - Including the many various import and export patterns
 - Tree shaking
 - Copy-on-write optimizations
 - utf8 strings (_not_ JS's utf16 strings)
@@ -480,8 +481,6 @@ not the subset of ValueScript that has actually been implemented.
 - Rest params
 - Async functions
 - TypeScript namespaces
-- `export * from`
-  - (`export { name } from` _does_ work)
 - `import.meta`
 - Dynamic imports
 - Unusual JS things like passing unintended types to standard functions

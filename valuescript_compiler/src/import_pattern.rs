@@ -6,6 +6,7 @@ pub struct ImportPattern {
   pub kind: ImportKind,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum ImportKind {
   Default,
   Star,

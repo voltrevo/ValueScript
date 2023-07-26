@@ -78,6 +78,7 @@ where
     };
 
     let mut compiler_output = compile_module(&file_contents);
+    // println!("{}: {}", dependency.path, compiler_output.module);
 
     gm.diagnostics
       .entry(dependency.path.clone())
