@@ -11,6 +11,7 @@ mod ident;
 mod import_pattern;
 mod instruction;
 mod link_module;
+mod minify;
 mod module_compiler;
 mod name_allocator;
 mod optimization;

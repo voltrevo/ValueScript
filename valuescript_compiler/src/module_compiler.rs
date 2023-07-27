@@ -15,6 +15,7 @@ use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
 use crate::function_compiler::{FunctionCompiler, Functionish};
 use crate::ident::Ident;
+use crate::minify::minify;
 use crate::name_allocator::{ident_from_str, NameAllocator};
 use crate::scope::OwnerId;
 use crate::scope_analysis::{class_to_owner_id, ScopeAnalysis};
@@ -70,8 +71,8 @@ pub struct CompilerOutput {
   pub module: Module,
 }
 
-pub fn compile_program(program: &swc_ecma_ast::Program) -> CompilerOutput {
-  let compiler = ModuleCompiler::compile_program(program);
+pub fn compile_program(source: &str, program: &swc_ecma_ast::Program) -> CompilerOutput {
+  let compiler = ModuleCompiler::compile_program(source, program);
 
   CompilerOutput {
     diagnostics: compiler.diagnostics.take(),
@@ -83,7 +84,7 @@ pub fn compile_module(source: &str) -> CompilerOutput {
   let (program_optional, mut diagnostics) = parse(source);
 
   let mut compiler_output = match program_optional {
-    Some(program) => compile_program(&program),
+    Some(program) => compile_program(source, &program),
     None => CompilerOutput::default(),
   };
 
@@ -99,6 +100,7 @@ pub struct ModuleCompiler {
   pub definition_allocator: NameAllocator,
   pub scope_analysis: ScopeAnalysis,
   pub constants_map: HashMap<Pointer, Value>,
+  pub source: String,
   pub module: Module,
 }
 
@@ -125,7 +127,7 @@ impl ModuleCompiler {
     }
   }
 
-  fn compile_program(program: &swc_ecma_ast::Program) -> Self {
+  fn compile_program(source: &str, program: &swc_ecma_ast::Program) -> Self {
     use swc_ecma_ast::Program::*;
 
     let module = match program {
@@ -144,6 +146,7 @@ impl ModuleCompiler {
     let mut self_ = Self {
       scope_analysis,
       diagnostics: RefCell::new(diagnostics),
+      source: source.to_string(),
       ..Default::default()
     };
 
@@ -153,6 +156,8 @@ impl ModuleCompiler {
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
+    println!("Min: {}", minify(&self.source, module.span));
+
     for module_item in &module.body {
       self.compile_module_item(module_item);
     }
