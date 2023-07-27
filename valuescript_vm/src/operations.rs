@@ -318,6 +318,10 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
 
       left.hash == right.hash
     }
+    #[allow(clippy::vtable_address_comparisons)] // TODO: Is this ok?
+    (Val::Static(left), Val::Static(right)) => std::ptr::eq(&**left, &**right),
+    #[allow(clippy::vtable_address_comparisons)] // TODO: Is this ok?
+    (Val::Dynamic(left), Val::Dynamic(right)) => std::ptr::eq(&**left, &**right),
     (Val::Static(..) | Val::Dynamic(..) | Val::CopyCounter(..), _)
     | (_, Val::Static(..) | Val::Dynamic(..) | Val::CopyCounter(..)) => {
       if left.typeof_() != right.typeof_() {
@@ -551,8 +555,25 @@ pub fn op_typeof(input: &Val) -> Val {
   .to_val()
 }
 
-pub fn op_instance_of(_left: &Val, _right: &Val) -> Result<Val, Val> {
-  Err("TODO: op_instance_of".to_internal_error())
+pub fn op_instance_of(left: &Val, right: &Val) -> Result<Val, Val> {
+  let class_data = match right.as_class_data() {
+    Some(class_data) => class_data,
+    None => return Err("Right-hand side of `instanceof` is not a class".to_type_error()),
+  };
+
+  let left_prototype = match left {
+    Val::Object(obj) => match &obj.prototype {
+      Some(proto) => proto,
+      None => return Ok(false.to_val()),
+    },
+    Val::Null => return Ok(false.to_val()),
+    _ => match left.typeof_() {
+      VsType::Object => return Err("TODO: instanceof indirection".to_internal_error()),
+      _ => return Ok(false.to_val()),
+    },
+  };
+
+  Ok(op_triple_eq_impl(left_prototype, &class_data.prototype)?.to_val())
 }
 
 pub fn op_in(left: &Val, right: &Val) -> Result<Val, Val> {
