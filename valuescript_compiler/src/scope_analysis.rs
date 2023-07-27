@@ -254,7 +254,14 @@ impl ScopeAnalysis {
       Some(name_id) => {
         let name = self.names.get(&name_id).expect("Name not found");
 
-        if name.type_ != NameType::This {
+        let name_span = match name.id {
+          NameId::Span(span) => Some(span),
+          NameId::This(span) => Some(span),
+          NameId::Builtin(_) => None,
+          NameId::Constant(_) => None,
+        };
+
+        if name.type_ != NameType::This && name_span == Some(origin_ident.span) {
           match &name.value {
             // Already inserted, skip
             Value::Pointer(_) => return,

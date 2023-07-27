@@ -40,6 +40,7 @@ pub enum OwnerId {
 }
 
 pub trait ScopeTrait {
+  fn trace(&self);
   fn get(&self, name: &swc_atoms::JsWord) -> Option<NameId>;
   fn set(
     &self,
@@ -52,6 +53,24 @@ pub trait ScopeTrait {
 }
 
 impl ScopeTrait for Scope {
+  fn trace(&self) {
+    println!(
+      "scope trace {:?} names: {:?}",
+      &self.borrow().owner_id,
+      &self
+        .borrow()
+        .name_map
+        .keys()
+        .map(|k| k.to_string())
+        .collect::<Vec<String>>()
+    );
+
+    match &self.borrow().parent {
+      Some(parent) => parent.trace(),
+      None => println!("scope trace end"),
+    };
+  }
+
   fn get(&self, name: &swc_atoms::JsWord) -> Option<NameId> {
     match self.borrow().name_map.get(name) {
       Some(mapped_name) => Some(mapped_name.clone()),

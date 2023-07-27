@@ -714,10 +714,10 @@ impl ModuleCompiler {
     let mut static_: Object = Object::default();
 
     let defn_name = match ident {
-      Some(ident) => match self
-        .scope_analysis
-        .lookup_value(&OwnerId::Module, &Ident::from_swc_ident(ident))
-      {
+      Some(ident) => match self.scope_analysis.lookup_value(
+        &OwnerId::Module, // TODO: Do we need the scope/owner_id to be passed in instead?
+        &Ident::from_swc_ident(ident),
+      ) {
         Some(Value::Pointer(p)) => p,
         _ => {
           self.internal_error(

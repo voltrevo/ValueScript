@@ -1,4 +1,4 @@
-// //! test_output("foo")
+//! test_output("foo")
 
 export default () => {
   class X {
