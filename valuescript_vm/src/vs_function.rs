@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use crate::bytecode::Bytecode;
 use crate::make_generator_frame::MakeGeneratorFrame;
+use crate::vs_function_metadata::VsFunctionMetadata;
 use crate::vs_value::ToVal;
 
 use super::bytecode_decoder::BytecodeDecoder;
@@ -12,7 +13,7 @@ use super::vs_value::Val;
 #[derive(Debug, Clone)]
 pub struct VsFunction {
   pub bytecode: Rc<Bytecode>,
-  pub hash: [u8; 32],
+  pub metadata: VsFunctionMetadata,
   pub is_generator: bool,
   pub register_count: usize,
   pub parameter_count: usize,
@@ -30,7 +31,7 @@ impl VsFunction {
 
     VsFunction {
       bytecode: self.bytecode.clone(),
-      hash: self.hash,
+      metadata: self.metadata.clone(),
       is_generator: self.is_generator,
       register_count: self.register_count,
       parameter_count: self.parameter_count,

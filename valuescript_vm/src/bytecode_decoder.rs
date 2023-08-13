@@ -10,6 +10,7 @@ use crate::builtins::BUILTIN_VALS;
 use crate::bytecode::Bytecode;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
+use crate::vs_function_metadata::VsFunctionMetadata;
 use crate::vs_object::VsObject;
 use crate::vs_symbol::VsSymbol;
 use crate::vs_value::ToVal;
@@ -292,7 +293,10 @@ impl BytecodeDecoder {
 
     VsFunction {
       bytecode: self.bytecode.clone(),
-      hash,
+      metadata: VsFunctionMetadata {
+        name: Rc::from(""),
+        hash,
+      },
       is_generator,
       register_count,
       parameter_count,
