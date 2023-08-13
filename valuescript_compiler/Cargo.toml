@@ -16,6 +16,7 @@ swc_ecma_parser = "0.102.2"
 swc = "0.168.3"
 swc_ecma_ast = "0.76.0"
 queues = "1.0.2"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
 
 valuescript_common = { path = "../valuescript_common" }
 valuescript_vm = { path = "../valuescript_vm" }

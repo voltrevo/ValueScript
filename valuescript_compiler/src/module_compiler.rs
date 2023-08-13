@@ -15,7 +15,6 @@ use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
 use crate::function_compiler::{FunctionCompiler, Functionish};
 use crate::ident::Ident;
-use crate::minify::minify;
 use crate::name_allocator::{ident_from_str, NameAllocator};
 use crate::scope::OwnerId;
 use crate::scope_analysis::{class_to_owner_id, ScopeAnalysis};
@@ -156,8 +155,6 @@ impl ModuleCompiler {
   }
 
   fn compile_module(&mut self, module: &swc_ecma_ast::Module) {
-    println!("Min: {}", minify(&self.source, module.span));
-
     for module_item in &module.body {
       self.compile_module_item(module_item);
     }
