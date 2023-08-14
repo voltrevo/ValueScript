@@ -1,6 +1,6 @@
 use crate::asm::{
-  Array, Definition, DefinitionContent, ExportStar, FnLine, Instruction, Module, Object, Pointer,
-  Value,
+  Array, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, Instruction, Module,
+  Object, Pointer, Value,
 };
 
 pub fn visit_pointers<Visitor>(module: &mut Module, visitor: Visitor)
@@ -47,9 +47,21 @@ where
 
     match &mut definition.content {
       DefinitionContent::Function(function) => {
-        self.value(Some(&definition.pointer), &mut function.metadata);
+        if let Some(metadata) = &mut function.metadata {
+          self.pointer(Some(&definition.pointer), metadata);
+        }
+
         self.body(&definition.pointer, &mut function.body);
       }
+      DefinitionContent::FnMeta(fn_meta) => match &mut fn_meta.content_hashable {
+        ContentHashable::Empty => {}
+        ContentHashable::Src(_, deps) => {
+          for dep in deps {
+            self.value(Some(&definition.pointer), dep);
+          }
+        }
+        ContentHashable::Hash(_) => {}
+      },
       DefinitionContent::Value(value) => {
         self.value(Some(&definition.pointer), value);
       }

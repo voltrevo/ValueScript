@@ -468,7 +468,7 @@ impl ScopeAnalysis {
       Decl::Class(class_decl) => {
         self.class_(scope, &Some(class_decl.ident.clone()), &class_decl.class)
       }
-      Decl::Fn(fn_decl) => self.function(scope, Some(&fn_decl.ident), &fn_decl.function),
+      Decl::Fn(fn_decl) => self.function(scope, Some(&fn_decl.ident), &fn_decl.function, false),
       Decl::Var(var_decl) => {
         for decl in &var_decl.decls {
           self.var_declarator(scope, decl);
@@ -496,14 +496,17 @@ impl ScopeAnalysis {
     scope: &Scope,
     name: Option<&swc_ecma_ast::Ident>,
     function: &swc_ecma_ast::Function,
+    is_method: bool,
   ) {
     let owner_span = fn_owner_span(name, function);
 
     let child_scope = scope.nest(Some(OwnerId::Span(owner_span)));
     self.insert_this_name(&child_scope, owner_span);
 
-    if let Some(name) = name {
-      self.insert_pointer_name(&child_scope, NameType::Function, name);
+    if !is_method {
+      if let Some(name) = name {
+        self.insert_pointer_name(&child_scope, NameType::Function, name);
+      }
     }
 
     for param in &function.params {
@@ -950,7 +953,7 @@ impl ScopeAnalysis {
           _ => None,
         };
 
-        self.function(scope, method_id, &method.function);
+        self.function(scope, method_id, &method.function, true);
       }
       ClassProp(class_prop) => {
         self.prop_key(scope, &class_prop.key);
@@ -971,6 +974,7 @@ impl ScopeAnalysis {
           scope,
           Some(&private_method.key.id),
           &private_method.function,
+          true,
         );
       }
       PrivateProp(private_prop) => {
@@ -989,7 +993,7 @@ impl ScopeAnalysis {
   }
 
   fn fn_expr(&mut self, scope: &Scope, fn_expr: &swc_ecma_ast::FnExpr) {
-    self.function(scope, fn_expr.ident.as_ref(), &fn_expr.function);
+    self.function(scope, fn_expr.ident.as_ref(), &fn_expr.function, false);
   }
 
   fn expr(&mut self, scope: &Scope, expr: &swc_ecma_ast::Expr) {
@@ -1494,7 +1498,7 @@ impl ScopeAnalysis {
             _ => None,
           };
 
-          self.function(scope, method_ident, &method.function);
+          self.function(scope, method_ident, &method.function, true);
         }
         swc_ecma_ast::Prop::Assign(assign) => {
           self.todo(

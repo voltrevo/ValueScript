@@ -8,8 +8,8 @@ use num_bigint::{BigInt, Sign};
 use valuescript_common::BuiltinName;
 
 use crate::asm::{
-  Array, Builtin, Class, Definition, DefinitionContent, FnLine, Function, Instruction, Label,
-  LabelRef, Lazy, Module, Number, Object, Pointer, Register, Value,
+  Array, Builtin, Class, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Function,
+  Instruction, Label, LabelRef, Lazy, Module, Number, Object, Pointer, Register, Value,
 };
 
 pub fn assemble(module: &Module) -> Vec<u8> {
@@ -62,6 +62,9 @@ impl Assembler {
       DefinitionContent::Function(function) => {
         self.function(function);
       }
+      DefinitionContent::FnMeta(fn_meta) => {
+        self.fn_meta(fn_meta);
+      }
       DefinitionContent::Value(value) => {
         self.value(value);
       }
@@ -77,7 +80,15 @@ impl Assembler {
       true => ValueType::GeneratorFunction,
     } as u8);
 
-    self.value(&function.metadata);
+    match &function.metadata {
+      Some(p) => {
+        self.output.push(0x01);
+        self.pointer(p);
+      }
+      None => {
+        self.output.push(0x00);
+      }
+    }
 
     self.fn_data = Default::default();
 
@@ -119,6 +130,36 @@ impl Assembler {
     self.output[self.fn_data.register_count_pos] = (self.fn_data.register_map.len() + 3) as u8;
 
     self.fn_data.labels_map.resolve(&mut self.output);
+  }
+
+  fn fn_meta(&mut self, fn_meta: &FnMeta) {
+    self.output.push(ValueType::FnMeta as u8);
+
+    self.string(&fn_meta.name);
+
+    match &fn_meta.content_hashable {
+      ContentHashable::Empty => self.output.push(0x00),
+      ContentHashable::Src(src_hash, deps) => {
+        self.output.push(0x01);
+
+        for b in src_hash {
+          self.output.push(*b);
+        }
+
+        self.varsize_uint(deps.len());
+
+        for dep in deps {
+          self.value(dep);
+        }
+      }
+      ContentHashable::Hash(content_hash) => {
+        self.output.push(0x02);
+
+        for b in content_hash {
+          self.output.push(*b);
+        }
+      }
+    }
   }
 
   fn lazy(&mut self, lazy: &Lazy) {
@@ -458,6 +499,7 @@ pub enum ValueType {
   BigInt = 0x13,
   GeneratorFunction = 0x14,
   ExportStar = 0x15,
+  FnMeta = 0x16,
   // External = TBD,
 }
 

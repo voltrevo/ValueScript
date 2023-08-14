@@ -15,6 +15,7 @@ pub fn simplify(module: &mut Module, take_registers: bool) {
           Kal::from_function(defn.pointer.clone(), fn_),
         );
       }
+      DefinitionContent::FnMeta(_) => {}
       DefinitionContent::Value(value) => {
         pointer_kals.insert(defn.pointer.clone(), Kal::from_value(value));
       }
@@ -27,6 +28,7 @@ pub fn simplify(module: &mut Module, take_registers: bool) {
       DefinitionContent::Function(fn_) => {
         simplify_fn(FnState::new(fn_, pointer_kals.clone()), fn_, take_registers)
       }
+      DefinitionContent::FnMeta(_) => {}
       DefinitionContent::Value(_) => {}
       DefinitionContent::Lazy(_) => {}
     }

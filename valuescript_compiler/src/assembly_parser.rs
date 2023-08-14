@@ -5,8 +5,8 @@ use num_bigint::BigInt;
 use valuescript_common::{InstructionByte, BUILTIN_NAMES};
 
 use crate::asm::{
-  Array, Builtin, Class, Definition, DefinitionContent, ExportStar, FnLine, Function, Instruction,
-  Label, LabelRef, Module, Number, Object, Pointer, Register, Value,
+  Array, Builtin, Class, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine,
+  FnMeta, Function, Instruction, Label, LabelRef, Module, Number, Object, Pointer, Register, Value,
 };
 
 pub struct AssemblyParser<'a> {
@@ -85,7 +85,7 @@ impl<'a> AssemblyParser<'a> {
     return self.content.split('\n').collect();
   }
 
-  fn render_pos(&self, offset: isize, message: &String) -> String {
+  fn render_pos(&self, offset: isize, message: &str) -> String {
     let LineCol { line, col } = self.get_line_col(offset);
     let source_lines = self.get_lines();
 
@@ -134,7 +134,7 @@ impl<'a> AssemblyParser<'a> {
     }
 
     if count == 0 {
-      panic!("{}", self.render_pos(0, &"Expected whitespace".to_string()));
+      panic!("{}", self.render_pos(0, "Expected whitespace"));
     }
   }
 
@@ -180,11 +180,16 @@ impl<'a> AssemblyParser<'a> {
     self.parse_exact("=");
     self.parse_optional_whitespace();
 
-    let c = *self.pos.peek().expect("Expected value for definition");
+    let content = 'b: {
+      if self.test_chars("function") {
+        break 'b DefinitionContent::Function(self.assemble_function());
+      }
 
-    let content = match c {
-      'f' => DefinitionContent::Function(self.assemble_function()),
-      _ => DefinitionContent::Value(self.assemble_value()),
+      if self.test_chars("fn_meta") {
+        break 'b DefinitionContent::FnMeta(self.assemble_fn_meta());
+      }
+
+      DefinitionContent::Value(self.assemble_value())
     };
 
     Definition {
@@ -268,10 +273,7 @@ impl<'a> AssemblyParser<'a> {
       }
     }
 
-    panic!(
-      "{}",
-      self.render_pos(0, &"Failed to parse instruction".to_string())
-    );
+    panic!("{}", self.render_pos(0, "Failed to parse instruction"));
   }
 
   fn test_instruction_word(&self, word: &str) -> bool {
@@ -327,7 +329,7 @@ impl<'a> AssemblyParser<'a> {
     let optional_identifier = self.test_identifier();
 
     if optional_identifier.is_none() {
-      panic!("{}", self.render_pos(0, &"Invalid identifier".to_string()));
+      panic!("{}", self.render_pos(0, "Invalid identifier"));
     }
 
     let identifier = optional_identifier.unwrap();
@@ -383,10 +385,7 @@ impl<'a> AssemblyParser<'a> {
         } else if c == 't' {
           result.push('\t');
         } else {
-          panic!(
-            "{}",
-            self.render_pos(-1, &"Unimplemented escape sequence".to_string())
-          );
+          panic!("{}", self.render_pos(-1, "Unimplemented escape sequence"));
         }
 
         escaping = false;
@@ -402,10 +401,7 @@ impl<'a> AssemblyParser<'a> {
     if escaping {
       panic!(
         "{}",
-        self.render_pos(
-          0,
-          &"Unexpected end of input after escape character".to_string()
-        )
+        self.render_pos(0, "Unexpected end of input after escape character")
       );
     }
 
@@ -428,7 +424,7 @@ impl<'a> AssemblyParser<'a> {
       // Leave metadata as void
       self.parse_exact("(");
     } else {
-      function.metadata = self.assemble_value();
+      function.metadata = Some(self.assemble_pointer());
       self.parse_optional_whitespace();
       self.parse_exact("(");
     }
@@ -523,6 +519,60 @@ impl<'a> AssemblyParser<'a> {
     }
 
     function
+  }
+
+  fn assemble_fn_meta(&mut self) -> FnMeta {
+    self.parse_exact("fn_meta {");
+    self.parse_optional_whitespace();
+
+    self.parse_exact("name: ");
+
+    let name = self.parse_string_literal();
+
+    self.parse_exact(",");
+    self.parse_optional_whitespace();
+
+    let content_hashable = 'b: {
+      if self.test_chars("}") {
+        break 'b ContentHashable::Empty;
+      }
+
+      if self.test_chars("srcHash:") {
+        self.parse_exact("srcHash: ");
+
+        let src_hash = self.assemble_hash();
+
+        self.parse_exact(",");
+        self.parse_optional_whitespace();
+
+        self.parse_exact("deps: ");
+        let deps = self.assemble_array().values;
+        self.parse_exact(",");
+        self.parse_optional_whitespace();
+
+        break 'b ContentHashable::Src(src_hash, deps);
+      }
+
+      if self.test_chars("contentHash:") {
+        self.parse_exact("contentHash: ");
+
+        let content_hash = self.assemble_hash();
+
+        self.parse_exact(",");
+        self.parse_optional_whitespace();
+
+        break 'b ContentHashable::Hash(content_hash);
+      }
+
+      panic!("{}", self.render_pos(-1, "Expected ContentHashable"));
+    };
+
+    self.parse_exact("}");
+
+    FnMeta {
+      name,
+      content_hashable,
+    }
   }
 
   fn assemble_class(&mut self) -> Class {
@@ -783,7 +833,7 @@ impl<'a> AssemblyParser<'a> {
 
     match self.pos.peek() {
       None => {
-        panic!("{}", self.render_pos(0, &"Expected value".to_string()));
+        panic!("{}", self.render_pos(0, "Expected value"));
       }
       Some('%') => Value::Register(self.assemble_register()),
       Some('@') => Value::Pointer(self.assemble_pointer()),
@@ -849,10 +899,7 @@ impl<'a> AssemblyParser<'a> {
 
       match self.pos.peek() {
         None => {
-          panic!(
-            "{}",
-            self.render_pos(0, &"Expected value or array end".to_string())
-          );
+          panic!("{}", self.render_pos(0, "Expected value or array end"));
         }
         Some(']') => {
           self.pos.next();
@@ -945,10 +992,7 @@ impl<'a> AssemblyParser<'a> {
         None => {
           panic!(
             "{}",
-            self.render_pos(
-              -(num_string.len() as isize + 1),
-              &"Expected valid number".to_string()
-            )
+            self.render_pos(-(num_string.len() as isize + 1), "Expected valid number")
           );
         }
       }
@@ -959,10 +1003,7 @@ impl<'a> AssemblyParser<'a> {
     if value_result.is_err() {
       panic!(
         "{}",
-        self.render_pos(
-          -(num_string.len() as isize),
-          &"Expected valid number".to_string()
-        )
+        self.render_pos(-(num_string.len() as isize), "Expected valid number")
       );
     }
 
@@ -1081,6 +1122,28 @@ impl<'a> AssemblyParser<'a> {
         }
       }
     }
+  }
+
+  fn assemble_hash(&mut self) -> [u8; 32] {
+    self.parse_exact("0x");
+
+    let mut res = [0u8; 32];
+
+    for res_byte in &mut res {
+      *res_byte = match self.assemble_hex_byte() {
+        Some(b) => b,
+        None => panic!("{}", self.render_pos(0, "Expected hex byte")),
+      }
+    }
+
+    res
+  }
+
+  fn assemble_hex_byte(&mut self) -> Option<u8> {
+    let high_nibble = self.pos.next()?.to_digit(16)? as u8;
+    let low_nibble = self.pos.next()?.to_digit(16)? as u8;
+
+    Some((high_nibble << 4) | low_nibble)
   }
 }
 

@@ -5,8 +5,8 @@ use std::mem::take;
 use swc_common::Spanned;
 
 use crate::asm::{
-  Array, Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Object,
-  Pointer, Register, Value,
+  Builtin, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Function, Instruction,
+  Label, Pointer, Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::CompiledExpression;
@@ -16,7 +16,7 @@ use crate::module_compiler::ModuleCompiler;
 use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, Name};
-use crate::src_hash::src_hash_asm;
+use crate::src_hash::src_hash;
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
@@ -34,49 +34,28 @@ impl Functionish {
     }
   }
 
-  pub fn metadata(&self, mc: &ModuleCompiler) -> Value {
+  pub fn metadata(&self, mc: &ModuleCompiler) -> FnMeta {
     match self {
-      Functionish::Fn(ident, fn_) => Value::Object(Box::new(Object {
-        properties: vec![
-          (
-            Value::String("name".to_string()),
-            Value::String(
-              ident
-                .as_ref()
-                .map_or_else(|| "".to_string(), |ident| ident.sym.to_string()),
-            ),
-          ),
-          (
-            Value::String("srcHash".to_string()),
-            src_hash_asm(&mc.source, fn_.span),
-          ),
-          (
-            Value::String("deps".to_string()),
-            Value::Array(Box::new(Array {
-              values: mc.scope_analysis.get_deps(fn_.span),
-            })),
-          ),
-        ],
-      })),
-      Functionish::Arrow(arrow) => Value::Object(Box::new(Object {
-        properties: vec![
-          (
-            Value::String("name".to_string()),
-            Value::String("".to_string()),
-          ),
-          (
-            Value::String("srcHash".to_string()),
-            src_hash_asm(&mc.source, arrow.span),
-          ),
-          // (
-          //   Value::String("deps".to_string()),
-          //   Value::Array(Box::new(Array {
-          //     values: mc.scope_analysis.get_deps(arrow.span),
-          //   })),
-          // ),
-        ],
-      })),
-      Functionish::Constructor(_, _, _) => Value::Void,
+      Functionish::Fn(ident, fn_) => FnMeta {
+        name: ident
+          .as_ref()
+          .map_or_else(|| "".to_string(), |ident| ident.sym.to_string()),
+        content_hashable: ContentHashable::Src(
+          src_hash(&mc.source, fn_.span),
+          mc.scope_analysis.get_deps(fn_.span),
+        ),
+      },
+      Functionish::Arrow(arrow) => FnMeta {
+        name: "".to_string(),
+        content_hashable: ContentHashable::Src(
+          src_hash(&mc.source, arrow.span),
+          mc.scope_analysis.get_deps(arrow.span),
+        ),
+      },
+      Functionish::Constructor(_, _, _constructor) => FnMeta {
+        name: "".to_string(),                     // TODO: Use class name?
+        content_hashable: ContentHashable::Empty, // TODO
+      },
     }
   }
 }
@@ -250,9 +229,12 @@ impl<'a> FunctionCompiler<'a> {
       Functionish::Constructor(..) => false,
     };
 
-    let metadata_pointer = self.mc.allocate_defn_numbered("meta");
+    let metadata_pointer = self
+      .mc
+      .allocate_defn(&format!("{}_meta", definition_pointer.name));
+
     let metadata = functionish.metadata(self.mc);
-    self.fn_.metadata = Value::Pointer(metadata_pointer.clone());
+    self.fn_.metadata = Some(metadata_pointer.clone());
 
     self.set_owner_id(functionish.owner_id());
 
@@ -343,7 +325,7 @@ impl<'a> FunctionCompiler<'a> {
 
     self.mc.module.definitions.push(Definition {
       pointer: metadata_pointer,
-      content: DefinitionContent::Value(metadata),
+      content: DefinitionContent::FnMeta(metadata),
     });
   }
 

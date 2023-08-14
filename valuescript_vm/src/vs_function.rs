@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
-use crate::bytecode::Bytecode;
+use crate::builtins::internal_error_builtin::ToInternalError;
+use crate::bytecode::{Bytecode, DecoderMaker};
 use crate::make_generator_frame::MakeGeneratorFrame;
 use crate::vs_value::ToVal;
 
@@ -12,7 +13,7 @@ use super::vs_value::Val;
 #[derive(Debug, Clone)]
 pub struct VsFunction {
   pub bytecode: Rc<Bytecode>,
-  pub metadata: Val,
+  pub metadata_pos: Option<usize>,
   pub is_generator: bool,
   pub register_count: usize,
   pub parameter_count: usize,
@@ -30,12 +31,19 @@ impl VsFunction {
 
     VsFunction {
       bytecode: self.bytecode.clone(),
-      metadata: self.metadata.clone(),
+      metadata_pos: self.metadata_pos,
       is_generator: self.is_generator,
       register_count: self.register_count,
       parameter_count: self.parameter_count,
       start: self.start,
       binds: new_binds,
+    }
+  }
+
+  pub fn content_hash(&self) -> Result<[u8; 32], Val> {
+    match self.metadata_pos {
+      Some(p) => self.bytecode.decoder(p).decode_content_hash(),
+      None => Err("Can't get content_hash without metadata_pos".to_internal_error()),
     }
   }
 

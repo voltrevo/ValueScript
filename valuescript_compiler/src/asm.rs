@@ -112,19 +112,19 @@ impl std::fmt::Display for DefinitionContent {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct FnMeta {
-  name: String,
-  content_hashable: ContentHashable,
+  pub name: String,
+  pub content_hashable: ContentHashable,
 }
 
 impl std::fmt::Display for FnMeta {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "fn_meta {{\n")?;
+    writeln!(f, "fn_meta {{")?;
 
-    write!(
+    writeln!(
       f,
-      "  name: {}",
+      "  name: {},",
       serde_json::to_string(&self.name).expect("Failed json serialization")
     )?;
 
@@ -137,11 +137,11 @@ impl std::fmt::Display for FnMeta {
           write!(f, "{:02x}", b)?;
         }
 
-        write!(f, ",\n")?;
+        writeln!(f, ",")?;
 
-        write!(
+        writeln!(
           f,
-          "  deps: {},\n",
+          "  deps: {},",
           Array {
             values: deps.clone()
           }
@@ -154,7 +154,7 @@ impl std::fmt::Display for FnMeta {
           write!(f, "{:02x}", b)?;
         }
 
-        write!(f, ",\n")?;
+        writeln!(f, ",")?;
       }
     }
 
@@ -162,8 +162,9 @@ impl std::fmt::Display for FnMeta {
   }
 }
 
-#[derive(Debug, Clone)]
-enum ContentHashable {
+#[derive(Debug, Clone, Default)]
+pub enum ContentHashable {
+  #[default]
   Empty,
   Src([u8; 32], Vec<Value>),
   Hash([u8; 32]),

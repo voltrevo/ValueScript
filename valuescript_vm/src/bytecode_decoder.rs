@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use num_bigint::Sign;
 use valuescript_common::InstructionByte;
 
+use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::BUILTIN_VALS;
 use crate::bytecode::Bytecode;
 use crate::vs_class::VsClass;
@@ -44,6 +45,8 @@ pub enum BytecodeType {
   Class = 0x11,
   BigInt = 0x13,
   GeneratorFunction = 0x14,
+  // ExportStar = 0x15,
+  // FnMeta = 0x16,
   Unrecognized = 0xff,
 }
 
@@ -133,7 +136,7 @@ impl BytecodeDecoder {
         }
         .to_val()
       }
-      BytecodeType::Function => self.decode_function(false, registers),
+      BytecodeType::Function => self.decode_function(false),
       BytecodeType::Pointer => self.decode_pointer(registers),
       BytecodeType::Register => match registers[self.decode_register_index().unwrap()].clone() {
         Val::Void => Val::Undefined,
@@ -151,7 +154,7 @@ impl BytecodeDecoder {
       }
       .to_val(),
       BytecodeType::BigInt => self.decode_bigint().to_val(),
-      BytecodeType::GeneratorFunction => self.decode_function(true, registers),
+      BytecodeType::GeneratorFunction => self.decode_function(true),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     }
   }
@@ -280,8 +283,16 @@ impl BytecodeDecoder {
     }
   }
 
-  pub fn decode_function(&mut self, is_generator: bool, registers: &mut Vec<Val>) -> Val {
-    let metadata = self.decode_val(registers);
+  pub fn decode_function(&mut self, is_generator: bool) -> Val {
+    let metadata_pos = if self.decode_byte() == 0 {
+      None
+    } else {
+      if self.decode_type() != BytecodeType::Pointer {
+        panic!("Unexpected non-pointer function metadata");
+      }
+
+      Some(self.decode_pos())
+    };
 
     // TODO: Support >256
     let register_count = self.decode_byte() as usize;
@@ -289,7 +300,7 @@ impl BytecodeDecoder {
 
     VsFunction {
       bytecode: self.bytecode.clone(),
-      metadata,
+      metadata_pos,
       is_generator,
       register_count,
       parameter_count,
@@ -301,5 +312,35 @@ impl BytecodeDecoder {
 
   pub fn decode_instruction(&mut self) -> InstructionByte {
     InstructionByte::from_byte(self.decode_byte())
+  }
+
+  pub fn decode_content_hash(&mut self) -> Result<[u8; 32], Val> {
+    if self.decode_byte() != 0x16 {
+      return Err("Can't decode a content hash here".to_internal_error());
+    }
+
+    if self.decode_type() != BytecodeType::String {
+      return Err("Expected string".to_internal_error());
+    }
+
+    let name_len = self.decode_varsize_uint();
+    self.pos += name_len;
+
+    match self.decode_byte() {
+      0 => Err("Missing content_hashable".to_internal_error()), // Empty
+      1 | 2 => {
+        // Src | Hash
+        // TODO: In the Src case, we should be calculating the content hash, or throwing a todo
+        // error
+        let mut res = [0u8; 32];
+
+        for b in &mut res {
+          *b = self.decode_byte();
+        }
+
+        Ok(res)
+      }
+      _ => Err("Unrecognized content_hashable case".to_internal_error()),
+    }
   }
 }

@@ -194,10 +194,16 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
         }
       }
 
-      op_triple_eq_impl(
-        &left.metadata.sub(&"srcHash".to_val())?,
-        &right.metadata.sub(&"srcHash".to_val())?,
-      )?
+      let left_hash = left.content_hash()?;
+      let right_hash = right.content_hash()?;
+
+      for i in 0..32 {
+        if left_hash[i] != right_hash[i] {
+          return Ok(false);
+        }
+      }
+
+      true
     }
     _ => {
       if left.is_truthy() != right.is_truthy() {
@@ -319,10 +325,16 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
         }
       }
 
-      op_triple_eq_impl(
-        &left.metadata.sub(&"srcHash".to_val())?,
-        &right.metadata.sub(&"srcHash".to_val())?,
-      )?
+      let left_hash = left.content_hash()?;
+      let right_hash = right.content_hash()?;
+
+      for i in 0..32 {
+        if left_hash[i] != right_hash[i] {
+          return Ok(false);
+        }
+      }
+
+      true
     }
     #[allow(clippy::vtable_address_comparisons)] // TODO: Is this ok?
     (Val::Static(left), Val::Static(right)) => std::ptr::eq(&**left, &**right),

@@ -72,7 +72,9 @@ pub fn shake_tree(module: &mut Module) {
 
       // First include pointers that are allowed to be circular
       match &defn.content {
-        DefinitionContent::Function(..) | DefinitionContent::Value(Value::Class(..)) => {}
+        DefinitionContent::Function(..)
+        | DefinitionContent::Value(Value::Class(..))
+        | DefinitionContent::FnMeta(..) => {}
         DefinitionContent::Value(..) | DefinitionContent::Lazy(..) => continue,
       }
 
