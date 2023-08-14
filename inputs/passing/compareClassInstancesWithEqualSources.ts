@@ -1,10 +1,7 @@
-//! test_output(false)
-// Should be: true
+//! test_output(true)
 
 // When functions (and therefore classes) have the same source (and references), they should compare
-// equal due to the content hash system. This isn't implemented yet - the content hash is just faked
-// using its location in the bytecode, which means you only get equal comparison when the functions
-// are referentially equal (inconsistent with value semantics).
+// equal due to the content hash system.
 
 export default () => {
   const a = new classes[0](1, 2);

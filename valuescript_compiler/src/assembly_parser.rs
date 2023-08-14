@@ -422,7 +422,16 @@ impl<'a> AssemblyParser<'a> {
       function.is_generator = true;
     }
 
-    self.parse_exact("(");
+    self.parse_whitespace();
+
+    if self.test_chars("(") {
+      // Leave metadata as void
+      self.parse_exact("(");
+    } else {
+      function.metadata = self.assemble_value();
+      self.parse_optional_whitespace();
+      self.parse_exact("(");
+    }
 
     loop {
       self.parse_optional_whitespace();

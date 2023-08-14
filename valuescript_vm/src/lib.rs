@@ -23,7 +23,6 @@ mod virtual_machine;
 pub mod vs_array;
 pub mod vs_class;
 mod vs_function;
-mod vs_function_metadata;
 pub mod vs_object;
 mod vs_symbol;
 pub mod vs_value;

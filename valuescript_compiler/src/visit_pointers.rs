@@ -47,6 +47,7 @@ where
 
     match &mut definition.content {
       DefinitionContent::Function(function) => {
+        self.value(Some(&definition.pointer), &mut function.metadata);
         self.body(&definition.pointer, &mut function.body);
       }
       DefinitionContent::Value(value) => {

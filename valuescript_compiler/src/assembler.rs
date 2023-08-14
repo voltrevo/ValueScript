@@ -77,6 +77,8 @@ impl Assembler {
       true => ValueType::GeneratorFunction,
     } as u8);
 
+    self.value(&function.metadata);
+
     self.fn_data = Default::default();
 
     self.fn_data.register_count_pos = self.output.len();

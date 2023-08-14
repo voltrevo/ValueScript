@@ -194,7 +194,10 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
         }
       }
 
-      left.metadata.hash == right.metadata.hash
+      op_triple_eq_impl(
+        &left.metadata.sub(&"hash".to_val())?,
+        &right.metadata.sub(&"hash".to_val())?,
+      )?
     }
     _ => {
       if left.is_truthy() != right.is_truthy() {
@@ -316,7 +319,10 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
         }
       }
 
-      left.metadata.hash == right.metadata.hash
+      op_triple_eq_impl(
+        &left.metadata.sub(&"hash".to_val())?,
+        &right.metadata.sub(&"hash".to_val())?,
+      )?
     }
     #[allow(clippy::vtable_address_comparisons)] // TODO: Is this ok?
     (Val::Static(left), Val::Static(right)) => std::ptr::eq(&**left, &**right),

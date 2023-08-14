@@ -10,7 +10,6 @@ use crate::builtins::BUILTIN_VALS;
 use crate::bytecode::Bytecode;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
-use crate::vs_function_metadata::VsFunctionMetadata;
 use crate::vs_object::VsObject;
 use crate::vs_symbol::VsSymbol;
 use crate::vs_value::ToVal;
@@ -134,7 +133,7 @@ impl BytecodeDecoder {
         }
         .to_val()
       }
-      BytecodeType::Function => self.decode_function(false),
+      BytecodeType::Function => self.decode_function(false, registers),
       BytecodeType::Pointer => self.decode_pointer(registers),
       BytecodeType::Register => match registers[self.decode_register_index().unwrap()].clone() {
         Val::Void => Val::Undefined,
@@ -152,7 +151,7 @@ impl BytecodeDecoder {
       }
       .to_val(),
       BytecodeType::BigInt => self.decode_bigint().to_val(),
-      BytecodeType::GeneratorFunction => self.decode_function(true),
+      BytecodeType::GeneratorFunction => self.decode_function(true, registers),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
     }
   }
@@ -281,11 +280,8 @@ impl BytecodeDecoder {
     }
   }
 
-  pub fn decode_function(&mut self, is_generator: bool) -> Val {
-    // TODO: Use actual content hash
-    let mut hash = [0u8; 32];
-    hash[0] = (self.pos & 0xff) as u8;
-    hash[1] = ((self.pos >> 8) & 0xff) as u8;
+  pub fn decode_function(&mut self, is_generator: bool, registers: &mut Vec<Val>) -> Val {
+    let metadata = self.decode_val(registers);
 
     // TODO: Support >256
     let register_count = self.decode_byte() as usize;
@@ -293,10 +289,7 @@ impl BytecodeDecoder {
 
     VsFunction {
       bytecode: self.bytecode.clone(),
-      metadata: VsFunctionMetadata {
-        name: Rc::from(""),
-        hash,
-      },
+      metadata,
       is_generator,
       register_count,
       parameter_count,

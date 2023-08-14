@@ -122,15 +122,21 @@ impl std::fmt::Display for Pointer {
 #[derive(Default, Debug, Clone)]
 pub struct Function {
   pub is_generator: bool,
+  pub metadata: Value,
   pub parameters: Vec<Register>,
   pub body: Vec<FnLine>,
 }
 
 impl std::fmt::Display for Function {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    let metadata_str = match &self.metadata {
+      Value::Void => "".to_string(),
+      metadata => format!(" {}", metadata),
+    };
+
     match self.is_generator {
-      false => write!(f, "function(")?,
-      true => write!(f, "function*(")?,
+      false => write!(f, "function{}(", metadata_str)?,
+      true => write!(f, "function*{}(", metadata_str)?,
     }
 
     for (i, parameter) in self.parameters.iter().enumerate() {

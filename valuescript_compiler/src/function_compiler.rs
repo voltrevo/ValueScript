@@ -5,8 +5,8 @@ use std::mem::take;
 use swc_common::Spanned;
 
 use crate::asm::{
-  Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Pointer, Register,
-  Value,
+  Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Object, Pointer,
+  Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::CompiledExpression;
@@ -16,6 +16,7 @@ use crate::module_compiler::ModuleCompiler;
 use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, Name};
+use crate::source_hash::source_hash_asm;
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
@@ -30,6 +31,40 @@ impl Functionish {
       Functionish::Fn(ident, fn_) => fn_to_owner_id(ident.as_ref(), fn_),
       Functionish::Arrow(arrow) => OwnerId::Span(arrow.span),
       Functionish::Constructor(_, owner_id, _) => owner_id.clone(),
+    }
+  }
+
+  pub fn metadata(&self, source: &str) -> Value {
+    match self {
+      Functionish::Fn(ident, fn_) => Value::Object(Box::new(Object {
+        properties: vec![
+          (
+            Value::String("name".to_string()),
+            Value::String(
+              ident
+                .as_ref()
+                .map_or_else(|| "".to_string(), |ident| ident.sym.to_string()),
+            ),
+          ),
+          (
+            Value::String("hash".to_string()),
+            source_hash_asm(source, fn_.span),
+          ),
+        ],
+      })),
+      Functionish::Arrow(arrow) => Value::Object(Box::new(Object {
+        properties: vec![
+          (
+            Value::String("name".to_string()),
+            Value::String("".to_string()),
+          ),
+          (
+            Value::String("hash".to_string()),
+            source_hash_asm(source, arrow.span),
+          ),
+        ],
+      })),
+      Functionish::Constructor(_, _, _) => Value::Void,
     }
   }
 }
@@ -203,6 +238,10 @@ impl<'a> FunctionCompiler<'a> {
       Functionish::Constructor(..) => false,
     };
 
+    let metadata_pointer = self.mc.allocate_defn_numbered("meta");
+    let metadata = functionish.metadata(&self.mc.source);
+    self.fn_.metadata = Value::Pointer(metadata_pointer.clone());
+
     self.set_owner_id(functionish.owner_id());
 
     let capture_params = self
@@ -288,6 +327,11 @@ impl<'a> FunctionCompiler<'a> {
     self.mc.module.definitions.push(Definition {
       pointer: definition_pointer,
       content: DefinitionContent::Function(take(&mut self.fn_)),
+    });
+
+    self.mc.module.definitions.push(Definition {
+      pointer: metadata_pointer,
+      content: DefinitionContent::Value(metadata),
     });
   }
 
