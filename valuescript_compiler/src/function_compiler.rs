@@ -5,8 +5,8 @@ use std::mem::take;
 use swc_common::Spanned;
 
 use crate::asm::{
-  Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Object, Pointer,
-  Register, Value,
+  Array, Builtin, Definition, DefinitionContent, FnLine, Function, Instruction, Label, Object,
+  Pointer, Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::CompiledExpression;
@@ -34,7 +34,7 @@ impl Functionish {
     }
   }
 
-  pub fn metadata(&self, source: &str) -> Value {
+  pub fn metadata(&self, mc: &ModuleCompiler) -> Value {
     match self {
       Functionish::Fn(ident, fn_) => Value::Object(Box::new(Object {
         properties: vec![
@@ -48,7 +48,13 @@ impl Functionish {
           ),
           (
             Value::String("srcHash".to_string()),
-            src_hash_asm(source, fn_.span),
+            src_hash_asm(&mc.source, fn_.span),
+          ),
+          (
+            Value::String("deps".to_string()),
+            Value::Array(Box::new(Array {
+              values: mc.scope_analysis.get_deps(fn_.span),
+            })),
           ),
         ],
       })),
@@ -60,8 +66,14 @@ impl Functionish {
           ),
           (
             Value::String("srcHash".to_string()),
-            src_hash_asm(source, arrow.span),
+            src_hash_asm(&mc.source, arrow.span),
           ),
+          // (
+          //   Value::String("deps".to_string()),
+          //   Value::Array(Box::new(Array {
+          //     values: mc.scope_analysis.get_deps(arrow.span),
+          //   })),
+          // ),
         ],
       })),
       Functionish::Constructor(_, _, _) => Value::Void,
@@ -239,7 +251,7 @@ impl<'a> FunctionCompiler<'a> {
     };
 
     let metadata_pointer = self.mc.allocate_defn_numbered("meta");
-    let metadata = functionish.metadata(&self.mc.source);
+    let metadata = functionish.metadata(self.mc);
     self.fn_.metadata = Value::Pointer(metadata_pointer.clone());
 
     self.set_owner_id(functionish.owner_id());

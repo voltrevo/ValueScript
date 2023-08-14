@@ -71,7 +71,7 @@ pub struct ScopeAnalysis {
   pub capture_values: HashMap<(OwnerId, NameId), Value>,
   pub mutations: BTreeMap<swc_common::Span, NameId>,
   pub optional_mutations: BTreeMap<swc_common::Span, NameId>,
-  pub refs: HashMap<swc_common::Span, Ref>,
+  pub refs: BTreeMap<swc_common::Span, Ref>,
   pub diagnostics: RefCell<Vec<Diagnostic>>,
   pub pointer_allocator: PointerAllocator,
   pub reg_allocators: HashMap<OwnerId, RegAllocator>,
@@ -1993,6 +1993,34 @@ impl ScopeAnalysis {
     res.sort();
 
     res
+  }
+
+  pub fn get_deps(&self, span: swc_common::Span) -> Vec<Value> {
+    let start = swc_common::Span {
+      lo: span.lo,
+      hi: span.lo,
+      ctxt: span.ctxt,
+    };
+
+    let end = swc_common::Span {
+      lo: span.hi,
+      hi: span.hi,
+      ctxt: span.ctxt,
+    };
+
+    let mut deps = Vec::<Value>::new();
+
+    for (_span, ref_) in self.refs.range(start..end) {
+      let name = self.names.get(&ref_.name_id).unwrap();
+
+      if let Value::Register(_) = &name.value {
+        continue;
+      }
+
+      deps.push(name.value.clone());
+    }
+
+    deps
   }
 }
 

@@ -88,6 +88,7 @@ impl std::fmt::Display for Definition {
 #[derive(Debug, Clone)]
 pub enum DefinitionContent {
   Function(Function),
+  FnMeta(FnMeta),
   Value(Value),
   Lazy(Lazy),
 }
@@ -98,6 +99,9 @@ impl std::fmt::Display for DefinitionContent {
       DefinitionContent::Function(function) => {
         write!(f, "{}", function)
       }
+      DefinitionContent::FnMeta(fn_meta) => {
+        write!(f, "{}", fn_meta)
+      }
       DefinitionContent::Value(value) => {
         write!(f, "{}", value)
       }
@@ -106,6 +110,63 @@ impl std::fmt::Display for DefinitionContent {
       }
     }
   }
+}
+
+#[derive(Debug, Clone)]
+pub struct FnMeta {
+  name: String,
+  content_hashable: ContentHashable,
+}
+
+impl std::fmt::Display for FnMeta {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "fn_meta {{\n")?;
+
+    write!(
+      f,
+      "  name: {}",
+      serde_json::to_string(&self.name).expect("Failed json serialization")
+    )?;
+
+    match &self.content_hashable {
+      ContentHashable::Empty => {}
+      ContentHashable::Src(src_hash, deps) => {
+        write!(f, "  srcHash: 0x")?;
+
+        for b in src_hash {
+          write!(f, "{:02x}", b)?;
+        }
+
+        write!(f, ",\n")?;
+
+        write!(
+          f,
+          "  deps: {},\n",
+          Array {
+            values: deps.clone()
+          }
+        )?;
+      }
+      ContentHashable::Hash(content_hash) => {
+        write!(f, "  contentHash: 0x")?;
+
+        for b in content_hash {
+          write!(f, "{:02x}", b)?;
+        }
+
+        write!(f, ",\n")?;
+      }
+    }
+
+    write!(f, "}}")
+  }
+}
+
+#[derive(Debug, Clone)]
+enum ContentHashable {
+  Empty,
+  Src([u8; 32], Vec<Value>),
+  Hash([u8; 32]),
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
@@ -122,7 +183,7 @@ impl std::fmt::Display for Pointer {
 #[derive(Default, Debug, Clone)]
 pub struct Function {
   pub is_generator: bool,
-  pub metadata: Value,
+  pub metadata: Option<Pointer>,
   pub parameters: Vec<Register>,
   pub body: Vec<FnLine>,
 }
@@ -130,8 +191,8 @@ pub struct Function {
 impl std::fmt::Display for Function {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     let metadata_str = match &self.metadata {
-      Value::Void => "".to_string(),
-      metadata => format!(" {}", metadata),
+      None => "".to_string(),
+      Some(p) => format!(" {}", p),
     };
 
     match self.is_generator {
