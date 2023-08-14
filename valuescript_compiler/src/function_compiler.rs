@@ -16,7 +16,7 @@ use crate::module_compiler::ModuleCompiler;
 use crate::name_allocator::{NameAllocator, RegAllocator};
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, Name};
-use crate::source_hash::source_hash_asm;
+use crate::src_hash::src_hash_asm;
 
 #[derive(Clone, Debug)]
 pub enum Functionish {
@@ -47,8 +47,8 @@ impl Functionish {
             ),
           ),
           (
-            Value::String("hash".to_string()),
-            source_hash_asm(source, fn_.span),
+            Value::String("srcHash".to_string()),
+            src_hash_asm(source, fn_.span),
           ),
         ],
       })),
@@ -59,8 +59,8 @@ impl Functionish {
             Value::String("".to_string()),
           ),
           (
-            Value::String("hash".to_string()),
-            source_hash_asm(source, arrow.span),
+            Value::String("srcHash".to_string()),
+            src_hash_asm(source, arrow.span),
           ),
         ],
       })),
