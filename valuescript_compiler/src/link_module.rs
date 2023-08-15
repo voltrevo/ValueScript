@@ -388,12 +388,12 @@ pub fn collapse_pointers_of_pointers(module: &mut Module) {
 fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnostic>) {
   let ptr_to_index = module.ptr_to_index();
 
-  let mut ptr_to_src_meta = HashMap::<Pointer, (Hash, Vec<Value>)>::new();
+  let mut ptr_to_src_trace = HashMap::<Pointer, (String, Vec<Value>)>::new();
   let mut meta_to_fn = HashMap::<Pointer, Pointer>::new();
 
   for defn in &module.definitions {
-    if let Some(src_meta) = find_src_metadata(module, &ptr_to_index, defn) {
-      ptr_to_src_meta.insert(defn.pointer.clone(), src_meta);
+    if let Some(src_meta) = find_ptr_src_trace(module, &ptr_to_index, &defn.pointer) {
+      ptr_to_src_trace.insert(defn.pointer.clone(), src_meta);
 
       if let DefinitionContent::Function(fn_) = &defn.content {
         if let Some(metadata_ptr) = &fn_.metadata {
@@ -409,14 +409,14 @@ fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnost
       DefinitionContent::FnMeta(fn_meta) => {
         if let ContentHashable::Src(..) = &fn_meta.content_hashable {
           let content_hash =
-            calculate_content_hash(&ptr_to_src_meta, meta_to_fn.get(&defn.pointer).unwrap());
+            calculate_content_hash(&ptr_to_src_trace, meta_to_fn.get(&defn.pointer).unwrap());
 
           fn_meta.content_hashable = ContentHashable::Content(content_hash);
         }
       }
       DefinitionContent::Value(value) => {
         if let Value::Class(class) = value {
-          let content_hash = calculate_content_hash(&ptr_to_src_meta, &defn.pointer);
+          let content_hash = calculate_content_hash(&ptr_to_src_trace, &defn.pointer);
           class.metadata.content_hashable = ContentHashable::Content(content_hash);
         }
       }
@@ -430,7 +430,15 @@ where
   S: IntoIterator<Item = T>,
   F: Fn(T) -> String,
 {
-  let mut result = "[".to_string();
+  format!("[{}]", comma_join(seq, to_string_fn))
+}
+
+fn comma_join<T, F, S>(seq: S, to_string_fn: F) -> String
+where
+  S: IntoIterator<Item = T>,
+  F: Fn(T) -> String,
+{
+  let mut result = "".to_string();
   let mut iter = seq.into_iter();
 
   if let Some(first_item) = iter.next() {
@@ -442,16 +450,15 @@ where
     }
   }
 
-  result.push(']');
   result
 }
 
-fn find_src_metadata(
+fn find_ptr_src_trace(
   module: &Module,
   ptr_to_index: &HashMap<Pointer, usize>,
-  defn: &Definition,
-) -> Option<(Hash, Vec<Value>)> {
-  match &defn.content {
+  ptr: &Pointer,
+) -> Option<(String, Vec<Value>)> {
+  match module.get(ptr_to_index, ptr) {
     DefinitionContent::Function(fn_) => {
       let metadata_ptr = match &fn_.metadata {
         Some(ptr) => ptr,
@@ -460,7 +467,7 @@ fn find_src_metadata(
 
       let src_meta = match module.get(ptr_to_index, metadata_ptr) {
         DefinitionContent::FnMeta(fn_meta) => match &fn_meta.content_hashable {
-          ContentHashable::Src(src_hash, deps) => (src_hash.clone(), deps.clone()),
+          ContentHashable::Src(src_hash, deps) => (src_hash.to_string(), deps.clone()),
           _ => return None,
         },
         _ => panic!("metadata_ptr did not point to metadata"),
@@ -469,23 +476,71 @@ fn find_src_metadata(
       Some(src_meta)
     }
     DefinitionContent::FnMeta(_fn_meta) => None,
-    DefinitionContent::Value(value) => match value {
-      Value::Class(class) => {
-        let src_meta = match &class.metadata.content_hashable {
-          ContentHashable::Src(src_hash, deps) => (src_hash.clone(), deps.clone()),
-          _ => return None,
-        };
-
-        Some(src_meta)
-      }
-      _ => None,
-    },
+    DefinitionContent::Value(value) => find_value_src_trace(module, ptr_to_index, value),
     DefinitionContent::Lazy(_) => None,
   }
 }
 
+fn find_value_src_trace(
+  module: &Module,
+  ptr_to_index: &HashMap<Pointer, usize>,
+  value: &Value,
+) -> Option<(String, Vec<Value>)> {
+  match value {
+    Value::Class(class) => {
+      let src_meta = match &class.metadata.content_hashable {
+        ContentHashable::Src(src_hash, deps) => (src_hash.to_string(), deps.clone()),
+        _ => return None,
+      };
+
+      Some(src_meta)
+    }
+    Value::Void
+    | Value::Undefined
+    | Value::Null
+    | Value::Bool(_)
+    | Value::Number(_)
+    | Value::BigInt(_)
+    | Value::String(_)
+    | Value::Builtin(_) => Some((value.to_string(), vec![])),
+    Value::Array(array) => {
+      let mut src_tags = Vec::<String>::new();
+      let mut deps = Vec::<Value>::new();
+
+      for item in &array.values {
+        let (src_tag, mut item_deps) = find_value_src_trace(module, ptr_to_index, item)
+          .expect("Couldn't get required source trace");
+
+        src_tags.push(src_tag);
+        deps.append(&mut item_deps);
+      }
+
+      Some((make_array_string(src_tags, |src_tag| src_tag), deps))
+    }
+    Value::Object(object) => {
+      let mut src_tags = Vec::<String>::new();
+      let mut deps = Vec::<Value>::new();
+
+      for (k, v) in &object.properties {
+        let (src_tag, mut item_deps) = find_value_src_trace(module, ptr_to_index, v)
+          .expect("Couldn't get required source trace");
+
+        src_tags.push(format!("{}:{}", k, src_tag));
+        deps.append(&mut item_deps);
+      }
+
+      Some((
+        format!("{{{}}}", comma_join(src_tags, |src_tag| src_tag)),
+        deps,
+      ))
+    }
+    Value::Pointer(ptr) => find_ptr_src_trace(module, ptr_to_index, ptr),
+    Value::Register(_) => panic!("Can't get source trace of a register"),
+  }
+}
+
 fn calculate_content_hash(
-  ptr_to_src_meta: &HashMap<Pointer, (Hash, Vec<Value>)>,
+  ptr_to_src_trace: &HashMap<Pointer, (String, Vec<Value>)>,
   fn_ptr: &Pointer,
 ) -> Hash {
   let mut full_deps = vec![Value::Pointer(fn_ptr.clone())];
@@ -499,29 +554,31 @@ fn calculate_content_hash(
 
     let ptr_dep = match dep {
       Value::Pointer(p) => p,
-      Value::Builtin(_)
-      | Value::Void
-      | Value::Undefined
-      | Value::Null
-      | Value::Bool(_)
-      | Value::Number(_)
-      | Value::BigInt(_)
-      | Value::String(_) => {
+      Value::Builtin(_) | Value::Undefined | Value::Number(_) => {
         i += 1;
         continue;
       }
-      Value::Array(_) | Value::Object(_) | Value::Class(_) => todo!(),
-      Value::Register(_) => panic!("Unexpected register dep"),
+      Value::Void
+      | Value::Null
+      | Value::Bool(_)
+      | Value::BigInt(_)
+      | Value::String(_)
+      | Value::Array(_)
+      | Value::Object(_)
+      | Value::Class(_)
+      | Value::Register(_) => {
+        // undefined, Infinity, and NaN are treated as global variables, which lead them to be the
+        // resolution of dependencies. All other dependencies should be builtins or pointers.
+        panic!("Unexpected dependency ({})", dep)
+      }
     };
 
-    if let Some((_, sub_deps)) = ptr_to_src_meta.get(&ptr_dep) {
-      for sub_dep in sub_deps {
-        if deps_included.insert(sub_dep.clone()) {
-          full_deps.push(sub_dep.clone());
-        }
+    let (_, sub_deps) = ptr_to_src_trace.get(&ptr_dep).unwrap();
+
+    for sub_dep in sub_deps {
+      if deps_included.insert(sub_dep.clone()) {
+        full_deps.push(sub_dep.clone());
       }
-    } else {
-      println!("FIXME");
     }
 
     i += 1;
@@ -540,25 +597,27 @@ fn calculate_content_hash(
 
     match dep {
       Value::Pointer(ptr_dep) => {
-        if let Some((_, sub_deps)) = ptr_to_src_meta.get(ptr_dep) {
-          for sub_dep in sub_deps {
-            let index = dep_to_index.get(sub_dep).unwrap();
-            link.push(*index);
-          }
-        } else {
-          println!("FIXME (2)");
+        let (_, sub_deps) = ptr_to_src_trace.get(ptr_dep).unwrap();
+
+        for sub_dep in sub_deps {
+          let index = dep_to_index.get(sub_dep).unwrap();
+          link.push(*index);
         }
       }
-      Value::Builtin(_)
-      | Value::Void
-      | Value::Undefined
+      Value::Builtin(_) | Value::Undefined | Value::Number(_) => {}
+      Value::Void
       | Value::Null
       | Value::Bool(_)
-      | Value::Number(_)
       | Value::BigInt(_)
-      | Value::String(_) => {}
-      Value::Array(_) | Value::Object(_) | Value::Class(_) => todo!(),
-      Value::Register(_) => panic!("Unexpected register dep"),
+      | Value::String(_)
+      | Value::Array(_)
+      | Value::Object(_)
+      | Value::Class(_)
+      | Value::Register(_) => {
+        // undefined, Infinity, and NaN are treated as global variables, which lead them to be the
+        // resolution of dependencies. All other dependencies should be builtins or pointers.
+        panic!("Unexpected dependency ({})", dep)
+      }
     };
 
     links.push(link);
@@ -567,20 +626,21 @@ fn calculate_content_hash(
   let mut content_trace = "{deps:".to_string();
 
   content_trace.push_str(&make_array_string(&full_deps, |dep| match dep {
-    Value::Pointer(ptr_dep) => match ptr_to_src_meta.get(ptr_dep) {
-      Some((src_hash, _)) => src_hash.to_string(),
-      None => "FIXME".to_string(),
-    },
-    Value::Builtin(_)
-    | Value::Void
-    | Value::Undefined
+    Value::Pointer(ptr_dep) => ptr_to_src_trace.get(ptr_dep).unwrap().0.clone(),
+    Value::Builtin(_) | Value::Undefined | Value::Number(_) => dep.to_string(),
+    Value::Void
     | Value::Null
     | Value::Bool(_)
-    | Value::Number(_)
     | Value::BigInt(_)
-    | Value::String(_) => dep.to_string(),
-    Value::Array(_) | Value::Object(_) | Value::Class(_) => todo!(),
-    Value::Register(_) => panic!("Unexpected register dep"),
+    | Value::String(_)
+    | Value::Array(_)
+    | Value::Object(_)
+    | Value::Class(_)
+    | Value::Register(_) => {
+      // undefined, Infinity, and NaN are treated as global variables, which lead them to be the
+      // resolution of dependencies. All other dependencies should be builtins or pointers.
+      panic!("Unexpected dependency ({})", dep)
+    }
   }));
 
   content_trace.push_str(",links:");
@@ -590,8 +650,6 @@ fn calculate_content_hash(
   }));
 
   content_trace.push('}');
-
-  // dbg!((fn_ptr, full_deps, links, content_trace));
 
   let mut k = Keccak::v256();
   k.update(content_trace.as_bytes());
