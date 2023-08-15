@@ -435,8 +435,10 @@ not the subset of ValueScript that has actually been implemented.
 - Iterators
 - Spread operator on iterables
 - Generators
-- Structural comparison (not yet for class instances)
+- Structural comparison
   - `{} === {} -> true`
+  - `new Point(1, 2) === new Point(1, 2)`
+  - `(() => {}) === (() => {})`
   - JS: `-> false`
   - This is a value semantics thing - objects don't have identity
 - TypeScript enums
@@ -476,7 +478,6 @@ not the subset of ValueScript that has actually been implemented.
     - Uses `.toString()` to get the source code and compiles and runs it in
       WebAssembly
   - C libraries, and bindings for python etc
-- Comparison of class instances and functions
 - Object spreading
 - Rest params
 - Async functions
