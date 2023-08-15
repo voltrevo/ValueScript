@@ -515,12 +515,14 @@ fn update_metadata(
       Value::Register(_) => panic!("Unexpected register dep"),
     };
 
-    let (_, sub_deps) = ptr_to_src_meta.get(&ptr_dep).unwrap();
-
-    for sub_dep in sub_deps {
-      if deps_included.insert(sub_dep.clone()) {
-        full_deps.push(sub_dep.clone());
+    if let Some((_, sub_deps)) = ptr_to_src_meta.get(&ptr_dep) {
+      for sub_dep in sub_deps {
+        if deps_included.insert(sub_dep.clone()) {
+          full_deps.push(sub_dep.clone());
+        }
       }
+    } else {
+      println!("FIXME");
     }
 
     i += 1;
@@ -539,15 +541,13 @@ fn update_metadata(
 
     match dep {
       Value::Pointer(ptr_dep) => {
-        let (_, sub_deps) = ptr_to_src_meta.get(ptr_dep).unwrap();
-
-        for sub_dep in sub_deps {
-          if dep_to_index.get(sub_dep).is_none() {
-            dbg!(&dep_to_index);
-            dbg!(sub_dep);
+        if let Some((_, sub_deps)) = ptr_to_src_meta.get(ptr_dep) {
+          for sub_dep in sub_deps {
+            let index = dep_to_index.get(sub_dep).unwrap();
+            link.push(*index);
           }
-          let index = dep_to_index.get(sub_dep).unwrap();
-          link.push(*index);
+        } else {
+          println!("FIXME (2)");
         }
       }
       Value::Builtin(_)
@@ -568,10 +568,10 @@ fn update_metadata(
   let mut content_trace = "{deps:".to_string();
 
   content_trace.push_str(&make_array_string(&full_deps, |dep| match dep {
-    Value::Pointer(ptr_dep) => {
-      let (src_hash, _) = ptr_to_src_meta.get(ptr_dep).unwrap();
-      src_hash.to_string()
-    }
+    Value::Pointer(ptr_dep) => match ptr_to_src_meta.get(ptr_dep) {
+      Some((src_hash, _)) => src_hash.to_string(),
+      None => "FIXME".to_string(),
+    },
     Value::Builtin(_)
     | Value::Void
     | Value::Undefined
