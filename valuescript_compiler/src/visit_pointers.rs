@@ -1,6 +1,6 @@
 use crate::asm::{
-  Array, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, Instruction, Module,
-  Object, Pointer, Value,
+  Array, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, FnMeta, Instruction,
+  Module, Object, Pointer, Value,
 };
 
 pub fn visit_pointers<Visitor>(module: &mut Module, visitor: Visitor)
@@ -53,21 +53,25 @@ where
 
         self.body(&definition.pointer, &mut function.body);
       }
-      DefinitionContent::FnMeta(fn_meta) => match &mut fn_meta.content_hashable {
-        ContentHashable::Empty => {}
-        ContentHashable::Src(_, deps) => {
-          for dep in deps {
-            self.value(Some(&definition.pointer), dep);
-          }
-        }
-        ContentHashable::Content(_) => {}
-      },
+      DefinitionContent::FnMeta(fn_meta) => self.fn_meta(Some(&definition.pointer), fn_meta),
       DefinitionContent::Value(value) => {
         self.value(Some(&definition.pointer), value);
       }
       DefinitionContent::Lazy(lazy) => {
         self.body(&definition.pointer, &mut lazy.body);
       }
+    }
+  }
+
+  fn fn_meta(&mut self, owner: Option<&Pointer>, fn_meta: &mut FnMeta) {
+    match &mut fn_meta.content_hashable {
+      ContentHashable::Empty => {}
+      ContentHashable::Src(_, deps) => {
+        for dep in deps {
+          self.value(owner, dep);
+        }
+      }
+      ContentHashable::Content(_) => {}
     }
   }
 
@@ -105,6 +109,7 @@ where
         self.object(owner, object);
       }
       Class(class) => {
+        self.fn_meta(owner, &mut class.metadata);
         self.value(owner, &mut class.constructor);
         self.value(owner, &mut class.prototype);
         self.value(owner, &mut class.static_);
