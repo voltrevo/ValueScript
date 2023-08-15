@@ -1,4 +1,7 @@
-use std::hash::{Hash as HashTrait, Hasher};
+use std::{
+  collections::HashMap,
+  hash::{Hash as HashTrait, Hasher},
+};
 
 use num_bigint::BigInt;
 
@@ -47,6 +50,24 @@ impl Module {
     let assembly_lines = assembly_str.split('\n');
 
     assembly_lines.map(|s| s.to_string()).collect()
+  }
+
+  pub fn ptr_to_index(&self) -> HashMap<Pointer, usize> {
+    let mut res = HashMap::<Pointer, usize>::new();
+
+    for (i, defn) in self.definitions.iter().enumerate() {
+      res.insert(defn.pointer.clone(), i);
+    }
+
+    res
+  }
+
+  pub fn get<'a>(
+    &'a self,
+    ptr_to_index: &HashMap<Pointer, usize>,
+    ptr: &Pointer,
+  ) -> &'a DefinitionContent {
+    &self.definitions[*ptr_to_index.get(ptr).unwrap()].content
   }
 }
 
@@ -112,7 +133,7 @@ impl std::fmt::Display for DefinitionContent {
   }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct FnMeta {
   pub name: String,
   pub content_hashable: ContentHashable,
@@ -150,7 +171,7 @@ impl std::fmt::Display for FnMeta {
   }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Hash(pub [u8; 32]);
 
 impl std::fmt::Display for Hash {
@@ -167,7 +188,7 @@ impl std::fmt::Display for Hash {
   }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub enum ContentHashable {
   #[default]
   Empty,
@@ -228,6 +249,7 @@ impl std::fmt::Display for Function {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Class {
+  pub metadata: FnMeta,
   pub constructor: Value,
   pub prototype: Value,
   pub static_: Value,
@@ -237,6 +259,7 @@ impl std::fmt::Display for Class {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     writeln!(f, "class {{")?;
 
+    writeln!(f, "    metadata: {},", self.metadata)?;
     writeln!(f, "    constructor: {},", self.constructor)?;
 
     write!(f, "    prototype: ")?;

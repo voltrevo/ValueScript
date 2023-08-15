@@ -386,155 +386,31 @@ pub fn collapse_pointers_of_pointers(module: &mut Module) {
 
 #[allow(clippy::ptr_arg)]
 fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnostic>) {
-  let mut fn_to_meta = HashMap::<Pointer, Pointer>::new();
+  let ptr_to_index = module.ptr_to_index();
+
+  let mut ptr_to_src_meta = HashMap::<Pointer, (Hash, Vec<Value>)>::new();
   let mut meta_to_fn = HashMap::<Pointer, Pointer>::new();
-  let mut src_and_deps_map = HashMap::<Pointer, (Hash, Vec<Value>)>::new();
 
   for defn in &module.definitions {
-    match &defn.content {
-      DefinitionContent::Function(fn_) => {
-        if let Some(metadata) = &fn_.metadata {
-          fn_to_meta.insert(defn.pointer.clone(), metadata.clone());
-          meta_to_fn.insert(metadata.clone(), defn.pointer.clone());
+    if let Some(src_meta) = find_src_metadata(module, &ptr_to_index, defn) {
+      ptr_to_src_meta.insert(defn.pointer.clone(), src_meta);
+
+      if let DefinitionContent::Function(fn_) = &defn.content {
+        if let Some(metadata_ptr) = &fn_.metadata {
+          meta_to_fn.insert(metadata_ptr.clone(), defn.pointer.clone());
         }
-      }
-      DefinitionContent::FnMeta(fn_meta) => match &fn_meta.content_hashable {
-        ContentHashable::Empty => {}
-        ContentHashable::Src(src_hash, deps) => {
-          src_and_deps_map.insert(defn.pointer.clone(), (src_hash.clone(), deps.clone()));
-        }
-        ContentHashable::Content(_) => {}
-      },
-      DefinitionContent::Value(_) => {}
-      DefinitionContent::Lazy(_) => {}
+      };
     }
   }
 
   for defn in &mut module.definitions {
     match &mut defn.content {
       DefinitionContent::Function(_) => {}
-      DefinitionContent::FnMeta(fn_meta) => {
-        let fn_ptr = meta_to_fn.get(&defn.pointer).unwrap().clone();
-
-        let mut full_deps = vec![PointerOrBuiltin::Pointer(fn_ptr.clone())];
-        let mut deps_included = HashSet::<PointerOrBuiltin>::new();
-        deps_included.insert(PointerOrBuiltin::Pointer(fn_ptr.clone()));
-
-        let mut i = 0;
-
-        while i < full_deps.len() {
-          let dep = full_deps[i].clone();
-
-          let ptr_dep = match dep {
-            PointerOrBuiltin::Pointer(p) => p,
-            PointerOrBuiltin::Builtin(_) => {
-              i += 1;
-              continue;
-            }
-          };
-
-          let meta_ptr = fn_to_meta.get(&ptr_dep).unwrap();
-          let (_, sub_deps) = src_and_deps_map.get(meta_ptr).unwrap();
-
-          for sub_dep in sub_deps {
-            match sub_dep {
-              Value::Pointer(p) => {
-                if deps_included.insert(PointerOrBuiltin::Pointer(p.clone())) {
-                  full_deps.push(PointerOrBuiltin::Pointer(p.clone()));
-                }
-              }
-              Value::Builtin(b) => {
-                if deps_included.insert(PointerOrBuiltin::Builtin(b.clone())) {
-                  full_deps.push(PointerOrBuiltin::Builtin(b.clone()));
-                }
-              }
-              _ => {
-                panic!("Expected sub_dep to be pointer or builtin")
-              }
-            }
-          }
-
-          i += 1;
-        }
-
-        let mut dep_to_index = HashMap::<PointerOrBuiltin, usize>::new();
-
-        for (i, dep) in full_deps.iter().enumerate() {
-          dep_to_index.insert(dep.clone(), i);
-        }
-
-        let mut links = Vec::<Vec<usize>>::new();
-
-        for dep in &full_deps {
-          let mut link = Vec::<usize>::new();
-
-          match dep {
-            PointerOrBuiltin::Pointer(ptr_dep) => {
-              let meta_ptr = fn_to_meta.get(ptr_dep).unwrap();
-              let (_, sub_deps) = src_and_deps_map.get(meta_ptr).unwrap();
-
-              for sub_dep in sub_deps {
-                match sub_dep {
-                  Value::Pointer(p) => {
-                    let index = dep_to_index
-                      .get(&PointerOrBuiltin::Pointer(p.clone()))
-                      .unwrap();
-
-                    link.push(*index);
-                  }
-                  Value::Builtin(b) => {
-                    let index = dep_to_index
-                      .get(&PointerOrBuiltin::Builtin(b.clone()))
-                      .unwrap();
-
-                    link.push(*index);
-                  }
-                  _ => {
-                    panic!("Expected sub_dep to be pointer or builtin")
-                  }
-                }
-              }
-            }
-            PointerOrBuiltin::Builtin(_) => {}
-          };
-
-          links.push(link);
-        }
-
-        let mut content_trace = "{deps:".to_string();
-
-        content_trace.push_str(&make_array_string(&full_deps, |dep| match dep {
-          PointerOrBuiltin::Pointer(ptr_dep) => {
-            let meta_ptr = fn_to_meta.get(ptr_dep).unwrap();
-            let (src_hash, _) = src_and_deps_map.get(meta_ptr).unwrap();
-            src_hash.to_string()
-          }
-          PointerOrBuiltin::Builtin(b) => b.to_string(),
-        }));
-
-        content_trace.push_str(",links:");
-
-        content_trace.push_str(&make_array_string(&links, |link| {
-          make_array_string(link, |i| i.to_string())
-        }));
-
-        content_trace.push('}');
-
-        // dbg!((fn_ptr, full_deps, links, content_trace));
-
-        let mut k = Keccak::v256();
-        k.update(content_trace.as_bytes());
-
-        let mut content_hash_data = [0u8; 32];
-        k.finalize(&mut content_hash_data);
-
-        let content_hash = Hash(content_hash_data);
-
-        *fn_meta = FnMeta {
-          name: take(&mut fn_meta.name),
-          content_hashable: ContentHashable::Content(content_hash),
-        };
-      }
+      DefinitionContent::FnMeta(fn_meta) => update_metadata(
+        &ptr_to_src_meta,
+        meta_to_fn.get(&defn.pointer).unwrap(),
+        fn_meta,
+      ),
       DefinitionContent::Value(_) => {}
       DefinitionContent::Lazy(_) => {}
     }
@@ -566,4 +442,164 @@ where
 
   result.push(']');
   result
+}
+
+fn find_src_metadata(
+  module: &Module,
+  ptr_to_index: &HashMap<Pointer, usize>,
+  defn: &Definition,
+) -> Option<(Hash, Vec<Value>)> {
+  match &defn.content {
+    DefinitionContent::Function(fn_) => {
+      let metadata_ptr = match &fn_.metadata {
+        Some(ptr) => ptr,
+        None => return None,
+      };
+
+      let src_meta = match module.get(ptr_to_index, metadata_ptr) {
+        DefinitionContent::FnMeta(fn_meta) => match &fn_meta.content_hashable {
+          ContentHashable::Src(src_hash, deps) => (src_hash.clone(), deps.clone()),
+          _ => return None,
+        },
+        _ => panic!("metadata_ptr did not point to metadata"),
+      };
+
+      Some(src_meta)
+    }
+    DefinitionContent::FnMeta(_fn_meta) => None,
+    DefinitionContent::Value(value) => match value {
+      Value::Class(class) => {
+        let src_meta = match &class.metadata.content_hashable {
+          ContentHashable::Src(src_hash, deps) => (src_hash.clone(), deps.clone()),
+          _ => return None,
+        };
+
+        Some(src_meta)
+      }
+      _ => None,
+    },
+    DefinitionContent::Lazy(_) => None,
+  }
+}
+
+fn update_metadata(
+  ptr_to_src_meta: &HashMap<Pointer, (Hash, Vec<Value>)>,
+  fn_ptr: &Pointer,
+  fn_meta: &mut FnMeta,
+) {
+  let mut full_deps = vec![PointerOrBuiltin::Pointer(fn_ptr.clone())];
+  let mut deps_included = HashSet::<PointerOrBuiltin>::new();
+  deps_included.insert(PointerOrBuiltin::Pointer(fn_ptr.clone()));
+
+  let mut i = 0;
+
+  while i < full_deps.len() {
+    let dep = full_deps[i].clone();
+
+    let ptr_dep = match dep {
+      PointerOrBuiltin::Pointer(p) => p,
+      PointerOrBuiltin::Builtin(_) => {
+        i += 1;
+        continue;
+      }
+    };
+
+    let (_, sub_deps) = ptr_to_src_meta.get(&ptr_dep).unwrap();
+
+    for sub_dep in sub_deps {
+      match sub_dep {
+        Value::Pointer(p) => {
+          if deps_included.insert(PointerOrBuiltin::Pointer(p.clone())) {
+            full_deps.push(PointerOrBuiltin::Pointer(p.clone()));
+          }
+        }
+        Value::Builtin(b) => {
+          if deps_included.insert(PointerOrBuiltin::Builtin(b.clone())) {
+            full_deps.push(PointerOrBuiltin::Builtin(b.clone()));
+          }
+        }
+        _ => {
+          panic!("Expected sub_dep to be pointer or builtin")
+        }
+      }
+    }
+
+    i += 1;
+  }
+
+  let mut dep_to_index = HashMap::<PointerOrBuiltin, usize>::new();
+
+  for (i, dep) in full_deps.iter().enumerate() {
+    dep_to_index.insert(dep.clone(), i);
+  }
+
+  let mut links = Vec::<Vec<usize>>::new();
+
+  for dep in &full_deps {
+    let mut link = Vec::<usize>::new();
+
+    match dep {
+      PointerOrBuiltin::Pointer(ptr_dep) => {
+        let (_, sub_deps) = ptr_to_src_meta.get(ptr_dep).unwrap();
+
+        for sub_dep in sub_deps {
+          match sub_dep {
+            Value::Pointer(p) => {
+              let index = dep_to_index
+                .get(&PointerOrBuiltin::Pointer(p.clone()))
+                .unwrap();
+
+              link.push(*index);
+            }
+            Value::Builtin(b) => {
+              let index = dep_to_index
+                .get(&PointerOrBuiltin::Builtin(b.clone()))
+                .unwrap();
+
+              link.push(*index);
+            }
+            _ => {
+              panic!("Expected sub_dep to be pointer or builtin")
+            }
+          }
+        }
+      }
+      PointerOrBuiltin::Builtin(_) => {}
+    };
+
+    links.push(link);
+  }
+
+  let mut content_trace = "{deps:".to_string();
+
+  content_trace.push_str(&make_array_string(&full_deps, |dep| match dep {
+    PointerOrBuiltin::Pointer(ptr_dep) => {
+      let (src_hash, _) = ptr_to_src_meta.get(ptr_dep).unwrap();
+      src_hash.to_string()
+    }
+    PointerOrBuiltin::Builtin(b) => b.to_string(),
+  }));
+
+  content_trace.push_str(",links:");
+
+  content_trace.push_str(&make_array_string(&links, |link| {
+    make_array_string(link, |i| i.to_string())
+  }));
+
+  content_trace.push('}');
+
+  // dbg!((fn_ptr, full_deps, links, content_trace));
+
+  let mut k = Keccak::v256();
+  k.update(content_trace.as_bytes());
+
+  let mut content_hash_data = [0u8; 32];
+  k.finalize(&mut content_hash_data);
+
+  let content_hash = Hash(content_hash_data);
+
+  *fn_meta = FnMeta {
+    name: take(&mut fn_meta.name),
+    content_hashable: ContentHashable::Content(content_hash),
+  };
 }

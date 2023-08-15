@@ -8,8 +8,8 @@ use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
 use crate::asm::{
-  Class, Definition, DefinitionContent, FnLine, Instruction, Lazy, Module, Number, Object, Pointer,
-  Register, Value,
+  Class, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Instruction, Lazy, Module,
+  Number, Object, Pointer, Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
@@ -18,6 +18,7 @@ use crate::ident::Ident;
 use crate::name_allocator::{ident_from_str, NameAllocator};
 use crate::scope::OwnerId;
 use crate::scope_analysis::{class_to_owner_id, ScopeAnalysis};
+use crate::src_hash::src_hash;
 use crate::static_expression_compiler::StaticExpressionCompiler;
 
 struct DiagnosticCollector {
@@ -877,6 +878,13 @@ impl ModuleCompiler {
     }
 
     let class_value = Value::Class(Box::new(Class {
+      metadata: FnMeta {
+        name: ident.map_or_else(String::new, |ident| ident.sym.to_string()),
+        content_hashable: ContentHashable::Src(
+          src_hash(&self.source, class.span),
+          self.scope_analysis.get_deps(class.span),
+        ),
+      },
       constructor,
       prototype: Value::Object(Box::new(prototype)),
       static_: Value::Object(Box::new(static_)),

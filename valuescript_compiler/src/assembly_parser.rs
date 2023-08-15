@@ -580,6 +580,11 @@ impl<'a> AssemblyParser<'a> {
     self.parse_exact("class {");
     self.parse_optional_whitespace();
 
+    self.parse_exact("metadata: ");
+    let metadata = self.assemble_fn_meta();
+    self.parse_exact(",");
+    self.parse_optional_whitespace();
+
     self.parse_exact("constructor: ");
     let constructor = self.assemble_value();
     self.parse_exact(",");
@@ -598,6 +603,7 @@ impl<'a> AssemblyParser<'a> {
     self.parse_exact("}");
 
     Class {
+      metadata,
       constructor,
       prototype,
       static_,
