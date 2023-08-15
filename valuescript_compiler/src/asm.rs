@@ -467,7 +467,14 @@ pub struct Number(pub f64);
 
 impl PartialEq for Number {
   fn eq(&self, other: &Self) -> bool {
-    self.0 == other.0
+    if self.0.is_nan() {
+      // Note: We do this so that the compiler can track dependencies, so it just wants to know
+      // the identities of things. In general it's not a good idea to break the well-established
+      // practice that NaN !== NaN.
+      other.0.is_nan()
+    } else {
+      self.0 == other.0
+    }
   }
 }
 
@@ -477,7 +484,10 @@ impl Eq for Number {
 
 impl HashTrait for Number {
   fn hash<H: Hasher>(&self, state: &mut H) {
-    state.write_u64(self.0.to_bits());
+    state.write_u64(match self.0.is_nan() {
+      true => f64::NAN.to_bits(),
+      false => self.0.to_bits(),
+    });
   }
 }
 

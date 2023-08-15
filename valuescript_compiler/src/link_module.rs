@@ -4,8 +4,8 @@ use std::mem::{swap, take};
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::asm::{
-  Builtin, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, FnMeta, Hash,
-  Instruction, Object, Pointer, Value,
+  ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, FnMeta, Hash, Instruction,
+  Object, Pointer, Value,
 };
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
@@ -425,12 +425,6 @@ fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnost
   }
 }
 
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
-enum PointerOrBuiltin {
-  Pointer(Pointer),
-  Builtin(Builtin),
-}
-
 fn make_array_string<T, F, S>(seq: S, to_string_fn: F) -> String
 where
   S: IntoIterator<Item = T>,
@@ -495,9 +489,9 @@ fn update_metadata(
   fn_ptr: &Pointer,
   fn_meta: &mut FnMeta,
 ) {
-  let mut full_deps = vec![PointerOrBuiltin::Pointer(fn_ptr.clone())];
-  let mut deps_included = HashSet::<PointerOrBuiltin>::new();
-  deps_included.insert(PointerOrBuiltin::Pointer(fn_ptr.clone()));
+  let mut full_deps = vec![Value::Pointer(fn_ptr.clone())];
+  let mut deps_included = HashSet::<Value>::new();
+  deps_included.insert(Value::Pointer(fn_ptr.clone()));
 
   let mut i = 0;
 
@@ -505,37 +499,34 @@ fn update_metadata(
     let dep = full_deps[i].clone();
 
     let ptr_dep = match dep {
-      PointerOrBuiltin::Pointer(p) => p,
-      PointerOrBuiltin::Builtin(_) => {
+      Value::Pointer(p) => p,
+      Value::Builtin(_)
+      | Value::Void
+      | Value::Undefined
+      | Value::Null
+      | Value::Bool(_)
+      | Value::Number(_)
+      | Value::BigInt(_)
+      | Value::String(_) => {
         i += 1;
         continue;
       }
+      Value::Array(_) | Value::Object(_) | Value::Class(_) => todo!(),
+      Value::Register(_) => panic!("Unexpected register dep"),
     };
 
     let (_, sub_deps) = ptr_to_src_meta.get(&ptr_dep).unwrap();
 
     for sub_dep in sub_deps {
-      match sub_dep {
-        Value::Pointer(p) => {
-          if deps_included.insert(PointerOrBuiltin::Pointer(p.clone())) {
-            full_deps.push(PointerOrBuiltin::Pointer(p.clone()));
-          }
-        }
-        Value::Builtin(b) => {
-          if deps_included.insert(PointerOrBuiltin::Builtin(b.clone())) {
-            full_deps.push(PointerOrBuiltin::Builtin(b.clone()));
-          }
-        }
-        _ => {
-          panic!("Expected sub_dep to be pointer or builtin ({})", sub_dep)
-        }
+      if deps_included.insert(sub_dep.clone()) {
+        full_deps.push(sub_dep.clone());
       }
     }
 
     i += 1;
   }
 
-  let mut dep_to_index = HashMap::<PointerOrBuiltin, usize>::new();
+  let mut dep_to_index = HashMap::<Value, usize>::new();
 
   for (i, dep) in full_deps.iter().enumerate() {
     dep_to_index.insert(dep.clone(), i);
@@ -547,32 +538,28 @@ fn update_metadata(
     let mut link = Vec::<usize>::new();
 
     match dep {
-      PointerOrBuiltin::Pointer(ptr_dep) => {
+      Value::Pointer(ptr_dep) => {
         let (_, sub_deps) = ptr_to_src_meta.get(ptr_dep).unwrap();
 
         for sub_dep in sub_deps {
-          match sub_dep {
-            Value::Pointer(p) => {
-              let index = dep_to_index
-                .get(&PointerOrBuiltin::Pointer(p.clone()))
-                .unwrap();
-
-              link.push(*index);
-            }
-            Value::Builtin(b) => {
-              let index = dep_to_index
-                .get(&PointerOrBuiltin::Builtin(b.clone()))
-                .unwrap();
-
-              link.push(*index);
-            }
-            _ => {
-              panic!("Expected sub_dep to be pointer or builtin")
-            }
+          if dep_to_index.get(sub_dep).is_none() {
+            dbg!(&dep_to_index);
+            dbg!(sub_dep);
           }
+          let index = dep_to_index.get(sub_dep).unwrap();
+          link.push(*index);
         }
       }
-      PointerOrBuiltin::Builtin(_) => {}
+      Value::Builtin(_)
+      | Value::Void
+      | Value::Undefined
+      | Value::Null
+      | Value::Bool(_)
+      | Value::Number(_)
+      | Value::BigInt(_)
+      | Value::String(_) => {}
+      Value::Array(_) | Value::Object(_) | Value::Class(_) => todo!(),
+      Value::Register(_) => panic!("Unexpected register dep"),
     };
 
     links.push(link);
@@ -581,11 +568,20 @@ fn update_metadata(
   let mut content_trace = "{deps:".to_string();
 
   content_trace.push_str(&make_array_string(&full_deps, |dep| match dep {
-    PointerOrBuiltin::Pointer(ptr_dep) => {
+    Value::Pointer(ptr_dep) => {
       let (src_hash, _) = ptr_to_src_meta.get(ptr_dep).unwrap();
       src_hash.to_string()
     }
-    PointerOrBuiltin::Builtin(b) => b.to_string(),
+    Value::Builtin(_)
+    | Value::Void
+    | Value::Undefined
+    | Value::Null
+    | Value::Bool(_)
+    | Value::Number(_)
+    | Value::BigInt(_)
+    | Value::String(_) => dep.to_string(),
+    Value::Array(_) | Value::Object(_) | Value::Class(_) => todo!(),
+    Value::Register(_) => panic!("Unexpected register dep"),
   }));
 
   content_trace.push_str(",links:");
