@@ -527,7 +527,7 @@ fn update_metadata(
           }
         }
         _ => {
-          panic!("Expected sub_dep to be pointer or builtin")
+          panic!("Expected sub_dep to be pointer or builtin ({})", sub_dep)
         }
       }
     }

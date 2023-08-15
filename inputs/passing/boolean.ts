@@ -1,4 +1,4 @@
-//! test_output([true,false,false,true,true,true,true,false,true,false,false,false])
+//! test_output([true,false,false,true,true,true,true,false,true,false,false,false,true])
 
 export default function () {
   return [
@@ -14,5 +14,6 @@ export default function () {
     null,
     undefined,
     NaN,
+    Infinity,
   ].map(Boolean);
 }

@@ -2017,7 +2017,7 @@ impl ScopeAnalysis {
     for (_span, ref_) in self.refs.range(start..end) {
       let name = self.names.get(&ref_.name_id).unwrap();
 
-      if let Value::Undefined | Value::Register(_) = &name.value {
+      if let Value::Register(_) = &name.value {
         continue;
       }
 

@@ -145,25 +145,25 @@ impl std::fmt::Display for FnMeta {
 
     writeln!(
       f,
-      "  name: {},",
+      "    name: {},",
       serde_json::to_string(&self.name).expect("Failed json serialization")
     )?;
 
     match &self.content_hashable {
       ContentHashable::Empty => {}
       ContentHashable::Src(src_hash, deps) => {
-        writeln!(f, "  srcHash: {},", src_hash)?;
+        writeln!(f, "    srcHash: {},", src_hash)?;
 
         writeln!(
           f,
-          "  deps: {},",
+          "    deps: {},",
           Array {
             values: deps.clone()
           }
         )?;
       }
       ContentHashable::Content(content_hash) => {
-        writeln!(f, "  contentHash: {},", content_hash)?;
+        writeln!(f, "    contentHash: {},", content_hash)?;
       }
     }
 
