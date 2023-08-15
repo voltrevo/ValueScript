@@ -327,11 +327,9 @@ impl BytecodeDecoder {
     self.pos += name_len;
 
     match self.decode_byte() {
-      0 => Err("Missing content_hashable".to_internal_error()), // Empty
-      1 | 2 => {
-        // Src | Hash
-        // TODO: In the Src case, we should be calculating the content hash, or throwing a todo
-        // error
+      0 | 1 => Err("Missing content hash".to_internal_error()), // Empty | Src
+      2 => {
+        // Hash
         let mut res = [0u8; 32];
 
         for b in &mut res {
