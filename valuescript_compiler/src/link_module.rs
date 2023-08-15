@@ -406,12 +406,20 @@ fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnost
   for defn in &mut module.definitions {
     match &mut defn.content {
       DefinitionContent::Function(_) => {}
-      DefinitionContent::FnMeta(fn_meta) => update_metadata(
-        &ptr_to_src_meta,
-        meta_to_fn.get(&defn.pointer).unwrap(),
-        fn_meta,
-      ),
-      DefinitionContent::Value(_) => {}
+      DefinitionContent::FnMeta(fn_meta) => {
+        if let ContentHashable::Src(..) = &fn_meta.content_hashable {
+          update_metadata(
+            &ptr_to_src_meta,
+            meta_to_fn.get(&defn.pointer).unwrap(),
+            fn_meta,
+          );
+        }
+      }
+      DefinitionContent::Value(value) => {
+        if let Value::Class(class) = value {
+          update_metadata(&ptr_to_src_meta, &defn.pointer, &mut class.metadata);
+        }
+      }
       DefinitionContent::Lazy(_) => {}
     }
   }
