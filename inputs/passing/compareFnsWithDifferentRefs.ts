@@ -1,5 +1,4 @@
-//! test_output(true)
-// Should be: false.
+//! test_output(false)
 
 export default function () {
   // The test functions returned have exactly the same source code, but they should not be equal
