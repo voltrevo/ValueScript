@@ -1,7 +1,6 @@
 use crate::asm::Module;
 use crate::name_allocator::NameAllocator;
 
-use super::collapse_pointers_of_pointers::collapse_pointers_of_pointers;
 use super::extract_constants::extract_constants;
 use super::reduce_instructions::reduce_instructions;
 use super::remove_meta_lines::remove_meta_lines;
@@ -12,7 +11,6 @@ use super::simplify::simplify;
 use super::simplify_jumps::simplify_jumps;
 
 pub fn optimize(module: &mut Module, pointer_allocator: &mut NameAllocator) {
-  collapse_pointers_of_pointers(module);
   shake_tree(module);
 
   let passes = 3;

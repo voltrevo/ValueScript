@@ -1,8 +1,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::mem::swap;
+use std::mem::{swap, take};
+
+use tiny_keccak::{Hasher, Keccak};
 
 use crate::asm::{
-  Definition, DefinitionContent, ExportStar, FnLine, Instruction, Object, Pointer, Value,
+  Builtin, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, FnMeta, Hash,
+  Instruction, Object, Pointer, Value,
 };
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
@@ -108,6 +111,9 @@ pub fn link_module(
     &included_modules,
     &mut result.diagnostics,
   );
+
+  collapse_pointers_of_pointers(&mut path_and_module.module);
+  calculate_content_hashes(&mut path_and_module.module, &mut result.diagnostics);
 
   optimize(&mut path_and_module.module, &mut pointer_allocator);
 
@@ -345,4 +351,219 @@ fn flatten_export_star(
     .append(&mut export_star.local.properties.clone());
 
   obj
+}
+
+pub fn collapse_pointers_of_pointers(module: &mut Module) {
+  let mut double_pointer_map = HashMap::<Pointer, Pointer>::new();
+
+  for definition in &mut module.definitions {
+    let pointer = match &definition.content {
+      DefinitionContent::Value(Value::Pointer(pointer)) => pointer,
+      _ => continue,
+    };
+
+    double_pointer_map.insert(definition.pointer.clone(), pointer.clone());
+  }
+
+  visit_pointers(module, |visitation| match visitation {
+    PointerVisitation::Definition(_) => {}
+    PointerVisitation::Export(pointer) | PointerVisitation::Reference(_, pointer) => {
+      let mut mapped_pointer: &Pointer = pointer;
+
+      loop {
+        if let Some(new_pointer) = double_pointer_map.get(mapped_pointer) {
+          mapped_pointer = new_pointer;
+          continue;
+        }
+
+        break;
+      }
+
+      *pointer = mapped_pointer.clone();
+    }
+  });
+}
+
+#[allow(clippy::ptr_arg)]
+fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnostic>) {
+  let mut fn_to_meta = HashMap::<Pointer, Pointer>::new();
+  let mut meta_to_fn = HashMap::<Pointer, Pointer>::new();
+  let mut src_and_deps_map = HashMap::<Pointer, (Hash, Vec<Value>)>::new();
+
+  for defn in &module.definitions {
+    match &defn.content {
+      DefinitionContent::Function(fn_) => {
+        if let Some(metadata) = &fn_.metadata {
+          fn_to_meta.insert(defn.pointer.clone(), metadata.clone());
+          meta_to_fn.insert(metadata.clone(), defn.pointer.clone());
+        }
+      }
+      DefinitionContent::FnMeta(fn_meta) => match &fn_meta.content_hashable {
+        ContentHashable::Empty => {}
+        ContentHashable::Src(src_hash, deps) => {
+          src_and_deps_map.insert(defn.pointer.clone(), (src_hash.clone(), deps.clone()));
+        }
+        ContentHashable::Content(_) => {}
+      },
+      DefinitionContent::Value(_) => {}
+      DefinitionContent::Lazy(_) => {}
+    }
+  }
+
+  for defn in &mut module.definitions {
+    match &mut defn.content {
+      DefinitionContent::Function(_) => {}
+      DefinitionContent::FnMeta(fn_meta) => {
+        let fn_ptr = meta_to_fn.get(&defn.pointer).unwrap().clone();
+
+        let mut full_deps = vec![PointerOrBuiltin::Pointer(fn_ptr.clone())];
+        let mut deps_included = HashSet::<PointerOrBuiltin>::new();
+        deps_included.insert(PointerOrBuiltin::Pointer(fn_ptr.clone()));
+
+        let mut i = 0;
+
+        while i < full_deps.len() {
+          let dep = full_deps[i].clone();
+
+          let ptr_dep = match dep {
+            PointerOrBuiltin::Pointer(p) => p,
+            PointerOrBuiltin::Builtin(_) => {
+              i += 1;
+              continue;
+            }
+          };
+
+          let meta_ptr = fn_to_meta.get(&ptr_dep).unwrap();
+          let (_, sub_deps) = src_and_deps_map.get(meta_ptr).unwrap();
+
+          for sub_dep in sub_deps {
+            match sub_dep {
+              Value::Pointer(p) => {
+                if deps_included.insert(PointerOrBuiltin::Pointer(p.clone())) {
+                  full_deps.push(PointerOrBuiltin::Pointer(p.clone()));
+                }
+              }
+              Value::Builtin(b) => {
+                if deps_included.insert(PointerOrBuiltin::Builtin(b.clone())) {
+                  full_deps.push(PointerOrBuiltin::Builtin(b.clone()));
+                }
+              }
+              _ => {
+                panic!("Expected sub_dep to be pointer or builtin")
+              }
+            }
+          }
+
+          i += 1;
+        }
+
+        let mut dep_to_index = HashMap::<PointerOrBuiltin, usize>::new();
+
+        for (i, dep) in full_deps.iter().enumerate() {
+          dep_to_index.insert(dep.clone(), i);
+        }
+
+        let mut links = Vec::<Vec<usize>>::new();
+
+        for dep in &full_deps {
+          let mut link = Vec::<usize>::new();
+
+          match dep {
+            PointerOrBuiltin::Pointer(ptr_dep) => {
+              let meta_ptr = fn_to_meta.get(ptr_dep).unwrap();
+              let (_, sub_deps) = src_and_deps_map.get(meta_ptr).unwrap();
+
+              for sub_dep in sub_deps {
+                match sub_dep {
+                  Value::Pointer(p) => {
+                    let index = dep_to_index
+                      .get(&PointerOrBuiltin::Pointer(p.clone()))
+                      .unwrap();
+
+                    link.push(*index);
+                  }
+                  Value::Builtin(b) => {
+                    let index = dep_to_index
+                      .get(&PointerOrBuiltin::Builtin(b.clone()))
+                      .unwrap();
+
+                    link.push(*index);
+                  }
+                  _ => {
+                    panic!("Expected sub_dep to be pointer or builtin")
+                  }
+                }
+              }
+            }
+            PointerOrBuiltin::Builtin(_) => {}
+          };
+
+          links.push(link);
+        }
+
+        let mut content_trace = "{deps:".to_string();
+
+        content_trace.push_str(&make_array_string(&full_deps, |dep| match dep {
+          PointerOrBuiltin::Pointer(ptr_dep) => {
+            let meta_ptr = fn_to_meta.get(ptr_dep).unwrap();
+            let (src_hash, _) = src_and_deps_map.get(meta_ptr).unwrap();
+            src_hash.to_string()
+          }
+          PointerOrBuiltin::Builtin(b) => b.to_string(),
+        }));
+
+        content_trace.push_str(",links:");
+
+        content_trace.push_str(&make_array_string(&links, |link| {
+          make_array_string(link, |i| i.to_string())
+        }));
+
+        content_trace.push('}');
+
+        // dbg!((fn_ptr, full_deps, links, content_trace));
+
+        let mut k = Keccak::v256();
+        k.update(content_trace.as_bytes());
+
+        let mut content_hash_data = [0u8; 32];
+        k.finalize(&mut content_hash_data);
+
+        let content_hash = Hash(content_hash_data);
+
+        *fn_meta = FnMeta {
+          name: take(&mut fn_meta.name),
+          content_hashable: ContentHashable::Content(content_hash),
+        };
+      }
+      DefinitionContent::Value(_) => {}
+      DefinitionContent::Lazy(_) => {}
+    }
+  }
+}
+
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+enum PointerOrBuiltin {
+  Pointer(Pointer),
+  Builtin(Builtin),
+}
+
+fn make_array_string<T, F, S>(seq: S, to_string_fn: F) -> String
+where
+  S: IntoIterator<Item = T>,
+  F: Fn(T) -> String,
+{
+  let mut result = "[".to_string();
+  let mut iter = seq.into_iter();
+
+  if let Some(first_item) = iter.next() {
+    result.push_str(&to_string_fn(first_item));
+
+    for item in iter {
+      result.push(',');
+      result.push_str(&to_string_fn(item));
+    }
+  }
+
+  result.push(']');
+  result
 }

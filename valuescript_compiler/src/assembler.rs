@@ -9,7 +9,7 @@ use valuescript_common::BuiltinName;
 
 use crate::asm::{
   Array, Builtin, Class, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Function,
-  Instruction, Label, LabelRef, Lazy, Module, Number, Object, Pointer, Register, Value,
+  Hash, Instruction, Label, LabelRef, Lazy, Module, Number, Object, Pointer, Register, Value,
 };
 
 pub fn assemble(module: &Module) -> Vec<u8> {
@@ -142,7 +142,9 @@ impl Assembler {
       ContentHashable::Src(src_hash, deps) => {
         self.output.push(0x01);
 
-        for b in src_hash {
+        let Hash(src_hash_data) = src_hash;
+
+        for b in src_hash_data {
           self.output.push(*b);
         }
 
@@ -152,10 +154,12 @@ impl Assembler {
           self.value(dep);
         }
       }
-      ContentHashable::Hash(content_hash) => {
+      ContentHashable::Content(content_hash) => {
         self.output.push(0x02);
 
-        for b in content_hash {
+        let Hash(content_hash_data) = content_hash;
+
+        for b in content_hash_data {
           self.output.push(*b);
         }
       }

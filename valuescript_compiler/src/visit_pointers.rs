@@ -60,7 +60,7 @@ where
             self.value(Some(&definition.pointer), dep);
           }
         }
-        ContentHashable::Hash(_) => {}
+        ContentHashable::Content(_) => {}
       },
       DefinitionContent::Value(value) => {
         self.value(Some(&definition.pointer), value);

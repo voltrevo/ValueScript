@@ -1,4 +1,3 @@
-mod collapse_pointers_of_pointers;
 mod extract_constants;
 pub mod kal;
 mod optimize;

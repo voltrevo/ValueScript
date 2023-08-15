@@ -131,13 +131,7 @@ impl std::fmt::Display for FnMeta {
     match &self.content_hashable {
       ContentHashable::Empty => {}
       ContentHashable::Src(src_hash, deps) => {
-        write!(f, "  srcHash: 0x")?;
-
-        for b in src_hash {
-          write!(f, "{:02x}", b)?;
-        }
-
-        writeln!(f, ",")?;
+        writeln!(f, "  srcHash: {},", src_hash)?;
 
         writeln!(
           f,
@@ -147,14 +141,8 @@ impl std::fmt::Display for FnMeta {
           }
         )?;
       }
-      ContentHashable::Hash(content_hash) => {
-        write!(f, "  contentHash: 0x")?;
-
-        for b in content_hash {
-          write!(f, "{:02x}", b)?;
-        }
-
-        writeln!(f, ",")?;
+      ContentHashable::Content(content_hash) => {
+        writeln!(f, "  contentHash: {},", content_hash)?;
       }
     }
 
@@ -163,11 +151,28 @@ impl std::fmt::Display for FnMeta {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct Hash(pub [u8; 32]);
+
+impl std::fmt::Display for Hash {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "#")?;
+
+    let Hash(data) = self;
+
+    for b in data {
+      write!(f, "{:02x}", b)?;
+    }
+
+    Ok(())
+  }
+}
+
+#[derive(Debug, Clone, Default)]
 pub enum ContentHashable {
   #[default]
   Empty,
-  Src([u8; 32], Vec<Value>),
-  Hash([u8; 32]),
+  Src(Hash, Vec<Value>),
+  Content(Hash),
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]

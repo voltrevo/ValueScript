@@ -6,7 +6,8 @@ use valuescript_common::{InstructionByte, BUILTIN_NAMES};
 
 use crate::asm::{
   Array, Builtin, Class, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine,
-  FnMeta, Function, Instruction, Label, LabelRef, Module, Number, Object, Pointer, Register, Value,
+  FnMeta, Function, Hash, Instruction, Label, LabelRef, Module, Number, Object, Pointer, Register,
+  Value,
 };
 
 pub struct AssemblyParser<'a> {
@@ -561,7 +562,7 @@ impl<'a> AssemblyParser<'a> {
         self.parse_exact(",");
         self.parse_optional_whitespace();
 
-        break 'b ContentHashable::Hash(content_hash);
+        break 'b ContentHashable::Content(content_hash);
       }
 
       panic!("{}", self.render_pos(-1, "Expected ContentHashable"));
@@ -1124,8 +1125,8 @@ impl<'a> AssemblyParser<'a> {
     }
   }
 
-  fn assemble_hash(&mut self) -> [u8; 32] {
-    self.parse_exact("0x");
+  fn assemble_hash(&mut self) -> Hash {
+    self.parse_exact("#");
 
     let mut res = [0u8; 32];
 
@@ -1136,7 +1137,7 @@ impl<'a> AssemblyParser<'a> {
       }
     }
 
-    res
+    Hash(res)
   }
 
   fn assemble_hex_byte(&mut self) -> Option<u8> {
