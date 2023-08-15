@@ -2,14 +2,18 @@
 // identity.
 
 export default function () {
-  return vec3(-5, 7, 12) === vec3(-5, 7, 12);
+  return new Vec3(-5, 7, 12) === new Vec3(-5, 7, 12);
   // JavaScript:  false
   // ValueScript: true
 }
 
-function vec3(x: number, y: number, z: number) {
-  return { x, y, z };
+class Vec3 {
+  constructor(public x: number, public y: number, public z: number) {}
 }
+
+// There's a lot going on to make this work for the underlying functions being compared, especially
+// since functions can reference each other recursively. The underlying mechanism is content
+// hashing. Check the source or open an issue if you'd like to know more.
 
 // Caveat:
 // - TypeScript will emit an error for expressions like `[a, b] === [c, d]`.
