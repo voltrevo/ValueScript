@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::mem::{swap, take};
+use std::mem::swap;
 
 use tiny_keccak::{Hasher, Keccak};
 
 use crate::asm::{
-  ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, FnMeta, Hash, Instruction,
-  Object, Pointer, Value,
+  ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, Hash, Instruction, Object,
+  Pointer, Value,
 };
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
@@ -408,16 +408,16 @@ fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnost
       DefinitionContent::Function(_) => {}
       DefinitionContent::FnMeta(fn_meta) => {
         if let ContentHashable::Src(..) = &fn_meta.content_hashable {
-          update_metadata(
-            &ptr_to_src_meta,
-            meta_to_fn.get(&defn.pointer).unwrap(),
-            fn_meta,
-          );
+          let content_hash =
+            calculate_content_hash(&ptr_to_src_meta, meta_to_fn.get(&defn.pointer).unwrap());
+
+          fn_meta.content_hashable = ContentHashable::Content(content_hash);
         }
       }
       DefinitionContent::Value(value) => {
         if let Value::Class(class) = value {
-          update_metadata(&ptr_to_src_meta, &defn.pointer, &mut class.metadata);
+          let content_hash = calculate_content_hash(&ptr_to_src_meta, &defn.pointer);
+          class.metadata.content_hashable = ContentHashable::Content(content_hash);
         }
       }
       DefinitionContent::Lazy(_) => {}
@@ -484,11 +484,10 @@ fn find_src_metadata(
   }
 }
 
-fn update_metadata(
+fn calculate_content_hash(
   ptr_to_src_meta: &HashMap<Pointer, (Hash, Vec<Value>)>,
   fn_ptr: &Pointer,
-  fn_meta: &mut FnMeta,
-) {
+) -> Hash {
   let mut full_deps = vec![Value::Pointer(fn_ptr.clone())];
   let mut deps_included = HashSet::<Value>::new();
   deps_included.insert(Value::Pointer(fn_ptr.clone()));
@@ -600,10 +599,5 @@ fn update_metadata(
   let mut content_hash_data = [0u8; 32];
   k.finalize(&mut content_hash_data);
 
-  let content_hash = Hash(content_hash_data);
-
-  *fn_meta = FnMeta {
-    name: take(&mut fn_meta.name),
-    content_hashable: ContentHashable::Content(content_hash),
-  };
+  Hash(content_hash_data)
 }
