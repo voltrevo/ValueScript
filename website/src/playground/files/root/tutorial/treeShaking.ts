@@ -12,7 +12,7 @@
 //
 // These definitions are not included, because the definitions exported by this
 // module do not need them. Omitting those unused definitions reduces the
-// bytecode for this module from 3,606 to 337 bytes.
+// bytecode for this module from 6,739 to 525 bytes.
 
 import { factorize } from "../lib/mod.ts";
 
