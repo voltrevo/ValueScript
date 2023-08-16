@@ -5,8 +5,8 @@ use std::mem::take;
 use swc_common::Spanned;
 
 use crate::asm::{
-  Builtin, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Function, Instruction,
-  Label, Pointer, Register, Value,
+  Builtin, ContentHashable, Definition, DefinitionContent, FnLine, Function, Instruction, Label,
+  Meta, Pointer, Register, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::CompiledExpression;
@@ -34,9 +34,9 @@ impl Functionish {
     }
   }
 
-  pub fn metadata(&self, mc: &ModuleCompiler) -> FnMeta {
+  pub fn meta(&self, mc: &ModuleCompiler) -> Meta {
     match self {
-      Functionish::Fn(ident, fn_) => FnMeta {
+      Functionish::Fn(ident, fn_) => Meta {
         name: ident
           .as_ref()
           .map_or_else(|| "".to_string(), |ident| ident.sym.to_string()),
@@ -45,14 +45,14 @@ impl Functionish {
           mc.scope_analysis.get_deps(fn_.span),
         ),
       },
-      Functionish::Arrow(arrow) => FnMeta {
+      Functionish::Arrow(arrow) => Meta {
         name: "".to_string(),
         content_hashable: ContentHashable::Src(
           src_hash(&mc.source, arrow.span),
           mc.scope_analysis.get_deps(arrow.span),
         ),
       },
-      Functionish::Constructor(_, _, _constructor) => FnMeta {
+      Functionish::Constructor(_, _, _constructor) => Meta {
         name: "".to_string(),                     // TODO: Use class name?
         content_hashable: ContentHashable::Empty, // TODO
       },
@@ -229,12 +229,12 @@ impl<'a> FunctionCompiler<'a> {
       Functionish::Constructor(..) => false,
     };
 
-    let metadata_pointer = self
+    let meta_ptr = self
       .mc
       .allocate_defn(&format!("{}_meta", definition_pointer.name));
 
-    let metadata = functionish.metadata(self.mc);
-    self.fn_.metadata = Some(metadata_pointer.clone());
+    let meta = functionish.meta(self.mc);
+    self.fn_.meta = Some(meta_ptr.clone());
 
     self.set_owner_id(functionish.owner_id());
 
@@ -324,8 +324,8 @@ impl<'a> FunctionCompiler<'a> {
     });
 
     self.mc.module.definitions.push(Definition {
-      pointer: metadata_pointer,
-      content: DefinitionContent::FnMeta(metadata),
+      pointer: meta_ptr,
+      content: DefinitionContent::Meta(meta),
     });
   }
 

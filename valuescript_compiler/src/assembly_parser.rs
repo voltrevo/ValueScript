@@ -6,7 +6,7 @@ use valuescript_common::{InstructionByte, BUILTIN_NAMES};
 
 use crate::asm::{
   Array, Builtin, Class, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine,
-  FnMeta, Function, Hash, Instruction, Label, LabelRef, Module, Number, Object, Pointer, Register,
+  Function, Hash, Instruction, Label, LabelRef, Meta, Module, Number, Object, Pointer, Register,
   Value,
 };
 
@@ -186,8 +186,8 @@ impl<'a> AssemblyParser<'a> {
         break 'b DefinitionContent::Function(self.assemble_function());
       }
 
-      if self.test_chars("fn_meta") {
-        break 'b DefinitionContent::FnMeta(self.assemble_fn_meta());
+      if self.test_chars("meta") {
+        break 'b DefinitionContent::Meta(self.assemble_fn_meta());
       }
 
       DefinitionContent::Value(self.assemble_value())
@@ -422,10 +422,10 @@ impl<'a> AssemblyParser<'a> {
     self.parse_whitespace();
 
     if self.test_chars("(") {
-      // Leave metadata as void
+      // Leave meta as void
       self.parse_exact("(");
     } else {
-      function.metadata = Some(self.assemble_pointer());
+      function.meta = Some(self.assemble_pointer());
       self.parse_optional_whitespace();
       self.parse_exact("(");
     }
@@ -522,8 +522,8 @@ impl<'a> AssemblyParser<'a> {
     function
   }
 
-  fn assemble_fn_meta(&mut self) -> FnMeta {
-    self.parse_exact("fn_meta {");
+  fn assemble_fn_meta(&mut self) -> Meta {
+    self.parse_exact("meta {");
     self.parse_optional_whitespace();
 
     self.parse_exact("name: ");
@@ -570,7 +570,7 @@ impl<'a> AssemblyParser<'a> {
 
     self.parse_exact("}");
 
-    FnMeta {
+    Meta {
       name,
       content_hashable,
     }
@@ -580,8 +580,8 @@ impl<'a> AssemblyParser<'a> {
     self.parse_exact("class {");
     self.parse_optional_whitespace();
 
-    self.parse_exact("metadata: ");
-    let metadata = self.assemble_fn_meta();
+    self.parse_exact("meta: ");
+    let meta = self.assemble_fn_meta();
     self.parse_exact(",");
     self.parse_optional_whitespace();
 
@@ -603,7 +603,7 @@ impl<'a> AssemblyParser<'a> {
     self.parse_exact("}");
 
     Class {
-      metadata,
+      meta,
       constructor,
       prototype,
       static_,

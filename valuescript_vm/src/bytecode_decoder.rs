@@ -46,7 +46,7 @@ pub enum BytecodeType {
   BigInt = 0x13,
   GeneratorFunction = 0x14,
   // ExportStar = 0x15,
-  // FnMeta = 0x16,
+  // Meta = 0x16,
   Unrecognized = 0xff,
 }
 
@@ -284,11 +284,11 @@ impl BytecodeDecoder {
   }
 
   pub fn decode_function(&mut self, is_generator: bool) -> Val {
-    let metadata_pos = if self.decode_byte() == 0 {
+    let meta_pos = if self.decode_byte() == 0 {
       None
     } else {
       if self.decode_type() != BytecodeType::Pointer {
-        panic!("Unexpected non-pointer function metadata");
+        panic!("Unexpected non-pointer function meta");
       }
 
       Some(self.decode_pos())
@@ -300,7 +300,7 @@ impl BytecodeDecoder {
 
     VsFunction {
       bytecode: self.bytecode.clone(),
-      metadata_pos,
+      meta_pos,
       is_generator,
       register_count,
       parameter_count,

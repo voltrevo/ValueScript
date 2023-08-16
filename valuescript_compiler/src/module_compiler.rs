@@ -8,7 +8,7 @@ use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::{Syntax, TsConfig};
 
 use crate::asm::{
-  Class, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Instruction, Lazy, Module,
+  Class, ContentHashable, Definition, DefinitionContent, FnLine, Instruction, Lazy, Meta, Module,
   Number, Object, Pointer, Register, Structured, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
@@ -881,7 +881,7 @@ impl ModuleCompiler {
     }
 
     let class_value = Value::Class(Box::new(Class {
-      metadata: FnMeta {
+      meta: Meta {
         name: ident.map_or_else(String::new, |ident| ident.sym.to_string()),
         content_hashable: ContentHashable::Src(
           src_hash(&self.source, class.span),

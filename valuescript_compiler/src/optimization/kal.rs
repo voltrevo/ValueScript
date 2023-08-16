@@ -12,7 +12,7 @@ use std::{
 };
 
 use crate::{
-  asm::{self, Builtin, FnLine, FnMeta, Function, Number, Pointer, Register, Value},
+  asm::{self, Builtin, FnLine, Function, Meta, Number, Pointer, Register, Value},
   instruction::Instruction,
   name_allocator::RegAllocator,
 };
@@ -72,7 +72,7 @@ pub struct KFunction {
 
 #[derive(Clone, Debug)]
 pub struct Class {
-  pub metadata: FnMeta,
+  pub meta: Meta,
   pub constructor: Kal,
   pub prototype: Kal,
   pub static_: Kal,
@@ -137,7 +137,7 @@ impl Kal {
           .collect(),
       })),
       Value::Class(class) => Kal::Class(Box::new(Class {
-        metadata: class.metadata.clone(),
+        meta: class.meta.clone(),
         constructor: Kal::from_value(&class.constructor),
         prototype: Kal::from_value(&class.prototype),
         static_: Kal::from_value(&class.static_),
@@ -211,7 +211,7 @@ impl Kal {
       }))),
       Kal::Function(_) => None,
       Kal::Class(class) => Some(Value::Class(Box::new(asm::Class {
-        metadata: class.metadata.clone(),
+        meta: class.meta.clone(),
         constructor: class.constructor.try_to_value()?,
         prototype: class.prototype.try_to_value()?,
         static_: class.static_.try_to_value()?,
@@ -786,7 +786,7 @@ impl FnState {
         Kal::Object(Box::new(Object { properties }))
       }
       Value::Class(class) => Kal::Class(Box::new(Class {
-        metadata: class.metadata.clone(),
+        meta: class.meta.clone(),
         constructor: self.eval_arg(&mut class.constructor),
         prototype: self.eval_arg(&mut class.prototype),
         static_: self.eval_arg(&mut class.static_),

@@ -1,5 +1,5 @@
 use crate::asm::{
-  Array, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, FnMeta, Instruction,
+  Array, ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, Instruction, Meta,
   Module, Object, Pointer, Value,
 };
 
@@ -47,13 +47,13 @@ where
 
     match &mut definition.content {
       DefinitionContent::Function(function) => {
-        if let Some(metadata) = &mut function.metadata {
-          self.pointer(Some(&definition.pointer), metadata);
+        if let Some(meta) = &mut function.meta {
+          self.pointer(Some(&definition.pointer), meta);
         }
 
         self.body(&definition.pointer, &mut function.body);
       }
-      DefinitionContent::FnMeta(fn_meta) => self.fn_meta(Some(&definition.pointer), fn_meta),
+      DefinitionContent::Meta(meta) => self.meta(Some(&definition.pointer), meta),
       DefinitionContent::Value(value) => {
         self.value(Some(&definition.pointer), value);
       }
@@ -63,8 +63,8 @@ where
     }
   }
 
-  fn fn_meta(&mut self, owner: Option<&Pointer>, fn_meta: &mut FnMeta) {
-    match &mut fn_meta.content_hashable {
+  fn meta(&mut self, owner: Option<&Pointer>, meta: &mut Meta) {
+    match &mut meta.content_hashable {
       ContentHashable::Empty => {}
       ContentHashable::Src(_, deps) => {
         for dep in deps {
@@ -109,7 +109,7 @@ where
         self.object(owner, object);
       }
       Class(class) => {
-        self.fn_meta(owner, &mut class.metadata);
+        self.meta(owner, &mut class.meta);
         self.value(owner, &mut class.constructor);
         self.value(owner, &mut class.prototype);
         self.value(owner, &mut class.static_);

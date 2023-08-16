@@ -396,8 +396,8 @@ fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnost
       ptr_to_src_trace.insert(defn.pointer.clone(), src_meta);
 
       if let DefinitionContent::Function(fn_) = &defn.content {
-        if let Some(metadata_ptr) = &fn_.metadata {
-          meta_to_fn.insert(metadata_ptr.clone(), defn.pointer.clone());
+        if let Some(meta_ptr) = &fn_.meta {
+          meta_to_fn.insert(meta_ptr.clone(), defn.pointer.clone());
         }
       };
     }
@@ -406,18 +406,18 @@ fn calculate_content_hashes(module: &mut Module, _diagnostics: &mut Vec<Diagnost
   for defn in &mut module.definitions {
     match &mut defn.content {
       DefinitionContent::Function(_) => {}
-      DefinitionContent::FnMeta(fn_meta) => {
-        if let ContentHashable::Src(..) = &fn_meta.content_hashable {
+      DefinitionContent::Meta(meta) => {
+        if let ContentHashable::Src(..) = &meta.content_hashable {
           let content_hash =
             calculate_content_hash(&ptr_to_src_trace, meta_to_fn.get(&defn.pointer).unwrap());
 
-          fn_meta.content_hashable = ContentHashable::Content(content_hash);
+          meta.content_hashable = ContentHashable::Content(content_hash);
         }
       }
       DefinitionContent::Value(value) => {
         if let Value::Class(class) = value {
           let content_hash = calculate_content_hash(&ptr_to_src_trace, &defn.pointer);
-          class.metadata.content_hashable = ContentHashable::Content(content_hash);
+          class.meta.content_hashable = ContentHashable::Content(content_hash);
         }
       }
       DefinitionContent::Lazy(_) => {}
@@ -460,22 +460,22 @@ fn find_ptr_src_trace(
 ) -> Option<(String, Vec<Value>)> {
   match module.get(ptr_to_index, ptr) {
     DefinitionContent::Function(fn_) => {
-      let metadata_ptr = match &fn_.metadata {
+      let meta_ptr = match &fn_.meta {
         Some(ptr) => ptr,
         None => return None,
       };
 
-      let src_meta = match module.get(ptr_to_index, metadata_ptr) {
-        DefinitionContent::FnMeta(fn_meta) => match &fn_meta.content_hashable {
+      let src_meta = match module.get(ptr_to_index, meta_ptr) {
+        DefinitionContent::Meta(meta) => match &meta.content_hashable {
           ContentHashable::Src(src_hash, deps) => (Structured(src_hash).to_string(), deps.clone()),
           _ => return None,
         },
-        _ => panic!("metadata_ptr did not point to metadata"),
+        _ => panic!("meta_ptr did not point to meta"),
       };
 
       Some(src_meta)
     }
-    DefinitionContent::FnMeta(_fn_meta) => None,
+    DefinitionContent::Meta(_fn_meta) => None,
     DefinitionContent::Value(value) => find_value_src_trace(module, ptr_to_index, value),
     DefinitionContent::Lazy(_) => None,
   }
@@ -488,7 +488,7 @@ fn find_value_src_trace(
 ) -> Option<(String, Vec<Value>)> {
   match value {
     Value::Class(class) => {
-      let src_meta = match &class.metadata.content_hashable {
+      let src_meta = match &class.meta.content_hashable {
         ContentHashable::Src(src_hash, deps) => (Structured(src_hash).to_string(), deps.clone()),
         _ => return None,
       };

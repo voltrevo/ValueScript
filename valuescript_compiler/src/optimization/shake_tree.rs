@@ -74,7 +74,7 @@ pub fn shake_tree(module: &mut Module) {
       match &defn.content {
         DefinitionContent::Function(..)
         | DefinitionContent::Value(Value::Class(..))
-        | DefinitionContent::FnMeta(..) => {}
+        | DefinitionContent::Meta(..) => {}
         DefinitionContent::Value(..) | DefinitionContent::Lazy(..) => continue,
       }
 

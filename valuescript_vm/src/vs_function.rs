@@ -13,7 +13,7 @@ use super::vs_value::Val;
 #[derive(Debug, Clone)]
 pub struct VsFunction {
   pub bytecode: Rc<Bytecode>,
-  pub metadata_pos: Option<usize>,
+  pub meta_pos: Option<usize>,
   pub is_generator: bool,
   pub register_count: usize,
   pub parameter_count: usize,
@@ -31,7 +31,7 @@ impl VsFunction {
 
     VsFunction {
       bytecode: self.bytecode.clone(),
-      metadata_pos: self.metadata_pos,
+      meta_pos: self.meta_pos,
       is_generator: self.is_generator,
       register_count: self.register_count,
       parameter_count: self.parameter_count,
@@ -41,9 +41,9 @@ impl VsFunction {
   }
 
   pub fn content_hash(&self) -> Result<[u8; 32], Val> {
-    match self.metadata_pos {
+    match self.meta_pos {
       Some(p) => self.bytecode.decoder(p).decode_content_hash(),
-      None => Err("Can't get content_hash without metadata_pos".to_internal_error()),
+      None => Err("Can't get content_hash without meta_pos".to_internal_error()),
     }
   }
 

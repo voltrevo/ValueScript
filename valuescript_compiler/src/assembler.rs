@@ -8,8 +8,8 @@ use num_bigint::{BigInt, Sign};
 use valuescript_common::BuiltinName;
 
 use crate::asm::{
-  Array, Builtin, Class, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Function,
-  Hash, Instruction, Label, LabelRef, Lazy, Module, Number, Object, Pointer, Register, Structured,
+  Array, Builtin, Class, ContentHashable, Definition, DefinitionContent, FnLine, Function, Hash,
+  Instruction, Label, LabelRef, Lazy, Meta, Module, Number, Object, Pointer, Register, Structured,
   StructuredFormattable, Value,
 };
 
@@ -63,8 +63,8 @@ impl Assembler {
       DefinitionContent::Function(function) => {
         self.function(function);
       }
-      DefinitionContent::FnMeta(fn_meta) => {
-        self.fn_meta(fn_meta);
+      DefinitionContent::Meta(meta) => {
+        self.meta(meta);
       }
       DefinitionContent::Value(value) => {
         self.value(value);
@@ -81,7 +81,7 @@ impl Assembler {
       true => ValueType::GeneratorFunction,
     } as u8);
 
-    match &function.metadata {
+    match &function.meta {
       Some(p) => {
         self.output.push(0x01);
         self.pointer(p);
@@ -133,12 +133,12 @@ impl Assembler {
     self.fn_data.labels_map.resolve(&mut self.output);
   }
 
-  fn fn_meta(&mut self, fn_meta: &FnMeta) {
-    self.output.push(ValueType::FnMeta as u8);
+  fn meta(&mut self, meta: &Meta) {
+    self.output.push(ValueType::Meta as u8);
 
-    self.string(&fn_meta.name);
+    self.string(&meta.name);
 
-    match &fn_meta.content_hashable {
+    match &meta.content_hashable {
       ContentHashable::Empty => self.output.push(0x00),
       ContentHashable::Src(src_hash, deps) => {
         self.output.push(0x01);
@@ -504,7 +504,7 @@ pub enum ValueType {
   BigInt = 0x13,
   GeneratorFunction = 0x14,
   ExportStar = 0x15,
-  FnMeta = 0x16,
+  Meta = 0x16,
   // External = TBD,
 }
 

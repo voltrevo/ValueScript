@@ -244,7 +244,7 @@ impl StructuredFormattable for Definition {
 #[derive(Debug, Clone)]
 pub enum DefinitionContent {
   Function(Function),
-  FnMeta(FnMeta),
+  Meta(Meta),
   Value(Value),
   Lazy(Lazy),
 }
@@ -253,7 +253,7 @@ impl StructuredFormattable for DefinitionContent {
   fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
     match self {
       DefinitionContent::Function(function) => sf.write(function),
-      DefinitionContent::FnMeta(fn_meta) => sf.write(fn_meta),
+      DefinitionContent::Meta(meta) => sf.write(meta),
       DefinitionContent::Value(value) => sf.write(value),
       DefinitionContent::Lazy(lazy) => sf.write(lazy),
     }
@@ -261,14 +261,14 @@ impl StructuredFormattable for DefinitionContent {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct FnMeta {
+pub struct Meta {
   pub name: String,
   pub content_hashable: ContentHashable,
 }
 
-impl StructuredFormattable for FnMeta {
+impl StructuredFormattable for Meta {
   fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
-    sf.write("fn_meta {")?;
+    sf.write("meta {")?;
 
     sf.nest(|sf| {
       sf.write_line(&[
@@ -339,21 +339,21 @@ impl StructuredFormattable for Pointer {
 #[derive(Default, Debug, Clone)]
 pub struct Function {
   pub is_generator: bool,
-  pub metadata: Option<Pointer>,
+  pub meta: Option<Pointer>,
   pub parameters: Vec<Register>,
   pub body: Vec<FnLine>,
 }
 
 impl StructuredFormattable for Function {
   fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
-    let metadata_str = match &self.metadata {
+    let meta_str = match &self.meta {
       None => "".to_string(),
       Some(p) => format!(" {}", Structured(p)),
     };
 
     match self.is_generator {
-      false => sf.write(&format!("function{}(", metadata_str))?,
-      true => sf.write(&format!("function*{}(", metadata_str))?,
+      false => sf.write(&format!("function{}(", meta_str))?,
+      true => sf.write(&format!("function*{}(", meta_str))?,
     }
 
     for (i, parameter) in self.parameters.iter().enumerate() {
@@ -384,7 +384,7 @@ impl StructuredFormattable for Function {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Class {
-  pub metadata: FnMeta,
+  pub meta: Meta,
   pub constructor: Value,
   pub prototype: Value,
   pub static_: Value,
@@ -395,7 +395,7 @@ impl StructuredFormattable for Class {
     sf.write("class {")?;
 
     sf.nest(|sf| {
-      sf.write_line(&[&"metadata: ", &self.metadata, &","])?;
+      sf.write_line(&[&"meta: ", &self.meta, &","])?;
       sf.write_line(&[&"constructor: ", &self.constructor, &","])?;
       sf.write_line(&[&"prototype: ", &MultilineValue(&self.prototype), &","])?;
       sf.write_line(&[&"static: ", &MultilineValue(&self.static_), &","])?;
