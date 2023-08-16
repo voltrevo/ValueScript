@@ -1,6 +1,6 @@
 use valuescript_common::InstructionByte;
 
-use crate::asm::{LabelRef, Register, Value};
+use crate::asm::{LabelRef, Register, StructuredFormattable, StructuredFormatter, Value};
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
@@ -422,183 +422,165 @@ impl Instruction {
   }
 }
 
-impl std::fmt::Display for Instruction {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl StructuredFormattable for Instruction {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
     match self {
-      Instruction::End => write!(f, "end"),
-      Instruction::Mov(value, register) => {
-        write!(f, "mov {} {}", value, register)
-      }
-      Instruction::OpInc(register) => write!(f, "op++ {}", register),
-      Instruction::OpDec(register) => write!(f, "op-- {}", register),
+      Instruction::End => sf.write("end"),
+      Instruction::Mov(value, register) => sf.write_slice_joined(" ", &[&"mov", value, register]),
+      Instruction::OpInc(register) => sf.write_slice_joined(" ", &[&"op++", register]),
+      Instruction::OpDec(register) => sf.write_slice_joined(" ", &[&"op--", register]),
       Instruction::OpPlus(lhs, rhs, register) => {
-        write!(f, "op+ {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op+", lhs, rhs, register])
       }
       Instruction::OpMinus(lhs, rhs, register) => {
-        write!(f, "op- {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op-", lhs, rhs, register])
       }
       Instruction::OpMul(lhs, rhs, register) => {
-        write!(f, "op* {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op*", lhs, rhs, register])
       }
       Instruction::OpDiv(lhs, rhs, register) => {
-        write!(f, "op/ {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op/", lhs, rhs, register])
       }
       Instruction::OpMod(lhs, rhs, register) => {
-        write!(f, "op% {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op%", lhs, rhs, register])
       }
       Instruction::OpExp(lhs, rhs, register) => {
-        write!(f, "op** {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op**", lhs, rhs, register])
       }
       Instruction::OpEq(lhs, rhs, register) => {
-        write!(f, "op== {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op==", lhs, rhs, register])
       }
       Instruction::OpNe(lhs, rhs, register) => {
-        write!(f, "op!= {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op!=", lhs, rhs, register])
       }
       Instruction::OpTripleEq(lhs, rhs, register) => {
-        write!(f, "op=== {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op===", lhs, rhs, register])
       }
       Instruction::OpTripleNe(lhs, rhs, register) => {
-        write!(f, "op!== {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op!==", lhs, rhs, register])
       }
       Instruction::OpAnd(lhs, rhs, register) => {
-        write!(f, "op&& {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op&&", lhs, rhs, register])
       }
       Instruction::OpOr(lhs, rhs, register) => {
-        write!(f, "op|| {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op||", lhs, rhs, register])
       }
-      Instruction::OpNot(value, register) => {
-        write!(f, "op! {} {}", value, register)
-      }
+      Instruction::OpNot(value, register) => sf.write_slice_joined(" ", &[&"op!", value, register]),
       Instruction::OpLess(lhs, rhs, register) => {
-        write!(f, "op< {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op<", lhs, rhs, register])
       }
       Instruction::OpLessEq(lhs, rhs, register) => {
-        write!(f, "op<= {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op<=", lhs, rhs, register])
       }
       Instruction::OpGreater(lhs, rhs, register) => {
-        write!(f, "op> {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op>", lhs, rhs, register])
       }
       Instruction::OpGreaterEq(lhs, rhs, register) => {
-        write!(f, "op>= {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op>=", lhs, rhs, register])
       }
       Instruction::OpNullishCoalesce(lhs, rhs, register) => {
-        write!(f, "op?? {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op??", lhs, rhs, register])
       }
       Instruction::OpOptionalChain(lhs, rhs, register) => {
-        write!(f, "op?. {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op?.", lhs, rhs, register])
       }
       Instruction::OpBitAnd(lhs, rhs, register) => {
-        write!(f, "op& {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op&", lhs, rhs, register])
       }
       Instruction::OpBitOr(lhs, rhs, register) => {
-        write!(f, "op| {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op|", lhs, rhs, register])
       }
       Instruction::OpBitNot(value, register) => {
-        write!(f, "op~ {} {}", value, register)
+        sf.write_slice_joined(" ", &[&"op~", value, register])
       }
       Instruction::OpBitXor(lhs, rhs, register) => {
-        write!(f, "op^ {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op^", lhs, rhs, register])
       }
       Instruction::OpLeftShift(lhs, rhs, register) => {
-        write!(f, "op<< {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op<<", lhs, rhs, register])
       }
       Instruction::OpRightShift(lhs, rhs, register) => {
-        write!(f, "op>> {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op>>", lhs, rhs, register])
       }
       Instruction::OpRightShiftUnsigned(lhs, rhs, register) => {
-        write!(f, "op>>> {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"op>>>", lhs, rhs, register])
       }
       Instruction::TypeOf(value, register) => {
-        write!(f, "typeof {} {}", value, register)
+        sf.write_slice_joined(" ", &[&"typeof", value, register])
       }
       Instruction::InstanceOf(lhs, rhs, register) => {
-        write!(f, "instanceof {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"instanceof", lhs, rhs, register])
       }
       Instruction::In(lhs, rhs, register) => {
-        write!(f, "in {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"in", lhs, rhs, register])
       }
       Instruction::Call(value, args, register) => {
-        write!(f, "call {} {} {}", value, args, register)
+        sf.write_slice_joined(" ", &[&"call", value, args, register])
       }
       Instruction::Apply(value, this, args, register) => {
-        write!(f, "apply {} {} {} {}", value, this, args, register)
+        sf.write_slice_joined(" ", &[&"apply", value, this, args, register])
       }
       Instruction::ConstApply(value, this, args, register) => {
-        write!(f, "const_apply {} {} {} {}", value, this, args, register)
+        sf.write_slice_joined(" ", &[&"const_apply", value, this, args, register])
       }
       Instruction::Bind(value, args, register) => {
-        write!(f, "bind {} {} {}", value, args, register)
+        sf.write_slice_joined(" ", &[&"bind", value, args, register])
       }
       Instruction::Sub(lhs, rhs, register) => {
-        write!(f, "sub {} {} {}", lhs, rhs, register)
+        sf.write_slice_joined(" ", &[&"sub", lhs, rhs, register])
       }
       Instruction::SubMov(subscript, value, register) => {
-        write!(f, "submov {} {} {}", subscript, value, register)
+        sf.write_slice_joined(" ", &[&"submov", subscript, value, register])
       }
-      Instruction::SubCall(obj, subscript, args, register) => {
-        write!(f, "subcall {} {} {} {}", obj, subscript, args, register)
+      Instruction::SubCall(this, key, args, register) => {
+        sf.write_slice_joined(" ", &[&"subcall", this, key, args, register])
       }
-      Instruction::Jmp(label_ref) => write!(f, "jmp {}", label_ref),
+      Instruction::Jmp(label_ref) => sf.write_slice_joined(" ", &[&"jmp", label_ref]),
       Instruction::JmpIf(value, label_ref) => {
-        write!(f, "jmpif {} {}", value, label_ref)
+        sf.write_slice_joined(" ", &[&"jmpif", value, label_ref])
       }
       Instruction::JmpIfNot(value, label_ref) => {
-        write!(f, "jmpif_not {} {}", value, label_ref)
+        sf.write_slice_joined(" ", &[&"jmpif_not", value, label_ref])
       }
       Instruction::UnaryPlus(value, register) => {
-        write!(f, "unary+ {} {}", value, register)
+        sf.write_slice_joined(" ", &[&"unary+", value, register])
       }
       Instruction::UnaryMinus(value, register) => {
-        write!(f, "unary- {} {}", value, register)
+        sf.write_slice_joined(" ", &[&"unary-", value, register])
       }
       Instruction::New(value, args, register) => {
-        write!(f, "new {} {} {}", value, args, register)
+        sf.write_slice_joined(" ", &[&"new", value, args, register])
       }
-      Instruction::Throw(value) => write!(f, "throw {}", value),
+      Instruction::Throw(value) => sf.write_slice_joined(" ", &[&"throw", value]),
       Instruction::Import(value, register) => {
-        write!(f, "import {} {}", value, register)
+        sf.write_slice_joined(" ", &[&"import", value, register])
       }
       Instruction::ImportStar(value, register) => {
-        write!(f, "import* {} {}", value, register)
+        sf.write_slice_joined(" ", &[&"import*", value, register])
       }
-      Instruction::SetCatch(label, register) => {
-        write!(f, "set_catch {} {}", label, register)
+      Instruction::SetCatch(label_ref, register) => {
+        sf.write_slice_joined(" ", &[&"set_catch", label_ref, register])
       }
-      Instruction::UnsetCatch => write!(f, "unset_catch"),
-      Instruction::ConstSubCall(obj, subscript, args, register) => {
-        write!(
-          f,
-          "const_subcall {} {} {} {}",
-          obj, subscript, args, register
-        )
+      Instruction::UnsetCatch => sf.write("unset_catch"),
+      Instruction::ConstSubCall(a1, a2, a3, register) => {
+        sf.write_slice_joined(" ", &[&"const_subcall", a1, a2, a3, register])
       }
-      Instruction::RequireMutableThis => write!(f, "require_mutable_this"),
-      Instruction::ThisSubCall(obj, subscript, args, register) => {
-        write!(
-          f,
-          "this_subcall {} {} {} {}",
-          obj, subscript, args, register
-        )
+      Instruction::RequireMutableThis => sf.write("require_mutable_this"),
+      Instruction::ThisSubCall(this, key, args, register) => {
+        sf.write_slice_joined(" ", &[&"this_subcall", this, key, args, register])
       }
-      Instruction::Next(obj, register) => {
-        write!(f, "next {} {}", obj, register)
+      Instruction::Next(iterable, register) => {
+        sf.write_slice_joined(" ", &[&"next", iterable, register])
       }
-      Instruction::UnpackIterRes(obj, value_register, done_register) => {
-        write!(
-          f,
-          "unpack_iter_res {} {} {}",
-          obj, value_register, done_register
-        )
+      Instruction::UnpackIterRes(iter_res, value_dst, done_dst) => {
+        sf.write_slice_joined(" ", &[&"unpack_iter_res", iter_res, value_dst, done_dst])
       }
-      Instruction::Cat(iterables, register) => {
-        write!(f, "cat {} {}", iterables, register)
-      }
+      Instruction::Cat(value, register) => sf.write_slice_joined(" ", &[&"cat", value, register]),
       Instruction::Yield(value, register) => {
-        write!(f, "yield {} {}", value, register)
+        sf.write_slice_joined(" ", &[&"yield", value, register])
       }
       Instruction::YieldStar(value, register) => {
-        write!(f, "yield* {} {}", value, register)
+        sf.write_slice_joined(" ", &[&"yield*", value, register])
       }
     }
   }

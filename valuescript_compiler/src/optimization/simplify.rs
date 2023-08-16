@@ -1,6 +1,8 @@
 use std::{collections::HashMap, mem::take};
 
-use crate::asm::{DefinitionContent, FnLine, Function, Instruction, Module, Pointer, Register};
+use crate::asm::{
+  DefinitionContent, FnLine, Function, Instruction, Module, Pointer, Register, Structured,
+};
 
 use super::kal::{FnState, Kal};
 
@@ -128,7 +130,7 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function, take_registers: bool) {
   while i < fn_.body.len() {
     if let FnLine::Instruction(Instruction::RequireMutableThis) = &fn_.body[i] {
       if state.mutable_this_established {
-        fn_.body[i] = FnLine::Comment(fn_.body[i].to_string());
+        fn_.body[i] = FnLine::Comment(Structured(&fn_.body[i]).to_string());
         continue;
       }
     }

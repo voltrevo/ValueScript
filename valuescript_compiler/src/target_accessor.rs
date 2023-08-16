@@ -123,7 +123,7 @@ impl TargetAccessor {
     match self {
       Register(reg) => {
         // TODO: Should value just derive from Eq?
-        if value.to_string() != reg.to_string() {
+        if *value != Value::Register(reg.clone()) {
           ec.fnc.push(Instruction::Mov(value.clone(), reg.clone()));
         }
       }

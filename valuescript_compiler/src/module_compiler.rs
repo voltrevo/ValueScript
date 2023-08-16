@@ -9,7 +9,7 @@ use swc_ecma_parser::{Syntax, TsConfig};
 
 use crate::asm::{
   Class, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Instruction, Lazy, Module,
-  Number, Object, Pointer, Register, Value,
+  Number, Object, Pointer, Register, Structured, Value,
 };
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::expression_compiler::{CompiledExpression, ExpressionCompiler};
@@ -836,8 +836,11 @@ impl ModuleCompiler {
             }
           };
 
-          let method_defn_name =
-            self.allocate_defn(&ident_from_str(&format!("{}_{}", defn_name.name, name)));
+          let method_defn_name = self.allocate_defn(&ident_from_str(&format!(
+            "{}_{}",
+            defn_name.name,
+            Structured(&name)
+          )));
 
           let method_id = match &method.key {
             swc_ecma_ast::PropName::Ident(ident) => Some(ident.clone()),

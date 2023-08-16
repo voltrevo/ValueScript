@@ -3,7 +3,7 @@ use std::mem::take;
 
 use swc_common::Spanned;
 
-use crate::asm::{Array, Instruction, Label, Number, Object, Register, Value};
+use crate::asm::{Array, Instruction, Label, Number, Object, Register, Structured, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::function_compiler::{FunctionCompiler, Functionish};
 use crate::ident::Ident as CrateIdent;
@@ -1321,7 +1321,9 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
             pat.span(),
             &format!(
               "Register mismatch for parameter {} (expected {}, got {})",
-              ident.id.sym, ident_reg, register
+              ident.id.sym,
+              Structured(&ident_reg),
+              Structured(register),
             ),
           );
 

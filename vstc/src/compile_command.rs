@@ -5,6 +5,7 @@ use std::process::exit;
 use crate::resolve_entry_path::resolve_entry_path;
 
 use super::handle_diagnostics_cli::handle_diagnostics_cli;
+use valuescript_compiler::asm::Structured;
 use valuescript_compiler::compile;
 
 pub fn compile_command(args: &Vec<String>) {
@@ -24,7 +25,7 @@ pub fn compile_command(args: &Vec<String>) {
     let mut file = File::create("out.vsm").expect("Couldn't create out.vsm");
 
     file
-      .write_all(module.to_string().as_bytes())
+      .write_all(Structured(module).to_string().as_bytes())
       .expect("Failed to write out.vsm");
 
     file.write_all(b"\n").expect("Failed to write out.vsm");

@@ -1,5 +1,6 @@
 use std::{
   collections::HashMap,
+  fmt::Write,
   hash::{Hash as HashTrait, Hasher},
 };
 
@@ -10,6 +11,127 @@ use crate::{
 };
 
 pub use crate::instruction::{Instruction, InstructionFieldMut};
+
+pub struct StructuredFormatter<'a, 'b> {
+  f: &'a mut std::fmt::Formatter<'b>,
+  indent_level: usize,
+  indent_str: &'a str,
+  indent_str_short: &'a str,
+}
+
+impl<'a, 'b> StructuredFormatter<'a, 'b> {
+  pub fn nest<F: FnMut(&mut StructuredFormatter<'_, '_>) -> std::fmt::Result>(
+    &mut self,
+    mut f: F,
+  ) -> std::fmt::Result {
+    let mut nested = StructuredFormatter {
+      f: self.f,
+      indent_level: self.indent_level + 1,
+      indent_str: self.indent_str,
+      indent_str_short: self.indent_str_short,
+    };
+
+    f(&mut nested)
+  }
+
+  pub fn indent(&mut self) -> std::fmt::Result {
+    for _ in 0..self.indent_level {
+      self.f.write_str(self.indent_str)?;
+    }
+
+    Ok(())
+  }
+
+  pub fn write<T>(&mut self, data: &T) -> std::fmt::Result
+  where
+    T: StructuredFormattable + ?Sized,
+  {
+    data.structured_fmt(self)
+  }
+
+  pub fn newline(&mut self) -> std::fmt::Result {
+    self.f.write_char('\n')?;
+    self.indent()
+  }
+
+  pub fn newline_short(&mut self) -> std::fmt::Result {
+    self.f.write_char('\n')?;
+
+    for _ in 0..(self.indent_level - 1) {
+      self.f.write_str(self.indent_str)?;
+    }
+
+    self.f.write_str(self.indent_str_short)
+  }
+
+  pub fn write_slice_joined(
+    &mut self,
+    sep: &str,
+    data: &[&dyn StructuredFormattable],
+  ) -> std::fmt::Result {
+    let mut iter = data.iter();
+
+    if let Some(first) = iter.next() {
+      self.write(*first)?;
+
+      for item in iter {
+        self.write(&sep)?;
+        self.write(*item)?;
+      }
+    }
+
+    Ok(())
+  }
+
+  pub fn write_slice(&mut self, data: &[&dyn StructuredFormattable]) -> std::fmt::Result {
+    for item in data {
+      self.write(*item)?;
+    }
+
+    Ok(())
+  }
+
+  pub fn write_line(&mut self, data: &[&dyn StructuredFormattable]) -> std::fmt::Result {
+    self.newline()?;
+    self.write_slice(data)
+  }
+}
+
+pub trait StructuredFormattable {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result;
+}
+
+impl StructuredFormattable for str {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.f.write_str(self)
+  }
+}
+
+impl StructuredFormattable for &str {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.f.write_str(self)
+  }
+}
+
+impl StructuredFormattable for String {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.f.write_str(self)
+  }
+}
+
+pub struct Structured<'a, T>(pub &'a T);
+
+impl<'a, T: StructuredFormattable> std::fmt::Display for Structured<'a, T> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    StructuredFormatter {
+      f,
+      indent_level: 0,
+      indent_str: "    ",
+      indent_str_short: "  ",
+    }
+    .write(self.0)
+  }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct Module {
@@ -24,29 +146,33 @@ pub struct ExportStar {
   pub local: Object,
 }
 
-impl std::fmt::Display for ExportStar {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl StructuredFormattable for ExportStar {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
     if self.local.properties.is_empty() && self.includes.is_empty() {
-      return write!(f, "{{}}");
+      return sf.f.write_str("{}");
     }
 
-    writeln!(f, "{{")?;
+    sf.write("{")?;
 
-    for p in &self.includes {
-      writeln!(f, "    include {},", p)?;
-    }
+    sf.nest(|sf| {
+      for p in &self.includes {
+        sf.write_line(&[&"include ", p, &","])?;
+      }
 
-    for (name, value) in &self.local.properties {
-      writeln!(f, "    {}: {},", name, value)?;
-    }
+      for (name, value) in &self.local.properties {
+        sf.write_line(&[name, &": ", value, &","])?;
+      }
 
-    write!(f, "}}")
+      Ok(())
+    })?;
+
+    sf.write("}")
   }
 }
 
 impl Module {
   pub fn as_lines(&self) -> Vec<String> {
-    let assembly_str = self.to_string();
+    let assembly_str = format!("{}", Structured(self));
     let assembly_lines = assembly_str.split('\n');
 
     assembly_lines.map(|s| s.to_string()).collect()
@@ -71,12 +197,21 @@ impl Module {
   }
 }
 
-impl std::fmt::Display for Module {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "export {} {}", self.export_default, self.export_star)?;
+impl StructuredFormattable for Module {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write_slice_joined(
+      " ",
+      &[
+        &"export",
+        &MultilineValue(&self.export_default),
+        &self.export_star,
+      ],
+    )?;
 
     for definition in &self.definitions {
-      write!(f, "\n\n{}", definition)?;
+      sf.newline()?;
+      sf.newline()?;
+      sf.write(definition)?;
     }
 
     Ok(())
@@ -100,9 +235,9 @@ impl Default for Definition {
   }
 }
 
-impl std::fmt::Display for Definition {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "{} = {}", self.pointer, self.content)
+impl StructuredFormattable for Definition {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write_slice_joined(" ", &[&self.pointer, &"=", &self.content])
   }
 }
 
@@ -114,21 +249,13 @@ pub enum DefinitionContent {
   Lazy(Lazy),
 }
 
-impl std::fmt::Display for DefinitionContent {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl StructuredFormattable for DefinitionContent {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
     match self {
-      DefinitionContent::Function(function) => {
-        write!(f, "{}", function)
-      }
-      DefinitionContent::FnMeta(fn_meta) => {
-        write!(f, "{}", fn_meta)
-      }
-      DefinitionContent::Value(value) => {
-        write!(f, "{}", value)
-      }
-      DefinitionContent::Lazy(lazy) => {
-        write!(f, "{}", lazy)
-      }
+      DefinitionContent::Function(function) => sf.write(function),
+      DefinitionContent::FnMeta(fn_meta) => sf.write(fn_meta),
+      DefinitionContent::Value(value) => sf.write(value),
+      DefinitionContent::Lazy(lazy) => sf.write(lazy),
     }
   }
 }
@@ -139,49 +266,50 @@ pub struct FnMeta {
   pub content_hashable: ContentHashable,
 }
 
-impl std::fmt::Display for FnMeta {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    writeln!(f, "fn_meta {{")?;
+impl StructuredFormattable for FnMeta {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write("fn_meta {")?;
 
-    writeln!(
-      f,
-      "    name: {},",
-      serde_json::to_string(&self.name).expect("Failed json serialization")
-    )?;
+    sf.nest(|sf| {
+      sf.write_line(&[
+        &"name: ",
+        &serde_json::to_string(&self.name).expect("Failed json serialization"),
+        &",",
+      ])?;
 
-    match &self.content_hashable {
-      ContentHashable::Empty => {}
-      ContentHashable::Src(src_hash, deps) => {
-        writeln!(f, "    srcHash: {},", src_hash)?;
-
-        writeln!(
-          f,
-          "    deps: {},",
-          Array {
-            values: deps.clone()
-          }
-        )?;
+      match &self.content_hashable {
+        ContentHashable::Empty => {}
+        ContentHashable::Src(src_hash, deps) => {
+          sf.write_line(&[&"srcHash: ", src_hash, &","])?;
+          sf.write_line(&[
+            &"deps: ",
+            &Array {
+              values: deps.clone(),
+            },
+            &",",
+          ])?;
+        }
+        ContentHashable::Content(content_hash) => {
+          sf.write_line(&[&"contentHash: ", content_hash, &","])?;
+        }
       }
-      ContentHashable::Content(content_hash) => {
-        writeln!(f, "    contentHash: {},", content_hash)?;
-      }
-    }
 
-    write!(f, "}}")
+      Ok(())
+    })?;
+
+    sf.write_line(&[&"}"])
   }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Hash(pub [u8; 32]);
 
-impl std::fmt::Display for Hash {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "#")?;
+impl StructuredFormattable for Hash {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write("#")?;
 
-    let Hash(data) = self;
-
-    for b in data {
-      write!(f, "{:02x}", b)?;
+    for b in self.0 {
+      sf.write(&format!("{:02x}", b))?;
     }
 
     Ok(())
@@ -201,9 +329,10 @@ pub struct Pointer {
   pub name: String,
 }
 
-impl std::fmt::Display for Pointer {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "@{}", self.name)
+impl StructuredFormattable for Pointer {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write("@")?;
+    sf.write(&self.name)
   }
 }
 
@@ -215,35 +344,41 @@ pub struct Function {
   pub body: Vec<FnLine>,
 }
 
-impl std::fmt::Display for Function {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl StructuredFormattable for Function {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
     let metadata_str = match &self.metadata {
       None => "".to_string(),
-      Some(p) => format!(" {}", p),
+      Some(p) => format!(" {}", Structured(p)),
     };
 
     match self.is_generator {
-      false => write!(f, "function{}(", metadata_str)?,
-      true => write!(f, "function*{}(", metadata_str)?,
+      false => sf.write(&format!("function{}(", metadata_str))?,
+      true => sf.write(&format!("function*{}(", metadata_str))?,
     }
 
     for (i, parameter) in self.parameters.iter().enumerate() {
       if i > 0 {
-        write!(f, ", ")?;
+        sf.write(", ")?;
       }
-      write!(f, "{}", parameter)?;
+      sf.write(parameter)?;
     }
-    writeln!(f, ") {{")?;
-    for fn_line in &self.body {
-      match fn_line {
-        FnLine::Instruction(instruction) => writeln!(f, "    {}", instruction)?,
-        FnLine::Label(label) => writeln!(f, "  {}", label)?,
-        FnLine::Empty => writeln!(f)?,
-        FnLine::Comment(message) => writeln!(f, "    // {}", message)?,
-        FnLine::Release(reg) => writeln!(f, "    (release {})", reg)?,
+    sf.write(") {")?;
+
+    sf.nest(|sf| {
+      for fn_line in &self.body {
+        match fn_line {
+          FnLine::Label(..) => sf.newline_short()?,
+          _ => sf.newline()?,
+        };
+
+        sf.write(fn_line)?;
       }
-    }
-    write!(f, "}}")
+
+      Ok(())
+    })?;
+
+    sf.newline()?;
+    sf.write("}")
   }
 }
 
@@ -255,54 +390,21 @@ pub struct Class {
   pub static_: Value,
 }
 
-impl std::fmt::Display for Class {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    writeln!(f, "class {{")?;
+impl StructuredFormattable for Class {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write("class {")?;
 
-    writeln!(f, "    metadata: {},", self.metadata)?;
-    writeln!(f, "    constructor: {},", self.constructor)?;
+    sf.nest(|sf| {
+      sf.write_line(&[&"metadata: ", &self.metadata, &","])?;
+      sf.write_line(&[&"constructor: ", &self.constructor, &","])?;
+      sf.write_line(&[&"prototype: ", &MultilineValue(&self.prototype), &","])?;
+      sf.write_line(&[&"static: ", &MultilineValue(&self.static_), &","])?;
 
-    write!(f, "    prototype: ")?;
+      Ok(())
+    })?;
 
-    match &self.prototype {
-      Value::Object(object) => {
-        if object.properties.is_empty() {
-          writeln!(f, "{{}},")?;
-        } else {
-          writeln!(f, "{{")?;
-          for (name, method) in &object.properties {
-            writeln!(f, "        {}: {},", name, method)?;
-          }
-          writeln!(f, "    }},")?;
-        }
-      }
-      _ => {
-        writeln!(f, "{},", self.prototype)?;
-      }
-    }
-
-    write!(f, "    static: ")?;
-
-    match &self.static_ {
-      Value::Object(object) => {
-        if object.properties.is_empty() {
-          writeln!(f, "{{}},")?;
-        } else {
-          writeln!(f, "{{")?;
-          for (name, method) in &object.properties {
-            writeln!(f, "        {}: {},", name, method)?;
-          }
-          writeln!(f, "    }},")?;
-        }
-      }
-      _ => {
-        writeln!(f, "{},", self.prototype)?;
-      }
-    }
-
-    write!(f, "}}")?;
-
-    Ok(())
+    sf.newline()?;
+    sf.write("}")
   }
 }
 
@@ -381,15 +483,15 @@ impl Register {
   }
 }
 
-impl std::fmt::Display for Register {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "%")?;
+impl StructuredFormattable for Register {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write("%")?;
 
     if self.take {
-      write!(f, "!")?;
+      sf.write("!")?;
     }
 
-    write!(f, "{}", self.name)
+    sf.write(&self.name)
   }
 }
 
@@ -402,14 +504,14 @@ pub enum FnLine {
   Release(Register),
 }
 
-impl std::fmt::Display for FnLine {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl StructuredFormattable for FnLine {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
     match self {
-      FnLine::Instruction(instruction) => write!(f, "{}", instruction),
-      FnLine::Label(label) => write!(f, "{}", label),
+      FnLine::Instruction(instruction) => sf.write(instruction),
+      FnLine::Label(label) => sf.write(label),
       FnLine::Empty => Ok(()),
-      FnLine::Comment(message) => write!(f, "// {}", message),
-      FnLine::Release(reg) => write!(f, "(release {})", reg),
+      FnLine::Comment(message) => sf.write(&format!("// {}", message)),
+      FnLine::Release(reg) => sf.write(&format!("(release {})", Structured(reg))),
     }
   }
 }
@@ -427,9 +529,9 @@ impl Label {
   }
 }
 
-impl std::fmt::Display for Label {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "{}:", self.name)
+impl StructuredFormattable for Label {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write_slice(&[&self.name, &":"])
   }
 }
 
@@ -438,9 +540,9 @@ pub struct LabelRef {
   pub name: String,
 }
 
-impl std::fmt::Display for LabelRef {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, ":{}", self.name)
+impl StructuredFormattable for LabelRef {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write_slice(&[&":", &self.name])
   }
 }
 
@@ -569,36 +671,86 @@ impl Value {
   }
 }
 
-impl std::fmt::Display for Value {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl StructuredFormattable for Value {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
     match self {
-      Value::Void => write!(f, "void"),
-      Value::Undefined => write!(f, "undefined"),
-      Value::Null => write!(f, "null"),
-      Value::Bool(value) => write!(f, "{}", value),
+      Value::Void => sf.write("void"),
+      Value::Undefined => sf.write("undefined"),
+      Value::Null => sf.write("null"),
+      Value::Bool(value) => sf.write(&value.to_string()),
       Value::Number(Number(value)) => {
         if value.is_infinite() {
           if value.is_sign_positive() {
-            write!(f, "Infinity")
+            sf.write("Infinity")
           } else {
-            write!(f, "-Infinity")
+            sf.write("-Infinity")
           }
         } else {
-          write!(f, "{}", value)
+          sf.write(&value.to_string())
         }
       }
-      Value::BigInt(value) => write!(f, "{}n", value),
-      Value::String(value) => write!(
-        f,
-        "{}",
-        serde_json::to_string(&value).expect("Failed json serialization")
-      ),
-      Value::Array(value) => write!(f, "{}", value),
-      Value::Object(value) => write!(f, "{}", value),
-      Value::Class(class) => write!(f, "{}", class),
-      Value::Register(value) => write!(f, "{}", value),
-      Value::Pointer(value) => write!(f, "{}", value),
-      Value::Builtin(value) => write!(f, "{}", value),
+      Value::BigInt(value) => sf.write_slice(&[&value.to_string(), &"n"]),
+      Value::String(value) => {
+        sf.write(&serde_json::to_string(&value).expect("Failed json serialization"))
+      }
+      Value::Array(value) => sf.write(&**value),
+      Value::Object(value) => sf.write(&**value),
+      Value::Class(value) => sf.write(&**value),
+      Value::Register(value) => sf.write(value),
+      Value::Pointer(value) => sf.write(value),
+      Value::Builtin(value) => sf.write(value),
+    }
+  }
+}
+
+struct MultilineValue<'a>(&'a Value);
+
+impl<'a> StructuredFormattable for MultilineValue<'a> {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    match self.0 {
+      Value::Array(array) => {
+        if array.values.is_empty() {
+          return sf.write("[]");
+        }
+
+        sf.write("[")?;
+
+        sf.nest(|sf| {
+          for value in &array.values {
+            sf.newline()?;
+            sf.write(value)?;
+            sf.write(",")?;
+          }
+
+          Ok(())
+        })?;
+
+        sf.newline()?;
+        sf.write("]")
+      }
+      Value::Object(object) => {
+        if object.properties.is_empty() {
+          return sf.write("{}");
+        }
+
+        sf.write("{")?;
+
+        sf.nest(|sf| {
+          for (key, value) in &object.properties {
+            sf.newline()?;
+            sf.write(key)?;
+            sf.write(": ")?;
+            sf.write(value)?;
+            sf.write(",")?;
+          }
+
+          Ok(())
+        })?;
+
+        sf.newline()?;
+        sf.write("}")
+      }
+      _ => sf.write(self.0),
     }
   }
 }
@@ -608,21 +760,21 @@ pub struct Lazy {
   pub body: Vec<FnLine>,
 }
 
-impl std::fmt::Display for Lazy {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    writeln!(f, "lazy {{")?;
+impl StructuredFormattable for Lazy {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write("lazy {")?;
 
-    for fn_line in &self.body {
-      match fn_line {
-        FnLine::Instruction(instruction) => writeln!(f, "    {}", instruction)?,
-        FnLine::Label(label) => writeln!(f, "  {}", label)?,
-        FnLine::Empty => writeln!(f)?,
-        FnLine::Comment(message) => writeln!(f, "    // {}", message)?,
-        FnLine::Release(reg) => writeln!(f, "    (release {})", reg)?,
+    sf.nest(|sf| {
+      for fn_line in &self.body {
+        sf.newline()?;
+        sf.write(fn_line)?;
       }
-    }
 
-    write!(f, "}}")
+      Ok(())
+    })?;
+
+    sf.newline()?;
+    sf.write("}")
   }
 }
 
@@ -631,9 +783,9 @@ pub struct Builtin {
   pub name: String,
 }
 
-impl std::fmt::Display for Builtin {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "${}", self.name)
+impl StructuredFormattable for Builtin {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write_slice(&[&"$", &self.name])
   }
 }
 
@@ -642,16 +794,19 @@ pub struct Array {
   pub values: Vec<Value>,
 }
 
-impl std::fmt::Display for Array {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "[")?;
+impl StructuredFormattable for Array {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
+    sf.write("[")?;
+
     for (i, value) in self.values.iter().enumerate() {
       if i > 0 {
-        write!(f, ", ")?;
+        sf.write(", ")?;
       }
-      write!(f, "{}", value)?;
+
+      sf.write(value)?;
     }
-    write!(f, "]")
+
+    sf.write("]")
   }
 }
 
@@ -660,20 +815,23 @@ pub struct Object {
   pub properties: Vec<(Value, Value)>,
 }
 
-impl std::fmt::Display for Object {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl StructuredFormattable for Object {
+  fn structured_fmt(&self, sf: &mut StructuredFormatter<'_, '_>) -> std::fmt::Result {
     if self.properties.is_empty() {
-      return write!(f, "{{}}");
+      return sf.write("{}");
     }
 
-    write!(f, "{{ ")?;
+    sf.write("{ ")?;
+
     for (i, (key, value)) in self.properties.iter().enumerate() {
       if i > 0 {
-        write!(f, ", ")?;
+        sf.write(", ")?;
       }
-      write!(f, "{}: {}", key, value)?;
+
+      sf.write_slice(&[key, &": ", value])?;
     }
-    write!(f, " }}")
+
+    sf.write(" }")
   }
 }
 

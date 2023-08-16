@@ -9,7 +9,8 @@ use valuescript_common::BuiltinName;
 
 use crate::asm::{
   Array, Builtin, Class, ContentHashable, Definition, DefinitionContent, FnLine, FnMeta, Function,
-  Hash, Instruction, Label, LabelRef, Lazy, Module, Number, Object, Pointer, Register, Value,
+  Hash, Instruction, Label, LabelRef, Lazy, Module, Number, Object, Pointer, Register, Structured,
+  StructuredFormattable, Value,
 };
 
 pub fn assemble(module: &Module) -> Vec<u8> {
@@ -103,7 +104,7 @@ impl Assembler {
       let inserted = param_set.insert(parameter.clone());
 
       if !inserted {
-        panic!("Duplicate parameter: {}", parameter);
+        panic!("Duplicate parameter: {}", Structured(parameter));
       }
 
       // Only lookup so that parameters go into the first registers.
@@ -513,11 +514,11 @@ enum LocationRef {
   LabelRef(LabelRef),
 }
 
-impl std::fmt::Display for LocationRef {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl StructuredFormattable for LocationRef {
+  fn structured_fmt(&self, sf: &mut crate::asm::StructuredFormatter<'_, '_>) -> std::fmt::Result {
     match self {
-      LocationRef::Pointer(def) => write!(f, "{}", def),
-      LocationRef::LabelRef(label) => write!(f, "{}", label),
+      LocationRef::Pointer(pointer) => sf.write(pointer),
+      LocationRef::LabelRef(label_ref) => sf.write(label_ref),
     }
   }
 }
@@ -541,7 +542,11 @@ impl LocationMap {
       let location_optional = self.found_locations.get(name);
 
       if location_optional.is_none() {
-        std::panic!("Unresolved reference to {} at {}", name, ref_locations[0]);
+        std::panic!(
+          "Unresolved reference to {} at {}",
+          Structured(name),
+          ref_locations[0]
+        );
       }
 
       let location = location_optional.unwrap();

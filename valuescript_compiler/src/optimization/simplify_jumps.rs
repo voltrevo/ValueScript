@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-  asm::{DefinitionContent, FnLine, Function, Module},
+  asm::{DefinitionContent, FnLine, Function, Module, Structured},
   instruction::Instruction,
 };
 
@@ -20,7 +20,7 @@ fn simplify_jumps_fn(fn_: &mut Function) {
     if let FnLine::Instruction(Instruction::End) = &fn_.body[i] {
       if next_instruction_index(&fn_.body, i).is_none() {
         // Remove `end` instructions when we're already at the end of the function.
-        substitutions.insert(i, FnLine::Comment(fn_.body[i].to_string()));
+        substitutions.insert(i, FnLine::Comment(Structured(&fn_.body[i]).to_string()));
         continue;
       }
     }
@@ -54,7 +54,7 @@ fn simplify_jumps_fn(fn_: &mut Function) {
 
     if i_next_instr == j_next_instr {
       // The next instruction is the same regardless of whether we jump. So don't jump.
-      substitutions.insert(i, FnLine::Comment(fn_.body[i].to_string()));
+      substitutions.insert(i, FnLine::Comment(Structured(&fn_.body[i]).to_string()));
     }
 
     if !conditional {

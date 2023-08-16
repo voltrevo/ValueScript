@@ -5,7 +5,7 @@ use tiny_keccak::{Hasher, Keccak};
 
 use crate::asm::{
   ContentHashable, Definition, DefinitionContent, ExportStar, FnLine, Hash, Instruction, Object,
-  Pointer, Value,
+  Pointer, Structured, Value,
 };
 use crate::gather_modules::PathAndModule;
 use crate::import_pattern::{ImportKind, ImportPattern};
@@ -467,7 +467,7 @@ fn find_ptr_src_trace(
 
       let src_meta = match module.get(ptr_to_index, metadata_ptr) {
         DefinitionContent::FnMeta(fn_meta) => match &fn_meta.content_hashable {
-          ContentHashable::Src(src_hash, deps) => (src_hash.to_string(), deps.clone()),
+          ContentHashable::Src(src_hash, deps) => (Structured(src_hash).to_string(), deps.clone()),
           _ => return None,
         },
         _ => panic!("metadata_ptr did not point to metadata"),
@@ -489,7 +489,7 @@ fn find_value_src_trace(
   match value {
     Value::Class(class) => {
       let src_meta = match &class.metadata.content_hashable {
-        ContentHashable::Src(src_hash, deps) => (src_hash.to_string(), deps.clone()),
+        ContentHashable::Src(src_hash, deps) => (Structured(src_hash).to_string(), deps.clone()),
         _ => return None,
       };
 
@@ -502,7 +502,7 @@ fn find_value_src_trace(
     | Value::Number(_)
     | Value::BigInt(_)
     | Value::String(_)
-    | Value::Builtin(_) => Some((value.to_string(), vec![])),
+    | Value::Builtin(_) => Some((Structured(value).to_string(), vec![])),
     Value::Array(array) => {
       let mut src_tags = Vec::<String>::new();
       let mut deps = Vec::<Value>::new();
@@ -525,7 +525,7 @@ fn find_value_src_trace(
         let (src_tag, mut item_deps) = find_value_src_trace(module, ptr_to_index, v)
           .expect("Couldn't get required source trace");
 
-        src_tags.push(format!("{}:{}", k, src_tag));
+        src_tags.push(format!("{}:{}", Structured(k), src_tag));
         deps.append(&mut item_deps);
       }
 
@@ -569,7 +569,7 @@ fn calculate_content_hash(
       | Value::Register(_) => {
         // undefined, Infinity, and NaN are treated as global variables, which lead them to be the
         // resolution of dependencies. All other dependencies should be builtins or pointers.
-        panic!("Unexpected dependency ({})", dep)
+        panic!("Unexpected dependency ({})", Structured(&dep))
       }
     };
 
@@ -616,7 +616,7 @@ fn calculate_content_hash(
       | Value::Register(_) => {
         // undefined, Infinity, and NaN are treated as global variables, which lead them to be the
         // resolution of dependencies. All other dependencies should be builtins or pointers.
-        panic!("Unexpected dependency ({})", dep)
+        panic!("Unexpected dependency ({})", Structured(dep))
       }
     };
 
@@ -627,7 +627,7 @@ fn calculate_content_hash(
 
   content_trace.push_str(&make_array_string(&full_deps, |dep| match dep {
     Value::Pointer(ptr_dep) => ptr_to_src_trace.get(ptr_dep).unwrap().0.clone(),
-    Value::Builtin(_) | Value::Undefined | Value::Number(_) => dep.to_string(),
+    Value::Builtin(_) | Value::Undefined | Value::Number(_) => Structured(dep).to_string(),
     Value::Void
     | Value::Null
     | Value::Bool(_)
@@ -639,7 +639,7 @@ fn calculate_content_hash(
     | Value::Register(_) => {
       // undefined, Infinity, and NaN are treated as global variables, which lead them to be the
       // resolution of dependencies. All other dependencies should be builtins or pointers.
-      panic!("Unexpected dependency ({})", dep)
+      panic!("Unexpected dependency ({})", Structured(dep))
     }
   }));
 

@@ -6,6 +6,7 @@ mod tests {
   use std::path::PathBuf;
   use std::rc::Rc;
 
+  use valuescript_compiler::asm::Structured;
   use valuescript_compiler::compile;
   use valuescript_compiler::{assemble, parse_module};
   use valuescript_vm::VirtualMachine;
@@ -85,7 +86,7 @@ mod tests {
 
           let bytecode = Rc::new(Bytecode::new(assemble(&module)));
 
-          let assembly = module.to_string();
+          let assembly = Structured(&module).to_string();
 
           {
             // Write the assembly to test_output
@@ -98,7 +99,7 @@ mod tests {
           }
 
           let parsed_assembly = parse_module(&assembly);
-          let assembly_from_parse = parsed_assembly.to_string();
+          let assembly_from_parse = Structured(&parsed_assembly).to_string();
 
           if assembly_from_parse != assembly {
             println!("  Parsed assembly doesn't match assembly");

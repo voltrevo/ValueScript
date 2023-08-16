@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  asm::{DefinitionContent, FnLine, Function, Module, Register, Value},
+  asm::{DefinitionContent, FnLine, Function, Module, Register, Structured, Value},
   instruction::Instruction,
 };
 
@@ -37,7 +37,7 @@ fn remove_unused_registers_fn(fn_: &mut Function) {
     });
 
     if comment_out {
-      *line = FnLine::Comment(line.to_string());
+      *line = FnLine::Comment(Structured(line).to_string());
     }
   }
 
