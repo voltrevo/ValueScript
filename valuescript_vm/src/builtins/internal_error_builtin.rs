@@ -39,6 +39,8 @@ impl BuiltinObject for InternalErrorBuiltin {
 
   fn bo_as_class_data() -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
+      name: "InternalError".to_string(),
+      content_hash: None,
       constructor: Val::Static(&SET_MESSAGE),
       prototype: make_internal_error_prototype(),
       static_: VsObject::default().to_val(),

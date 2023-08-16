@@ -197,6 +197,7 @@ impl Assembler {
 
   fn class(&mut self, class: &Class) {
     self.output.push(ValueType::Class as u8);
+    self.meta(&class.meta);
     self.value(&class.constructor);
     self.value(&class.prototype);
     self.value(&class.static_);

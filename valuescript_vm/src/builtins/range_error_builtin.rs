@@ -31,6 +31,8 @@ impl BuiltinObject for RangeErrorBuiltin {
 
   fn bo_as_class_data() -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
+      name: "RangeError".to_string(),
+      content_hash: None,
       constructor: Val::Static(&SET_MESSAGE),
       prototype: make_range_error_prototype(),
       static_: VsObject::default().to_val(),

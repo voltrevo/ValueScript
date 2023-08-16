@@ -256,6 +256,11 @@ impl Kal {
       }
       Kal::Function(_) => return None,
       Kal::Class(class) => VsClass {
+        name: class.meta.name,
+        content_hash: match class.meta.content_hashable {
+          asm::ContentHashable::Empty | asm::ContentHashable::Src(_, _) => None,
+          asm::ContentHashable::Content(hash) => Some(hash.0),
+        },
         constructor: class.constructor.try_to_val()?,
         prototype: class.prototype.try_to_val()?,
         static_: class.static_.try_to_val()?,

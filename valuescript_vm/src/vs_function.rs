@@ -42,7 +42,10 @@ impl VsFunction {
 
   pub fn content_hash(&self) -> Result<[u8; 32], Val> {
     match self.meta_pos {
-      Some(p) => self.bytecode.decoder(p).decode_content_hash(),
+      Some(p) => match self.bytecode.decoder(p).decode_meta().content_hash {
+        Some(content_hash) => Ok(content_hash),
+        None => Err("content_hash missing".to_internal_error()),
+      },
       None => Err("Can't get content_hash without meta_pos".to_internal_error()),
     }
   }

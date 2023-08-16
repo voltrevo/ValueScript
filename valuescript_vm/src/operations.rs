@@ -205,6 +205,11 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
 
       true
     }
+    (Val::Class(left), Val::Class(right)) => match (&left.content_hash, &right.content_hash) {
+      (None, None) => std::ptr::eq(&**left, &**right),
+      (None, Some(_)) | (Some(_), None) => return Ok(false),
+      (Some(left_hash), Some(right_hash)) => left_hash == right_hash,
+    },
     _ => {
       if left.is_truthy() != right.is_truthy() {
         return Ok(false);
@@ -350,6 +355,11 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
         format!("TODO: op=== with special types ({}, {})", left, right).to_internal_error(),
       );
     }
+    (Val::Class(left), Val::Class(right)) => match (&left.content_hash, &right.content_hash) {
+      (None, None) => std::ptr::eq(&**left, &**right),
+      (None, Some(_)) | (Some(_), None) => return Ok(false),
+      (Some(left_hash), Some(right_hash)) => left_hash == right_hash,
+    },
     _ => {
       assert!(left.typeof_() != right.typeof_());
       false

@@ -6,7 +6,7 @@ use valuescript_vm::{
   vs_value::{ToVal, Val},
 };
 
-use crate::asm::{Number, Value};
+use crate::asm::{ContentHashable, Number, Value};
 
 pub trait TryToVal {
   fn try_to_val(self) -> Result<Val, Val>;
@@ -45,6 +45,11 @@ impl TryToVal for Value {
         .to_val()
       }
       Value::Class(class) => VsClass {
+        name: class.meta.name,
+        content_hash: match class.meta.content_hashable {
+          ContentHashable::Empty | ContentHashable::Src(_, _) => None,
+          ContentHashable::Content(hash) => Some(hash.0),
+        },
         constructor: class.constructor.try_to_val()?,
         prototype: class.prototype.try_to_val()?,
         static_: class.static_.try_to_val()?,

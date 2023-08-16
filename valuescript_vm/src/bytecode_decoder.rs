@@ -6,7 +6,6 @@ use num_bigint::BigInt;
 use num_bigint::Sign;
 use valuescript_common::InstructionByte;
 
-use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::BUILTIN_VALS;
 use crate::bytecode::Bytecode;
 use crate::vs_class::VsClass;
@@ -147,12 +146,18 @@ impl BytecodeDecoder {
         val => take(val),
       },
       BytecodeType::Builtin => BUILTIN_VALS[self.decode_varsize_uint()](),
-      BytecodeType::Class => VsClass {
-        constructor: self.decode_val(registers),
-        prototype: self.decode_val(registers),
-        static_: self.decode_val(registers),
+      BytecodeType::Class => {
+        let meta = self.decode_meta();
+
+        VsClass {
+          name: meta.name,
+          content_hash: meta.content_hash,
+          constructor: self.decode_val(registers),
+          prototype: self.decode_val(registers),
+          static_: self.decode_val(registers),
+        }
+        .to_val()
       }
-      .to_val(),
       BytecodeType::BigInt => self.decode_bigint().to_val(),
       BytecodeType::GeneratorFunction => self.decode_function(true),
       BytecodeType::Unrecognized => panic!("Unrecognized bytecode type at {}", self.pos - 1),
@@ -314,20 +319,19 @@ impl BytecodeDecoder {
     InstructionByte::from_byte(self.decode_byte())
   }
 
-  pub fn decode_content_hash(&mut self) -> Result<[u8; 32], Val> {
+  pub fn decode_meta(&mut self) -> Meta {
     if self.decode_byte() != 0x16 {
-      return Err("Can't decode a content hash here".to_internal_error());
+      panic!("Expected meta");
     }
 
     if self.decode_type() != BytecodeType::String {
-      return Err("Expected string".to_internal_error());
+      panic!("Expected string");
     }
 
-    let name_len = self.decode_varsize_uint();
-    self.pos += name_len;
+    let name = self.decode_string();
 
-    match self.decode_byte() {
-      0 | 1 => Err("Missing content hash".to_internal_error()), // Empty | Src
+    let content_hash = match self.decode_byte() {
+      0 | 1 => None, // Empty | Src
       2 => {
         // Hash
         let mut res = [0u8; 32];
@@ -336,9 +340,16 @@ impl BytecodeDecoder {
           *b = self.decode_byte();
         }
 
-        Ok(res)
+        Some(res)
       }
-      _ => Err("Unrecognized content_hashable case".to_internal_error()),
-    }
+      _ => panic!("Unrecognized ContentHashable case"),
+    };
+
+    Meta { name, content_hash }
   }
+}
+
+pub struct Meta {
+  pub name: String,
+  pub content_hash: Option<[u8; 32]>,
 }

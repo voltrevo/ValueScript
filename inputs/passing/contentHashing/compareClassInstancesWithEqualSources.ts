@@ -1,35 +1,35 @@
-//! test_output([true,true,true,true,true])
+//! test_output([true,true,true,true,true,true])
 
 // When functions (and therefore classes) have the same source (and references), they should compare
 // equal due to the content hash system.
 
 export default () => {
-  const a = new classes[0](1, 2);
-  const b = new classes[1](1, 2);
+  const a = new pointClasses.V1(3, 5);
+  const b = new pointClasses.V2(3, 5);
 
   return [
     a === b,
-    // classes[0] === classes[1], TODO: Compare actual classes
-    a instanceof classes[0],
-    a instanceof classes[1],
-    b instanceof classes[0],
-    b instanceof classes[1],
+    pointClasses.V1 === pointClasses.V2,
+    a instanceof pointClasses.V1,
+    a instanceof pointClasses.V2,
+    b instanceof pointClasses.V1,
+    b instanceof pointClasses.V2,
   ];
 };
 
-const classes = [
-  class Point {
+const pointClasses = {
+  V1: class Point {
     constructor(public x: number, public y: number) {}
 
     lenSq() {
       return this.x ** 2 + this.y ** 2;
     }
   },
-  class Point {
+  V2: class Point {
     constructor(public x: number, public y: number) {}
 
     lenSq() {
       return this.x ** 2 + this.y ** 2;
     }
   },
-];
+};

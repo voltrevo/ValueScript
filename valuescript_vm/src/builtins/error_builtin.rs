@@ -40,6 +40,8 @@ impl BuiltinObject for ErrorBuiltin {
 
   fn bo_as_class_data() -> Option<Rc<VsClass>> {
     Some(Rc::new(VsClass {
+      name: "Error".to_string(),
+      content_hash: None,
       constructor: SET_MESSAGE.to_val(),
       prototype: make_error_prototype(),
       static_: VsObject::default().to_val(),
