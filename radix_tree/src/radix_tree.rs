@@ -222,7 +222,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     }
   }
 
-  fn index_path(&self, mut i: usize) -> Vec<usize> {
+  fn index_path(&self, mut i: usize) -> Option<Vec<usize>> {
     let mut path = vec![0; self.depth()];
 
     for p in path.iter_mut().rev() {
@@ -230,7 +230,44 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
       i /= N;
     }
 
-    path
+    match i {
+      0 => Some(path),
+      _ => None,
+    }
+  }
+
+  pub fn get(&self, i: usize) -> Option<&T> {
+    let mut tree = self;
+
+    for p in tree.index_path(i)? {
+      match tree.data() {
+        RadixTreeData::Meta(meta) => {
+          tree = meta.get(p)?;
+        }
+        RadixTreeData::Leaves(leaves) => {
+          return leaves.get(p);
+        }
+      }
+    }
+
+    None
+  }
+
+  pub fn get_mut(&mut self, i: usize) -> Option<&mut T> {
+    let mut tree = self;
+
+    for p in tree.index_path(i)? {
+      match tree.data_mut() {
+        RadixTreeData::Meta(meta) => {
+          tree = meta.get_mut(p)?;
+        }
+        RadixTreeData::Leaves(leaves) => {
+          return leaves.get_mut(p);
+        }
+      }
+    }
+
+    None
   }
 }
 
@@ -246,7 +283,7 @@ impl<T: Clone, const N: usize> Index<usize> for RadixTree<T, N> {
   fn index(&self, i: usize) -> &T {
     let mut tree = self;
 
-    for p in tree.index_path(i) {
+    for p in tree.index_path(i).expect("Out of bounds") {
       match tree.data() {
         RadixTreeData::Meta(meta) => {
           tree = &meta[p];
@@ -265,7 +302,7 @@ impl<T: Clone, const N: usize> IndexMut<usize> for RadixTree<T, N> {
   fn index_mut(&mut self, i: usize) -> &mut T {
     let mut tree = self;
 
-    for p in tree.index_path(i) {
+    for p in tree.index_path(i).expect("Out of bounds") {
       match tree.data_mut() {
         RadixTreeData::Meta(meta) => {
           tree = &mut meta[p];

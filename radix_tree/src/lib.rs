@@ -49,5 +49,28 @@ mod tests {
 
     assert_eq!(tree.first(), Some(&1000));
     assert_eq!(tree.last(), Some(&1099));
+
+    assert_eq!(tree.get(100), None);
+    assert_eq!(tree.get_mut(100), None);
+  }
+
+  #[test]
+  fn push_64() {
+    let mut tree = RadixTree::<usize, 4>::new();
+
+    for i in 0..64 {
+      tree.push(i);
+      assert_eq!(tree.len(), i + 1);
+    }
+
+    for i in 0..64 {
+      assert_eq!(tree.get(i), Some(&i));
+      assert_eq!(tree.get_mut(i), Some(&mut i.clone()));
+    }
+
+    for i in 64..256 {
+      assert_eq!(tree.get(i), None);
+      assert_eq!(tree.get_mut(i), None);
+    }
   }
 }
