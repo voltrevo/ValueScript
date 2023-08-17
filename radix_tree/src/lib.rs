@@ -73,4 +73,31 @@ mod tests {
       assert_eq!(tree.get_mut(i), None);
     }
   }
+
+  #[test]
+  #[should_panic] // TODO: Fix test
+  fn iters() {
+    let mut tree = RadixTree::<usize, 4>::new();
+
+    for i in 0..100 {
+      tree.push(i);
+    }
+
+    for (i, v) in tree.into_iter().enumerate() {
+      assert_eq!(*v, i);
+    }
+
+    // let mut i = 0;
+    // for v in tree.iter_mut() {
+    //   assert_eq!(*v, i);
+    //   *v = 1000 + i;
+    //   i += 1;
+    // }
+
+    // let mut i = 0;
+    // for v in tree.iter() {
+    //   assert_eq!(*v, 1000 + i);
+    //   i += 1;
+    // }
+  }
 }
