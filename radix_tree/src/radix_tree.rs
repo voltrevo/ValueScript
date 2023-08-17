@@ -22,6 +22,15 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     RadixTree::<T, N>(Rc::new(RadixTreeData::<T, N>::Leaves(ArrayVec::new())))
   }
 
+  pub fn clear(&mut self) {
+    match self.data_mut() {
+      RadixTreeData::Leaves(leaves) => leaves.clear(),
+      data_mut => {
+        *data_mut = RadixTreeData::Leaves(ArrayVec::new());
+      }
+    }
+  }
+
   pub fn is_empty(&self) -> bool {
     match self.data() {
       RadixTreeData::Meta(_) => false,
