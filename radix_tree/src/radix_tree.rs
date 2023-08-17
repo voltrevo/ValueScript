@@ -397,7 +397,7 @@ impl<'a, T: Clone, const N: usize> Iterator for RadixTreeIterator<'a, T, N> {
   fn next(&mut self) -> Option<Self::Item> {
     let leaf = self.next_leaf();
 
-    match self.next_leaf() {
+    match leaf {
       Some(_) => leaf,
       None => {
         self.next_leaves()?;

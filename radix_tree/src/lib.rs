@@ -75,7 +75,6 @@ mod tests {
   }
 
   #[test]
-  #[should_panic] // TODO: Fix test
   fn iters() {
     let mut tree = RadixTree::<usize, 4>::new();
 
