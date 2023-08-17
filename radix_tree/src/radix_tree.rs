@@ -22,30 +22,6 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     RadixTree::<T, N>(Rc::new(RadixTreeData::<T, N>::Leaves(ArrayVec::new())))
   }
 
-  fn new_meta() -> Self {
-    RadixTree::<T, N>(Rc::new(RadixTreeData::<T, N>::Meta(ArrayVec::new())))
-  }
-
-  pub(crate) fn data(&self) -> &RadixTreeData<T, N> {
-    &self.0
-  }
-
-  fn data_mut(&mut self) -> &mut RadixTreeData<T, N> {
-    Rc::make_mut(&mut self.0)
-  }
-
-  fn depth(&self) -> usize {
-    let mut res = 1;
-    let mut tree = self;
-
-    while let RadixTreeData::Meta(meta) = tree.data() {
-      tree = &meta[0];
-      res += 1;
-    }
-
-    res
-  }
-
   pub fn is_empty(&self) -> bool {
     match self.data() {
       RadixTreeData::Meta(_) => false,
@@ -224,20 +200,6 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     }
   }
 
-  fn index_path(&self, mut i: usize) -> Option<Vec<usize>> {
-    let mut path = vec![0; self.depth()];
-
-    for p in path.iter_mut().rev() {
-      *p = i % N;
-      i /= N;
-    }
-
-    match i {
-      0 => Some(path),
-      _ => None,
-    }
-  }
-
   pub fn get(&self, i: usize) -> Option<&T> {
     let mut tree = self;
 
@@ -270,6 +232,44 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     }
 
     None
+  }
+
+  fn new_meta() -> Self {
+    RadixTree::<T, N>(Rc::new(RadixTreeData::<T, N>::Meta(ArrayVec::new())))
+  }
+
+  pub(crate) fn data(&self) -> &RadixTreeData<T, N> {
+    &self.0
+  }
+
+  fn data_mut(&mut self) -> &mut RadixTreeData<T, N> {
+    Rc::make_mut(&mut self.0)
+  }
+
+  fn depth(&self) -> usize {
+    let mut res = 1;
+    let mut tree = self;
+
+    while let RadixTreeData::Meta(meta) = tree.data() {
+      tree = &meta[0];
+      res += 1;
+    }
+
+    res
+  }
+
+  fn index_path(&self, mut i: usize) -> Option<Vec<usize>> {
+    let mut path = vec![0; self.depth()];
+
+    for p in path.iter_mut().rev() {
+      *p = i % N;
+      i /= N;
+    }
+
+    match i {
+      0 => Some(path),
+      _ => None,
+    }
   }
 }
 
