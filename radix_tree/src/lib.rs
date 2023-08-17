@@ -89,7 +89,6 @@ mod tests {
   }
 
   #[test]
-  #[should_panic] // TODO: fix
   fn pop_100() {
     let mut tree = RadixTree::<usize, 4>::new();
 
@@ -97,11 +96,37 @@ mod tests {
       tree.push(i);
     }
 
+    assert_eq!(tree.depth(), 4);
+
     for i in (0..100).rev() {
       assert_eq!(tree.pop(), Some(i));
       assert_eq!(tree.len(), i);
     }
 
     assert_eq!(tree.pop(), None);
+    assert_eq!(tree.depth(), 1);
+  }
+
+  #[test]
+  fn truncate() {
+    let mut tree = RadixTree::<usize, 4>::new();
+
+    for i in 0..100 {
+      tree.push(i);
+    }
+
+    tree.truncate(50);
+
+    assert_eq!(tree.len(), 50);
+    assert_eq!(tree.depth(), 3);
+
+    for i in 0..50 {
+      assert_eq!(tree[i], i);
+    }
+
+    tree.truncate(1);
+
+    assert_eq!(tree.len(), 1);
+    assert_eq!(tree.depth(), 1);
   }
 }

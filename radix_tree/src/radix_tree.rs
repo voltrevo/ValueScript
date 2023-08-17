@@ -156,7 +156,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
   }
 
   pub fn pop(&mut self) -> Option<T> {
-    let mut tree = self;
+    let mut tree = &mut *self;
 
     loop {
       match tree.data_mut() {
@@ -168,12 +168,47 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
           let res = leaves.pop();
 
           if leaves.is_empty() {
-            todo!(); // Shrink tree
+            self.truncate(self.len());
           }
 
           return res;
         }
       }
+    }
+  }
+
+  pub fn truncate(&mut self, len: usize) {
+    if len == 0 {
+      self.clear();
+      return;
+    }
+
+    let path = match self.index_path(len - 1) {
+      Some(path) => path,
+      None => return,
+    };
+
+    let mut tree = &mut *self;
+
+    for p in path {
+      match tree.data_mut() {
+        RadixTreeData::Meta(meta) => {
+          meta.truncate(p + 1);
+          tree = &mut meta[p];
+        }
+        RadixTreeData::Leaves(leaves) => {
+          leaves.truncate(p + 1);
+          break;
+        }
+      }
+    }
+
+    while let RadixTreeData::Meta(meta) = self.data_mut() {
+      if meta.len() > 1 {
+        break;
+      }
+
+      *self = meta.pop().unwrap();
     }
   }
 
@@ -277,7 +312,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     Rc::make_mut(&mut self.0)
   }
 
-  fn depth(&self) -> usize {
+  pub(crate) fn depth(&self) -> usize {
     let mut res = 1;
     let mut tree = self;
 
