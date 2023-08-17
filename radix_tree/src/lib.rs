@@ -7,10 +7,12 @@ mod tests {
   use super::*;
 
   #[test]
-  fn initial_len_0() {
+  fn empty_tree() {
     let tree = RadixTree::<usize, 4>::new();
-    assert_eq!(tree.len(), 0);
     assert!(tree.is_empty());
+    assert_eq!(tree.len(), 0);
+    assert_eq!(tree.first(), None);
+    assert_eq!(tree.last(), None);
   }
 
   #[test]
@@ -29,5 +31,23 @@ mod tests {
       tree.push(i);
       assert_eq!(tree.len(), i + 1);
     }
+
+    assert_eq!(tree.first(), Some(&0));
+    assert_eq!(tree.last(), Some(&99));
+
+    for i in 0..100 {
+      assert_eq!(tree[i], i);
+    }
+
+    for i in 0..100 {
+      tree[i] = 1000 + i;
+    }
+
+    for i in 0..100 {
+      assert_eq!(tree[i], 1000 + i);
+    }
+
+    assert_eq!(tree.first(), Some(&1000));
+    assert_eq!(tree.last(), Some(&1099));
   }
 }

@@ -1,9 +1,13 @@
-use std::{mem::swap, rc::Rc};
+use std::{
+  mem::swap,
+  ops::{Index, IndexMut},
+  rc::Rc,
+};
 
 use arrayvec::ArrayVec;
 
 #[derive(Clone)]
-pub enum RadixTreeData<T, const N: usize> {
+enum RadixTreeData<T, const N: usize> {
   Meta(ArrayVec<RadixTree<T, N>, N>),
   Leaves(ArrayVec<T, N>),
 }
@@ -26,6 +30,18 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
   fn data_mut(&mut self) -> &mut RadixTreeData<T, N> {
     Rc::make_mut(&mut self.0)
+  }
+
+  fn depth(&self) -> usize {
+    let mut res = 1;
+    let mut tree = self;
+
+    while let RadixTreeData::Meta(meta) = tree.data() {
+      tree = &meta[0];
+      res += 1;
+    }
+
+    res
   }
 
   pub fn is_empty(&self) -> bool {
@@ -210,5 +226,59 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 impl<T: Clone, const N: usize> Default for RadixTree<T, N> {
   fn default() -> Self {
     Self::new()
+  }
+}
+
+impl<T: Clone, const N: usize> Index<usize> for RadixTree<T, N> {
+  type Output = T;
+
+  fn index(&self, mut i: usize) -> &T {
+    let mut path = vec![0; self.depth()];
+
+    for p in path.iter_mut().rev() {
+      *p = i % N;
+      i /= N;
+    }
+
+    let mut tree = self;
+
+    for p in path {
+      match tree.data() {
+        RadixTreeData::Meta(meta) => {
+          tree = &meta[p];
+        }
+        RadixTreeData::Leaves(leaves) => {
+          return &leaves[p];
+        }
+      }
+    }
+
+    panic!("Out of bounds");
+  }
+}
+
+impl<T: Clone, const N: usize> IndexMut<usize> for RadixTree<T, N> {
+  fn index_mut(&mut self, mut i: usize) -> &mut T {
+    let mut path = vec![0; self.depth()];
+
+    for p in path.iter_mut().rev() {
+      *p = i % N;
+      i /= N;
+    }
+
+    let mut tree = self;
+
+    for p in path {
+      match tree.data_mut() {
+        RadixTreeData::Meta(meta) => {
+          tree = &mut meta[p];
+        }
+        RadixTreeData::Leaves(leaves) => {
+          return &mut leaves[p];
+        }
+      }
+    }
+
+    panic!("Out of bounds");
   }
 }
