@@ -86,18 +86,5 @@ mod tests {
     for (i, v) in tree.into_iter().enumerate() {
       assert_eq!(*v, i);
     }
-
-    // let mut i = 0;
-    // for v in tree.iter_mut() {
-    //   assert_eq!(*v, i);
-    //   *v = 1000 + i;
-    //   i += 1;
-    // }
-
-    // let mut i = 0;
-    // for v in tree.iter() {
-    //   assert_eq!(*v, 1000 + i);
-    //   i += 1;
-    // }
   }
 }
