@@ -87,4 +87,21 @@ mod tests {
       assert_eq!(*v, i);
     }
   }
+
+  #[test]
+  #[should_panic] // TODO: fix
+  fn pop_100() {
+    let mut tree = RadixTree::<usize, 4>::new();
+
+    for i in 0..100 {
+      tree.push(i);
+    }
+
+    for i in (0..100).rev() {
+      assert_eq!(tree.pop(), Some(i));
+      assert_eq!(tree.len(), i);
+    }
+
+    assert_eq!(tree.pop(), None);
+  }
 }

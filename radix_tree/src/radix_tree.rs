@@ -155,6 +155,28 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     meta_node_with_space.push(RadixTree(Rc::new(RadixTreeData::Leaves(new_leaves))));
   }
 
+  pub fn pop(&mut self) -> Option<T> {
+    let mut tree = self;
+
+    loop {
+      match tree.data_mut() {
+        RadixTreeData::Meta(meta) => {
+          let last = meta.len() - 1;
+          tree = &mut meta[last];
+        }
+        RadixTreeData::Leaves(leaves) => {
+          let res = leaves.pop();
+
+          if leaves.is_empty() {
+            todo!(); // Shrink tree
+          }
+
+          return res;
+        }
+      }
+    }
+  }
+
   pub fn first(&self) -> Option<&T> {
     let mut tree = self;
 
