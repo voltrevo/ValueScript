@@ -20,6 +20,13 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     RadixTree::<T, N>(Rc::new(RadixTreeData::<T, N>::Meta(ArrayVec::new())))
   }
 
+  pub fn is_empty(&self) -> bool {
+    match &*self.0 {
+      RadixTreeData::Meta(_) => false,
+      RadixTreeData::Leaves(leaves) => leaves.is_empty(),
+    }
+  }
+
   pub fn len(&self) -> usize {
     let mut res = 0;
     let mut tree = self;
@@ -135,5 +142,11 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     let mut new_leaves = ArrayVec::new();
     new_leaves.push(value);
     meta_node_with_space.push(RadixTree(Rc::new(RadixTreeData::Leaves(new_leaves))));
+  }
+}
+
+impl<T: Clone, const N: usize> Default for RadixTree<T, N> {
+  fn default() -> Self {
+    Self::new()
   }
 }

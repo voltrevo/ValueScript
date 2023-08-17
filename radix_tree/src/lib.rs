@@ -10,6 +10,7 @@ mod tests {
   fn initial_len_0() {
     let tree = RadixTree::<usize, 4>::new();
     assert_eq!(tree.len(), 0);
+    assert!(tree.is_empty());
   }
 
   #[test]
@@ -17,6 +18,7 @@ mod tests {
     let mut tree = RadixTree::<usize, 4>::new();
     tree.push(0);
     assert_eq!(tree.len(), 1);
+    assert!(!tree.is_empty());
   }
 
   #[test]
