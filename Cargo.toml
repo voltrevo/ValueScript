@@ -11,4 +11,5 @@ members = [
   "measure_bytecode_size",
   "compile_to_rust_tests",
   "bench",
+  "radix_tree",
 ]
