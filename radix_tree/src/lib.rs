@@ -115,8 +115,18 @@ mod tests {
       tree.push(i);
     }
 
-    tree.truncate(50);
+    assert_eq!(tree.len(), 100);
 
+    tree.truncate(100);
+    assert_eq!(tree.len(), 100);
+
+    tree.truncate(101);
+    assert_eq!(tree.len(), 100);
+
+    tree.truncate(1000);
+    assert_eq!(tree.len(), 100);
+
+    tree.truncate(50);
     assert_eq!(tree.len(), 50);
     assert_eq!(tree.depth(), 3);
 
@@ -125,7 +135,6 @@ mod tests {
     }
 
     tree.truncate(1);
-
     assert_eq!(tree.len(), 1);
     assert_eq!(tree.depth(), 1);
   }

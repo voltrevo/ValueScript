@@ -193,6 +193,10 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     for p in path {
       match tree.data_mut() {
         RadixTreeData::Meta(meta) => {
+          if meta.len() <= p {
+            break;
+          }
+
           meta.truncate(p + 1);
           tree = &mut meta[p];
         }
