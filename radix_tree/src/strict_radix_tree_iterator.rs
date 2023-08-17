@@ -1,23 +1,23 @@
 use arrayvec::ArrayVec;
 
-use crate::{radix_tree::RadixTreeData, RadixTree};
+use crate::{strict_radix_tree::StrictRadixTreeData, StrictRadixTree};
 
-pub struct RadixTreeIterator<'a, T, const N: usize> {
-  meta_path: Vec<(&'a ArrayVec<RadixTree<T, N>, N>, usize)>,
+pub struct StrictRadixTreeIterator<'a, T, const N: usize> {
+  meta_path: Vec<(&'a ArrayVec<StrictRadixTree<T, N>, N>, usize)>,
   leaf_path: (&'a ArrayVec<T, N>, usize),
 }
 
-impl<'a, T: Clone, const N: usize> RadixTreeIterator<'a, T, N> {
-  pub fn new(mut tree: &'a RadixTree<T, N>) -> Self {
-    let mut meta_path = Vec::<(&'a ArrayVec<RadixTree<T, N>, N>, usize)>::new();
+impl<'a, T: Clone, const N: usize> StrictRadixTreeIterator<'a, T, N> {
+  pub fn new(mut tree: &'a StrictRadixTree<T, N>) -> Self {
+    let mut meta_path = Vec::<(&'a ArrayVec<StrictRadixTree<T, N>, N>, usize)>::new();
 
     loop {
       match tree.data() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           meta_path.push((meta, 0));
           tree = &meta[0];
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           return Self {
             meta_path,
             leaf_path: (leaves, 0),
@@ -50,15 +50,15 @@ impl<'a, T: Clone, const N: usize> RadixTreeIterator<'a, T, N> {
     None
   }
 
-  fn set_path(&mut self, mut meta_i: usize, mut tree: &'a RadixTree<T, N>) {
+  fn set_path(&mut self, mut meta_i: usize, mut tree: &'a StrictRadixTree<T, N>) {
     loop {
       match tree.data() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           self.meta_path[meta_i] = (meta, 0);
           meta_i += 1;
           tree = &meta[0];
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           self.leaf_path = (leaves, 0);
           break;
         }
@@ -67,7 +67,7 @@ impl<'a, T: Clone, const N: usize> RadixTreeIterator<'a, T, N> {
   }
 }
 
-impl<'a, T: Clone, const N: usize> Iterator for RadixTreeIterator<'a, T, N> {
+impl<'a, T: Clone, const N: usize> Iterator for StrictRadixTreeIterator<'a, T, N> {
   type Item = &'a T;
 
   fn next(&mut self) -> Option<Self::Item> {

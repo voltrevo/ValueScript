@@ -6,35 +6,37 @@ use std::{
 
 use arrayvec::ArrayVec;
 
-use crate::radix_tree_iterator::RadixTreeIterator;
+use crate::strict_radix_tree_iterator::StrictRadixTreeIterator;
 
 #[derive(Clone)]
-pub(crate) enum RadixTreeData<T, const N: usize> {
-  Meta(ArrayVec<RadixTree<T, N>, N>),
+pub(crate) enum StrictRadixTreeData<T, const N: usize> {
+  Meta(ArrayVec<StrictRadixTree<T, N>, N>),
   Leaves(ArrayVec<T, N>),
 }
 
 #[derive(Clone)]
-pub struct RadixTree<T, const N: usize>(Rc<RadixTreeData<T, N>>);
+pub struct StrictRadixTree<T, const N: usize>(Rc<StrictRadixTreeData<T, N>>);
 
-impl<T: Clone, const N: usize> RadixTree<T, N> {
+impl<T: Clone, const N: usize> StrictRadixTree<T, N> {
   pub fn new() -> Self {
-    RadixTree::<T, N>(Rc::new(RadixTreeData::<T, N>::Leaves(ArrayVec::new())))
+    StrictRadixTree::<T, N>(Rc::new(
+      StrictRadixTreeData::<T, N>::Leaves(ArrayVec::new()),
+    ))
   }
 
   pub fn clear(&mut self) {
     match self.data_mut() {
-      RadixTreeData::Leaves(leaves) => leaves.clear(),
+      StrictRadixTreeData::Leaves(leaves) => leaves.clear(),
       data_mut => {
-        *data_mut = RadixTreeData::Leaves(ArrayVec::new());
+        *data_mut = StrictRadixTreeData::Leaves(ArrayVec::new());
       }
     }
   }
 
   pub fn is_empty(&self) -> bool {
     match self.data() {
-      RadixTreeData::Meta(_) => false,
-      RadixTreeData::Leaves(leaves) => leaves.is_empty(),
+      StrictRadixTreeData::Meta(_) => false,
+      StrictRadixTreeData::Leaves(leaves) => leaves.is_empty(),
     }
   }
 
@@ -44,12 +46,12 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     loop {
       match tree.data() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           let i = meta.len() - 1;
           res += i;
           tree = &meta[i];
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           res += leaves.len();
           break;
         }
@@ -62,15 +64,15 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
   }
 
   pub fn push(&mut self, value: T) {
-    let mut tree: &mut RadixTreeData<T, N> = Rc::make_mut(&mut self.0);
+    let mut tree: &mut StrictRadixTreeData<T, N> = Rc::make_mut(&mut self.0);
 
     loop {
       match tree {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           let last = meta.len() - 1;
           tree = Rc::make_mut(&mut meta[last].0);
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           if leaves.is_full() {
             break;
           }
@@ -81,13 +83,13 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
       }
     }
 
-    let mut tree: &RadixTree<T, N> = self;
+    let mut tree: &StrictRadixTree<T, N> = self;
     let mut max_depth_with_space = 0;
     let mut depth = 1;
 
     loop {
       match tree.data() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           if !meta.is_full() {
             max_depth_with_space = depth;
           }
@@ -95,7 +97,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
           let last = meta.len() - 1;
           tree = &meta[last];
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           assert!(leaves.is_full());
           break;
         }
@@ -109,8 +111,8 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
       swap(&mut swap_node, self);
 
       let self_meta = match self.data_mut() {
-        RadixTreeData::Meta(meta) => meta,
-        RadixTreeData::Leaves(_) => {
+        StrictRadixTreeData::Meta(meta) => meta,
+        StrictRadixTreeData::Leaves(_) => {
           panic!("Should not happen because we just swapped meta into self")
         }
       };
@@ -121,23 +123,23 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
       depth += 1;
     }
 
-    let mut tree_with_space: &mut RadixTreeData<T, N> = Rc::make_mut(&mut self.0);
+    let mut tree_with_space: &mut StrictRadixTreeData<T, N> = Rc::make_mut(&mut self.0);
 
     for _ in 1..max_depth_with_space {
       match tree_with_space {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           let last = meta.len() - 1;
           tree_with_space = Rc::make_mut(&mut meta[last].0);
         }
-        RadixTreeData::Leaves(_leaves) => {
+        StrictRadixTreeData::Leaves(_leaves) => {
           panic!("Should have found meta with space");
         }
       }
     }
 
     let mut meta_node_with_space = match tree_with_space {
-      RadixTreeData::Meta(meta) => meta,
-      RadixTreeData::Leaves(_) => panic!("Should not happen"),
+      StrictRadixTreeData::Meta(meta) => meta,
+      StrictRadixTreeData::Leaves(_) => panic!("Should not happen"),
     };
 
     for _ in max_depth_with_space..(depth - 1) {
@@ -145,14 +147,18 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
       meta_node_with_space.push(Self::new_meta());
 
       meta_node_with_space = match Rc::make_mut(&mut meta_node_with_space[last].0) {
-        RadixTreeData::Meta(meta) => meta,
-        RadixTreeData::Leaves(_) => panic!("Should not happen because we just pushed a meta node"),
+        StrictRadixTreeData::Meta(meta) => meta,
+        StrictRadixTreeData::Leaves(_) => {
+          panic!("Should not happen because we just pushed a meta node")
+        }
       };
     }
 
     let mut new_leaves = ArrayVec::new();
     new_leaves.push(value);
-    meta_node_with_space.push(RadixTree(Rc::new(RadixTreeData::Leaves(new_leaves))));
+    meta_node_with_space.push(StrictRadixTree(Rc::new(StrictRadixTreeData::Leaves(
+      new_leaves,
+    ))));
   }
 
   pub fn pop(&mut self) -> Option<T> {
@@ -160,11 +166,11 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     loop {
       match tree.data_mut() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           let last = meta.len() - 1;
           tree = &mut meta[last];
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           let res = leaves.pop();
 
           if leaves.is_empty() {
@@ -192,7 +198,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     for p in path {
       match tree.data_mut() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           if meta.len() <= p {
             break;
           }
@@ -200,14 +206,14 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
           meta.truncate(p + 1);
           tree = &mut meta[p];
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           leaves.truncate(p + 1);
           break;
         }
       }
     }
 
-    while let RadixTreeData::Meta(meta) = self.data_mut() {
+    while let StrictRadixTreeData::Meta(meta) = self.data_mut() {
       if meta.len() > 1 {
         break;
       }
@@ -221,10 +227,10 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     loop {
       match tree.data() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           tree = &meta[0];
         }
-        RadixTreeData::Leaves(leaves) => break leaves.first(),
+        StrictRadixTreeData::Leaves(leaves) => break leaves.first(),
       }
     }
   }
@@ -234,10 +240,10 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     loop {
       match tree.data_mut() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           tree = &mut meta[0];
         }
-        RadixTreeData::Leaves(leaves) => break leaves.first_mut(),
+        StrictRadixTreeData::Leaves(leaves) => break leaves.first_mut(),
       }
     }
   }
@@ -247,11 +253,11 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     loop {
       match tree.data() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           let last = meta.len() - 1;
           tree = &meta[last];
         }
-        RadixTreeData::Leaves(leaves) => break leaves.last(),
+        StrictRadixTreeData::Leaves(leaves) => break leaves.last(),
       }
     }
   }
@@ -261,11 +267,11 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     loop {
       match tree.data_mut() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           let last = meta.len() - 1;
           tree = &mut meta[last];
         }
-        RadixTreeData::Leaves(leaves) => break leaves.last_mut(),
+        StrictRadixTreeData::Leaves(leaves) => break leaves.last_mut(),
       }
     }
   }
@@ -275,10 +281,10 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     for p in tree.index_path(i)? {
       match tree.data() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           tree = meta.get(p)?;
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           return leaves.get(p);
         }
       }
@@ -292,10 +298,10 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
 
     for p in tree.index_path(i)? {
       match tree.data_mut() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           tree = meta.get_mut(p)?;
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           return leaves.get_mut(p);
         }
       }
@@ -305,14 +311,14 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
   }
 
   fn new_meta() -> Self {
-    RadixTree::<T, N>(Rc::new(RadixTreeData::<T, N>::Meta(ArrayVec::new())))
+    StrictRadixTree::<T, N>(Rc::new(StrictRadixTreeData::<T, N>::Meta(ArrayVec::new())))
   }
 
-  pub(crate) fn data(&self) -> &RadixTreeData<T, N> {
+  pub(crate) fn data(&self) -> &StrictRadixTreeData<T, N> {
     &self.0
   }
 
-  fn data_mut(&mut self) -> &mut RadixTreeData<T, N> {
+  fn data_mut(&mut self) -> &mut StrictRadixTreeData<T, N> {
     Rc::make_mut(&mut self.0)
   }
 
@@ -320,7 +326,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     let mut res = 1;
     let mut tree = self;
 
-    while let RadixTreeData::Meta(meta) = tree.data() {
+    while let StrictRadixTreeData::Meta(meta) = tree.data() {
       tree = &meta[0];
       res += 1;
     }
@@ -343,13 +349,13 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
   }
 }
 
-impl<T: Clone, const N: usize> Default for RadixTree<T, N> {
+impl<T: Clone, const N: usize> Default for StrictRadixTree<T, N> {
   fn default() -> Self {
     Self::new()
   }
 }
 
-impl<T: Clone, const N: usize> Index<usize> for RadixTree<T, N> {
+impl<T: Clone, const N: usize> Index<usize> for StrictRadixTree<T, N> {
   type Output = T;
 
   fn index(&self, i: usize) -> &T {
@@ -357,10 +363,10 @@ impl<T: Clone, const N: usize> Index<usize> for RadixTree<T, N> {
 
     for p in tree.index_path(i).expect("Out of bounds") {
       match tree.data() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           tree = &meta[p];
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           return &leaves[p];
         }
       }
@@ -370,16 +376,16 @@ impl<T: Clone, const N: usize> Index<usize> for RadixTree<T, N> {
   }
 }
 
-impl<T: Clone, const N: usize> IndexMut<usize> for RadixTree<T, N> {
+impl<T: Clone, const N: usize> IndexMut<usize> for StrictRadixTree<T, N> {
   fn index_mut(&mut self, i: usize) -> &mut T {
     let mut tree = self;
 
     for p in tree.index_path(i).expect("Out of bounds") {
       match tree.data_mut() {
-        RadixTreeData::Meta(meta) => {
+        StrictRadixTreeData::Meta(meta) => {
           tree = &mut meta[p];
         }
-        RadixTreeData::Leaves(leaves) => {
+        StrictRadixTreeData::Leaves(leaves) => {
           return &mut leaves[p];
         }
       }
@@ -389,11 +395,11 @@ impl<T: Clone, const N: usize> IndexMut<usize> for RadixTree<T, N> {
   }
 }
 
-impl<'a, T: Clone, const N: usize> IntoIterator for &'a RadixTree<T, N> {
+impl<'a, T: Clone, const N: usize> IntoIterator for &'a StrictRadixTree<T, N> {
   type Item = &'a T;
-  type IntoIter = RadixTreeIterator<'a, T, N>;
+  type IntoIter = StrictRadixTreeIterator<'a, T, N>;
 
   fn into_iter(self) -> Self::IntoIter {
-    RadixTreeIterator::new(self)
+    StrictRadixTreeIterator::new(self)
   }
 }

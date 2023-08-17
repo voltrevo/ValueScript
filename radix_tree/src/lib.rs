@@ -1,7 +1,7 @@
-mod radix_tree;
-mod radix_tree_iterator;
+mod strict_radix_tree;
+mod strict_radix_tree_iterator;
 
-pub use crate::radix_tree::RadixTree;
+pub use crate::strict_radix_tree::StrictRadixTree;
 
 #[cfg(test)]
 mod tests {
@@ -9,7 +9,7 @@ mod tests {
 
   #[test]
   fn empty_tree() {
-    let tree = RadixTree::<usize, 4>::new();
+    let tree = StrictRadixTree::<usize, 4>::new();
     assert!(tree.is_empty());
     assert_eq!(tree.len(), 0);
     assert_eq!(tree.first(), None);
@@ -18,7 +18,7 @@ mod tests {
 
   #[test]
   fn push_once() {
-    let mut tree = RadixTree::<usize, 4>::new();
+    let mut tree = StrictRadixTree::<usize, 4>::new();
     tree.push(0);
     assert_eq!(tree.len(), 1);
     assert!(!tree.is_empty());
@@ -26,7 +26,7 @@ mod tests {
 
   #[test]
   fn push_100() {
-    let mut tree = RadixTree::<usize, 4>::new();
+    let mut tree = StrictRadixTree::<usize, 4>::new();
 
     for i in 0..100 {
       tree.push(i);
@@ -57,7 +57,7 @@ mod tests {
 
   #[test]
   fn push_64() {
-    let mut tree = RadixTree::<usize, 4>::new();
+    let mut tree = StrictRadixTree::<usize, 4>::new();
 
     for i in 0..64 {
       tree.push(i);
@@ -77,7 +77,7 @@ mod tests {
 
   #[test]
   fn iters() {
-    let mut tree = RadixTree::<usize, 4>::new();
+    let mut tree = StrictRadixTree::<usize, 4>::new();
 
     for i in 0..100 {
       tree.push(i);
@@ -90,7 +90,7 @@ mod tests {
 
   #[test]
   fn pop_100() {
-    let mut tree = RadixTree::<usize, 4>::new();
+    let mut tree = StrictRadixTree::<usize, 4>::new();
 
     for i in 0..100 {
       tree.push(i);
@@ -109,7 +109,7 @@ mod tests {
 
   #[test]
   fn truncate() {
-    let mut tree = RadixTree::<usize, 4>::new();
+    let mut tree = StrictRadixTree::<usize, 4>::new();
 
     for i in 0..100 {
       tree.push(i);
