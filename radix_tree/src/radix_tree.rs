@@ -221,6 +221,17 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
       }
     }
   }
+
+  fn index_path(&self, mut i: usize) -> Vec<usize> {
+    let mut path = vec![0; self.depth()];
+
+    for p in path.iter_mut().rev() {
+      *p = i % N;
+      i /= N;
+    }
+
+    path
+  }
 }
 
 impl<T: Clone, const N: usize> Default for RadixTree<T, N> {
@@ -232,17 +243,10 @@ impl<T: Clone, const N: usize> Default for RadixTree<T, N> {
 impl<T: Clone, const N: usize> Index<usize> for RadixTree<T, N> {
   type Output = T;
 
-  fn index(&self, mut i: usize) -> &T {
-    let mut path = vec![0; self.depth()];
-
-    for p in path.iter_mut().rev() {
-      *p = i % N;
-      i /= N;
-    }
-
+  fn index(&self, i: usize) -> &T {
     let mut tree = self;
 
-    for p in path {
+    for p in tree.index_path(i) {
       match tree.data() {
         RadixTreeData::Meta(meta) => {
           tree = &meta[p];
@@ -258,17 +262,10 @@ impl<T: Clone, const N: usize> Index<usize> for RadixTree<T, N> {
 }
 
 impl<T: Clone, const N: usize> IndexMut<usize> for RadixTree<T, N> {
-  fn index_mut(&mut self, mut i: usize) -> &mut T {
-    let mut path = vec![0; self.depth()];
-
-    for p in path.iter_mut().rev() {
-      *p = i % N;
-      i /= N;
-    }
-
+  fn index_mut(&mut self, i: usize) -> &mut T {
     let mut tree = self;
 
-    for p in path {
+    for p in tree.index_path(i) {
       match tree.data_mut() {
         RadixTreeData::Meta(meta) => {
           tree = &mut meta[p];
