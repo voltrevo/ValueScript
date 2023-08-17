@@ -1,4 +1,5 @@
 mod radix_tree;
+mod radix_tree_iterator;
 
 pub use crate::radix_tree::RadixTree;
 
