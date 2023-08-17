@@ -20,8 +20,16 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     RadixTree::<T, N>(Rc::new(RadixTreeData::<T, N>::Meta(ArrayVec::new())))
   }
 
+  fn data(&self) -> &RadixTreeData<T, N> {
+    &self.0
+  }
+
+  fn data_mut(&mut self) -> &mut RadixTreeData<T, N> {
+    Rc::make_mut(&mut self.0)
+  }
+
   pub fn is_empty(&self) -> bool {
-    match &*self.0 {
+    match self.data() {
       RadixTreeData::Meta(_) => false,
       RadixTreeData::Leaves(leaves) => leaves.is_empty(),
     }
@@ -32,7 +40,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     let mut tree = self;
 
     loop {
-      match &*tree.0 {
+      match tree.data() {
         RadixTreeData::Meta(meta) => {
           let i = meta.len() - 1;
           res += i;
@@ -75,7 +83,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     let mut depth = 1;
 
     loop {
-      match &*tree.0 {
+      match tree.data() {
         RadixTreeData::Meta(meta) => {
           if !meta.is_full() {
             max_depth_with_space = depth;
@@ -97,7 +105,7 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
       let mut swap_node = Self::new_meta();
       swap(&mut swap_node, self);
 
-      let self_meta = match Rc::make_mut(&mut self.0) {
+      let self_meta = match self.data_mut() {
         RadixTreeData::Meta(meta) => meta,
         RadixTreeData::Leaves(_) => {
           panic!("Should not happen because we just swapped meta into self")
@@ -142,6 +150,60 @@ impl<T: Clone, const N: usize> RadixTree<T, N> {
     let mut new_leaves = ArrayVec::new();
     new_leaves.push(value);
     meta_node_with_space.push(RadixTree(Rc::new(RadixTreeData::Leaves(new_leaves))));
+  }
+
+  pub fn first(&self) -> Option<&T> {
+    let mut tree = self;
+
+    loop {
+      match tree.data() {
+        RadixTreeData::Meta(meta) => {
+          tree = &meta[0];
+        }
+        RadixTreeData::Leaves(leaves) => break leaves.first(),
+      }
+    }
+  }
+
+  pub fn first_mut(&mut self) -> Option<&mut T> {
+    let mut tree = self;
+
+    loop {
+      match tree.data_mut() {
+        RadixTreeData::Meta(meta) => {
+          tree = &mut meta[0];
+        }
+        RadixTreeData::Leaves(leaves) => break leaves.first_mut(),
+      }
+    }
+  }
+
+  pub fn last(&self) -> Option<&T> {
+    let mut tree = self;
+
+    loop {
+      match tree.data() {
+        RadixTreeData::Meta(meta) => {
+          let last = meta.len() - 1;
+          tree = &meta[last];
+        }
+        RadixTreeData::Leaves(leaves) => break leaves.last(),
+      }
+    }
+  }
+
+  pub fn last_mut(&mut self) -> Option<&mut T> {
+    let mut tree = self;
+
+    loop {
+      match tree.data_mut() {
+        RadixTreeData::Meta(meta) => {
+          let last = meta.len() - 1;
+          tree = &mut meta[last];
+        }
+        RadixTreeData::Leaves(leaves) => break leaves.last_mut(),
+      }
+    }
   }
 }
 
