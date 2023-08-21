@@ -46,6 +46,7 @@ pub fn run_command(args: &Vec<String>) {
     .collect();
 
   match vm.run(bytecode, None, &val_args) {
+    Ok(Val::Undefined) => {},
     Ok(result) => {
       println!("{}", result.pretty());
     }

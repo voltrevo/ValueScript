@@ -31,6 +31,9 @@ pub enum BuiltinName {
   SymbolIterator,
 
   BigInt,
+
+  #[allow(non_camel_case_types)]
+  console,
 }
 
 pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
@@ -51,6 +54,7 @@ pub const BUILTIN_NAMES: [&str; BuiltinName::COUNT] = [
   "Symbol",
   "SymbolIterator",
   "BigInt",
+  "console",
 ];
 
 pub const BUILTIN_COUNT: usize = BuiltinName::COUNT;
