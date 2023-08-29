@@ -6,9 +6,11 @@ Welcome! ❤️
 
 1. Pick a
    [good first issue](https://github.com/voltrevo/ValueScript/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+   - **Note**:
+     [Some issues don't require any coding](https://github.com/voltrevo/ValueScript/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22+label%3A%22no+coding%22)
 2. Comment on the issue and mention @voltrevo
 3. Solve the issue (after waiting for assistance if needed)
-4. Submit a pull request
+4. Submit a pull request (if applicable)
 
 ## No Suitable Good-First-Issues?
 
