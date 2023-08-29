@@ -16,6 +16,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(src, "index.html"),
+        proceedToGitHub: resolve(src, "proceed-to-github.html"),
         playground: resolve(src, "playground", "index.html"),
       },
     },
