@@ -410,6 +410,7 @@ not the subset of ValueScript that has actually been implemented.
 <details>
 <summary>Implemented</summary>
 
+- `console.log`
 - Classes
 - Closures
 - Loops
@@ -458,9 +459,11 @@ not the subset of ValueScript that has actually been implemented.
 <details>
 <summary>Not yet implemented</summary>
 
+**Ecosystem**
+
 - Foreign functions
 - Standardized foreign function packages for web/node/deno-like APIs
-  - Sadly, there's currently _zero_ access to the host environment
+  - Sadly, the only access to the host environment is currently `console.log`
   - We consider this extremely important, but want the language itself to be
     more robust before embarking on this enormous category of work
   - (Some small & strategic host access will probably be implemented earlier)
@@ -478,21 +481,28 @@ not the subset of ValueScript that has actually been implemented.
     - Uses `.toString()` to get the source code and compiles and runs it in
       WebAssembly
   - C libraries, and bindings for python etc
+- Dynamic imports
+- Importing modules from npm
+  - (Even when this is implemented, many modules won't work due to their
+    intention to run in a JS environment though. At least at first.)
+
+**Core**
+
 - Object spreading
 - Rest params
 - Async functions
 - TypeScript namespaces
 - `import.meta`
-- Dynamic imports
 - Unusual JS things like passing unintended types to standard functions
 - A workaround for JavaScript's utf16 strings
   - `jsˋ🫣ˋ.length -> 2`
   - `[0, 1, 2].map(i => jsˋ🫣ˋ[i]) -> [jsˋ\ud83eˋ, jsˋ\udee3ˋ, undefined]`
   - (To be fair to js, note that iteration uses code points:
     `[...jsˋ🫣🚀ˋ] -> [jsˋ🫣ˋ, jsˋ🚀ˋ]`)
-- Importing modules from npm
-  - (Even when this is implemented, many modules won't work due to their
-    intention to run in a JS environment though. At least at first.)
+- JSX
+- Regex
+- Date
+- Stack traces
 
 </details>
 
@@ -503,6 +513,10 @@ not the subset of ValueScript that has actually been implemented.
 - Mutating imported variables
 - Reference semantics
 - Mutating captured variables
+- "Everything is an object"
+  - Properties cannot be set on non-objects like arrays and functions
+  - `new Number()` throws a `TypeError` instead of creating a non-primitive
+    number-like thing
 - The `with` keyword
 - utf16-based operations on native strings
   - (But see `jsˋˋ` workaround in not-yet section)
