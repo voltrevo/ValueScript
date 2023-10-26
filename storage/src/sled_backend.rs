@@ -1,6 +1,9 @@
 use std::fmt::Debug as DebugTrait;
 
-use crate::storage::{StorageBackend, StorageBackendHandle, StorageKey};
+use crate::{
+  storage::{StorageBackend, StorageBackendHandle},
+  StorageKey,
+};
 
 pub struct SledBackend {
   db: sled::Db,

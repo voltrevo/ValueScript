@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Debug as DebugTrait;
 
-use crate::storage::{StorageBackend, StorageBackendHandle, StorageKey};
+use crate::{
+  storage::{StorageBackend, StorageBackendHandle},
+  StorageKey,
+};
 
 pub struct MemoryBackend {
   data: HashMap<StorageKey, Vec<u8>>,
