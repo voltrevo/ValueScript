@@ -22,6 +22,9 @@ pub trait StorageOps<E> {
   fn inc_ref(&mut self, key: StorageKey) -> Result<(), E>;
   fn dec_ref(&mut self, key: StorageKey) -> Result<(), E>;
 
+  fn get_head_key(&mut self, name: &[u8]) -> Result<Option<StorageKey>, E>;
+  fn set_head_key(&mut self, name: &[u8], key: Option<&StorageKey>) -> Result<(), E>;
+
   fn get_head(&mut self, name: &[u8]) -> Result<Option<StorageVal>, E>;
   fn set_head(&mut self, name: &[u8], value: Option<&StorageVal>) -> Result<(), E>;
 }
@@ -73,9 +76,20 @@ where
     }
   }
 
+  fn get_head_key(&mut self, name: &[u8]) -> Result<Option<StorageKey>, E> {
+    match self.read(StorageKey::from_bytes(name))? {
+      Some(key_bytes) => Ok(Some(StorageKey::from_bytes(&key_bytes))),
+      None => Ok(None),
+    }
+  }
+
+  fn set_head_key(&mut self, name: &[u8], key: Option<&StorageKey>) -> Result<(), E> {
+    self.write(StorageKey::from_bytes(name), key.map(|key| key.to_bytes()))
+  }
+
   fn get_head(&mut self, name: &[u8]) -> Result<Option<StorageVal>, E> {
-    let key = match self.read(StorageKey::from_bytes(name))? {
-      Some(key_bytes) => StorageKey::from_bytes(&key_bytes),
+    let key = match self.get_head_key(name)? {
+      Some(key) => key,
       None => return Ok(None),
     };
 
@@ -92,17 +106,30 @@ where
   }
 
   fn set_head(&mut self, name: &[u8], value: Option<&StorageVal>) -> Result<(), E> {
-    let mut r = thread_rng();
+    if let Some(value) = value {
+      let key = StorageKey::random(&mut thread_rng());
+      self.write(key, Some(bincode::serialize(&value.serialize()).unwrap()))?;
 
-    let key = StorageKey::random(&mut r);
+      {
+        // TODO: Performance: Identify overlapping keys and cancel out the inc+dec
 
-    self.write(
-      key,
-      value.map(|value| bincode::serialize(&value.serialize()).unwrap()),
-    )?;
+        for subkey in value.refs.iter() {
+          self.inc_ref(*subkey)?;
+        }
 
-    // TODO: Handle existing
-    self.write(StorageKey::from_bytes(name), Some(key.to_bytes()))
+        if let Some(old_key) = self.get_head_key(name)? {
+          self.dec_ref(old_key)?;
+        }
+      }
+
+      self.set_head_key(name, Some(&key))
+    } else {
+      if let Some(old_key) = self.get_head_key(name)? {
+        self.dec_ref(old_key)?;
+      }
+
+      self.set_head_key(name, None)
+    }
   }
 }
 
