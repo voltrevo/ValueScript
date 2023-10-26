@@ -11,13 +11,13 @@ pub struct Storage<SB: StorageBackend> {
 }
 
 pub trait StorageBackendHandle<'a, E> {
-  fn read<T>(&self, key: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
-  fn write<T>(&mut self, key: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
+  fn read_bytes<T>(&self, key: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
+  fn write_bytes<T>(&mut self, key: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
 }
 
 pub trait StorageOps<E> {
-  fn read_t<T: for<'de> Deserialize<'de>>(&mut self, key: StoragePtr<T>) -> Result<Option<T>, E>;
-  fn write_t<T: Serialize>(&mut self, key: StoragePtr<T>, data: Option<&T>) -> Result<(), E>;
+  fn read<T: for<'de> Deserialize<'de>>(&mut self, key: StoragePtr<T>) -> Result<Option<T>, E>;
+  fn write<T: Serialize>(&mut self, key: StoragePtr<T>, data: Option<&T>) -> Result<(), E>;
 
   fn inc_ref(&mut self, key: StorageEntryPtr) -> Result<(), E>;
   fn dec_ref(&mut self, key: StorageEntryPtr) -> Result<(), E>;
@@ -30,8 +30,8 @@ impl<'a, Handle, E> StorageOps<E> for Handle
 where
   Handle: StorageBackendHandle<'a, E>,
 {
-  fn read_t<T: for<'de> Deserialize<'de>>(&mut self, key: StoragePtr<T>) -> Result<Option<T>, E> {
-    let data = match self.read(key)? {
+  fn read<T: for<'de> Deserialize<'de>>(&mut self, key: StoragePtr<T>) -> Result<Option<T>, E> {
+    let data = match self.read_bytes(key)? {
       Some(data) => data,
       None => return Ok(None),
     };
@@ -39,23 +39,23 @@ where
     Ok(Some(bincode::deserialize(&data).unwrap()))
   }
 
-  fn write_t<T: Serialize>(&mut self, key: StoragePtr<T>, data: Option<&T>) -> Result<(), E> {
-    self.write(key, data.map(|data| bincode::serialize(&data).unwrap()))
+  fn write<T: Serialize>(&mut self, key: StoragePtr<T>, data: Option<&T>) -> Result<(), E> {
+    self.write_bytes(key, data.map(|data| bincode::serialize(&data).unwrap()))
   }
 
   fn inc_ref(&mut self, key: StorageEntryPtr) -> Result<(), E> {
-    let mut entry = match self.read_t(key)? {
+    let mut entry = match self.read(key)? {
       Some(entry) => entry,
       None => panic!("Key does not exist"),
     };
 
     entry.ref_count += 1;
 
-    self.write_t(key, Some(&entry))
+    self.write(key, Some(&entry))
   }
 
   fn dec_ref(&mut self, key: StorageEntryPtr) -> Result<(), E> {
-    let mut entry = match self.read_t(key)? {
+    let mut entry = match self.read(key)? {
       Some(entry) => entry,
       None => panic!("Key does not exist"),
     };
@@ -67,19 +67,19 @@ where
         self.dec_ref(*key)?;
       }
 
-      self.write(key, None)
+      self.write_bytes(key, None)
     } else {
-      self.write_t(key, Some(&entry))
+      self.write(key, Some(&entry))
     }
   }
 
   fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E> {
-    let key = match self.read_t(ptr)? {
+    let key = match self.read(ptr)? {
       Some(key) => key,
       None => return Ok(None),
     };
 
-    let data = match self.read(key)? {
+    let data = match self.read_bytes(key)? {
       Some(data) => data,
       None => panic!("Head points to non-existent key"),
     };
@@ -94,7 +94,7 @@ where
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
     if let Some(value) = value {
       let key = StoragePtr::random(&mut thread_rng());
-      self.write(key, Some(bincode::serialize(&value.serialize()).unwrap()))?;
+      self.write_bytes(key, Some(bincode::serialize(&value.serialize()).unwrap()))?;
 
       {
         // TODO: Performance: Identify overlapping keys and cancel out the inc+dec
@@ -103,18 +103,18 @@ where
           self.inc_ref(*subkey)?;
         }
 
-        if let Some(old_key) = self.read_t(ptr)? {
+        if let Some(old_key) = self.read(ptr)? {
           self.dec_ref(old_key)?;
         }
       }
 
-      self.write_t(ptr, Some(&key))
+      self.write(ptr, Some(&key))
     } else {
-      if let Some(old_key) = self.read_t(ptr)? {
+      if let Some(old_key) = self.read(ptr)? {
         self.dec_ref(old_key)?;
       }
 
-      self.write_t(ptr, None)
+      self.write(ptr, None)
     }
   }
 }
@@ -148,17 +148,18 @@ impl<SB: StorageBackend> Storage<SB> {
 
   pub fn store_tmp(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, SB::Error<()>> {
     self.sb.transaction(|sb| {
-      let key = StoragePtr::random(&mut thread_rng());
-      sb.write(key, Some(bincode::serialize(value).unwrap()))?;
+      let tmp_count = sb.read(tmp_count_ptr())?.unwrap_or(0);
+      let tmp_ptr = tmp_at_ptr(tmp_count);
+      sb.set_head(tmp_ptr, Some(value))?;
 
-      let tmp_count = sb.read_t(tmp_count_ptr())?.unwrap_or(0);
-
-      sb.write(tmp_at_ptr(tmp_count), Some(key.to_bytes()))?;
-
-      sb.write(
+      sb.write_bytes(
         tmp_count_ptr(),
         Some(bincode::serialize(&(tmp_count + 1)).unwrap()),
       )?;
+
+      let key = sb
+        .read(tmp_ptr)?
+        .unwrap_or_else(|| panic!("Missing tmp key"));
 
       Ok(key)
     })
@@ -166,22 +167,25 @@ impl<SB: StorageBackend> Storage<SB> {
 
   pub fn clear_tmp(&mut self) -> Result<(), SB::Error<()>> {
     self.sb.transaction(|sb| {
-      let tmp_count = sb.read_t(tmp_count_ptr())?.unwrap_or(0);
+      let tmp_count = sb.read(tmp_count_ptr())?.unwrap_or(0);
 
       for i in 0..tmp_count {
-        let tmp_key = tmp_at_ptr(i);
-
-        let entry_ptr = sb
-          .read_t(tmp_key)?
-          .unwrap_or_else(|| panic!("Missing tmp key"));
-
-        sb.dec_ref(entry_ptr)?;
+        sb.set_head(tmp_at_ptr(i), None)?;
       }
 
       sb.write(tmp_count_ptr(), None)?;
 
       Ok(())
     })
+  }
+
+  pub(crate) fn get_ref_count(
+    &mut self,
+    key: StorageEntryPtr,
+  ) -> Result<Option<u64>, SB::Error<()>> {
+    self
+      .sb
+      .transaction(|sb| Ok(sb.read(key)?.map(|entry| entry.ref_count)))
   }
 }
 

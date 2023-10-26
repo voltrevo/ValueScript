@@ -49,7 +49,7 @@ pub struct SledBackendHandle<'a> {
 impl<'a, E> StorageBackendHandle<'a, sled::transaction::ConflictableTransactionError<E>>
   for SledBackendHandle<'a>
 {
-  fn read<T>(
+  fn read_bytes<T>(
     &self,
     key: StoragePtr<T>,
   ) -> Result<Option<Vec<u8>>, sled::transaction::ConflictableTransactionError<E>> {
@@ -57,7 +57,7 @@ impl<'a, E> StorageBackendHandle<'a, sled::transaction::ConflictableTransactionE
     Ok(value)
   }
 
-  fn write<T>(
+  fn write_bytes<T>(
     &mut self,
     key: StoragePtr<T>,
     data: Option<Vec<u8>>,

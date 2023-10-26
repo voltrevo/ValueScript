@@ -58,15 +58,28 @@ mod tests_ {
         })
         .unwrap();
 
-      // storage
-      //   .set_head(
-      //     b"test",
-      //     Some(&StorageVal {
-      //       point: StoragePoint::Array(Rc::new(vec![StoragePoint::Ref(0), StoragePoint::Ref(1)])),
-      //       refs: Rc::new(vec![key0, key1]),
-      //     }),
-      //   )
-      //   .unwrap();
+      storage
+        .set_head(
+          storage_head_ptr(b"test"),
+          Some(&StorageVal {
+            point: StoragePoint::Array(Rc::new(vec![StoragePoint::Ref(0), StoragePoint::Ref(1)])),
+            refs: Rc::new(vec![key0, key1]),
+          }),
+        )
+        .unwrap();
+
+      assert_eq!(storage.get_ref_count(key0).unwrap(), Some(2));
+      assert_eq!(storage.get_ref_count(key1).unwrap(), Some(2));
+
+      storage.clear_tmp().unwrap();
+
+      assert_eq!(storage.get_ref_count(key0).unwrap(), Some(1));
+      assert_eq!(storage.get_ref_count(key1).unwrap(), Some(1));
+
+      storage.set_head(storage_head_ptr(b"test"), None).unwrap();
+
+      assert_eq!(storage.get_ref_count(key0).unwrap(), None);
+      assert_eq!(storage.get_ref_count(key1).unwrap(), None);
     }
 
     run(impl_, impl_);

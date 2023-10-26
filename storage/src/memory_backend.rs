@@ -37,11 +37,11 @@ pub struct MemoryStorageHandle<'a> {
 }
 
 impl<'a, E> StorageBackendHandle<'a, E> for MemoryStorageHandle<'a> {
-  fn read<T>(&self, key: StoragePtr<T>) -> Result<Option<Vec<u8>>, E> {
+  fn read_bytes<T>(&self, key: StoragePtr<T>) -> Result<Option<Vec<u8>>, E> {
     Ok(self.storage.data.get(&key.data).cloned())
   }
 
-  fn write<T>(&mut self, key: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E> {
+  fn write_bytes<T>(&mut self, key: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E> {
     match data {
       Some(data) => self.storage.data.insert(key.data, data),
       None => self.storage.data.remove(&key.data),
