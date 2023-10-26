@@ -2,7 +2,7 @@ use rand::{rngs::ThreadRng, Rng};
 
 use crate::storage::StorageEntry;
 
-#[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq)]
 pub struct StoragePtr<T> {
   _marker: std::marker::PhantomData<T>,
 
@@ -19,6 +19,16 @@ impl<T> Clone for StoragePtr<T> {
 }
 
 impl<T> Copy for StoragePtr<T> {}
+
+impl<T> std::fmt::Debug for StoragePtr<T> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_tuple("StoragePtr")
+      .field(&self.data.0)
+      .field(&self.data.1)
+      .field(&self.data.2)
+      .finish()
+  }
+}
 
 pub type StorageEntryPtr = StoragePtr<StorageEntry>;
 pub type StorageHeadPtr = StoragePtr<StorageEntryPtr>;

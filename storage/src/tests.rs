@@ -86,4 +86,41 @@ mod tests_ {
 
     run(impl_, impl_);
   }
+
+  #[test]
+  fn array_of_arrays() {
+    fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
+      storage
+        .set_head(
+          storage_head_ptr(b"test"),
+          Some(&StorageVal {
+            point: StoragePoint::Array(Rc::new(vec![
+              StoragePoint::Array(Rc::new(vec![
+                StoragePoint::Number(1),
+                StoragePoint::Number(2),
+              ])),
+              StoragePoint::Array(Rc::new(vec![
+                StoragePoint::Number(3),
+                StoragePoint::Number(4),
+              ])),
+            ])),
+            refs: Rc::new(vec![]),
+          }),
+        )
+        .unwrap();
+
+      let value = storage
+        .get_head(storage_head_ptr(b"test"))
+        .unwrap()
+        .unwrap();
+
+      dbg!(&value);
+
+      let numbers = value.numbers(storage).unwrap();
+
+      assert_eq!(numbers, vec![1, 2, 3, 4]);
+    }
+
+    run(impl_, impl_);
+  }
 }

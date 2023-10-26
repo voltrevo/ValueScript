@@ -24,6 +24,9 @@ pub trait StorageOps<E> {
 
   fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E>;
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E>;
+
+  fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
+  fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
 }
 
 impl<'a, Handle, E> StorageOps<E> for Handle
@@ -86,19 +89,11 @@ where
 
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
     if let Some(value) = value {
-      let key = StoragePtr::random(&mut thread_rng());
-      self.write(key, Some(&value.to_entry()))?;
+      let key = self.store_with_replacements(value)?;
 
-      {
-        // TODO: Performance: Identify overlapping keys and cancel out the inc+dec
-
-        for subkey in value.refs.iter() {
-          self.inc_ref(*subkey)?;
-        }
-
-        if let Some(old_key) = self.read(ptr)? {
-          self.dec_ref(old_key)?;
-        }
+      // TODO: Performance: Identify overlapping keys and cancel out inc+dec
+      if let Some(old_key) = self.read(ptr)? {
+        self.dec_ref(old_key)?;
       }
 
       self.write(ptr, Some(&key))
@@ -109,6 +104,25 @@ where
 
       self.write(ptr, None)
     }
+  }
+
+  fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
+    if let Some(key) = value.point.maybe_replace_store(self, &value.refs)? {
+      return Ok(key);
+    }
+
+    self.store(value)
+  }
+
+  fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
+    let key = StoragePtr::random(&mut thread_rng());
+    self.write(key, Some(&value.to_entry()))?;
+
+    for subkey in value.refs.iter() {
+      self.inc_ref(*subkey)?;
+    }
+
+    Ok(key)
   }
 }
 
@@ -195,7 +209,7 @@ pub struct StorageEntry {
   data: Vec<u8>,
 }
 
-#[derive(Default, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Default, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub enum StoragePoint {
   #[default]
   Void,
@@ -207,7 +221,86 @@ pub enum StoragePoint {
   Ref(u64),
 }
 
-#[derive(Serialize, Deserialize)]
+impl StoragePoint {
+  pub fn maybe_replace_store<E, SO: StorageOps<E>>(
+    &self,
+    tx: &mut SO,
+    refs: &Rc<Vec<StorageEntryPtr>>,
+  ) -> Result<Option<StorageEntryPtr>, E> {
+    Ok(match &self {
+      StoragePoint::Void => None,
+      StoragePoint::Number(_) => None,
+      StoragePoint::Array(arr) => 'b: {
+        let mut replacements: Vec<(usize, StorageEntryPtr)> = Vec::new();
+
+        for i in 0..arr.len() {
+          if let Some(key) = arr[i].maybe_replace_store(tx, refs)? {
+            replacements.push((i, key));
+          }
+        }
+
+        if replacements.is_empty() {
+          break 'b Some(tx.store(&StorageVal {
+            point: StoragePoint::Array(arr.clone()),
+            refs: refs.clone(),
+          })?);
+        }
+
+        let mut new_arr = Vec::<StoragePoint>::new();
+        let mut new_refs = (**refs).clone();
+
+        let mut replacements_iter = replacements.iter();
+        let mut next_replacement = replacements_iter.next();
+
+        for (i, point) in arr.iter().enumerate() {
+          if let Some((j, entry_ptr)) = next_replacement {
+            if *j == i {
+              new_arr.push(StoragePoint::Ref(new_refs.len() as u64));
+              new_refs.push(*entry_ptr);
+              next_replacement = replacements_iter.next();
+              continue;
+            }
+          }
+
+          new_arr.push(point.clone());
+        }
+
+        Some(tx.store(&StorageVal {
+          point: StoragePoint::Array(Rc::new(new_arr)),
+          refs: Rc::new(new_refs),
+        })?)
+      }
+      StoragePoint::Ref(_) => None,
+    })
+  }
+
+  fn numbers<E, SO: StorageOps<E>>(
+    &self,
+    tx: &mut SO,
+    refs: &Rc<Vec<StorageEntryPtr>>,
+  ) -> Result<Vec<u64>, E> {
+    match &self {
+      StoragePoint::Void => Ok(Vec::new()),
+      StoragePoint::Number(n) => Ok(vec![*n]),
+      StoragePoint::Array(arr) => {
+        let mut numbers = Vec::new();
+
+        for point in arr.iter() {
+          numbers.extend(point.numbers(tx, refs)?);
+        }
+
+        Ok(numbers)
+      }
+      StoragePoint::Ref(i) => {
+        let key = refs[*i as usize];
+        let val = tx.read(key)?.unwrap().to_val();
+        val.point.numbers(tx, &val.refs)
+      }
+    }
+  }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct StorageVal {
   pub point: StoragePoint,
 
@@ -231,5 +324,14 @@ impl StorageVal {
       refs: self.refs.clone(),
       data: bincode::serialize(&self.point).unwrap(),
     }
+  }
+
+  pub(crate) fn numbers<SB: StorageBackend>(
+    &self,
+    storage: &mut Storage<SB>,
+  ) -> Result<Vec<u64>, SB::Error<()>> {
+    storage
+      .sb
+      .transaction(|sb| self.point.numbers(sb, &self.refs))
   }
 }
