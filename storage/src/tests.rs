@@ -6,7 +6,6 @@ mod tests_ {
     memory_backend::MemoryBackend,
     sled_backend::SledBackend,
     storage::{Storage, StorageBackend, StoragePoint, StorageVal},
-    StorageKey,
   };
 
   fn run(impl_memory: fn(&mut Storage<MemoryBackend>), impl_sled: fn(&mut Storage<SledBackend>)) {
@@ -18,23 +17,21 @@ mod tests_ {
   }
 
   #[test]
-  fn raw_number() {
+  fn number() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let key = storage.write_number(123.456).unwrap();
-      assert_eq!(storage.read_number(key).unwrap(), Some(123.456));
-    }
+      storage
+        .set_head(
+          b"test",
+          Some(&StorageVal {
+            point: StoragePoint::Number(123),
+            refs: Rc::new(vec![]),
+          }),
+        )
+        .unwrap();
 
-    run(impl_, impl_);
-  }
+      let val = storage.get_head(b"test").unwrap().unwrap();
 
-  fn store_void() {
-    fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let val = StorageVal {
-        point: StoragePoint::Void,
-        refs: Rc::new(Vec::<StorageKey>::new()),
-      };
-
-      // todo
+      assert_eq!(val.point, StoragePoint::Number(123));
     }
 
     run(impl_, impl_);

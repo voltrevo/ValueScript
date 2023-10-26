@@ -1,3 +1,5 @@
+use rand::{rngs::ThreadRng, Rng};
+
 #[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct StorageKey(pub u64, pub u64, pub u64);
 
@@ -14,5 +16,9 @@ impl StorageKey {
 
   pub fn to_bytes(&self) -> Vec<u8> {
     bincode::serialize(self).unwrap()
+  }
+
+  pub fn random(rng: &mut ThreadRng) -> Self {
+    Self(rng.gen(), rng.gen(), rng.gen())
   }
 }

@@ -1,7 +1,9 @@
 use std::{fmt::Debug as DebugTrait, rc::Rc};
 
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand::{rngs::ThreadRng, thread_rng};
+use serde::{Deserialize, Serialize};
 
+use crate::serde_rc::{deserialize_rc, serialize_rc};
 use crate::storage_key::StorageKey;
 
 pub struct Storage<SB: StorageBackend> {
@@ -32,36 +34,7 @@ impl<SB: StorageBackend> Storage<SB> {
     }
   }
 
-  pub fn random_key(&mut self) -> StorageKey {
-    StorageKey(self.rng.gen(), self.rng.gen(), self.rng.gen())
-  }
-
-  pub fn write_number(&mut self, number: f64) -> Result<StorageKey, SB::Error<()>> {
-    let mut data = Vec::<u8>::new();
-    data.extend_from_slice(&number.to_le_bytes());
-    let key = self.random_key();
-
-    self
-      .sb
-      .transaction(|sb| sb.write(key, Some(data.clone())))?;
-
-    Ok(key)
-  }
-
-  pub fn read_number(&mut self, key: StorageKey) -> Result<Option<f64>, SB::Error<()>> {
-    self.sb.transaction(|sb| {
-      let data = match sb.read(key)? {
-        Some(data) => data,
-        None => return Ok(None),
-      };
-
-      let mut bytes = [0u8; 8];
-      bytes.copy_from_slice(&data);
-      Ok(Some(f64::from_le_bytes(bytes)))
-    })
-  }
-
-  pub fn read(&mut self, key: StorageKey) -> Result<Option<StoredRc>, SB::Error<()>> {
+  pub fn read(&mut self, key: StorageKey) -> Result<Option<StorageEntry>, SB::Error<()>> {
     self.sb.transaction(|sb| {
       let data = match sb.read(key)? {
         Some(data) => data,
@@ -72,51 +45,97 @@ impl<SB: StorageBackend> Storage<SB> {
     })
   }
 
-  pub fn write(&mut self, key: StorageKey, data: &StoredRc) -> Result<(), SB::Error<()>> {
+  pub fn write(&mut self, key: StorageKey, data: &StorageEntry) -> Result<(), SB::Error<()>> {
     self.sb.transaction(|sb| {
       let data = bincode::serialize(&data).unwrap();
       sb.write(key, Some(data))
     })
   }
 
-  pub fn head(&mut self) -> Result<Option<StorageKey>, SB::Error<()>> {
+  pub fn set_head(&mut self, name: &[u8], value: Option<&StorageVal>) -> Result<(), SB::Error<()>> {
+    let Self { sb, rng } = self;
+
+    sb.transaction(|sb| {
+      let mut r = rng.clone();
+
+      let key = StorageKey::random(&mut r);
+
+      sb.write(
+        key,
+        value.map(|value| bincode::serialize(&value.serialize()).unwrap()),
+      )?;
+
+      // TODO: Handle existing
+      sb.write(StorageKey::from_bytes(name), Some(key.to_bytes()))
+    })
+  }
+
+  pub fn get_head(&mut self, name: &[u8]) -> Result<Option<StorageVal>, SB::Error<()>> {
     self.sb.transaction(|sb| {
-      let data = match sb.read(StorageKey(0, 0, 0))? {
-        Some(data) => data,
+      let key = match sb.read(StorageKey::from_bytes(name))? {
+        Some(key_bytes) => StorageKey::from_bytes(&key_bytes),
         None => return Ok(None),
       };
 
-      Ok(Some(bincode::deserialize(&data).unwrap()))
-    })
-  }
+      let data = match sb.read(key)? {
+        Some(data) => data,
+        None => panic!("Head points to non-existent key"),
+      };
 
-  pub fn set_head(&mut self, key: StorageKey) -> Result<(), SB::Error<()>> {
-    self.sb.transaction(|sb| {
-      // TODO: read old head, deal with ref counts
-
-      let data = bincode::serialize(&key).unwrap();
-      sb.write(StorageKey(0, 0, 0), Some(data))
+      Ok(Some(
+        bincode::deserialize::<StorageEntry>(&data)
+          .unwrap()
+          .deserialize(),
+      ))
     })
   }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct StoredRc {
-  count: u64,
-  refs: Vec<StorageKey>,
+#[derive(Serialize, Deserialize)]
+pub struct StorageEntry {
+  ref_count: u64,
+
+  #[serde(serialize_with = "serialize_rc", deserialize_with = "deserialize_rc")]
+  refs: Rc<Vec<StorageKey>>,
+
   data: Vec<u8>,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub enum StoragePoint {
   #[default]
   Void,
-  Number(f64),
-  Array(Rc<Vec<StoragePoint>>),
+  Number(u64),
+  Array(
+    #[serde(serialize_with = "serialize_rc", deserialize_with = "deserialize_rc")]
+    Rc<Vec<StoragePoint>>,
+  ),
   Ref(u64),
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct StorageVal {
   pub point: StoragePoint,
+
+  #[serde(serialize_with = "serialize_rc", deserialize_with = "deserialize_rc")]
   pub refs: Rc<Vec<StorageKey>>,
+}
+
+impl StorageEntry {
+  pub fn deserialize(&self) -> StorageVal {
+    StorageVal {
+      point: bincode::deserialize(&self.data).unwrap(),
+      refs: self.refs.clone(),
+    }
+  }
+}
+
+impl StorageVal {
+  pub fn serialize(&self) -> StorageEntry {
+    StorageEntry {
+      ref_count: 1,
+      refs: self.refs.clone(),
+      data: bincode::serialize(&self.point).unwrap(),
+    }
+  }
 }
