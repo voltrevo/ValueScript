@@ -36,4 +36,35 @@ mod tests_ {
 
     run(impl_, impl_);
   }
+
+  #[test]
+  fn array_0_1() {
+    fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
+      let key0 = storage
+        .store_tmp(&StorageVal {
+          point: StoragePoint::Number(0),
+          refs: Rc::new(vec![]),
+        })
+        .unwrap();
+
+      let key1 = storage
+        .store_tmp(&StorageVal {
+          point: StoragePoint::Number(1),
+          refs: Rc::new(vec![]),
+        })
+        .unwrap();
+
+      storage
+        .set_head(
+          b"test",
+          Some(&StorageVal {
+            point: StoragePoint::Array(Rc::new(vec![StoragePoint::Ref(0), StoragePoint::Ref(1)])),
+            refs: Rc::new(vec![key0, key1]),
+          }),
+        )
+        .unwrap();
+    }
+
+    run(impl_, impl_);
+  }
 }

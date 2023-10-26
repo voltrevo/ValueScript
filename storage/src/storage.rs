@@ -155,6 +155,50 @@ impl<SB: StorageBackend> Storage<SB> {
   pub fn set_head(&mut self, name: &[u8], value: Option<&StorageVal>) -> Result<(), SB::Error<()>> {
     self.sb.transaction(|sb| sb.set_head(name, value))
   }
+
+  pub fn store_tmp(&mut self, value: &StorageVal) -> Result<StorageKey, SB::Error<()>> {
+    self.sb.transaction(|sb| {
+      let key = StorageKey::random(&mut thread_rng());
+      sb.write(key, Some(bincode::serialize(value).unwrap()))?;
+
+      let tmp_count = sb
+        .read(StorageKey::tmp_count())?
+        .map(|data| bincode::deserialize::<u64>(&data).unwrap())
+        .unwrap_or(0);
+
+      sb.write(StorageKey::tmp_at(tmp_count), Some(key.to_bytes()))?;
+
+      sb.write(
+        StorageKey::tmp_count(),
+        Some(bincode::serialize(&(tmp_count + 1)).unwrap()),
+      )?;
+
+      Ok(key)
+    })
+  }
+
+  pub fn clear_tmp(&mut self) -> Result<(), SB::Error<()>> {
+    self.sb.transaction(|sb| {
+      let tmp_count = sb
+        .read(StorageKey::tmp_count())?
+        .map(|data| bincode::deserialize::<u64>(&data).unwrap())
+        .unwrap_or(0);
+
+      for i in 0..tmp_count {
+        let tmp_key = StorageKey::tmp_at(i);
+        let key_bytes = sb
+          .read(tmp_key)?
+          .unwrap_or_else(|| panic!("Missing tmp key: {:?}", tmp_key));
+
+        let key = StorageKey::from_bytes(&key_bytes);
+        sb.dec_ref(key)?;
+      }
+
+      sb.write(StorageKey::tmp_count(), None)?;
+
+      Ok(())
+    })
+  }
 }
 
 #[derive(Serialize, Deserialize)]
