@@ -10,3 +10,4 @@ serde = { version = "1", features = ["derive"] }
 bincode = "1"
 num-bigint = "0.4.3"
 rand = "0.8.5"
+sled = "0.34.7"

@@ -1,15 +1,9 @@
-mod memory_storage;
+mod memory_backend;
 mod storage;
 
-#[cfg(test)]
-mod tests {
-  use crate::{memory_storage::MemoryStorage, storage::Storage};
+mod sled_backend;
+mod tests;
 
-  #[test]
-  fn number() {
-    let mut storage = Storage::new(MemoryStorage::new());
-
-    let key = storage.write_number(123.456);
-    assert_eq!(storage.read_number(key), Some(123.456));
-  }
-}
+pub use self::storage::{Storage, StorageBackend, StorageKey};
+pub use memory_backend::MemoryBackend;
+pub use sled_backend::SledBackend;
