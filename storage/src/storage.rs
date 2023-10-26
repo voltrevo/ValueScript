@@ -189,6 +189,7 @@ impl<SB: StorageBackend> Storage<SB> {
     self.sb.is_empty()
   }
 
+  #[cfg(test)]
   pub(crate) fn get_ref_count(
     &mut self,
     key: StorageEntryPtr,
@@ -274,6 +275,7 @@ impl StoragePoint {
     })
   }
 
+  #[cfg(test)]
   fn numbers<E, SO: StorageOps<E>>(
     &self,
     tx: &mut SO,
@@ -326,6 +328,7 @@ impl StorageVal {
     }
   }
 
+  #[cfg(test)]
   pub(crate) fn numbers<SB: StorageBackend>(
     &self,
     storage: &mut Storage<SB>,

@@ -6,6 +6,7 @@ use crate::{
   StoragePtr,
 };
 
+#[derive(Default)]
 pub struct MemoryBackend {
   data: HashMap<(u64, u64, u64), Vec<u8>>,
 }

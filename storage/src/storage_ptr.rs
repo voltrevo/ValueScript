@@ -60,14 +60,14 @@ pub fn storage_head_ptr(name: &[u8]) -> StorageHeadPtr {
   StorageHeadPtr::from_bytes(name)
 }
 
-pub fn tmp_count_ptr() -> StoragePtr<u64> {
+pub(crate) fn tmp_count_ptr() -> StoragePtr<u64> {
   let mut key = StoragePtr::<u64>::from_bytes(b"tmp");
   key.data.2 = 1;
 
   key
 }
 
-pub fn tmp_at_ptr(i: u64) -> StorageHeadPtr {
+pub(crate) fn tmp_at_ptr(i: u64) -> StorageHeadPtr {
   let mut key = StorageHeadPtr::from_bytes(b"tmp");
   key.data.2 = i + 2;
 
