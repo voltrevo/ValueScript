@@ -67,7 +67,7 @@ where
         self.dec_ref(*key)?;
       }
 
-      self.write_bytes(key, None)
+      self.write(key, None)
     } else {
       self.write(key, Some(&entry))
     }
@@ -79,22 +79,15 @@ where
       None => return Ok(None),
     };
 
-    let data = match self.read_bytes(key)? {
-      Some(data) => data,
-      None => panic!("Head points to non-existent key"),
-    };
+    let value = self.read(key)?.map(|entry| entry.to_val());
 
-    Ok(Some(
-      bincode::deserialize::<StorageEntry>(&data)
-        .unwrap()
-        .deserialize(),
-    ))
+    Ok(value)
   }
 
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
     if let Some(value) = value {
       let key = StoragePtr::random(&mut thread_rng());
-      self.write_bytes(key, Some(bincode::serialize(&value.serialize()).unwrap()))?;
+      self.write(key, Some(&value.to_entry()))?;
 
       {
         // TODO: Performance: Identify overlapping keys and cancel out the inc+dec
@@ -154,10 +147,7 @@ impl<SB: StorageBackend> Storage<SB> {
       let tmp_ptr = tmp_at_ptr(tmp_count);
       sb.set_head(tmp_ptr, Some(value))?;
 
-      sb.write_bytes(
-        tmp_count_ptr(),
-        Some(bincode::serialize(&(tmp_count + 1)).unwrap()),
-      )?;
+      sb.write(tmp_count_ptr(), Some(&(tmp_count + 1)))?;
 
       let key = sb
         .read(tmp_ptr)?
@@ -226,7 +216,7 @@ pub struct StorageVal {
 }
 
 impl StorageEntry {
-  pub fn deserialize(&self) -> StorageVal {
+  pub fn to_val(&self) -> StorageVal {
     StorageVal {
       point: bincode::deserialize(&self.data).unwrap(),
       refs: self.refs.clone(),
@@ -235,7 +225,7 @@ impl StorageEntry {
 }
 
 impl StorageVal {
-  pub fn serialize(&self) -> StorageEntry {
+  pub fn to_entry(&self) -> StorageEntry {
     StorageEntry {
       ref_count: 1,
       refs: self.refs.clone(),
