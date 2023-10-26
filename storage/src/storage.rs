@@ -127,6 +127,8 @@ pub trait StorageBackend {
   fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
   where
     F: Fn(&mut Self::Handle<'_, E>) -> Result<T, Self::InTransactionError<E>>;
+
+  fn is_empty(&self) -> bool;
 }
 
 impl<SB: StorageBackend> Storage<SB> {
@@ -177,6 +179,10 @@ impl<SB: StorageBackend> Storage<SB> {
 
       Ok(())
     })
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.sb.is_empty()
   }
 
   pub(crate) fn get_ref_count(

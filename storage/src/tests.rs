@@ -80,6 +80,8 @@ mod tests_ {
 
       assert_eq!(storage.get_ref_count(key0).unwrap(), None);
       assert_eq!(storage.get_ref_count(key1).unwrap(), None);
+
+      assert!(storage.is_empty());
     }
 
     run(impl_, impl_);

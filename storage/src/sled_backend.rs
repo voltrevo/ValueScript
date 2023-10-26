@@ -40,6 +40,10 @@ impl StorageBackend for SledBackend {
       f(&mut handle)
     })
   }
+
+  fn is_empty(&self) -> bool {
+    self.db.is_empty()
+  }
 }
 
 pub struct SledBackendHandle<'a> {

@@ -30,6 +30,10 @@ impl StorageBackend for MemoryBackend {
     let mut handle = MemoryStorageHandle { storage: self };
     f(&mut handle)
   }
+
+  fn is_empty(&self) -> bool {
+    self.data.is_empty()
+  }
 }
 
 pub struct MemoryStorageHandle<'a> {
