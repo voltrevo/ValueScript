@@ -2,7 +2,7 @@ use std::fmt::Debug as DebugTrait;
 
 use crate::{
   storage::{StorageBackend, StorageBackendHandle},
-  StorageKey,
+  StoragePtr,
 };
 
 pub struct SledBackend {
@@ -49,17 +49,17 @@ pub struct SledBackendHandle<'a> {
 impl<'a, E> StorageBackendHandle<'a, sled::transaction::ConflictableTransactionError<E>>
   for SledBackendHandle<'a>
 {
-  fn read(
+  fn read<T>(
     &self,
-    key: StorageKey,
+    key: StoragePtr<T>,
   ) -> Result<Option<Vec<u8>>, sled::transaction::ConflictableTransactionError<E>> {
     let value = self.tx.get(key.to_bytes())?.map(|value| value.to_vec());
     Ok(value)
   }
 
-  fn write(
+  fn write<T>(
     &mut self,
-    key: StorageKey,
+    key: StoragePtr<T>,
     data: Option<Vec<u8>>,
   ) -> Result<(), sled::transaction::ConflictableTransactionError<E>> {
     match data {

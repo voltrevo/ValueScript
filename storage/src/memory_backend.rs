@@ -3,11 +3,11 @@ use std::fmt::Debug as DebugTrait;
 
 use crate::{
   storage::{StorageBackend, StorageBackendHandle},
-  StorageKey,
+  StoragePtr,
 };
 
 pub struct MemoryBackend {
-  data: HashMap<StorageKey, Vec<u8>>,
+  data: HashMap<(u64, u64, u64), Vec<u8>>,
 }
 
 impl MemoryBackend {
@@ -37,14 +37,14 @@ pub struct MemoryStorageHandle<'a> {
 }
 
 impl<'a, E> StorageBackendHandle<'a, E> for MemoryStorageHandle<'a> {
-  fn read(&self, key: StorageKey) -> Result<Option<Vec<u8>>, E> {
-    Ok(self.storage.data.get(&key).cloned())
+  fn read<T>(&self, key: StoragePtr<T>) -> Result<Option<Vec<u8>>, E> {
+    Ok(self.storage.data.get(&key.data).cloned())
   }
 
-  fn write(&mut self, key: StorageKey, data: Option<Vec<u8>>) -> Result<(), E> {
+  fn write<T>(&mut self, key: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E> {
     match data {
-      Some(data) => self.storage.data.insert(key, data),
-      None => self.storage.data.remove(&key),
+      Some(data) => self.storage.data.insert(key.data, data),
+      None => self.storage.data.remove(&key.data),
     };
 
     Ok(())
