@@ -11,21 +11,61 @@ use crate::storage_ptr::StorageEntryPtr;
 #[cfg(test)]
 use crate::{Storage, StorageBackend};
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StorageVal {
-  pub point: StoragePoint,
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+pub enum StorageVal {
+  #[default]
+  Void,
+  Number(u64),
+  Ptr(StorageEntryPtr),
+  Ref(u64),
+  Compound(
+    #[serde(serialize_with = "serialize_rc", deserialize_with = "deserialize_rc")]
+    Rc<StorageCompoundVal>,
+  ),
+}
 
-  #[serde(serialize_with = "serialize_rc", deserialize_with = "deserialize_rc")]
-  pub refs: Rc<Vec<StorageEntryPtr>>,
+#[derive(Debug, Serialize, Deserialize)]
+pub enum StorageCompoundVal {
+  Array(StorageArray),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StorageArray {
+  pub items: Vec<StorageVal>,
+
+  // Skipping serialization because they're stored in the entry. When converting from an entry, we
+  // copy (todo: move?) the refs from there.
+  #[serde(skip)]
+  pub refs: Vec<StorageEntryPtr>,
 }
 
 impl StorageVal {
   pub fn to_entry(&self) -> StorageEntry {
     StorageEntry {
       ref_count: 1,
-      refs: self.refs.clone(),
-      data: bincode::serialize(&self.point).unwrap(),
+      refs: match self {
+        StorageVal::Void | StorageVal::Number(_) | StorageVal::Ptr(_) | StorageVal::Ref(_) => {
+          vec![]
+        }
+        StorageVal::Compound(compound) => match &**compound {
+          StorageCompoundVal::Array(arr) => arr.refs.clone(),
+        },
+      },
+      data: bincode::serialize(self).unwrap(),
     }
+  }
+
+  pub fn refs(&self) -> Option<&Vec<StorageEntryPtr>> {
+    match self {
+      StorageVal::Void | StorageVal::Number(_) | StorageVal::Ptr(_) | StorageVal::Ref(_) => None,
+      StorageVal::Compound(compound) => match &**compound {
+        StorageCompoundVal::Array(arr) => Some(&arr.refs),
+      },
+    }
+  }
+
+  pub fn refs_iter(&self) -> impl Iterator<Item = &StorageEntryPtr> {
+    self.refs().into_iter().flatten()
   }
 
   #[cfg(test)]
@@ -33,29 +73,12 @@ impl StorageVal {
     &self,
     storage: &mut Storage<SB>,
   ) -> Result<Vec<u64>, SB::Error<()>> {
-    storage
-      .sb
-      .transaction(|sb| self.point.numbers(sb, &self.refs))
+    storage.sb.transaction(|sb| self.numbers_impl(sb))
   }
-}
 
-#[derive(Default, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
-pub enum StoragePoint {
-  #[default]
-  Void,
-  Number(u64),
-  Array(
-    #[serde(serialize_with = "serialize_rc", deserialize_with = "deserialize_rc")]
-    Rc<Vec<StoragePoint>>,
-  ),
-  Ref(u64),
-}
-
-impl StoragePoint {
   pub fn maybe_replace_store<E, SO: StorageOps<E>>(
     &self,
     tx: &mut SO,
-    refs: &Rc<Vec<StorageEntryPtr>>,
     cache: &mut HashMap<RcKey, StorageEntryPtr>,
   ) -> Result<Option<StorageEntryPtr>, E> {
     if let Some(id) = self.cache_id() {
@@ -65,94 +88,103 @@ impl StoragePoint {
     }
 
     Ok(match &self {
-      StoragePoint::Void => None,
-      StoragePoint::Number(_) => None,
-      StoragePoint::Array(arr) => 'b: {
-        let mut replacements: Vec<(usize, StorageEntryPtr)> = Vec::new();
+      StorageVal::Void | StorageVal::Number(_) | StorageVal::Ptr(_) | StorageVal::Ref(_) => None,
+      StorageVal::Compound(compound) => match &**compound {
+        StorageCompoundVal::Array(arr) => 'b: {
+          let mut replacements: Vec<(usize, StorageEntryPtr)> = Vec::new();
 
-        for i in 0..arr.len() {
-          if let Some(key) = arr[i].maybe_replace_store(tx, refs, cache)? {
-            replacements.push((i, key));
-          }
-        }
-
-        if replacements.is_empty() {
-          break 'b Some(cache_and_store(
-            tx,
-            &StorageVal {
-              point: StoragePoint::Array(arr.clone()),
-              refs: refs.clone(),
-            },
-            cache,
-            RcKey::from(arr.clone()),
-          )?);
-        }
-
-        let mut new_arr = Vec::<StoragePoint>::new();
-        let mut new_refs = (**refs).clone();
-
-        let mut replacements_iter = replacements.iter();
-        let mut next_replacement = replacements_iter.next();
-
-        for (i, point) in arr.iter().enumerate() {
-          if let Some((j, entry_ptr)) = next_replacement {
-            if *j == i {
-              new_arr.push(StoragePoint::Ref(new_refs.len() as u64));
-              new_refs.push(*entry_ptr);
-              next_replacement = replacements_iter.next();
-              continue;
+          for i in 0..arr.items.len() {
+            if let Some(key) = arr.items[i].maybe_replace_store(tx, cache)? {
+              replacements.push((i, key));
             }
           }
 
-          new_arr.push(point.clone());
-        }
+          let cache_id = RcKey::from(compound.clone());
 
-        Some(cache_and_store(
-          tx,
-          &StorageVal {
-            point: StoragePoint::Array(Rc::new(new_arr)),
-            refs: Rc::new(new_refs),
-          },
-          cache,
-          RcKey::from(arr.clone()),
-        )?)
-      }
-      StoragePoint::Ref(_) => None,
+          if replacements.is_empty() {
+            break 'b Some(cache_and_store(tx, self, cache, cache_id)?);
+          }
+
+          let mut new_arr = Vec::<StorageVal>::new();
+          let mut new_refs = arr.refs.clone();
+
+          let mut replacements_iter = replacements.iter();
+          let mut next_replacement = replacements_iter.next();
+
+          for (i, item) in arr.items.iter().enumerate() {
+            if let Some((j, entry_ptr)) = next_replacement {
+              if *j == i {
+                new_arr.push(StorageVal::Ref(new_refs.len() as u64));
+                new_refs.push(*entry_ptr);
+                next_replacement = replacements_iter.next();
+                continue;
+              }
+            }
+
+            new_arr.push(item.clone());
+          }
+
+          Some(cache_and_store(
+            tx,
+            &StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+              items: new_arr,
+              refs: new_refs,
+            }))),
+            cache,
+            cache_id,
+          )?)
+        }
+      },
     })
   }
 
   fn cache_id(&self) -> Option<RcKey> {
-    match &self {
-      StoragePoint::Void => None,
-      StoragePoint::Number(_) => None,
-      StoragePoint::Array(arr) => Some(RcKey::from(arr.clone())),
-      StoragePoint::Ref(_) => None,
+    match self {
+      StorageVal::Void => None,
+      StorageVal::Number(_) => None,
+      StorageVal::Ptr(_) => None,
+      StorageVal::Ref(_) => None,
+      StorageVal::Compound(compound) => Some(RcKey::from(compound.clone())),
     }
   }
 
   #[cfg(test)]
-  fn numbers<E, SO: StorageOps<E>>(
-    &self,
-    tx: &mut SO,
-    refs: &Rc<Vec<StorageEntryPtr>>,
-  ) -> Result<Vec<u64>, E> {
+  fn numbers_impl<E, SO: StorageOps<E>>(&self, tx: &mut SO) -> Result<Vec<u64>, E> {
     match &self {
-      StoragePoint::Void => Ok(Vec::new()),
-      StoragePoint::Number(n) => Ok(vec![*n]),
-      StoragePoint::Array(arr) => {
-        let mut numbers = Vec::new();
+      StorageVal::Void => Ok(Vec::new()),
+      StorageVal::Number(n) => Ok(vec![*n]),
+      StorageVal::Ptr(ptr) => {
+        let entry = tx.read(*ptr)?.unwrap();
+        entry.move_to_val().numbers_impl(tx)
+      }
+      // StorageVal::Array(arr) => {
+      //   let mut numbers = Vec::new();
 
-        for point in arr.iter() {
-          numbers.extend(point.numbers(tx, refs)?);
+      //   for point in arr.iter() {
+      //     numbers.extend(point.numbers(tx, refs)?);
+      //   }
+
+      //   Ok(numbers)
+      // }
+      StorageVal::Ref(_) => {
+        panic!("Can't lookup ref (shouldn't hit this case)")
+      }
+      StorageVal::Compound(compound) => match &**compound {
+        StorageCompoundVal::Array(arr) => {
+          let mut numbers = Vec::new();
+
+          for item in &arr.items {
+            if let StorageVal::Ref(i) = item {
+              let item = &StorageVal::Ptr(arr.refs[*i as usize]);
+              numbers.extend(item.numbers_impl(tx)?);
+            } else {
+              numbers.extend(item.numbers_impl(tx)?);
+            }
+          }
+
+          Ok(numbers)
         }
-
-        Ok(numbers)
-      }
-      StoragePoint::Ref(i) => {
-        let key = refs[*i as usize];
-        let val = tx.read(key)?.unwrap().to_val();
-        val.point.numbers(tx, &val.refs)
-      }
+      },
     }
   }
 }
@@ -160,19 +192,30 @@ impl StoragePoint {
 #[derive(Serialize, Deserialize)]
 pub struct StorageEntry {
   pub(crate) ref_count: u64,
-
-  #[serde(serialize_with = "serialize_rc", deserialize_with = "deserialize_rc")]
-  pub(crate) refs: Rc<Vec<StorageEntryPtr>>,
+  pub(crate) refs: Vec<StorageEntryPtr>,
 
   data: Vec<u8>,
 }
 
 impl StorageEntry {
-  pub fn to_val(&self) -> StorageVal {
-    StorageVal {
-      point: bincode::deserialize(&self.data).unwrap(),
-      refs: self.refs.clone(),
-    }
+  pub fn move_to_val(self) -> StorageVal {
+    let Self {
+      ref_count: _,
+      refs,
+      data,
+    } = self;
+
+    let mut val = bincode::deserialize::<StorageVal>(&data).unwrap();
+
+    if let StorageVal::Compound(compound) = &mut val {
+      match Rc::get_mut(compound).expect("Should be single ref") {
+        StorageCompoundVal::Array(arr) => {
+          arr.refs = refs;
+        }
+      }
+    };
+
+    val
   }
 }
 

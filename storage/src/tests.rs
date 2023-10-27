@@ -7,7 +7,7 @@ mod tests_ {
     sled_backend::SledBackend,
     storage::Storage,
     storage_ptr::storage_head_ptr,
-    storage_val::{StoragePoint, StorageVal},
+    storage_val::{StorageArray, StorageCompoundVal, StorageVal},
     StorageBackend,
   };
 
@@ -23,13 +23,7 @@ mod tests_ {
   fn number() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
       storage
-        .set_head(
-          storage_head_ptr(b"test"),
-          Some(&StorageVal {
-            point: StoragePoint::Number(123),
-            refs: Rc::new(vec![]),
-          }),
-        )
+        .set_head(storage_head_ptr(b"test"), Some(&StorageVal::Number(123)))
         .unwrap();
 
       let val = storage
@@ -37,7 +31,11 @@ mod tests_ {
         .unwrap()
         .unwrap();
 
-      assert_eq!(val.point, StoragePoint::Number(123));
+      if let StorageVal::Number(val) = val {
+        assert_eq!(val, 123);
+      } else {
+        panic!("Expected number");
+      }
     }
 
     run(impl_, impl_);
@@ -46,27 +44,18 @@ mod tests_ {
   #[test]
   fn array_0_1() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let key0 = storage
-        .store_tmp(&StorageVal {
-          point: StoragePoint::Number(0),
-          refs: Rc::new(vec![]),
-        })
-        .unwrap();
-
-      let key1 = storage
-        .store_tmp(&StorageVal {
-          point: StoragePoint::Number(1),
-          refs: Rc::new(vec![]),
-        })
-        .unwrap();
+      let key0 = storage.store_tmp(&StorageVal::Number(0)).unwrap();
+      let key1 = storage.store_tmp(&StorageVal::Number(1)).unwrap();
 
       storage
         .set_head(
           storage_head_ptr(b"test"),
-          Some(&StorageVal {
-            point: StoragePoint::Array(Rc::new(vec![StoragePoint::Ref(0), StoragePoint::Ref(1)])),
-            refs: Rc::new(vec![key0, key1]),
-          }),
+          Some(&StorageVal::Compound(Rc::new(StorageCompoundVal::Array(
+            StorageArray {
+              items: vec![StorageVal::Ref(0), StorageVal::Ref(1)],
+              refs: vec![key0, key1],
+            },
+          )))),
         )
         .unwrap();
 
@@ -95,19 +84,21 @@ mod tests_ {
       storage
         .set_head(
           storage_head_ptr(b"test"),
-          Some(&StorageVal {
-            point: StoragePoint::Array(Rc::new(vec![
-              StoragePoint::Array(Rc::new(vec![
-                StoragePoint::Number(1),
-                StoragePoint::Number(2),
-              ])),
-              StoragePoint::Array(Rc::new(vec![
-                StoragePoint::Number(3),
-                StoragePoint::Number(4),
-              ])),
-            ])),
-            refs: Rc::new(vec![]),
-          }),
+          Some(&StorageVal::Compound(Rc::new(StorageCompoundVal::Array(
+            StorageArray {
+              items: vec![
+                StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+                  items: vec![StorageVal::Number(1), StorageVal::Number(2)],
+                  refs: vec![],
+                }))),
+                StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+                  items: vec![StorageVal::Number(3), StorageVal::Number(4)],
+                  refs: vec![],
+                }))),
+              ],
+              refs: vec![],
+            },
+          )))),
         )
         .unwrap();
 
@@ -127,22 +118,22 @@ mod tests_ {
   #[test]
   fn small_redundant_tree() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let mut arr = StoragePoint::Array(Rc::new(vec![StoragePoint::Number(123)]));
+      let mut arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+        items: vec![StorageVal::Number(123)],
+        refs: vec![],
+      })));
 
       let depth = 3;
 
       for _ in 0..depth {
-        arr = StoragePoint::Array(Rc::new(vec![arr.clone(), arr]));
+        arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+          items: vec![arr.clone(), arr],
+          refs: vec![],
+        })));
       }
 
       storage
-        .set_head(
-          storage_head_ptr(b"test"),
-          Some(&StorageVal {
-            point: arr,
-            refs: Rc::new(vec![]),
-          }),
-        )
+        .set_head(storage_head_ptr(b"test"), Some(&arr))
         .unwrap();
 
       let value = storage
@@ -167,24 +158,24 @@ mod tests_ {
   #[test]
   fn large_redundant_tree() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let mut arr = StoragePoint::Array(Rc::new(vec![StoragePoint::Number(123)]));
+      let mut arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+        items: vec![StorageVal::Number(123)],
+        refs: vec![],
+      })));
 
       // 2^100 = 1267650600228229401496703205376
       // This tests that we can handle a tree with 2^100 nodes.
       // We do this by reusing the same array as both children of the parent array.
       // It's particularly important that this also happens during storage.
       for _ in 0..100 {
-        arr = StoragePoint::Array(Rc::new(vec![arr.clone(), arr]));
+        arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+          items: vec![arr.clone(), arr],
+          refs: vec![],
+        })));
       }
 
       storage
-        .set_head(
-          storage_head_ptr(b"test"),
-          Some(&StorageVal {
-            point: arr,
-            refs: Rc::new(vec![]),
-          }),
-        )
+        .set_head(storage_head_ptr(b"test"), Some(&arr))
         .unwrap();
 
       let value = storage
@@ -192,8 +183,9 @@ mod tests_ {
         .unwrap()
         .unwrap();
 
-      if let StoragePoint::Array(arr) = value.point {
-        assert_eq!(arr.len(), 2);
+      if let StorageVal::Compound(compound) = value {
+        let StorageCompoundVal::Array(arr) = &*compound;
+        assert_eq!(arr.items.len(), 2);
       } else {
         panic!("Expected array");
       }

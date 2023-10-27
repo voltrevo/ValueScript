@@ -47,7 +47,7 @@ where
       None => return Ok(None),
     };
 
-    let value = self.read(key)?.map(|entry| entry.to_val());
+    let value = self.read(key)?.map(|entry| entry.move_to_val());
 
     Ok(value)
   }
@@ -74,10 +74,7 @@ where
   fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
     let mut cache = HashMap::<RcKey, StorageEntryPtr>::new();
 
-    if let Some(key) = value
-      .point
-      .maybe_replace_store(self, &value.refs, &mut cache)?
-    {
+    if let Some(key) = value.maybe_replace_store(self, &mut cache)? {
       return Ok(key);
     }
 
@@ -89,7 +86,7 @@ where
     self.write(key, Some(&value.to_entry()))?;
     self.ref_delta(key, -1)?; // Cancel out the assumed single reference
 
-    for subkey in value.refs.iter() {
+    for subkey in value.refs_iter() {
       self.ref_delta(*subkey, 1)?;
     }
 
