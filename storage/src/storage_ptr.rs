@@ -1,9 +1,12 @@
+use std::hash::Hash;
+
 use rand::{rngs::ThreadRng, Rng};
 
 use crate::storage_val::StorageEntry;
 
 #[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq)]
 pub struct StoragePtr<T> {
+  #[serde(skip)]
   _marker: std::marker::PhantomData<T>,
 
   pub data: (u64, u64, u64),
@@ -42,6 +45,13 @@ impl<T> StoragePtr<T> {
     let mut key = [0u8; 24];
     key[..bytes.len()].copy_from_slice(bytes);
     bincode::deserialize(&key).unwrap()
+  }
+
+  pub(crate) fn from_data(data: (u64, u64, u64)) -> Self {
+    Self {
+      _marker: std::marker::PhantomData,
+      data,
+    }
   }
 
   pub fn to_bytes(&self) -> Vec<u8> {

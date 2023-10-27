@@ -123,4 +123,86 @@ mod tests_ {
 
     run(impl_, impl_);
   }
+
+  #[test]
+  fn small_redundant_tree() {
+    fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
+      let mut arr = StoragePoint::Array(Rc::new(vec![StoragePoint::Number(123)]));
+
+      let depth = 3;
+
+      for _ in 0..depth {
+        arr = StoragePoint::Array(Rc::new(vec![arr.clone(), arr]));
+      }
+
+      storage
+        .set_head(
+          storage_head_ptr(b"test"),
+          Some(&StorageVal {
+            point: arr,
+            refs: Rc::new(vec![]),
+          }),
+        )
+        .unwrap();
+
+      let value = storage
+        .get_head(storage_head_ptr(b"test"))
+        .unwrap()
+        .unwrap();
+
+      assert_eq!(
+        value.numbers(storage).unwrap(),
+        vec![123; 2usize.pow(depth as u32)]
+      );
+
+      storage.set_head(storage_head_ptr(b"test"), None).unwrap();
+
+      assert_eq!(storage.sb.len(), 0);
+      assert!(storage.is_empty());
+    }
+
+    run(impl_, impl_);
+  }
+
+  #[test]
+  fn large_redundant_tree() {
+    fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
+      let mut arr = StoragePoint::Array(Rc::new(vec![StoragePoint::Number(123)]));
+
+      // 2^100 = 1267650600228229401496703205376
+      // This tests that we can handle a tree with 2^100 nodes.
+      // We do this by reusing the same array as both children of the parent array.
+      // It's particularly important that this also happens during storage.
+      for _ in 0..100 {
+        arr = StoragePoint::Array(Rc::new(vec![arr.clone(), arr]));
+      }
+
+      storage
+        .set_head(
+          storage_head_ptr(b"test"),
+          Some(&StorageVal {
+            point: arr,
+            refs: Rc::new(vec![]),
+          }),
+        )
+        .unwrap();
+
+      let value = storage
+        .get_head(storage_head_ptr(b"test"))
+        .unwrap()
+        .unwrap();
+
+      if let StoragePoint::Array(arr) = value.point {
+        assert_eq!(arr.len(), 2);
+      } else {
+        panic!("Expected array");
+      }
+
+      storage.set_head(storage_head_ptr(b"test"), None).unwrap();
+
+      assert!(storage.is_empty());
+    }
+
+    run(impl_, impl_);
+  }
 }

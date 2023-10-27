@@ -1,3 +1,5 @@
+use std::{collections::HashMap, mem::take};
+
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +21,8 @@ pub trait StorageOps<E> {
 
   fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
+
+  fn flush_ref_deltas(&mut self) -> Result<(), E>;
 }
 
 impl<'a, Handle, E> StorageOps<E> for Handle
@@ -39,6 +43,11 @@ where
   }
 
   fn inc_ref(&mut self, key: StorageEntryPtr) -> Result<(), E> {
+    if let Some(delta) = self.ref_deltas().get_mut(&key.data) {
+      *delta += 1;
+      return Ok(());
+    }
+
     let mut entry = match self.read(key)? {
       Some(entry) => entry,
       None => panic!("Key does not exist"),
@@ -50,6 +59,11 @@ where
   }
 
   fn dec_ref(&mut self, key: StorageEntryPtr) -> Result<(), E> {
+    if let Some(delta) = self.ref_deltas().get_mut(&key.data) {
+      *delta -= 1;
+      return Ok(());
+    }
+
     let mut entry = match self.read(key)? {
       Some(entry) => entry,
       None => panic!("Key does not exist"),
@@ -82,8 +96,8 @@ where
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
     if let Some(value) = value {
       let key = self.store_with_replacements(value)?;
+      self.buf_ref_delta(key, 1)?;
 
-      // TODO: Performance: Identify overlapping keys and cancel out inc+dec
       if let Some(old_key) = self.read(ptr)? {
         self.dec_ref(old_key)?;
       }
@@ -99,7 +113,12 @@ where
   }
 
   fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
-    if let Some(key) = value.point.maybe_replace_store(self, &value.refs)? {
+    let mut cache = HashMap::<u64, StorageEntryPtr>::new();
+
+    if let Some(key) = value
+      .point
+      .maybe_replace_store(self, &value.refs, &mut cache)?
+    {
       return Ok(key);
     }
 
@@ -109,11 +128,63 @@ where
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
     let key = StoragePtr::random(&mut thread_rng());
     self.write(key, Some(&value.to_entry()))?;
+    self.buf_ref_delta(key, -1)?; // Cancel out the assumed single reference
 
     for subkey in value.refs.iter() {
-      self.inc_ref(*subkey)?;
+      self.buf_ref_delta(*subkey, 1)?;
     }
 
     Ok(key)
+  }
+
+  fn flush_ref_deltas(&mut self) -> Result<(), E> {
+    let ref_deltas = take(self.ref_deltas());
+
+    for (key, delta) in ref_deltas.iter() {
+      let delta = *delta;
+
+      if delta <= 0 {
+        continue;
+      }
+
+      let ptr = StorageEntryPtr::from_data(*key);
+
+      let mut entry = match self.read(ptr)? {
+        Some(entry) => entry,
+        None => panic!("Key does not exist"),
+      };
+
+      entry.ref_count += delta as u64;
+
+      self.write(ptr, Some(&entry))?;
+    }
+
+    for (key, delta) in ref_deltas.iter() {
+      let delta = *delta;
+
+      if delta >= 0 {
+        continue;
+      }
+
+      let ptr = StorageEntryPtr::from_data(*key);
+
+      let decrement = (-delta) as u64;
+
+      let mut entry = match self.read(ptr)? {
+        Some(entry) => entry,
+        None => panic!("Key does not exist"),
+      };
+
+      if entry.ref_count == decrement {
+        self.write(ptr, None)?;
+        continue;
+      }
+
+      entry.ref_count -= decrement;
+
+      self.write(ptr, Some(&entry))?;
+    }
+
+    Ok(())
   }
 }

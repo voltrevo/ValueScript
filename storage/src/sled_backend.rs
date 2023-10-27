@@ -1,6 +1,8 @@
-use std::fmt::Debug as DebugTrait;
+use std::{collections::HashMap, fmt::Debug as DebugTrait};
 
-use crate::{storage_backend::StorageBackendHandle, StorageBackend, StoragePtr};
+use crate::{
+  storage_backend::StorageBackendHandle, storage_ops::StorageOps, StorageBackend, StoragePtr,
+};
 
 pub struct SledBackend {
   db: sled::Db,
@@ -33,23 +35,51 @@ impl StorageBackend for SledBackend {
     F: Fn(&mut Self::Handle<'_, E>) -> Result<T, Self::InTransactionError<E>>,
   {
     self.db.transaction(|tx| {
-      let mut handle = SledBackendHandle { tx };
-      f(&mut handle)
+      let mut handle = SledBackendHandle {
+        ref_deltas: Default::default(),
+        tx,
+      };
+
+      let res = f(&mut handle)?;
+      handle.flush_ref_deltas()?;
+
+      Ok(res)
     })
   }
 
   fn is_empty(&self) -> bool {
     self.db.is_empty()
   }
+
+  #[cfg(test)]
+  fn len(&self) -> usize {
+    self.db.len()
+  }
 }
 
 pub struct SledBackendHandle<'a> {
+  ref_deltas: HashMap<(u64, u64, u64), i64>,
   tx: &'a sled::transaction::TransactionalTree,
 }
 
 impl<'a, E> StorageBackendHandle<'a, sled::transaction::ConflictableTransactionError<E>>
   for SledBackendHandle<'a>
 {
+  fn buf_ref_delta<T>(
+    &mut self,
+    key: StoragePtr<T>,
+    delta: i64,
+  ) -> Result<(), sled::transaction::ConflictableTransactionError<E>> {
+    let ref_delta = self.ref_deltas.entry(key.data).or_insert(0);
+    *ref_delta += delta;
+
+    Ok(())
+  }
+
+  fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
+    &mut self.ref_deltas
+  }
+
   fn read_bytes<T>(
     &self,
     key: StoragePtr<T>,

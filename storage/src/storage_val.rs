@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
@@ -54,7 +55,14 @@ impl StoragePoint {
     &self,
     tx: &mut SO,
     refs: &Rc<Vec<StorageEntryPtr>>,
+    cache: &mut HashMap<u64, StorageEntryPtr>,
   ) -> Result<Option<StorageEntryPtr>, E> {
+    if let Some(id) = self.cache_id() {
+      if let Some(key) = cache.get(&id) {
+        return Ok(Some(*key));
+      }
+    }
+
     Ok(match &self {
       StoragePoint::Void => None,
       StoragePoint::Number(_) => None,
@@ -62,16 +70,21 @@ impl StoragePoint {
         let mut replacements: Vec<(usize, StorageEntryPtr)> = Vec::new();
 
         for i in 0..arr.len() {
-          if let Some(key) = arr[i].maybe_replace_store(tx, refs)? {
+          if let Some(key) = arr[i].maybe_replace_store(tx, refs, cache)? {
             replacements.push((i, key));
           }
         }
 
         if replacements.is_empty() {
-          break 'b Some(tx.store(&StorageVal {
-            point: StoragePoint::Array(arr.clone()),
-            refs: refs.clone(),
-          })?);
+          break 'b Some(cache_and_store(
+            tx,
+            &StorageVal {
+              point: StoragePoint::Array(arr.clone()),
+              refs: refs.clone(),
+            },
+            cache,
+            cache_id(arr),
+          )?);
         }
 
         let mut new_arr = Vec::<StoragePoint>::new();
@@ -93,13 +106,27 @@ impl StoragePoint {
           new_arr.push(point.clone());
         }
 
-        Some(tx.store(&StorageVal {
-          point: StoragePoint::Array(Rc::new(new_arr)),
-          refs: Rc::new(new_refs),
-        })?)
+        Some(cache_and_store(
+          tx,
+          &StorageVal {
+            point: StoragePoint::Array(Rc::new(new_arr)),
+            refs: Rc::new(new_refs),
+          },
+          cache,
+          cache_id(arr),
+        )?)
       }
       StoragePoint::Ref(_) => None,
     })
+  }
+
+  fn cache_id(&self) -> Option<u64> {
+    match &self {
+      StoragePoint::Void => None,
+      StoragePoint::Number(_) => None,
+      StoragePoint::Array(arr) => Some(cache_id(arr)),
+      StoragePoint::Ref(_) => None,
+    }
   }
 
   #[cfg(test)]
@@ -146,4 +173,22 @@ impl StorageEntry {
       refs: self.refs.clone(),
     }
   }
+}
+
+fn cache_id<T>(rc: &Rc<T>) -> u64 {
+  rc.as_ref() as *const T as u64
+}
+
+fn cache_and_store<E, SO: StorageOps<E>>(
+  tx: &mut SO,
+  val: &StorageVal,
+  cache: &mut HashMap<u64, StorageEntryPtr>,
+  id: u64,
+) -> Result<StorageEntryPtr, E> {
+  let key = tx.store(val)?;
+
+  let pre_existing = cache.insert(id, key);
+  assert!(pre_existing.is_none());
+
+  Ok(key)
 }
