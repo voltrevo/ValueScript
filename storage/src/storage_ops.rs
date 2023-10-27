@@ -2,9 +2,9 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  storage::StorageVal,
   storage_backend::StorageBackendHandle,
   storage_ptr::{StorageEntryPtr, StorageHeadPtr, StoragePtr},
+  storage_val::StorageVal,
 };
 
 pub trait StorageOps<E> {

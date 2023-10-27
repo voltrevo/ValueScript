@@ -5,8 +5,9 @@ mod tests_ {
   use crate::{
     memory_backend::MemoryBackend,
     sled_backend::SledBackend,
-    storage::{Storage, StoragePoint, StorageVal},
+    storage::Storage,
     storage_ptr::storage_head_ptr,
+    storage_val::{StoragePoint, StorageVal},
     StorageBackend,
   };
 
@@ -114,8 +115,6 @@ mod tests_ {
         .get_head(storage_head_ptr(b"test"))
         .unwrap()
         .unwrap();
-
-      dbg!(&value);
 
       let numbers = value.numbers(storage).unwrap();
 

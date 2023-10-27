@@ -1,6 +1,6 @@
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::storage::StorageEntry;
+use crate::storage_val::StorageEntry;
 
 #[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq)]
 pub struct StoragePtr<T> {

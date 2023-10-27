@@ -6,6 +6,7 @@ mod sled_backend;
 mod storage_backend;
 mod storage_ops;
 mod storage_ptr;
+mod storage_val;
 mod tests;
 
 pub use self::storage::Storage;
