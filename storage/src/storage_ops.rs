@@ -4,6 +4,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+  rc_key::RcKey,
   storage_backend::StorageBackendHandle,
   storage_ptr::{StorageEntryPtr, StorageHeadPtr, StoragePtr},
   storage_val::StorageVal,
@@ -71,7 +72,7 @@ where
   }
 
   fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
-    let mut cache = HashMap::<u64, StorageEntryPtr>::new();
+    let mut cache = HashMap::<RcKey, StorageEntryPtr>::new();
 
     if let Some(key) = value
       .point

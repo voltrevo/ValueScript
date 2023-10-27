@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
+use crate::rc_key::RcKey;
 use crate::serde_rc::{deserialize_rc, serialize_rc};
 use crate::storage_ops::StorageOps;
 use crate::storage_ptr::StorageEntryPtr;
@@ -55,7 +56,7 @@ impl StoragePoint {
     &self,
     tx: &mut SO,
     refs: &Rc<Vec<StorageEntryPtr>>,
-    cache: &mut HashMap<u64, StorageEntryPtr>,
+    cache: &mut HashMap<RcKey, StorageEntryPtr>,
   ) -> Result<Option<StorageEntryPtr>, E> {
     if let Some(id) = self.cache_id() {
       if let Some(key) = cache.get(&id) {
@@ -83,7 +84,7 @@ impl StoragePoint {
               refs: refs.clone(),
             },
             cache,
-            cache_id(arr),
+            RcKey::from(arr.clone()),
           )?);
         }
 
@@ -113,18 +114,18 @@ impl StoragePoint {
             refs: Rc::new(new_refs),
           },
           cache,
-          cache_id(arr),
+          RcKey::from(arr.clone()),
         )?)
       }
       StoragePoint::Ref(_) => None,
     })
   }
 
-  fn cache_id(&self) -> Option<u64> {
+  fn cache_id(&self) -> Option<RcKey> {
     match &self {
       StoragePoint::Void => None,
       StoragePoint::Number(_) => None,
-      StoragePoint::Array(arr) => Some(cache_id(arr)),
+      StoragePoint::Array(arr) => Some(RcKey::from(arr.clone())),
       StoragePoint::Ref(_) => None,
     }
   }
@@ -175,15 +176,11 @@ impl StorageEntry {
   }
 }
 
-fn cache_id<T>(rc: &Rc<T>) -> u64 {
-  rc.as_ref() as *const T as u64
-}
-
 fn cache_and_store<E, SO: StorageOps<E>>(
   tx: &mut SO,
   val: &StorageVal,
-  cache: &mut HashMap<u64, StorageEntryPtr>,
-  id: u64,
+  cache: &mut HashMap<RcKey, StorageEntryPtr>,
+  id: RcKey,
 ) -> Result<StorageEntryPtr, E> {
   let key = tx.store(val)?;
 

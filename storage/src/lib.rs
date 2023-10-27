@@ -1,6 +1,7 @@
 mod memory_backend;
 mod storage;
 
+mod rc_key;
 mod serde_rc;
 mod sled_backend;
 mod storage_backend;
