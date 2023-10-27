@@ -54,13 +54,6 @@ pub struct MemoryStorageHandle<'a> {
 }
 
 impl<'a, E> StorageBackendHandle<'a, E> for MemoryStorageHandle<'a> {
-  fn buf_ref_delta<T>(&mut self, key: StoragePtr<T>, delta: i64) -> Result<(), E> {
-    let ref_delta = self.ref_deltas.entry(key.data).or_insert(0);
-    *ref_delta += delta;
-
-    Ok(())
-  }
-
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
   }

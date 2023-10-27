@@ -13,15 +13,13 @@ pub trait StorageOps<E> {
   fn read<T: for<'de> Deserialize<'de>>(&mut self, key: StoragePtr<T>) -> Result<Option<T>, E>;
   fn write<T: Serialize>(&mut self, key: StoragePtr<T>, data: Option<&T>) -> Result<(), E>;
 
-  fn inc_ref(&mut self, key: StorageEntryPtr) -> Result<(), E>;
-  fn dec_ref(&mut self, key: StorageEntryPtr) -> Result<(), E>;
-
   fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E>;
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E>;
 
   fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
 
+  fn ref_delta<T>(&mut self, key: StoragePtr<T>, delta: i64) -> Result<(), E>;
   fn flush_ref_deltas(&mut self) -> Result<(), E>;
 }
 
@@ -42,46 +40,6 @@ where
     self.write_bytes(key, data.map(|data| bincode::serialize(&data).unwrap()))
   }
 
-  fn inc_ref(&mut self, key: StorageEntryPtr) -> Result<(), E> {
-    if let Some(delta) = self.ref_deltas().get_mut(&key.data) {
-      *delta += 1;
-      return Ok(());
-    }
-
-    let mut entry = match self.read(key)? {
-      Some(entry) => entry,
-      None => panic!("Key does not exist"),
-    };
-
-    entry.ref_count += 1;
-
-    self.write(key, Some(&entry))
-  }
-
-  fn dec_ref(&mut self, key: StorageEntryPtr) -> Result<(), E> {
-    if let Some(delta) = self.ref_deltas().get_mut(&key.data) {
-      *delta -= 1;
-      return Ok(());
-    }
-
-    let mut entry = match self.read(key)? {
-      Some(entry) => entry,
-      None => panic!("Key does not exist"),
-    };
-
-    entry.ref_count -= 1;
-
-    if entry.ref_count == 0 {
-      for key in entry.refs.iter() {
-        self.dec_ref(*key)?;
-      }
-
-      self.write(key, None)
-    } else {
-      self.write(key, Some(&entry))
-    }
-  }
-
   fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E> {
     let key = match self.read(ptr)? {
       Some(key) => key,
@@ -96,16 +54,16 @@ where
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
     if let Some(value) = value {
       let key = self.store_with_replacements(value)?;
-      self.buf_ref_delta(key, 1)?;
+      self.ref_delta(key, 1)?;
 
       if let Some(old_key) = self.read(ptr)? {
-        self.dec_ref(old_key)?;
+        self.ref_delta(old_key, -1)?;
       }
 
       self.write(ptr, Some(&key))
     } else {
       if let Some(old_key) = self.read(ptr)? {
-        self.dec_ref(old_key)?;
+        self.ref_delta(old_key, -1)?;
       }
 
       self.write(ptr, None)
@@ -128,61 +86,75 @@ where
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
     let key = StoragePtr::random(&mut thread_rng());
     self.write(key, Some(&value.to_entry()))?;
-    self.buf_ref_delta(key, -1)?; // Cancel out the assumed single reference
+    self.ref_delta(key, -1)?; // Cancel out the assumed single reference
 
     for subkey in value.refs.iter() {
-      self.buf_ref_delta(*subkey, 1)?;
+      self.ref_delta(*subkey, 1)?;
     }
 
     Ok(key)
   }
 
+  fn ref_delta<T>(&mut self, key: StoragePtr<T>, delta: i64) -> Result<(), E> {
+    let ref_delta = self.ref_deltas().entry(key.data).or_insert(0);
+    *ref_delta += delta;
+
+    Ok(())
+  }
+
   fn flush_ref_deltas(&mut self) -> Result<(), E> {
-    let ref_deltas = take(self.ref_deltas());
+    while !self.ref_deltas().is_empty() {
+      let ref_deltas = take(self.ref_deltas());
 
-    for (key, delta) in ref_deltas.iter() {
-      let delta = *delta;
+      for (key, delta) in ref_deltas.iter() {
+        let delta = *delta;
 
-      if delta <= 0 {
-        continue;
+        if delta <= 0 {
+          continue;
+        }
+
+        let ptr = StorageEntryPtr::from_data(*key);
+
+        let mut entry = match self.read(ptr)? {
+          Some(entry) => entry,
+          None => panic!("Key does not exist"),
+        };
+
+        entry.ref_count += delta as u64;
+
+        self.write(ptr, Some(&entry))?;
       }
 
-      let ptr = StorageEntryPtr::from_data(*key);
+      for (key, delta) in ref_deltas.iter() {
+        let delta = *delta;
 
-      let mut entry = match self.read(ptr)? {
-        Some(entry) => entry,
-        None => panic!("Key does not exist"),
-      };
+        if delta >= 0 {
+          continue;
+        }
 
-      entry.ref_count += delta as u64;
+        let ptr = StorageEntryPtr::from_data(*key);
 
-      self.write(ptr, Some(&entry))?;
-    }
+        let decrement = (-delta) as u64;
 
-    for (key, delta) in ref_deltas.iter() {
-      let delta = *delta;
+        let mut entry = match self.read(ptr)? {
+          Some(entry) => entry,
+          None => panic!("Key does not exist"),
+        };
 
-      if delta >= 0 {
-        continue;
+        if entry.ref_count == decrement {
+          self.write(ptr, None)?;
+
+          for subkey in entry.refs.iter() {
+            self.ref_delta(*subkey, -1)?;
+          }
+
+          continue;
+        }
+
+        entry.ref_count -= decrement;
+
+        self.write(ptr, Some(&entry))?;
       }
-
-      let ptr = StorageEntryPtr::from_data(*key);
-
-      let decrement = (-delta) as u64;
-
-      let mut entry = match self.read(ptr)? {
-        Some(entry) => entry,
-        None => panic!("Key does not exist"),
-      };
-
-      if entry.ref_count == decrement {
-        self.write(ptr, None)?;
-        continue;
-      }
-
-      entry.ref_count -= decrement;
-
-      self.write(ptr, Some(&entry))?;
     }
 
     Ok(())
