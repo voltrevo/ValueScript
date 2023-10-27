@@ -3,6 +3,7 @@ mod storage;
 
 mod serde_rc;
 mod sled_backend;
+mod storage_ops;
 mod storage_ptr;
 mod tests;
 
