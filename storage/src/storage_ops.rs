@@ -2,7 +2,8 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  storage::{StorageBackendHandle, StorageVal},
+  storage::StorageVal,
+  storage_backend::StorageBackendHandle,
   storage_ptr::{StorageEntryPtr, StorageHeadPtr, StoragePtr},
 };
 

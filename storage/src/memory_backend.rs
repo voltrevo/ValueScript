@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug as DebugTrait;
 
-use crate::{
-  storage::{StorageBackend, StorageBackendHandle},
-  StoragePtr,
-};
+use crate::{storage_backend::StorageBackendHandle, StorageBackend, StoragePtr};
 
 #[derive(Default)]
 pub struct MemoryBackend {

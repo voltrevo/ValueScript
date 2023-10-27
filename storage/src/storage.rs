@@ -1,30 +1,14 @@
-use std::{fmt::Debug as DebugTrait, rc::Rc};
+use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::serde_rc::{deserialize_rc, serialize_rc};
 use crate::storage_ops::StorageOps;
-use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr, StoragePtr};
+use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
+use crate::StorageBackend;
 
 pub struct Storage<SB: StorageBackend> {
   sb: SB,
-}
-
-pub trait StorageBackendHandle<'a, E> {
-  fn read_bytes<T>(&self, key: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
-  fn write_bytes<T>(&mut self, key: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
-}
-
-pub trait StorageBackend {
-  type Error<E: DebugTrait>: DebugTrait;
-  type InTransactionError<E>;
-  type Handle<'a, E>: StorageBackendHandle<'a, Self::InTransactionError<E>>;
-
-  fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
-  where
-    F: Fn(&mut Self::Handle<'_, E>) -> Result<T, Self::InTransactionError<E>>;
-
-  fn is_empty(&self) -> bool;
 }
 
 impl<SB: StorageBackend> Storage<SB> {
