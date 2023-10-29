@@ -5,6 +5,7 @@ mod rc_key;
 mod serde_rc;
 mod sled_backend;
 mod storage_backend;
+mod storage_entry;
 mod storage_ops;
 mod storage_ptr;
 mod storage_val;

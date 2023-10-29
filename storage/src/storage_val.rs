@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::rc_key::RcKey;
 use crate::serde_rc::{deserialize_rc, serialize_rc};
+use crate::storage_entry::StorageEntry;
 use crate::storage_ops::StorageOps;
 use crate::storage_ptr::StorageEntryPtr;
 
@@ -186,36 +187,6 @@ impl StorageVal {
         }
       },
     }
-  }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct StorageEntry {
-  pub(crate) ref_count: u64,
-  pub(crate) refs: Vec<StorageEntryPtr>,
-
-  data: Vec<u8>,
-}
-
-impl StorageEntry {
-  pub fn move_to_val(self) -> StorageVal {
-    let Self {
-      ref_count: _,
-      refs,
-      data,
-    } = self;
-
-    let mut val = bincode::deserialize::<StorageVal>(&data).unwrap();
-
-    if let StorageVal::Compound(compound) = &mut val {
-      match Rc::get_mut(compound).expect("Should be single ref") {
-        StorageCompoundVal::Array(arr) => {
-          arr.refs = refs;
-        }
-      }
-    };
-
-    val
   }
 }
 

@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::storage_val::StorageEntry;
+use crate::storage_entry::StorageEntry;
 
 #[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq)]
 pub struct StoragePtr<T> {
