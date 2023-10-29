@@ -47,7 +47,7 @@ where
       None => return Ok(None),
     };
 
-    let value = self.read(key)?.map(|entry| entry.move_to_val());
+    let value = self.read(key)?.map(StorageVal::from_entry);
 
     Ok(value)
   }

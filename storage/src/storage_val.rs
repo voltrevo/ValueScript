@@ -56,6 +56,26 @@ impl StorageVal {
     }
   }
 
+  pub fn from_entry(entry: StorageEntry) -> Self {
+    let StorageEntry {
+      ref_count: _,
+      refs,
+      data,
+    } = entry;
+
+    let mut val = bincode::deserialize::<StorageVal>(&data).unwrap();
+
+    if let StorageVal::Compound(compound) = &mut val {
+      match Rc::get_mut(compound).expect("Should be single ref") {
+        StorageCompoundVal::Array(arr) => {
+          arr.refs = refs;
+        }
+      }
+    };
+
+    val
+  }
+
   pub fn refs(&self) -> Option<&Vec<StorageEntryPtr>> {
     match self {
       StorageVal::Void | StorageVal::Number(_) | StorageVal::Ptr(_) | StorageVal::Ref(_) => None,
@@ -156,17 +176,8 @@ impl StorageVal {
       StorageVal::Number(n) => Ok(vec![*n]),
       StorageVal::Ptr(ptr) => {
         let entry = tx.read(*ptr)?.unwrap();
-        entry.move_to_val().numbers_impl(tx)
+        Self::from_entry(entry).numbers_impl(tx)
       }
-      // StorageVal::Array(arr) => {
-      //   let mut numbers = Vec::new();
-
-      //   for point in arr.iter() {
-      //     numbers.extend(point.numbers(tx, refs)?);
-      //   }
-
-      //   Ok(numbers)
-      // }
       StorageVal::Ref(_) => {
         panic!("Can't lookup ref (shouldn't hit this case)")
       }
