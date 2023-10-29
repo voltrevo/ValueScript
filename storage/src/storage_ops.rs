@@ -83,10 +83,11 @@ where
 
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
     let key = StoragePtr::random(&mut thread_rng());
-    self.write(key, Some(&value.to_entry()))?;
+    let entry = value.to_entry();
+    self.write(key, Some(&entry))?;
     self.ref_delta(key, -1)?; // Cancel out the assumed single reference
 
-    for subkey in value.refs_iter() {
+    for subkey in &entry.refs {
       self.ref_delta(*subkey, 1)?;
     }
 

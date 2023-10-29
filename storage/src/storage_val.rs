@@ -76,19 +76,6 @@ impl StorageVal {
     val
   }
 
-  pub fn refs(&self) -> Option<&Vec<StorageEntryPtr>> {
-    match self {
-      StorageVal::Void | StorageVal::Number(_) | StorageVal::Ptr(_) | StorageVal::Ref(_) => None,
-      StorageVal::Compound(compound) => match &**compound {
-        StorageCompoundVal::Array(arr) => Some(&arr.refs),
-      },
-    }
-  }
-
-  pub fn refs_iter(&self) -> impl Iterator<Item = &StorageEntryPtr> {
-    self.refs().into_iter().flatten()
-  }
-
   #[cfg(test)]
   pub(crate) fn numbers<SB: StorageBackend>(
     &self,
