@@ -636,6 +636,7 @@ pub fn op_sub(left: &mut Val, right: &Val) -> Result<Val, Val> {
       "count" => (*cc.count.borrow() as f64).to_val(),
       _ => Val::Undefined,
     }),
+    Val::StoragePtr(ptr) => ptr.get().sub(right),
   }
 }
 
@@ -692,6 +693,13 @@ pub fn op_submov(target: &mut Val, subscript: &Val, value: Val) -> Result<(), Va
     Val::Static(_) => Err("Cannot assign to subscript of static value".to_type_error()),
     Val::Dynamic(_) => Err("TODO: Assign to subscript of dynamic value".to_type_error()),
     Val::CopyCounter(_) => Err("Cannot assign to subscript of CopyCounter".to_type_error()),
+    Val::StoragePtr(ptr) => {
+      let mut val = ptr.get();
+      val.submov(subscript, value)?;
+      *target = val;
+
+      Ok(())
+    }
   }
 }
 

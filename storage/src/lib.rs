@@ -17,5 +17,7 @@ pub use self::storage::Storage;
 pub use self::storage_backend::StorageBackend;
 pub use memory_backend::MemoryBackend;
 pub use sled_backend::SledBackend;
+pub use storage_entity::StorageEntity;
 pub use storage_entry::{StorageEntry, StorageEntryReader};
-pub use storage_ptr::{storage_head_ptr, StoragePtr};
+pub use storage_ops::StorageOps;
+pub use storage_ptr::{storage_head_ptr, StorageEntryPtr, StorageHeadPtr, StoragePtr};

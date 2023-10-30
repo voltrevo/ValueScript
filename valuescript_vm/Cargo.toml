@@ -9,3 +9,4 @@ edition = "2021"
 num-bigint = "0.4"
 num-traits = "0.2"
 valuescript_common = { path = "../valuescript_common" }
+storage = { path = "../storage" }

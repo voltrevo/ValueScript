@@ -5,8 +5,8 @@ use crate::storage_ptr::StorageEntryPtr;
 #[derive(Serialize, Deserialize)]
 pub struct StorageEntry {
   pub(crate) ref_count: u64,
-  pub(crate) refs: Vec<StorageEntryPtr>,
-  pub(crate) data: Vec<u8>,
+  pub refs: Vec<StorageEntryPtr>,
+  pub data: Vec<u8>,
 }
 
 pub struct StorageEntryReader<'a> {

@@ -19,11 +19,13 @@ pub mod operations;
 mod stack_frame;
 mod string_methods;
 mod todo_fn;
+mod val_storage;
 mod virtual_machine;
 pub mod vs_array;
 pub mod vs_class;
 mod vs_function;
 pub mod vs_object;
+mod vs_storage_ptr;
 mod vs_symbol;
 pub mod vs_value;
 

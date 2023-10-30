@@ -16,6 +16,7 @@ use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
 use crate::vs_object::VsObject;
+use crate::vs_storage_ptr::VsStoragePtr;
 use crate::vs_symbol::{symbol_to_name, VsSymbol};
 
 #[derive(Clone, Debug, Default)]
@@ -36,6 +37,7 @@ pub enum Val {
   Static(&'static dyn ValTrait),
   Dynamic(Rc<dyn DynValTrait>),
   CopyCounter(Box<CopyCounter>),
+  StoragePtr(Rc<VsStoragePtr>),
 }
 
 #[derive(PartialEq, Debug)]
@@ -185,6 +187,7 @@ impl ValTrait for Val {
       Static(val) => val.typeof_(),
       Dynamic(val) => val.typeof_(),
       CopyCounter(_) => VsType::Object,
+      StoragePtr(ptr) => ptr.get().typeof_(),
     }
   }
 
@@ -211,6 +214,7 @@ impl ValTrait for Val {
       Static(val) => val.to_number(),
       Dynamic(val) => val.to_number(),
       CopyCounter(_) => f64::NAN,
+      StoragePtr(ptr) => ptr.get().to_number(),
     }
   }
 
@@ -236,6 +240,7 @@ impl ValTrait for Val {
       Static(val) => val.to_index(),
       Dynamic(val) => val.to_index(),
       CopyCounter(_) => None,
+      StoragePtr(ptr) => ptr.get().to_index(),
     }
   }
 
@@ -258,6 +263,7 @@ impl ValTrait for Val {
       Static(val) => val.is_primitive(), // TODO: false?
       Dynamic(val) => val.is_primitive(),
       CopyCounter(_) => false,
+      StoragePtr(ptr) => ptr.get().is_primitive(),
     }
   }
 
@@ -280,6 +286,7 @@ impl ValTrait for Val {
       Static(val) => val.is_truthy(), // TODO: true?
       Dynamic(val) => val.is_truthy(),
       CopyCounter(_) => true,
+      StoragePtr(ptr) => ptr.get().is_truthy(),
     }
   }
 
@@ -302,6 +309,7 @@ impl ValTrait for Val {
       Static(_) => false,
       Dynamic(val) => val.is_nullish(),
       CopyCounter(_) => false,
+      StoragePtr(ptr) => ptr.get().is_nullish(),
     }
   }
 
@@ -454,6 +462,7 @@ impl ValTrait for Val {
       Val::Static(static_) => static_.has(key),
       Val::Dynamic(dynamic) => dynamic.has(key),
       Val::CopyCounter(_) => Some(matches!(key.to_string().as_str(), "tag" | "count")),
+      Val::StoragePtr(ptr) => ptr.get().has(key),
     }
   }
 
@@ -540,6 +549,7 @@ impl ValTrait for Val {
         cc.tag.codify(),
         cc.count.borrow()
       ),
+      Val::StoragePtr(_) => todo!(),
     }
   }
 }
@@ -601,6 +611,7 @@ impl fmt::Display for Val {
         cc.tag,
         (*cc.count.borrow() as f64).to_val()
       ),
+      StoragePtr(ptr) => ptr.get().fmt(f),
     }
   }
 }
@@ -771,6 +782,8 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
         cc.tag.pretty(),
         (*cc.count.borrow() as f64).to_val().pretty()
       ),
+
+      Val::StoragePtr(ptr) => ptr.get().pretty_fmt(f),
     }
   }
 }

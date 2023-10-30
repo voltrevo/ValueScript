@@ -2386,6 +2386,7 @@ version = "0.1.0"
 dependencies = [
  "num-bigint",
  "num-traits",
+ "storage",
  "valuescript_common",
 ]
 

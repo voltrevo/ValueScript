@@ -136,8 +136,6 @@ impl StorageEntity for DemoVal {
   }
 
   fn from_storage_entry<E, Tx: StorageOps<E>>(tx: &mut Tx, entry: StorageEntry) -> Result<Self, E> {
-    let mut reader = StorageEntryReader::new(&entry);
-
-    Self::read_from_entry(tx, &mut reader)
+    Self::read_from_entry(tx, &mut StorageEntryReader::new(&entry))
   }
 }
