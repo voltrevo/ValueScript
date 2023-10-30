@@ -176,7 +176,7 @@ fn read_from_entry<E, SO: StorageOps<E>>(
       let mut string_map = BTreeMap::<String, Val>::new();
 
       for _ in 0..len {
-        let key = read_string_from_entry(tx, reader)?;
+        let key = read_string_from_entry(reader);
         let value = read_from_entry(tx, reader)?;
 
         string_map.insert(key, value);
@@ -186,7 +186,7 @@ fn read_from_entry<E, SO: StorageOps<E>>(
       let mut symbol_map = BTreeMap::<VsSymbol, Val>::new();
 
       for _ in 0..len {
-        let key = read_symbol_from_entry(tx, reader)?;
+        let key = read_symbol_from_entry(reader);
         let value = read_from_entry(tx, reader)?;
 
         symbol_map.insert(key, value);
@@ -252,7 +252,7 @@ fn read_from_entry<E, SO: StorageOps<E>>(
     }
     Tag::Class => {
       // pub name: String,
-      let name = read_string_from_entry(tx, reader)?;
+      let name = read_string_from_entry(reader);
 
       // pub content_hash: Option<[u8; 32]>,
       let content_hash = match reader.read_u8().unwrap() {
@@ -291,21 +291,15 @@ fn read_from_entry<E, SO: StorageOps<E>>(
   })
 }
 
-fn read_string_from_entry<E, SO: StorageOps<E>>(
-  tx: &mut SO,
-  reader: &mut StorageEntryReader,
-) -> Result<String, E> {
+fn read_string_from_entry(reader: &mut StorageEntryReader) -> String {
   let len = reader.read_vlq().unwrap();
   let mut bytes = vec![0; len as usize];
   reader.read_exact(&mut bytes).unwrap();
-  Ok(String::from_utf8(bytes).unwrap())
+  String::from_utf8(bytes).unwrap()
 }
 
-fn read_symbol_from_entry<E, SO: StorageOps<E>>(
-  _tx: &mut SO,
-  reader: &mut StorageEntryReader,
-) -> Result<VsSymbol, E> {
-  Ok(FromPrimitive::from_u64(reader.read_vlq().unwrap()).unwrap())
+fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> VsSymbol {
+  FromPrimitive::from_u64(reader.read_vlq().unwrap()).unwrap()
 }
 
 fn read_ref_bytecode_from_entry<E, SO: StorageOps<E>>(
