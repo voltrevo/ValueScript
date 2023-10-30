@@ -3,12 +3,8 @@ mod tests_ {
   use std::rc::Rc;
 
   use crate::{
-    demo_val::{DemoVal, StorageArray, StorageCompoundVal},
-    memory_backend::MemoryBackend,
-    sled_backend::SledBackend,
-    storage::Storage,
-    storage_ptr::storage_head_ptr,
-    StorageBackend,
+    demo_val::DemoVal, memory_backend::MemoryBackend, sled_backend::SledBackend, storage::Storage,
+    storage_ptr::storage_head_ptr, StorageBackend,
   };
 
   fn run(impl_memory: fn(&mut Storage<MemoryBackend>), impl_sled: fn(&mut Storage<SledBackend>)) {
@@ -50,9 +46,7 @@ mod tests_ {
       storage
         .set_head(
           storage_head_ptr(b"test"),
-          &DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-            items: vec![DemoVal::Ptr(key0), DemoVal::Ptr(key1)],
-          }))),
+          &DemoVal::Array(Rc::new(vec![DemoVal::Ptr(key0), DemoVal::Ptr(key1)])),
         )
         .unwrap();
 
@@ -81,16 +75,10 @@ mod tests_ {
       storage
         .set_head(
           storage_head_ptr(b"test"),
-          &DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-            items: vec![
-              DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-                items: vec![DemoVal::Number(1), DemoVal::Number(2)],
-              }))),
-              DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-                items: vec![DemoVal::Number(3), DemoVal::Number(4)],
-              }))),
-            ],
-          }))),
+          &DemoVal::Array(Rc::new(vec![
+            DemoVal::Array(Rc::new(vec![DemoVal::Number(1), DemoVal::Number(2)])),
+            DemoVal::Array(Rc::new(vec![DemoVal::Number(3), DemoVal::Number(4)])),
+          ])),
         )
         .unwrap();
 
@@ -110,16 +98,12 @@ mod tests_ {
   #[test]
   fn small_redundant_tree() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let mut arr = DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-        items: vec![DemoVal::Number(123)],
-      })));
+      let mut arr = DemoVal::Array(Rc::new(vec![DemoVal::Number(123)]));
 
       let depth = 3;
 
       for _ in 0..depth {
-        arr = DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-          items: vec![arr.clone(), arr],
-        })));
+        arr = DemoVal::Array(Rc::new(vec![arr.clone(), arr]));
       }
 
       storage.set_head(storage_head_ptr(b"test"), &arr).unwrap();
@@ -146,18 +130,14 @@ mod tests_ {
   #[test]
   fn large_redundant_tree() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let mut arr = DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-        items: vec![DemoVal::Number(123)],
-      })));
+      let mut arr = DemoVal::Array(Rc::new(vec![DemoVal::Number(123)]));
 
       // 2^100 = 1267650600228229401496703205376
       // This tests that we can handle a tree with 2^100 nodes.
       // We do this by reusing the same array as both children of the parent array.
       // It's particularly important that this also happens during storage.
       for _ in 0..100 {
-        arr = DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-          items: vec![arr.clone(), arr],
-        })));
+        arr = DemoVal::Array(Rc::new(vec![arr.clone(), arr]));
       }
 
       storage.set_head(storage_head_ptr(b"test"), &arr).unwrap();
@@ -167,9 +147,8 @@ mod tests_ {
         .unwrap()
         .unwrap();
 
-      if let DemoVal::Compound(compound) = value {
-        let StorageCompoundVal::Array(arr) = &*compound;
-        assert_eq!(arr.items.len(), 2);
+      if let DemoVal::Array(arr) = value {
+        assert_eq!(arr.len(), 2);
       } else {
         panic!("Expected array");
       }

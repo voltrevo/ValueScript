@@ -15,17 +15,7 @@ pub enum DemoVal {
   Void,
   Number(u64),
   Ptr(StorageEntryPtr),
-  Compound(Rc<StorageCompoundVal>),
-}
-
-#[derive(Debug)]
-pub enum StorageCompoundVal {
-  Array(StorageArray),
-}
-
-#[derive(Debug)]
-pub struct StorageArray {
-  pub items: Vec<DemoVal>,
+  Array(Rc<Vec<DemoVal>>),
 }
 
 impl DemoVal {
@@ -54,8 +44,8 @@ impl DemoVal {
         entry.data.push(2);
         entry.refs.push(*ptr);
       }
-      DemoVal::Compound(compound) => 'b: {
-        let key = RcKey::from(compound.clone());
+      DemoVal::Array(arr) => 'b: {
+        let key = RcKey::from(arr.clone());
 
         if let Some(ptr) = tx.cache_get(key.clone()) {
           entry.data.push(2);
@@ -96,9 +86,7 @@ impl DemoVal {
           items.push(DemoVal::read_from_entry(_tx, reader)?);
         }
 
-        let compound = Rc::new(StorageCompoundVal::Array(StorageArray { items }));
-
-        DemoVal::Compound(compound)
+        DemoVal::Array(Rc::new(items))
       }
       _ => panic!("Invalid tag"),
     })
@@ -113,17 +101,15 @@ impl DemoVal {
         let entry = tx.read(*ptr)?.unwrap();
         Self::from_storage_entry(tx, entry)?.numbers_impl(tx)
       }
-      DemoVal::Compound(compound) => match &**compound {
-        StorageCompoundVal::Array(arr) => {
-          let mut numbers = Vec::new();
+      DemoVal::Array(arr) => {
+        let mut numbers = Vec::new();
 
-          for item in &arr.items {
-            numbers.extend(item.numbers_impl(tx)?);
-          }
-
-          Ok(numbers)
+        for item in arr.iter() {
+          numbers.extend(item.numbers_impl(tx)?);
         }
-      },
+
+        Ok(numbers)
+      }
     }
   }
 }
@@ -137,19 +123,17 @@ impl StorageEntity for DemoVal {
     };
 
     match self {
-      DemoVal::Compound(compound) => match &**compound {
-        StorageCompoundVal::Array(arr) => {
-          entry.data.push(3);
+      DemoVal::Array(arr) => {
+        entry.data.push(3);
 
-          entry
-            .data
-            .extend_from_slice(&(arr.items.len() as u64).to_le_bytes());
+        entry
+          .data
+          .extend_from_slice(&(arr.len() as u64).to_le_bytes());
 
-          for item in &arr.items {
-            item.write_to_entry(tx, &mut entry)?;
-          }
+        for item in arr.iter() {
+          item.write_to_entry(tx, &mut entry)?;
         }
-      },
+      }
       _ => {
         self.write_to_entry(tx, &mut entry)?;
       }
