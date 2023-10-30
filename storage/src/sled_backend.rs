@@ -1,7 +1,8 @@
 use std::{collections::HashMap, fmt::Debug as DebugTrait};
 
 use crate::{
-  storage_backend::StorageBackendHandle, storage_ops::StorageOps, StorageBackend, StoragePtr,
+  rc_key::RcKey, storage_backend::StorageBackendHandle, storage_ops::StorageOps,
+  storage_ptr::StorageEntryPtr, StorageBackend, StoragePtr,
 };
 
 pub struct SledBackend {
@@ -37,6 +38,7 @@ impl StorageBackend for SledBackend {
     self.db.transaction(|tx| {
       let mut handle = SledBackendHandle {
         ref_deltas: Default::default(),
+        cache: Default::default(),
         tx,
       };
 
@@ -59,6 +61,7 @@ impl StorageBackend for SledBackend {
 
 pub struct SledBackendHandle<'a> {
   ref_deltas: HashMap<(u64, u64, u64), i64>,
+  cache: HashMap<RcKey, StorageEntryPtr>,
   tx: &'a sled::transaction::TransactionalTree,
 }
 
@@ -67,6 +70,10 @@ impl<'a, E> StorageBackendHandle<'a, sled::transaction::ConflictableTransactionE
 {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
+  }
+
+  fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr> {
+    &mut self.cache
   }
 
   fn read_bytes<T>(

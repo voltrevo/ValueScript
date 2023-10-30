@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
@@ -87,11 +86,10 @@ impl StorageVal {
   pub fn maybe_replace_store<E, SO: StorageOps<E>>(
     &self,
     tx: &mut SO,
-    cache: &mut HashMap<RcKey, StorageEntryPtr>,
   ) -> Result<Option<StorageEntryPtr>, E> {
     if let Some(id) = self.cache_id() {
-      if let Some(key) = cache.get(&id) {
-        return Ok(Some(*key));
+      if let Some(key) = tx.cache_get(id) {
+        return Ok(Some(key));
       }
     }
 
@@ -102,7 +100,7 @@ impl StorageVal {
           let mut replacements: Vec<(usize, StorageEntryPtr)> = Vec::new();
 
           for i in 0..arr.items.len() {
-            if let Some(key) = arr.items[i].maybe_replace_store(tx, cache)? {
+            if let Some(key) = arr.items[i].maybe_replace_store(tx)? {
               replacements.push((i, key));
             }
           }
@@ -110,7 +108,7 @@ impl StorageVal {
           let cache_id = RcKey::from(compound.clone());
 
           if replacements.is_empty() {
-            break 'b Some(cache_and_store(tx, self, cache, cache_id)?);
+            break 'b Some(tx.store_and_cache(self, cache_id)?);
           }
 
           let mut new_arr = Vec::<StorageVal>::new();
@@ -132,13 +130,11 @@ impl StorageVal {
             new_arr.push(item.clone());
           }
 
-          Some(cache_and_store(
-            tx,
+          Some(tx.store_and_cache(
             &StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
               items: new_arr,
               refs: new_refs,
             }))),
-            cache,
             cache_id,
           )?)
         }
@@ -186,18 +182,4 @@ impl StorageVal {
       },
     }
   }
-}
-
-fn cache_and_store<E, SO: StorageOps<E>>(
-  tx: &mut SO,
-  val: &StorageVal,
-  cache: &mut HashMap<RcKey, StorageEntryPtr>,
-  id: RcKey,
-) -> Result<StorageEntryPtr, E> {
-  let key = tx.store(val)?;
-
-  let pre_existing = cache.insert(id, key);
-  assert!(pre_existing.is_none());
-
-  Ok(key)
 }

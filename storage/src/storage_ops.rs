@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem::take};
+use std::mem::take;
 
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,9 @@ pub trait StorageOps<E> {
 
   fn ref_delta<T>(&mut self, key: StoragePtr<T>, delta: i64) -> Result<(), E>;
   fn flush_ref_deltas(&mut self) -> Result<(), E>;
+
+  fn cache_get(&mut self, key: RcKey) -> Option<StorageEntryPtr>;
+  fn store_and_cache(&mut self, value: &StorageVal, key: RcKey) -> Result<StorageEntryPtr, E>;
 }
 
 impl<'a, Handle, E> StorageOps<E> for Handle
@@ -72,9 +75,7 @@ where
   }
 
   fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
-    let mut cache = HashMap::<RcKey, StorageEntryPtr>::new();
-
-    if let Some(key) = value.maybe_replace_store(self, &mut cache)? {
+    if let Some(key) = value.maybe_replace_store(self)? {
       return Ok(key);
     }
 
@@ -157,5 +158,18 @@ where
     }
 
     Ok(())
+  }
+
+  fn cache_get(&mut self, key: RcKey) -> Option<StorageEntryPtr> {
+    self.cache().get(&key).cloned()
+  }
+
+  fn store_and_cache(&mut self, value: &StorageVal, key: RcKey) -> Result<StorageEntryPtr, E> {
+    let ptr = self.store(value)?;
+
+    let pre_existing = self.cache().insert(key, ptr);
+    assert!(pre_existing.is_none());
+
+    Ok(ptr)
   }
 }

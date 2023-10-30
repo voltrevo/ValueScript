@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::fmt::Debug as DebugTrait;
 
 use crate::{
-  storage_backend::StorageBackendHandle, storage_ops::StorageOps, StorageBackend, StoragePtr,
+  rc_key::RcKey, storage_backend::StorageBackendHandle, storage_ops::StorageOps,
+  storage_ptr::StorageEntryPtr, StorageBackend, StoragePtr,
 };
 
 #[derive(Default)]
@@ -29,6 +30,7 @@ impl StorageBackend for MemoryBackend {
   {
     let mut handle = MemoryStorageHandle {
       ref_deltas: Default::default(),
+      cache: Default::default(),
       storage: self,
     };
 
@@ -50,12 +52,17 @@ impl StorageBackend for MemoryBackend {
 
 pub struct MemoryStorageHandle<'a> {
   ref_deltas: HashMap<(u64, u64, u64), i64>,
+  cache: HashMap<RcKey, StorageEntryPtr>,
   storage: &'a mut MemoryBackend,
 }
 
 impl<'a, E> StorageBackendHandle<'a, E> for MemoryStorageHandle<'a> {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
+  }
+
+  fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr> {
+    &mut self.cache
   }
 
   fn read_bytes<T>(&self, key: StoragePtr<T>) -> Result<Option<Vec<u8>>, E> {
