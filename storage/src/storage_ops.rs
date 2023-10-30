@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
   rc_key::RcKey,
   storage_backend::StorageBackendHandle,
+  storage_entity::StorageEntity,
   storage_ptr::{StorageEntryPtr, StorageHeadPtr, StoragePtr},
   storage_val::StorageVal,
 };
@@ -50,7 +51,9 @@ where
       None => return Ok(None),
     };
 
-    let value = self.read(entry_ptr)?.map(StorageVal::from_entry);
+    let value = self
+      .read(entry_ptr)?
+      .map(|entry| StorageVal::from_storage_entry(self, entry));
 
     Ok(value)
   }
@@ -84,7 +87,7 @@ where
 
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
     let ptr = StoragePtr::random(&mut thread_rng());
-    let entry = value.to_entry();
+    let entry = value.to_storage_entry(self);
     self.write(ptr, Some(&entry))?;
     self.ref_delta(ptr, -1)?; // Cancel out the assumed single reference
 

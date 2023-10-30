@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::rc_key::RcKey;
 use crate::serde_rc::{deserialize_rc, serialize_rc};
+use crate::storage_entity::StorageEntity;
 use crate::storage_entry::StorageEntry;
 use crate::storage_ops::StorageOps;
 use crate::storage_ptr::StorageEntryPtr;
@@ -40,41 +41,6 @@ pub struct StorageArray {
 }
 
 impl StorageVal {
-  pub fn to_entry(&self) -> StorageEntry {
-    StorageEntry {
-      ref_count: 1,
-      refs: match self {
-        StorageVal::Void | StorageVal::Number(_) | StorageVal::Ptr(_) | StorageVal::Ref(_) => {
-          vec![]
-        }
-        StorageVal::Compound(compound) => match &**compound {
-          StorageCompoundVal::Array(arr) => arr.refs.clone(),
-        },
-      },
-      data: bincode::serialize(self).unwrap(),
-    }
-  }
-
-  pub fn from_entry(entry: StorageEntry) -> Self {
-    let StorageEntry {
-      ref_count: _,
-      refs,
-      data,
-    } = entry;
-
-    let mut val = bincode::deserialize::<StorageVal>(&data).unwrap();
-
-    if let StorageVal::Compound(compound) = &mut val {
-      match Rc::get_mut(compound).expect("Should be single ref") {
-        StorageCompoundVal::Array(arr) => {
-          arr.refs = refs;
-        }
-      }
-    };
-
-    val
-  }
-
   #[cfg(test)]
   pub(crate) fn numbers<SB: StorageBackend>(
     &self,
@@ -159,7 +125,7 @@ impl StorageVal {
       StorageVal::Number(n) => Ok(vec![*n]),
       StorageVal::Ptr(ptr) => {
         let entry = tx.read(*ptr)?.unwrap();
-        Self::from_entry(entry).numbers_impl(tx)
+        Self::from_storage_entry(tx, entry).numbers_impl(tx)
       }
       StorageVal::Ref(_) => {
         panic!("Can't lookup ref (shouldn't hit this case)")
@@ -181,5 +147,42 @@ impl StorageVal {
         }
       },
     }
+  }
+}
+
+impl StorageEntity for StorageVal {
+  fn to_storage_entry<E, Tx: StorageOps<E>>(&self, _tx: &mut Tx) -> StorageEntry {
+    StorageEntry {
+      ref_count: 1,
+      refs: match self {
+        StorageVal::Void | StorageVal::Number(_) | StorageVal::Ptr(_) | StorageVal::Ref(_) => {
+          vec![]
+        }
+        StorageVal::Compound(compound) => match &**compound {
+          StorageCompoundVal::Array(arr) => arr.refs.clone(),
+        },
+      },
+      data: bincode::serialize(self).unwrap(),
+    }
+  }
+
+  fn from_storage_entry<E, Tx: StorageOps<E>>(_tx: &mut Tx, entry: StorageEntry) -> Self {
+    let StorageEntry {
+      ref_count: _,
+      refs,
+      data,
+    } = entry;
+
+    let mut val = bincode::deserialize::<StorageVal>(&data).unwrap();
+
+    if let StorageVal::Compound(compound) = &mut val {
+      match Rc::get_mut(compound).expect("Should be single ref") {
+        StorageCompoundVal::Array(arr) => {
+          arr.refs = refs;
+        }
+      }
+    };
+
+    val
   }
 }
