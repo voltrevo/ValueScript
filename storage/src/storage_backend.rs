@@ -8,8 +8,8 @@ use crate::{
 pub trait StorageBackendHandle<'a, E> {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
   fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
-  fn read_bytes<T>(&self, key: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
-  fn write_bytes<T>(&mut self, key: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
+  fn write_bytes<T>(&mut self, ptr: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
 }
 
 pub trait StorageBackend {

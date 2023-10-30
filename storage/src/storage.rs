@@ -32,11 +32,9 @@ impl<SB: StorageBackend> Storage<SB> {
 
       sb.write(tmp_count_ptr(), Some(&(tmp_count + 1)))?;
 
-      let key = sb
-        .read(tmp_ptr)?
-        .unwrap_or_else(|| panic!("Missing tmp key"));
+      let ptr = sb.read(tmp_ptr)?.unwrap_or_else(|| panic!("Ptr not found"));
 
-      Ok(key)
+      Ok(ptr)
     })
   }
 
@@ -61,10 +59,10 @@ impl<SB: StorageBackend> Storage<SB> {
   #[cfg(test)]
   pub(crate) fn get_ref_count(
     &mut self,
-    key: StorageEntryPtr,
+    ptr: StorageEntryPtr,
   ) -> Result<Option<u64>, SB::Error<()>> {
     self
       .sb
-      .transaction(|sb| Ok(sb.read(key)?.map(|entry| entry.ref_count)))
+      .transaction(|sb| Ok(sb.read(ptr)?.map(|entry| entry.ref_count)))
   }
 }

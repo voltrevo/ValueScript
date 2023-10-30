@@ -88,8 +88,8 @@ impl StorageVal {
     tx: &mut SO,
   ) -> Result<Option<StorageEntryPtr>, E> {
     if let Some(id) = self.cache_id() {
-      if let Some(key) = tx.cache_get(id) {
-        return Ok(Some(key));
+      if let Some(ptr) = tx.cache_get(id) {
+        return Ok(Some(ptr));
       }
     }
 
@@ -100,8 +100,8 @@ impl StorageVal {
           let mut replacements: Vec<(usize, StorageEntryPtr)> = Vec::new();
 
           for i in 0..arr.items.len() {
-            if let Some(key) = arr.items[i].maybe_replace_store(tx)? {
-              replacements.push((i, key));
+            if let Some(ptr) = arr.items[i].maybe_replace_store(tx)? {
+              replacements.push((i, ptr));
             }
           }
 

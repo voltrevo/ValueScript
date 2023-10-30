@@ -78,20 +78,20 @@ impl<'a, E> StorageBackendHandle<'a, sled::transaction::ConflictableTransactionE
 
   fn read_bytes<T>(
     &self,
-    key: StoragePtr<T>,
+    ptr: StoragePtr<T>,
   ) -> Result<Option<Vec<u8>>, sled::transaction::ConflictableTransactionError<E>> {
-    let value = self.tx.get(key.to_bytes())?.map(|value| value.to_vec());
+    let value = self.tx.get(ptr.to_bytes())?.map(|value| value.to_vec());
     Ok(value)
   }
 
   fn write_bytes<T>(
     &mut self,
-    key: StoragePtr<T>,
+    ptr: StoragePtr<T>,
     data: Option<Vec<u8>>,
   ) -> Result<(), sled::transaction::ConflictableTransactionError<E>> {
     match data {
-      Some(data) => self.tx.insert(key.to_bytes(), data)?,
-      None => self.tx.remove(key.to_bytes())?,
+      Some(data) => self.tx.insert(ptr.to_bytes(), data)?,
+      None => self.tx.remove(ptr.to_bytes())?,
     };
 
     Ok(())

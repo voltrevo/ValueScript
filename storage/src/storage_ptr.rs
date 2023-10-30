@@ -42,9 +42,9 @@ impl<T> StoragePtr<T> {
       panic!("Too many bytes");
     }
 
-    let mut key = [0u8; 24];
-    key[..bytes.len()].copy_from_slice(bytes);
-    bincode::deserialize(&key).unwrap()
+    let mut ptr = [0u8; 24];
+    ptr[..bytes.len()].copy_from_slice(bytes);
+    bincode::deserialize(&ptr).unwrap()
   }
 
   pub(crate) fn from_data(data: (u64, u64, u64)) -> Self {
@@ -71,15 +71,15 @@ pub fn storage_head_ptr(name: &[u8]) -> StorageHeadPtr {
 }
 
 pub(crate) fn tmp_count_ptr() -> StoragePtr<u64> {
-  let mut key = StoragePtr::<u64>::from_bytes(b"tmp");
-  key.data.2 = 1;
+  let mut ptr = StoragePtr::<u64>::from_bytes(b"tmp");
+  ptr.data.2 = 1;
 
-  key
+  ptr
 }
 
 pub(crate) fn tmp_at_ptr(i: u64) -> StorageHeadPtr {
-  let mut key = StorageHeadPtr::from_bytes(b"tmp");
-  key.data.2 = i + 2;
+  let mut ptr = StorageHeadPtr::from_bytes(b"tmp");
+  ptr.data.2 = i + 2;
 
-  key
+  ptr
 }

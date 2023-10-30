@@ -11,8 +11,8 @@ use crate::{
 };
 
 pub trait StorageOps<E> {
-  fn read<T: for<'de> Deserialize<'de>>(&mut self, key: StoragePtr<T>) -> Result<Option<T>, E>;
-  fn write<T: Serialize>(&mut self, key: StoragePtr<T>, data: Option<&T>) -> Result<(), E>;
+  fn read<T: for<'de> Deserialize<'de>>(&mut self, ptr: StoragePtr<T>) -> Result<Option<T>, E>;
+  fn write<T: Serialize>(&mut self, ptr: StoragePtr<T>, data: Option<&T>) -> Result<(), E>;
 
   fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E>;
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E>;
@@ -20,7 +20,7 @@ pub trait StorageOps<E> {
   fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
 
-  fn ref_delta<T>(&mut self, key: StoragePtr<T>, delta: i64) -> Result<(), E>;
+  fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), E>;
   fn flush_ref_deltas(&mut self) -> Result<(), E>;
 
   fn cache_get(&mut self, key: RcKey) -> Option<StorageEntryPtr>;
@@ -31,8 +31,8 @@ impl<'a, Handle, E> StorageOps<E> for Handle
 where
   Handle: StorageBackendHandle<'a, E>,
 {
-  fn read<T: for<'de> Deserialize<'de>>(&mut self, key: StoragePtr<T>) -> Result<Option<T>, E> {
-    let data = match self.read_bytes(key)? {
+  fn read<T: for<'de> Deserialize<'de>>(&mut self, ptr: StoragePtr<T>) -> Result<Option<T>, E> {
+    let data = match self.read_bytes(ptr)? {
       Some(data) => data,
       None => return Ok(None),
     };
@@ -40,63 +40,63 @@ where
     Ok(Some(bincode::deserialize(&data).unwrap()))
   }
 
-  fn write<T: Serialize>(&mut self, key: StoragePtr<T>, data: Option<&T>) -> Result<(), E> {
-    self.write_bytes(key, data.map(|data| bincode::serialize(&data).unwrap()))
+  fn write<T: Serialize>(&mut self, ptr: StoragePtr<T>, data: Option<&T>) -> Result<(), E> {
+    self.write_bytes(ptr, data.map(|data| bincode::serialize(&data).unwrap()))
   }
 
-  fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E> {
-    let key = match self.read(ptr)? {
-      Some(key) => key,
+  fn get_head(&mut self, head_ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E> {
+    let entry_ptr = match self.read(head_ptr)? {
+      Some(entry_ptr) => entry_ptr,
       None => return Ok(None),
     };
 
-    let value = self.read(key)?.map(StorageVal::from_entry);
+    let value = self.read(entry_ptr)?.map(StorageVal::from_entry);
 
     Ok(value)
   }
 
-  fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
+  fn set_head(&mut self, head_ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
     if let Some(value) = value {
-      let key = self.store_with_replacements(value)?;
-      self.ref_delta(key, 1)?;
+      let entry_ptr = self.store_with_replacements(value)?;
+      self.ref_delta(entry_ptr, 1)?;
 
-      if let Some(old_key) = self.read(ptr)? {
-        self.ref_delta(old_key, -1)?;
+      if let Some(old_entry_ptr) = self.read(head_ptr)? {
+        self.ref_delta(old_entry_ptr, -1)?;
       }
 
-      self.write(ptr, Some(&key))
+      self.write(head_ptr, Some(&entry_ptr))
     } else {
-      if let Some(old_key) = self.read(ptr)? {
-        self.ref_delta(old_key, -1)?;
+      if let Some(old_entry_ptr) = self.read(head_ptr)? {
+        self.ref_delta(old_entry_ptr, -1)?;
       }
 
-      self.write(ptr, None)
+      self.write(head_ptr, None)
     }
   }
 
   fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
-    if let Some(key) = value.maybe_replace_store(self)? {
-      return Ok(key);
+    if let Some(ptr) = value.maybe_replace_store(self)? {
+      return Ok(ptr);
     }
 
     self.store(value)
   }
 
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
-    let key = StoragePtr::random(&mut thread_rng());
+    let ptr = StoragePtr::random(&mut thread_rng());
     let entry = value.to_entry();
-    self.write(key, Some(&entry))?;
-    self.ref_delta(key, -1)?; // Cancel out the assumed single reference
+    self.write(ptr, Some(&entry))?;
+    self.ref_delta(ptr, -1)?; // Cancel out the assumed single reference
 
-    for subkey in &entry.refs {
-      self.ref_delta(*subkey, 1)?;
+    for subptr in &entry.refs {
+      self.ref_delta(*subptr, 1)?;
     }
 
-    Ok(key)
+    Ok(ptr)
   }
 
-  fn ref_delta<T>(&mut self, key: StoragePtr<T>, delta: i64) -> Result<(), E> {
-    let ref_delta = self.ref_deltas().entry(key.data).or_insert(0);
+  fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), E> {
+    let ref_delta = self.ref_deltas().entry(ptr.data).or_insert(0);
     *ref_delta += delta;
 
     Ok(())
@@ -106,18 +106,18 @@ where
     while !self.ref_deltas().is_empty() {
       let ref_deltas = take(self.ref_deltas());
 
-      for (key, delta) in ref_deltas.iter() {
+      for (ptr, delta) in ref_deltas.iter() {
         let delta = *delta;
 
         if delta <= 0 {
           continue;
         }
 
-        let ptr = StorageEntryPtr::from_data(*key);
+        let ptr = StorageEntryPtr::from_data(*ptr);
 
         let mut entry = match self.read(ptr)? {
           Some(entry) => entry,
-          None => panic!("Key does not exist"),
+          None => panic!("Ptr not found"),
         };
 
         entry.ref_count += delta as u64;
@@ -125,27 +125,27 @@ where
         self.write(ptr, Some(&entry))?;
       }
 
-      for (key, delta) in ref_deltas.iter() {
+      for (ptr, delta) in ref_deltas.iter() {
         let delta = *delta;
 
         if delta >= 0 {
           continue;
         }
 
-        let ptr = StorageEntryPtr::from_data(*key);
+        let ptr = StorageEntryPtr::from_data(*ptr);
 
         let decrement = (-delta) as u64;
 
         let mut entry = match self.read(ptr)? {
           Some(entry) => entry,
-          None => panic!("Key does not exist"),
+          None => panic!("Ptr not found"),
         };
 
         if entry.ref_count == decrement {
           self.write(ptr, None)?;
 
-          for subkey in entry.refs.iter() {
-            self.ref_delta(*subkey, -1)?;
+          for subptr in entry.refs.iter() {
+            self.ref_delta(*subptr, -1)?;
           }
 
           continue;
