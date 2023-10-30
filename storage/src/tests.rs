@@ -3,11 +3,11 @@ mod tests_ {
   use std::rc::Rc;
 
   use crate::{
+    demo_val::{DemoVal, StorageArray, StorageCompoundVal},
     memory_backend::MemoryBackend,
     sled_backend::SledBackend,
     storage::Storage,
     storage_ptr::storage_head_ptr,
-    storage_val::{StorageArray, StorageCompoundVal, StorageVal},
     StorageBackend,
   };
 
@@ -23,7 +23,7 @@ mod tests_ {
   fn number() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
       storage
-        .set_head(storage_head_ptr(b"test"), Some(&StorageVal::Number(123)))
+        .set_head(storage_head_ptr(b"test"), &DemoVal::Number(123))
         .unwrap();
 
       let val = storage
@@ -31,7 +31,7 @@ mod tests_ {
         .unwrap()
         .unwrap();
 
-      if let StorageVal::Number(val) = val {
+      if let DemoVal::Number(val) = val {
         assert_eq!(val, 123);
       } else {
         panic!("Expected number");
@@ -44,17 +44,15 @@ mod tests_ {
   #[test]
   fn array_0_1() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let key0 = storage.store_tmp(&StorageVal::Number(0)).unwrap();
-      let key1 = storage.store_tmp(&StorageVal::Number(1)).unwrap();
+      let key0 = storage.store_tmp(&DemoVal::Number(0)).unwrap();
+      let key1 = storage.store_tmp(&DemoVal::Number(1)).unwrap();
 
       storage
         .set_head(
           storage_head_ptr(b"test"),
-          Some(&StorageVal::Compound(Rc::new(StorageCompoundVal::Array(
-            StorageArray {
-              items: vec![StorageVal::Ptr(key0), StorageVal::Ptr(key1)],
-            },
-          )))),
+          &DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+            items: vec![DemoVal::Ptr(key0), DemoVal::Ptr(key1)],
+          }))),
         )
         .unwrap();
 
@@ -66,7 +64,7 @@ mod tests_ {
       assert_eq!(storage.get_ref_count(key0).unwrap(), Some(1));
       assert_eq!(storage.get_ref_count(key1).unwrap(), Some(1));
 
-      storage.set_head(storage_head_ptr(b"test"), None).unwrap();
+      storage.remove_head(storage_head_ptr(b"test")).unwrap();
 
       assert_eq!(storage.get_ref_count(key0).unwrap(), None);
       assert_eq!(storage.get_ref_count(key1).unwrap(), None);
@@ -83,23 +81,21 @@ mod tests_ {
       storage
         .set_head(
           storage_head_ptr(b"test"),
-          Some(&StorageVal::Compound(Rc::new(StorageCompoundVal::Array(
-            StorageArray {
-              items: vec![
-                StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-                  items: vec![StorageVal::Number(1), StorageVal::Number(2)],
-                }))),
-                StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-                  items: vec![StorageVal::Number(3), StorageVal::Number(4)],
-                }))),
-              ],
-            },
-          )))),
+          &DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+            items: vec![
+              DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+                items: vec![DemoVal::Number(1), DemoVal::Number(2)],
+              }))),
+              DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+                items: vec![DemoVal::Number(3), DemoVal::Number(4)],
+              }))),
+            ],
+          }))),
         )
         .unwrap();
 
       let value = storage
-        .get_head(storage_head_ptr(b"test"))
+        .get_head::<DemoVal>(storage_head_ptr(b"test"))
         .unwrap()
         .unwrap();
 
@@ -114,24 +110,22 @@ mod tests_ {
   #[test]
   fn small_redundant_tree() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let mut arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-        items: vec![StorageVal::Number(123)],
+      let mut arr = DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+        items: vec![DemoVal::Number(123)],
       })));
 
       let depth = 3;
 
       for _ in 0..depth {
-        arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+        arr = DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
           items: vec![arr.clone(), arr],
         })));
       }
 
-      storage
-        .set_head(storage_head_ptr(b"test"), Some(&arr))
-        .unwrap();
+      storage.set_head(storage_head_ptr(b"test"), &arr).unwrap();
 
       let value = storage
-        .get_head(storage_head_ptr(b"test"))
+        .get_head::<DemoVal>(storage_head_ptr(b"test"))
         .unwrap()
         .unwrap();
 
@@ -140,7 +134,7 @@ mod tests_ {
         vec![123; 2usize.pow(depth as u32)]
       );
 
-      storage.set_head(storage_head_ptr(b"test"), None).unwrap();
+      storage.remove_head(storage_head_ptr(b"test")).unwrap();
 
       assert_eq!(storage.sb.len(), 0);
       assert!(storage.is_empty());
@@ -152,8 +146,8 @@ mod tests_ {
   #[test]
   fn large_redundant_tree() {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
-      let mut arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
-        items: vec![StorageVal::Number(123)],
+      let mut arr = DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+        items: vec![DemoVal::Number(123)],
       })));
 
       // 2^100 = 1267650600228229401496703205376
@@ -161,28 +155,26 @@ mod tests_ {
       // We do this by reusing the same array as both children of the parent array.
       // It's particularly important that this also happens during storage.
       for _ in 0..100 {
-        arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
+        arr = DemoVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
           items: vec![arr.clone(), arr],
         })));
       }
 
-      storage
-        .set_head(storage_head_ptr(b"test"), Some(&arr))
-        .unwrap();
+      storage.set_head(storage_head_ptr(b"test"), &arr).unwrap();
 
       let value = storage
         .get_head(storage_head_ptr(b"test"))
         .unwrap()
         .unwrap();
 
-      if let StorageVal::Compound(compound) = value {
+      if let DemoVal::Compound(compound) = value {
         let StorageCompoundVal::Array(arr) = &*compound;
         assert_eq!(arr.items.len(), 2);
       } else {
         panic!("Expected array");
       }
 
-      storage.set_head(storage_head_ptr(b"test"), None).unwrap();
+      storage.remove_head(storage_head_ptr(b"test")).unwrap();
 
       assert!(storage.is_empty());
     }

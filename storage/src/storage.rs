@@ -1,6 +1,6 @@
+use crate::storage_entity::StorageEntity;
 use crate::storage_ops::StorageOps;
 use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
-use crate::storage_val::StorageVal;
 use crate::StorageBackend;
 
 pub struct Storage<SB: StorageBackend> {
@@ -12,23 +12,33 @@ impl<SB: StorageBackend> Storage<SB> {
     Self { sb }
   }
 
-  pub fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, SB::Error<()>> {
+  pub fn get_head<SE: StorageEntity>(
+    &mut self,
+    ptr: StorageHeadPtr,
+  ) -> Result<Option<SE>, SB::Error<()>> {
     self.sb.transaction(|sb| sb.get_head(ptr))
   }
 
-  pub fn set_head(
+  pub fn set_head<SE: StorageEntity>(
     &mut self,
     ptr: StorageHeadPtr,
-    value: Option<&StorageVal>,
+    value: &SE,
   ) -> Result<(), SB::Error<()>> {
     self.sb.transaction(|sb| sb.set_head(ptr, value))
   }
 
-  pub fn store_tmp(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, SB::Error<()>> {
+  pub fn remove_head(&mut self, ptr: StorageHeadPtr) -> Result<(), SB::Error<()>> {
+    self.sb.transaction(|sb| sb.remove_head(ptr))
+  }
+
+  pub fn store_tmp<SE: StorageEntity>(
+    &mut self,
+    value: &SE,
+  ) -> Result<StorageEntryPtr, SB::Error<()>> {
     self.sb.transaction(|sb| {
       let tmp_count = sb.read(tmp_count_ptr())?.unwrap_or(0);
       let tmp_ptr = tmp_at_ptr(tmp_count);
-      sb.set_head(tmp_ptr, Some(value))?;
+      sb.set_head(tmp_ptr, value)?;
 
       sb.write(tmp_count_ptr(), Some(&(tmp_count + 1)))?;
 
@@ -43,7 +53,7 @@ impl<SB: StorageBackend> Storage<SB> {
       let tmp_count = sb.read(tmp_count_ptr())?.unwrap_or(0);
 
       for i in 0..tmp_count {
-        sb.set_head(tmp_at_ptr(i), None)?;
+        sb.remove_head(tmp_at_ptr(i))?;
       }
 
       sb.write(tmp_count_ptr(), None)?;

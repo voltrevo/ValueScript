@@ -8,23 +8,27 @@ use crate::{
   storage_backend::StorageBackendHandle,
   storage_entity::StorageEntity,
   storage_ptr::{StorageEntryPtr, StorageHeadPtr, StoragePtr},
-  storage_val::StorageVal,
 };
 
 pub trait StorageOps<E> {
   fn read<T: for<'de> Deserialize<'de>>(&mut self, ptr: StoragePtr<T>) -> Result<Option<T>, E>;
   fn write<T: Serialize>(&mut self, ptr: StoragePtr<T>, data: Option<&T>) -> Result<(), E>;
 
-  fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E>;
-  fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E>;
+  fn get_head<SE: StorageEntity>(&mut self, ptr: StorageHeadPtr) -> Result<Option<SE>, E>;
+  fn set_head<SE: StorageEntity>(&mut self, ptr: StorageHeadPtr, value: &SE) -> Result<(), E>;
+  fn remove_head(&mut self, ptr: StorageHeadPtr) -> Result<(), E>;
 
-  fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
+  fn store<SE: StorageEntity>(&mut self, value: &SE) -> Result<StorageEntryPtr, E>;
 
   fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), E>;
   fn flush_ref_deltas(&mut self) -> Result<(), E>;
 
   fn cache_get(&mut self, key: RcKey) -> Option<StorageEntryPtr>;
-  fn store_and_cache(&mut self, value: &StorageVal, key: RcKey) -> Result<StorageEntryPtr, E>;
+  fn store_and_cache<SE: StorageEntity>(
+    &mut self,
+    value: &SE,
+    key: RcKey,
+  ) -> Result<StorageEntryPtr, E>;
 }
 
 impl<'a, Handle, E> StorageOps<E> for Handle
@@ -44,7 +48,7 @@ where
     self.write_bytes(ptr, data.map(|data| bincode::serialize(&data).unwrap()))
   }
 
-  fn get_head(&mut self, head_ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E> {
+  fn get_head<SE: StorageEntity>(&mut self, head_ptr: StorageHeadPtr) -> Result<Option<SE>, E> {
     let entry_ptr = match self.read(head_ptr)? {
       Some(entry_ptr) => entry_ptr,
       None => return Ok(None),
@@ -55,29 +59,29 @@ where
       None => return Ok(None),
     };
 
-    StorageVal::from_storage_entry(self, entry).map(Some)
+    SE::from_storage_entry(self, entry).map(Some)
   }
 
-  fn set_head(&mut self, head_ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
-    if let Some(value) = value {
-      let entry_ptr = self.store(value)?;
-      self.ref_delta(entry_ptr, 1)?;
+  fn set_head<SE: StorageEntity>(&mut self, head_ptr: StorageHeadPtr, value: &SE) -> Result<(), E> {
+    let entry_ptr = self.store(value)?;
+    self.ref_delta(entry_ptr, 1)?;
 
-      if let Some(old_entry_ptr) = self.read(head_ptr)? {
-        self.ref_delta(old_entry_ptr, -1)?;
-      }
-
-      self.write(head_ptr, Some(&entry_ptr))
-    } else {
-      if let Some(old_entry_ptr) = self.read(head_ptr)? {
-        self.ref_delta(old_entry_ptr, -1)?;
-      }
-
-      self.write(head_ptr, None)
+    if let Some(old_entry_ptr) = self.read(head_ptr)? {
+      self.ref_delta(old_entry_ptr, -1)?;
     }
+
+    self.write(head_ptr, Some(&entry_ptr))
   }
 
-  fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
+  fn remove_head(&mut self, head_ptr: StorageHeadPtr) -> Result<(), E> {
+    if let Some(old_entry_ptr) = self.read(head_ptr)? {
+      self.ref_delta(old_entry_ptr, -1)?;
+    }
+
+    self.write(head_ptr, None)
+  }
+
+  fn store<SE: StorageEntity>(&mut self, value: &SE) -> Result<StorageEntryPtr, E> {
     let ptr = StoragePtr::random(&mut thread_rng());
     let entry = value.to_storage_entry(self)?;
     self.write(ptr, Some(&entry))?;
@@ -159,7 +163,11 @@ where
     self.cache().get(&key).cloned()
   }
 
-  fn store_and_cache(&mut self, value: &StorageVal, key: RcKey) -> Result<StorageEntryPtr, E> {
+  fn store_and_cache<SE: StorageEntity>(
+    &mut self,
+    value: &SE,
+    key: RcKey,
+  ) -> Result<StorageEntryPtr, E> {
     let ptr = self.store(value)?;
 
     let pre_existing = self.cache().insert(key, ptr);

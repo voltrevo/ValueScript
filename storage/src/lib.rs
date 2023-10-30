@@ -1,6 +1,7 @@
 mod memory_backend;
 mod storage;
 
+mod demo_val;
 mod rc_key;
 mod sled_backend;
 mod storage_backend;
@@ -8,7 +9,6 @@ mod storage_entity;
 mod storage_entry;
 mod storage_ops;
 mod storage_ptr;
-mod storage_val;
 mod tests;
 
 pub use self::storage::Storage;

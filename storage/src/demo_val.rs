@@ -10,7 +10,7 @@ use crate::storage_ptr::StorageEntryPtr;
 use crate::{Storage, StorageBackend};
 
 #[derive(Default, Debug, Clone)]
-pub enum StorageVal {
+pub enum DemoVal {
   #[default]
   Void,
   Number(u64),
@@ -25,10 +25,10 @@ pub enum StorageCompoundVal {
 
 #[derive(Debug)]
 pub struct StorageArray {
-  pub items: Vec<StorageVal>,
+  pub items: Vec<DemoVal>,
 }
 
-impl StorageVal {
+impl DemoVal {
   #[cfg(test)]
   pub(crate) fn numbers<SB: StorageBackend>(
     &self,
@@ -43,18 +43,18 @@ impl StorageVal {
     entry: &mut StorageEntry,
   ) -> Result<(), E> {
     match self {
-      StorageVal::Void => {
+      DemoVal::Void => {
         entry.data.push(0);
       }
-      StorageVal::Number(n) => {
+      DemoVal::Number(n) => {
         entry.data.push(1);
         entry.data.extend(n.to_le_bytes());
       }
-      StorageVal::Ptr(ptr) => {
+      DemoVal::Ptr(ptr) => {
         entry.data.push(2);
         entry.refs.push(*ptr);
       }
-      StorageVal::Compound(compound) => 'b: {
+      DemoVal::Compound(compound) => 'b: {
         let key = RcKey::from(compound.clone());
 
         if let Some(ptr) = tx.cache_get(key.clone()) {
@@ -75,30 +75,30 @@ impl StorageVal {
   fn read_from_entry<E, SO: StorageOps<E>>(
     _tx: &mut SO,
     reader: &mut StorageEntryReader,
-  ) -> Result<StorageVal, E> {
+  ) -> Result<DemoVal, E> {
     let tag = reader.read_u8().unwrap();
 
     Ok(match tag {
-      0 => StorageVal::Void,
+      0 => DemoVal::Void,
       1 => {
         let n = reader.read_u64().unwrap();
-        StorageVal::Number(n)
+        DemoVal::Number(n)
       }
       2 => {
         let ptr = reader.read_ref().unwrap();
-        StorageVal::Ptr(ptr)
+        DemoVal::Ptr(ptr)
       }
       3 => {
         let len = reader.read_u64().unwrap();
         let mut items = Vec::new();
 
         for _ in 0..len {
-          items.push(StorageVal::read_from_entry(_tx, reader)?);
+          items.push(DemoVal::read_from_entry(_tx, reader)?);
         }
 
         let compound = Rc::new(StorageCompoundVal::Array(StorageArray { items }));
 
-        StorageVal::Compound(compound)
+        DemoVal::Compound(compound)
       }
       _ => panic!("Invalid tag"),
     })
@@ -107,13 +107,13 @@ impl StorageVal {
   #[cfg(test)]
   fn numbers_impl<E, SO: StorageOps<E>>(&self, tx: &mut SO) -> Result<Vec<u64>, E> {
     match &self {
-      StorageVal::Void => Ok(Vec::new()),
-      StorageVal::Number(n) => Ok(vec![*n]),
-      StorageVal::Ptr(ptr) => {
+      DemoVal::Void => Ok(Vec::new()),
+      DemoVal::Number(n) => Ok(vec![*n]),
+      DemoVal::Ptr(ptr) => {
         let entry = tx.read(*ptr)?.unwrap();
         Self::from_storage_entry(tx, entry)?.numbers_impl(tx)
       }
-      StorageVal::Compound(compound) => match &**compound {
+      DemoVal::Compound(compound) => match &**compound {
         StorageCompoundVal::Array(arr) => {
           let mut numbers = Vec::new();
 
@@ -128,7 +128,7 @@ impl StorageVal {
   }
 }
 
-impl StorageEntity for StorageVal {
+impl StorageEntity for DemoVal {
   fn to_storage_entry<E, Tx: StorageOps<E>>(&self, tx: &mut Tx) -> Result<StorageEntry, E> {
     let mut entry = StorageEntry {
       ref_count: 1,
@@ -137,7 +137,7 @@ impl StorageEntity for StorageVal {
     };
 
     match self {
-      StorageVal::Compound(compound) => match &**compound {
+      DemoVal::Compound(compound) => match &**compound {
         StorageCompoundVal::Array(arr) => {
           entry.data.push(3);
 
