@@ -51,11 +51,12 @@ where
       None => return Ok(None),
     };
 
-    let value = self
-      .read(entry_ptr)?
-      .map(|entry| StorageVal::from_storage_entry(self, entry));
+    let entry = match self.read(entry_ptr)? {
+      Some(entry) => entry,
+      None => return Ok(None),
+    };
 
-    Ok(value)
+    StorageVal::from_storage_entry(self, entry).map(Some)
   }
 
   fn set_head(&mut self, head_ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
@@ -87,7 +88,7 @@ where
 
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
     let ptr = StoragePtr::random(&mut thread_rng());
-    let entry = value.to_storage_entry(self);
+    let entry = value.to_storage_entry(self)?;
     self.write(ptr, Some(&entry))?;
     self.ref_delta(ptr, -1)?; // Cancel out the assumed single reference
 

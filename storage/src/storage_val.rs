@@ -125,7 +125,7 @@ impl StorageVal {
       StorageVal::Number(n) => Ok(vec![*n]),
       StorageVal::Ptr(ptr) => {
         let entry = tx.read(*ptr)?.unwrap();
-        Self::from_storage_entry(tx, entry).numbers_impl(tx)
+        Self::from_storage_entry(tx, entry)?.numbers_impl(tx)
       }
       StorageVal::Ref(_) => {
         panic!("Can't lookup ref (shouldn't hit this case)")
@@ -151,8 +151,8 @@ impl StorageVal {
 }
 
 impl StorageEntity for StorageVal {
-  fn to_storage_entry<E, Tx: StorageOps<E>>(&self, _tx: &mut Tx) -> StorageEntry {
-    StorageEntry {
+  fn to_storage_entry<E, Tx: StorageOps<E>>(&self, _tx: &mut Tx) -> Result<StorageEntry, E> {
+    Ok(StorageEntry {
       ref_count: 1,
       refs: match self {
         StorageVal::Void | StorageVal::Number(_) | StorageVal::Ptr(_) | StorageVal::Ref(_) => {
@@ -163,10 +163,13 @@ impl StorageEntity for StorageVal {
         },
       },
       data: bincode::serialize(self).unwrap(),
-    }
+    })
   }
 
-  fn from_storage_entry<E, Tx: StorageOps<E>>(_tx: &mut Tx, entry: StorageEntry) -> Self {
+  fn from_storage_entry<E, Tx: StorageOps<E>>(
+    _tx: &mut Tx,
+    entry: StorageEntry,
+  ) -> Result<Self, E> {
     let StorageEntry {
       ref_count: _,
       refs,
@@ -183,6 +186,6 @@ impl StorageEntity for StorageVal {
       }
     };
 
-    val
+    Ok(val)
   }
 }
