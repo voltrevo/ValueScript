@@ -87,7 +87,7 @@ impl StorageVal {
     &self,
     tx: &mut SO,
   ) -> Result<Option<StorageEntryPtr>, E> {
-    if let Some(id) = self.cache_id() {
+    if let Some(id) = self.cache_key() {
       if let Some(ptr) = tx.cache_get(id) {
         return Ok(Some(ptr));
       }
@@ -105,10 +105,10 @@ impl StorageVal {
             }
           }
 
-          let cache_id = RcKey::from(compound.clone());
+          let key = RcKey::from(compound.clone());
 
           if replacements.is_empty() {
-            break 'b Some(tx.store_and_cache(self, cache_id)?);
+            break 'b Some(tx.store_and_cache(self, key)?);
           }
 
           let mut new_arr = Vec::<StorageVal>::new();
@@ -135,14 +135,14 @@ impl StorageVal {
               items: new_arr,
               refs: new_refs,
             }))),
-            cache_id,
+            key,
           )?)
         }
       },
     })
   }
 
-  fn cache_id(&self) -> Option<RcKey> {
+  fn cache_key(&self) -> Option<RcKey> {
     match self {
       StorageVal::Void => None,
       StorageVal::Number(_) => None,
