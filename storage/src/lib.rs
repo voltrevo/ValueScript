@@ -1,7 +1,9 @@
 mod memory_backend;
 mod storage;
 
+#[cfg(test)]
 mod demo_val;
+
 mod rc_key;
 mod sled_backend;
 mod storage_backend;
@@ -15,4 +17,5 @@ pub use self::storage::Storage;
 pub use self::storage_backend::StorageBackend;
 pub use memory_backend::MemoryBackend;
 pub use sled_backend::SledBackend;
+pub use storage_entry::{StorageEntry, StorageEntryReader};
 pub use storage_ptr::{storage_head_ptr, StoragePtr};

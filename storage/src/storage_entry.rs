@@ -10,9 +10,9 @@ pub struct StorageEntry {
 }
 
 pub struct StorageEntryReader<'a> {
-  pub(crate) entry: &'a StorageEntry,
-  pub(crate) refs_i: usize,
-  pub(crate) data_i: usize,
+  pub entry: &'a StorageEntry,
+  pub refs_i: usize,
+  pub data_i: usize,
 }
 
 impl<'a> StorageEntryReader<'a> {

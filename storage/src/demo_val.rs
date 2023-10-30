@@ -5,21 +5,20 @@ use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
 use crate::storage_ops::StorageOps;
 use crate::storage_ptr::StorageEntryPtr;
-
-#[cfg(test)]
 use crate::{Storage, StorageBackend};
 
-#[derive(Default, Debug, Clone)]
+const NUMBER_TAG: u8 = 0;
+const ARRAY_TAG: u8 = 1;
+const PTR_TAG: u8 = 2;
+
+#[derive(Debug, Clone)]
 pub enum DemoVal {
-  #[default]
-  Void,
   Number(u64),
-  Ptr(StorageEntryPtr),
   Array(Rc<Vec<DemoVal>>),
+  Ptr(StorageEntryPtr),
 }
 
 impl DemoVal {
-  #[cfg(test)]
   pub(crate) fn numbers<SB: StorageBackend>(
     &self,
     storage: &mut Storage<SB>,
@@ -33,29 +32,26 @@ impl DemoVal {
     entry: &mut StorageEntry,
   ) -> Result<(), E> {
     match self {
-      DemoVal::Void => {
-        entry.data.push(0);
-      }
       DemoVal::Number(n) => {
-        entry.data.push(1);
+        entry.data.push(NUMBER_TAG);
         entry.data.extend(n.to_le_bytes());
-      }
-      DemoVal::Ptr(ptr) => {
-        entry.data.push(2);
-        entry.refs.push(*ptr);
       }
       DemoVal::Array(arr) => 'b: {
         let key = RcKey::from(arr.clone());
 
         if let Some(ptr) = tx.cache_get(key.clone()) {
-          entry.data.push(2);
+          entry.data.push(PTR_TAG);
           entry.refs.push(ptr);
           break 'b;
         }
 
         let ptr = tx.store_and_cache(self, key)?;
-        entry.data.push(2);
+        entry.data.push(PTR_TAG);
         entry.refs.push(ptr);
+      }
+      DemoVal::Ptr(ptr) => {
+        entry.data.push(PTR_TAG);
+        entry.refs.push(*ptr);
       }
     };
 
@@ -69,16 +65,11 @@ impl DemoVal {
     let tag = reader.read_u8().unwrap();
 
     Ok(match tag {
-      0 => DemoVal::Void,
-      1 => {
+      NUMBER_TAG => {
         let n = reader.read_u64().unwrap();
         DemoVal::Number(n)
       }
-      2 => {
-        let ptr = reader.read_ref().unwrap();
-        DemoVal::Ptr(ptr)
-      }
-      3 => {
+      ARRAY_TAG => {
         let len = reader.read_u64().unwrap();
         let mut items = Vec::new();
 
@@ -88,14 +79,16 @@ impl DemoVal {
 
         DemoVal::Array(Rc::new(items))
       }
+      PTR_TAG => {
+        let ptr = reader.read_ref().unwrap();
+        DemoVal::Ptr(ptr)
+      }
       _ => panic!("Invalid tag"),
     })
   }
 
-  #[cfg(test)]
   fn numbers_impl<E, SO: StorageOps<E>>(&self, tx: &mut SO) -> Result<Vec<u64>, E> {
     match &self {
-      DemoVal::Void => Ok(Vec::new()),
       DemoVal::Number(n) => Ok(vec![*n]),
       DemoVal::Ptr(ptr) => {
         let entry = tx.read(*ptr)?.unwrap();
@@ -124,7 +117,7 @@ impl StorageEntity for DemoVal {
 
     match self {
       DemoVal::Array(arr) => {
-        entry.data.push(3);
+        entry.data.push(ARRAY_TAG);
 
         entry
           .data
