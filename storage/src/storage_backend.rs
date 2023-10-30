@@ -10,6 +10,8 @@ pub trait StorageBackendHandle<'a, E> {
   fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
   fn write_bytes<T>(&mut self, ptr: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
+
+  // TODO: StorageOps should just be methods here
 }
 
 pub trait StorageBackend {

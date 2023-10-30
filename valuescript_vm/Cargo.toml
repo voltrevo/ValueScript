@@ -10,3 +10,4 @@ num-bigint = "0.4"
 num-traits = "0.2"
 valuescript_common = { path = "../valuescript_common" }
 storage = { path = "../storage" }
+num-derive = "0.4.1"

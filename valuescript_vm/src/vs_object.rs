@@ -11,7 +11,7 @@ use super::vs_value::Val;
 pub struct VsObject {
   pub string_map: BTreeMap<String, Val>,
   pub symbol_map: BTreeMap<VsSymbol, Val>,
-  pub prototype: Option<Val>,
+  pub prototype: Option<Val>, // TODO: Why optional? (Just use void/undefined?)
 }
 
 impl VsObject {

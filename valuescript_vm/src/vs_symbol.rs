@@ -1,6 +1,8 @@
+use num_derive::{FromPrimitive, ToPrimitive};
+
 use crate::vs_value::{ToVal, Val};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, FromPrimitive, ToPrimitive)]
 pub enum VsSymbol {
   ITERATOR,
 }
