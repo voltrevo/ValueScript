@@ -52,8 +52,7 @@ mod tests_ {
           storage_head_ptr(b"test"),
           Some(&StorageVal::Compound(Rc::new(StorageCompoundVal::Array(
             StorageArray {
-              items: vec![StorageVal::Ref(0), StorageVal::Ref(1)],
-              refs: vec![key0, key1],
+              items: vec![StorageVal::Ptr(key0), StorageVal::Ptr(key1)],
             },
           )))),
         )
@@ -89,14 +88,11 @@ mod tests_ {
               items: vec![
                 StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
                   items: vec![StorageVal::Number(1), StorageVal::Number(2)],
-                  refs: vec![],
                 }))),
                 StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
                   items: vec![StorageVal::Number(3), StorageVal::Number(4)],
-                  refs: vec![],
                 }))),
               ],
-              refs: vec![],
             },
           )))),
         )
@@ -120,7 +116,6 @@ mod tests_ {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
       let mut arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
         items: vec![StorageVal::Number(123)],
-        refs: vec![],
       })));
 
       let depth = 3;
@@ -128,7 +123,6 @@ mod tests_ {
       for _ in 0..depth {
         arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
           items: vec![arr.clone(), arr],
-          refs: vec![],
         })));
       }
 
@@ -160,7 +154,6 @@ mod tests_ {
     fn impl_<SB: StorageBackend>(storage: &mut Storage<SB>) {
       let mut arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
         items: vec![StorageVal::Number(123)],
-        refs: vec![],
       })));
 
       // 2^100 = 1267650600228229401496703205376
@@ -170,7 +163,6 @@ mod tests_ {
       for _ in 0..100 {
         arr = StorageVal::Compound(Rc::new(StorageCompoundVal::Array(StorageArray {
           items: vec![arr.clone(), arr],
-          refs: vec![],
         })));
       }
 

@@ -9,6 +9,7 @@ use std::rc::Rc;
  * using RcKey, we still effectively use the pointer as the key, but we also hold a reference to the
  * rc, so it cannot be dropped and reused, which would create a false association.
  */
+#[derive(Clone)]
 pub struct RcKey(Rc<dyn Any>);
 
 impl RcKey {

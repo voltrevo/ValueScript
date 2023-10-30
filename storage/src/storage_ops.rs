@@ -18,7 +18,6 @@ pub trait StorageOps<E> {
   fn get_head(&mut self, ptr: StorageHeadPtr) -> Result<Option<StorageVal>, E>;
   fn set_head(&mut self, ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E>;
 
-  fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E>;
 
   fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), E>;
@@ -61,7 +60,7 @@ where
 
   fn set_head(&mut self, head_ptr: StorageHeadPtr, value: Option<&StorageVal>) -> Result<(), E> {
     if let Some(value) = value {
-      let entry_ptr = self.store_with_replacements(value)?;
+      let entry_ptr = self.store(value)?;
       self.ref_delta(entry_ptr, 1)?;
 
       if let Some(old_entry_ptr) = self.read(head_ptr)? {
@@ -76,14 +75,6 @@ where
 
       self.write(head_ptr, None)
     }
-  }
-
-  fn store_with_replacements(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
-    if let Some(ptr) = value.maybe_replace_store(self)? {
-      return Ok(ptr);
-    }
-
-    self.store(value)
   }
 
   fn store(&mut self, value: &StorageVal) -> Result<StorageEntryPtr, E> {
