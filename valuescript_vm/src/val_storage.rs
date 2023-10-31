@@ -3,7 +3,9 @@ use std::{collections::BTreeMap, io::Read, rc::Rc};
 use num_bigint::BigInt;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
-use storage::{StorageEntity, StorageEntry, StorageEntryReader, StorageOps};
+use storage::{
+  RcKey, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter, StorageOps,
+};
 
 use crate::{
   vs_array::VsArray,
@@ -47,83 +49,217 @@ impl Tag {
 
 impl StorageEntity for Val {
   fn from_storage_entry<E, Tx: StorageOps<E>>(tx: &mut Tx, entry: StorageEntry) -> Result<Self, E> {
-    read_from_entry(tx, &mut StorageEntryReader::new(&entry))
-    // TODO: assert that we've read the whole entry
+    let mut reader = StorageEntryReader::new(&entry);
+    let res = read_from_entry(tx, &mut reader);
+    assert!(reader.done());
+
+    res
   }
 
   fn to_storage_entry<E, Tx: StorageOps<E>>(&self, tx: &mut Tx) -> Result<StorageEntry, E> {
-    todo!()
+    let mut entry = StorageEntry {
+      ref_count: 1,
+      refs: vec![],
+      data: vec![],
+    };
+
+    let writer = &mut StorageEntryWriter::new(&mut entry);
+
+    match self {
+      Val::Array(a) => {
+        writer.write_u8(Tag::Array.to_byte());
+        writer.write_vlq(a.elements.len() as u64);
+
+        for item in a.elements.iter() {
+          write_to_entry(item, tx, writer)?;
+        }
+      }
+      Val::Object(obj) => {
+        writer.write_u8(Tag::Object.to_byte());
+
+        writer.write_vlq(obj.string_map.len() as u64);
+
+        for (key, value) in obj.string_map.iter() {
+          let key_bytes = key.as_bytes();
+          writer.write_vlq(key_bytes.len() as u64);
+          writer.write_bytes(key_bytes);
+          write_to_entry(value, tx, writer)?;
+        }
+
+        writer.write_vlq(obj.symbol_map.len() as u64);
+
+        for (key, value) in obj.symbol_map.iter() {
+          writer.write_vlq(key.to_u64().unwrap());
+          write_to_entry(value, tx, writer)?;
+        }
+
+        match &obj.prototype {
+          None => writer.write_u8(0),
+          Some(val) => {
+            writer.write_u8(1);
+            write_to_entry(val, tx, writer)?
+          }
+        };
+      }
+      Val::Function(f) => {
+        let VsFunction {
+          bytecode,
+          meta_pos,
+          is_generator,
+          register_count,
+          parameter_count,
+          start,
+          binds,
+        } = f.as_ref();
+
+        writer.write_u8(Tag::Function.to_byte());
+
+        write_ref_bytecode_to_entry(tx, writer, bytecode)?;
+
+        match *meta_pos {
+          None => writer.write_u8(0),
+          Some(pos) => {
+            writer.write_u8(1);
+            writer.write_vlq(pos as u64);
+          }
+        };
+
+        writer.write_u8(if *is_generator { 1 } else { 0 });
+        writer.write_vlq(*register_count as u64);
+        writer.write_vlq(*parameter_count as u64);
+        writer.write_vlq(*start as u64);
+        writer.write_vlq(binds.len() as u64);
+
+        for bind in binds.iter() {
+          write_to_entry(bind, tx, writer)?;
+        }
+      }
+
+      Val::Void
+      | Val::Undefined
+      | Val::Null
+      | Val::Bool(_)
+      | Val::Number(_)
+      | Val::BigInt(_)
+      | Val::Symbol(_)
+      | Val::String(_)
+      | Val::Class(_)
+      | Val::Static(_)
+      | Val::Dynamic(_)
+      | Val::CopyCounter(_)
+      | Val::StoragePtr(_) => {
+        write_to_entry(self, tx, writer)?;
+      }
+    };
+
+    Ok(entry)
   }
 }
 
 fn write_to_entry<E, SO: StorageOps<E>>(
   val: &Val,
   tx: &mut SO,
-  entry: &mut StorageEntry,
+  writer: &mut StorageEntryWriter,
 ) -> Result<(), E> {
   match val {
     Val::Void => {
-      entry.data.push(Tag::Void.to_byte());
+      writer.write_u8(Tag::Void.to_byte());
     }
     Val::Undefined => {
-      entry.data.push(Tag::Undefined.to_byte());
+      writer.write_u8(Tag::Undefined.to_byte());
     }
     Val::Null => {
-      entry.data.push(Tag::Null.to_byte());
+      writer.write_u8(Tag::Null.to_byte());
     }
     Val::Bool(b) => {
-      entry.data.push(Tag::Bool.to_byte());
-      entry.data.push(if *b { 1 } else { 0 });
+      writer.write_u8(Tag::Bool.to_byte());
+      writer.write_u8(if *b { 1 } else { 0 });
     }
     Val::Number(n) => {
-      entry.data.push(Tag::Number.to_byte());
-      entry.data.extend_from_slice(&n.to_le_bytes());
+      writer.write_u8(Tag::Number.to_byte());
+      writer.write_bytes(&n.to_le_bytes());
     }
     Val::BigInt(b) => {
-      entry.data.push(Tag::BigInt.to_byte());
-      todo!()
+      writer.write_u8(Tag::BigInt.to_byte());
+      let bytes = b.to_signed_bytes_le();
+      writer.write_vlq(bytes.len() as u64);
+      writer.write_bytes(&bytes);
     }
     Val::Symbol(s) => {
-      entry.data.push(Tag::Symbol.to_byte());
-      todo!()
+      writer.write_u8(Tag::Symbol.to_byte());
+      writer.write_vlq(s.to_u64().unwrap());
     }
     Val::String(s) => {
-      entry.data.push(Tag::String.to_byte());
-      todo!()
+      writer.write_u8(Tag::String.to_byte());
+      let bytes = s.as_bytes();
+      writer.write_vlq(bytes.len() as u64);
+      writer.write_bytes(bytes);
     }
-    Val::Array(a) => {
-      entry.data.push(Tag::Array.to_byte());
-      todo!()
-    }
-    Val::Object(o) => {
-      entry.data.push(Tag::Object.to_byte());
-      todo!()
-    }
-    Val::Function(f) => {
-      entry.data.push(Tag::Function.to_byte());
-      todo!()
-    }
+    Val::Array(a) => write_ptr_to_entry(tx, writer, RcKey::from(a.clone()), val)?,
+    Val::Object(obj) => write_ptr_to_entry(tx, writer, RcKey::from(obj.clone()), val)?,
+    Val::Function(f) => write_ptr_to_entry(tx, writer, RcKey::from(f.clone()), val)?,
     Val::Class(c) => {
-      entry.data.push(Tag::Class.to_byte());
+      writer.write_u8(Tag::Class.to_byte());
+
+      let VsClass {
+        name,
+        content_hash,
+        constructor,
+        prototype,
+        static_,
+      } = c.as_ref();
+
+      let name_bytes = name.as_bytes();
+      writer.write_vlq(name_bytes.len() as u64);
+      writer.write_bytes(name_bytes);
+
+      match *content_hash {
+        None => writer.write_u8(0),
+        Some(hash) => {
+          writer.write_u8(1);
+          writer.write_bytes(&hash);
+        }
+      };
+
+      write_to_entry(constructor, tx, writer)?;
+      write_to_entry(prototype, tx, writer)?;
+      write_to_entry(static_, tx, writer)?;
+    }
+    Val::Static(_s) => {
+      writer.write_u8(Tag::Static.to_byte());
       todo!()
     }
-    Val::Static(s) => {
-      entry.data.push(Tag::Static.to_byte());
+    Val::Dynamic(_d) => {
+      writer.write_u8(Tag::Dynamic.to_byte());
       todo!()
     }
-    Val::Dynamic(d) => {
-      entry.data.push(Tag::Dynamic.to_byte());
-      todo!()
-    }
-    Val::CopyCounter(cc) => {
-      entry.data.push(Tag::CopyCounter.to_byte());
+    Val::CopyCounter(_cc) => {
+      writer.write_u8(Tag::CopyCounter.to_byte());
       todo!()
     }
     Val::StoragePtr(ptr) => {
-      entry.data.push(Tag::CopyCounter.to_byte());
-      todo!()
+      writer.write_u8(Tag::StoragePtr.to_byte());
+      writer.entry.refs.push(ptr.ptr);
     }
   };
+
+  Ok(())
+}
+
+fn write_ptr_to_entry<E, SO: StorageOps<E>>(
+  tx: &mut SO,
+  writer: &mut StorageEntryWriter,
+  key: RcKey,
+  val: &Val,
+) -> Result<(), E> {
+  if let Some(ptr) = tx.cache_get(key.clone()) {
+    writer.write_u8(Tag::StoragePtr.to_byte());
+    writer.entry.refs.push(ptr);
+  } else {
+    let ptr = tx.store_and_cache(val, key)?;
+    writer.write_u8(Tag::StoragePtr.to_byte());
+    writer.entry.refs.push(ptr);
+  }
 
   Ok(())
 }
@@ -205,33 +341,24 @@ fn read_from_entry<E, SO: StorageOps<E>>(
       .to_val()
     }
     Tag::Function => {
-      // pub bytecode: Rc<Bytecode>,
       let bytecode = read_ref_bytecode_from_entry(tx, reader)?;
 
-      // pub meta_pos: Option<usize>,
       let meta_pos = match reader.read_u8().unwrap() {
         0 => None,
         1 => Some(reader.read_vlq().unwrap() as usize),
         _ => panic!("Invalid meta_pos byte"),
       };
 
-      // pub is_generator: bool,
       let is_generator = match reader.read_u8().unwrap() {
         0 => false,
         1 => true,
         _ => panic!("Invalid is_generator byte"),
       };
 
-      // pub register_count: usize,
       let register_count = reader.read_vlq().unwrap() as usize;
-
-      // pub parameter_count: usize,
       let parameter_count = reader.read_vlq().unwrap() as usize;
-
-      // pub start: usize,
       let start = reader.read_vlq().unwrap() as usize;
 
-      // pub binds: Vec<Val>,
       let len = reader.read_vlq().unwrap();
       let mut binds = Vec::new();
 
@@ -251,10 +378,8 @@ fn read_from_entry<E, SO: StorageOps<E>>(
       .to_val()
     }
     Tag::Class => {
-      // pub name: String,
       let name = read_string_from_entry(reader);
 
-      // pub content_hash: Option<[u8; 32]>,
       let content_hash = match reader.read_u8().unwrap() {
         0 => None,
         1 => {
@@ -266,13 +391,8 @@ fn read_from_entry<E, SO: StorageOps<E>>(
         _ => panic!("Invalid content_hash byte"),
       };
 
-      // pub constructor: Val,
       let constructor = read_from_entry(tx, reader)?;
-
-      // pub prototype: Val,
       let prototype = read_from_entry(tx, reader)?;
-
-      // pub static_: Val,
       let static_ = read_from_entry(tx, reader)?;
 
       VsClass {
@@ -310,5 +430,22 @@ fn read_ref_bytecode_from_entry<E, SO: StorageOps<E>>(
   let entry = tx.read(ptr)?.unwrap();
 
   // TODO: Cached reads
-  Ok(Rc::new(Bytecode::new(entry.data)))
+  Ok(Rc::new(Bytecode::from_storage_entry(tx, entry)?))
+}
+
+fn write_ref_bytecode_to_entry<E, SO: StorageOps<E>>(
+  tx: &mut SO,
+  writer: &mut StorageEntryWriter,
+  bytecode: &Rc<Bytecode>,
+) -> Result<(), E> {
+  let key = RcKey::from(bytecode.clone());
+
+  if let Some(ptr) = tx.cache_get(key.clone()) {
+    writer.entry.refs.push(ptr);
+  } else {
+    let ptr = tx.store_and_cache(bytecode.as_ref(), key)?;
+    writer.entry.refs.push(ptr);
+  }
+
+  Ok(())
 }

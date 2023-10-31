@@ -6,7 +6,7 @@ use crate::storage_ptr::StorageEntryPtr;
 
 #[derive(Serialize, Deserialize)]
 pub struct StorageEntry {
-  pub(crate) ref_count: u64,
+  pub ref_count: u64,
   pub refs: Vec<StorageEntryPtr>,
   pub data: Vec<u8>,
 }
@@ -24,6 +24,10 @@ impl<'a> StorageEntryReader<'a> {
       refs_i: 0,
       data_i: 0,
     }
+  }
+
+  pub fn done(&self) -> bool {
+    self.refs_i == self.entry.refs.len() && self.data_i == self.entry.data.len()
   }
 
   pub fn read_ref(&mut self) -> std::io::Result<StorageEntryPtr> {
@@ -97,4 +101,40 @@ impl Read for StorageEntryReader<'_> {
 
 fn eof() -> std::io::Error {
   std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "not enough bytes")
+}
+
+pub struct StorageEntryWriter<'a> {
+  pub entry: &'a mut StorageEntry,
+}
+
+impl<'a> StorageEntryWriter<'a> {
+  pub fn new(entry: &'a mut StorageEntry) -> Self {
+    Self { entry }
+  }
+
+  pub fn write_u8(&mut self, byte: u8) {
+    self.entry.data.push(byte);
+  }
+
+  pub fn write_bytes(&mut self, bytes: &[u8]) {
+    self.entry.data.extend_from_slice(bytes);
+  }
+
+  pub fn write_vlq(&mut self, mut num: u64) {
+    loop {
+      let mut byte = (num & 0x7f) as u8;
+
+      if num != 0 {
+        byte |= 0x80;
+      }
+
+      self.write_u8(byte);
+
+      if num == 0 {
+        break;
+      }
+
+      num >>= 7;
+    }
+  }
 }

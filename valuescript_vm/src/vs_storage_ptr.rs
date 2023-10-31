@@ -6,7 +6,7 @@ use crate::vs_value::{ToVal, Val};
 
 #[derive(Debug)]
 pub struct VsStoragePtr {
-  ptr: StorageEntryPtr,
+  pub ptr: StorageEntryPtr,
   cache: RefCell<Option<Val>>,
 }
 

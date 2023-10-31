@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, fmt, ops::Index, rc::Rc, slice::SliceIndex};
 
+use storage::StorageEntity;
+
 use crate::{bytecode_decoder::BytecodeDecoder, vs_value::Val};
 
 pub struct Bytecode {
@@ -40,5 +42,25 @@ impl DecoderMaker for Rc<Bytecode> {
       bytecode: self.clone(),
       pos,
     }
+  }
+}
+
+impl StorageEntity for Bytecode {
+  fn to_storage_entry<E, Tx: storage::StorageOps<E>>(
+    &self,
+    _tx: &mut Tx,
+  ) -> Result<storage::StorageEntry, E> {
+    Ok(storage::StorageEntry {
+      ref_count: 1,
+      refs: vec![],
+      data: self.code.clone(),
+    })
+  }
+
+  fn from_storage_entry<E, Tx: storage::StorageOps<E>>(
+    _tx: &mut Tx,
+    entry: storage::StorageEntry,
+  ) -> Result<Self, E> {
+    Ok(Bytecode::new(entry.data))
   }
 }
