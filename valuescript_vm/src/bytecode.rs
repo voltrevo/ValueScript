@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, fmt, ops::Index, rc::Rc, slice::SliceIndex};
 
-use storage::{StorageBackend, StorageEntity, StorageTx};
+use storage::{StorageBackend, StorageEntity, StorageError, StorageTx};
 
 use crate::{bytecode_decoder::BytecodeDecoder, vs_value::Val};
 
@@ -46,7 +46,7 @@ impl DecoderMaker for Rc<Bytecode> {
 }
 
 impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> for Bytecode {
-  fn to_storage_entry(&self, _tx: &mut Tx) -> Result<storage::StorageEntry, SB::InTxError> {
+  fn to_storage_entry(&self, _tx: &mut Tx) -> Result<storage::StorageEntry, StorageError<SB>> {
     Ok(storage::StorageEntry {
       ref_count: 1,
       refs: vec![],
@@ -54,7 +54,10 @@ impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> fo
     })
   }
 
-  fn from_storage_entry(_tx: &mut Tx, entry: storage::StorageEntry) -> Result<Self, SB::InTxError> {
+  fn from_storage_entry(
+    _tx: &mut Tx,
+    entry: storage::StorageEntry,
+  ) -> Result<Self, StorageError<SB>> {
     Ok(Bytecode::new(entry.data))
   }
 }

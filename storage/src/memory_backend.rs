@@ -1,7 +1,8 @@
 use std::{collections::HashMap, error::Error};
 
 use crate::{
-  rc_key::RcKey, storage_ptr::StorageEntryPtr, storage_tx::StorageTx, StorageBackend, StoragePtr,
+  rc_key::RcKey, storage_backend::StorageError, storage_ptr::StorageEntryPtr,
+  storage_tx::StorageTx, StorageBackend, StoragePtr,
 };
 
 #[derive(Default)]
@@ -18,12 +19,12 @@ impl MemoryBackend {
 }
 
 impl StorageBackend for MemoryBackend {
-  type InTxError = Box<dyn Error>;
+  type CustomError = Box<dyn Error>;
   type Tx<'a> = MemoryTx<'a>;
 
   fn transaction<F, T>(&mut self, f: F) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::Tx<'_>) -> Result<T, Self::InTxError>,
+    F: Fn(&mut Self::Tx<'_>) -> Result<T, StorageError<Self>>,
   {
     let mut handle = MemoryTx {
       ref_deltas: Default::default(),
@@ -31,8 +32,15 @@ impl StorageBackend for MemoryBackend {
       storage: self,
     };
 
-    let res = f(&mut handle)?;
-    handle.flush_ref_deltas()?;
+    let res = f(&mut handle).map_err(|e| match e {
+      StorageError::<MemoryBackend>::CustomError(e) => e,
+      StorageError::<MemoryBackend>::Error(e) => e,
+    })?;
+
+    handle.flush_ref_deltas().map_err(|e| match e {
+      StorageError::<MemoryBackend>::CustomError(e) => e,
+      StorageError::<MemoryBackend>::Error(e) => e,
+    })?;
 
     Ok(res)
   }
@@ -62,7 +70,10 @@ impl<'a> StorageTx<'a, MemoryBackend> for MemoryTx<'a> {
     &mut self.cache
   }
 
-  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
+  fn read_bytes<T>(
+    &self,
+    ptr: StoragePtr<T>,
+  ) -> Result<Option<Vec<u8>>, StorageError<MemoryBackend>> {
     Ok(self.storage.data.get(&ptr.data).cloned())
   }
 
@@ -70,7 +81,7 @@ impl<'a> StorageTx<'a, MemoryBackend> for MemoryTx<'a> {
     &mut self,
     ptr: StoragePtr<T>,
     data: Option<Vec<u8>>,
-  ) -> Result<(), Box<dyn Error>> {
+  ) -> Result<(), StorageError<MemoryBackend>> {
     match data {
       Some(data) => self.storage.data.insert(ptr.data, data),
       None => self.storage.data.remove(&ptr.data),

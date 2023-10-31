@@ -3,42 +3,62 @@ use std::{collections::HashMap, mem::take};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
-use crate::{RcKey, StorageBackend, StorageEntity, StorageEntryPtr, StorageHeadPtr, StoragePtr};
+use crate::{
+  storage_backend::{to_storage_error, StorageError},
+  RcKey, StorageBackend, StorageEntity, StorageEntryPtr, StorageHeadPtr, StoragePtr,
+};
 
 pub trait StorageTx<'a, SB: StorageBackend>: Sized {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
   fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
-  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, SB::InTxError>;
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>>;
   fn write_bytes<T>(
     &mut self,
     ptr: StoragePtr<T>,
     data: Option<Vec<u8>>,
-  ) -> Result<(), SB::InTxError>;
+  ) -> Result<(), StorageError<SB>>;
 
   fn read<T: for<'de> Deserialize<'de>>(
     &mut self,
     ptr: StoragePtr<T>,
-  ) -> Result<Option<T>, SB::InTxError> {
+  ) -> Result<Option<T>, StorageError<SB>> {
     let data = match self.read_bytes(ptr)? {
       Some(data) => data,
       None => return Ok(None),
     };
 
-    Ok(Some(bincode::deserialize(&data).unwrap()))
+    bincode::deserialize(&data)
+      .map(Some)
+      .map_err(to_storage_error)
+  }
+
+  fn read_or_err<T: for<'de> Deserialize<'de>>(
+    &mut self,
+    ptr: StoragePtr<T>,
+  ) -> Result<T, StorageError<SB>> {
+    match self.read(ptr)? {
+      Some(data) => Ok(data),
+      None => Err(StorageError::Error("Ptr not found".into())),
+    }
   }
 
   fn write<T: Serialize>(
     &mut self,
     ptr: StoragePtr<T>,
     data: Option<&T>,
-  ) -> Result<(), SB::InTxError> {
-    self.write_bytes(ptr, data.map(|data| bincode::serialize(&data).unwrap()))
+  ) -> Result<(), StorageError<SB>> {
+    let bytes = match data {
+      Some(data) => Some(bincode::serialize(&data).map_err(to_storage_error)?),
+      None => None,
+    };
+
+    self.write_bytes(ptr, bytes)
   }
 
   fn get_head<SE: StorageEntity<'a, SB, Self>>(
     &mut self,
     head_ptr: StorageHeadPtr,
-  ) -> Result<Option<SE>, SB::InTxError> {
+  ) -> Result<Option<SE>, StorageError<SB>> {
     let entry_ptr = match self.read(head_ptr)? {
       Some(entry_ptr) => entry_ptr,
       None => return Ok(None),
@@ -56,7 +76,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     &mut self,
     head_ptr: StorageHeadPtr,
     value: &SE,
-  ) -> Result<(), SB::InTxError> {
+  ) -> Result<(), StorageError<SB>> {
     let entry_ptr = self.store(value)?;
     self.ref_delta(entry_ptr, 1)?;
 
@@ -67,7 +87,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     self.write(head_ptr, Some(&entry_ptr))
   }
 
-  fn remove_head(&mut self, head_ptr: StorageHeadPtr) -> Result<(), SB::InTxError> {
+  fn remove_head(&mut self, head_ptr: StorageHeadPtr) -> Result<(), StorageError<SB>> {
     if let Some(old_entry_ptr) = self.read(head_ptr)? {
       self.ref_delta(old_entry_ptr, -1)?;
     }
@@ -78,7 +98,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
   fn store<SE: StorageEntity<'a, SB, Self>>(
     &mut self,
     value: &SE,
-  ) -> Result<StorageEntryPtr, SB::InTxError> {
+  ) -> Result<StorageEntryPtr, StorageError<SB>> {
     let ptr = StoragePtr::random(&mut thread_rng());
     let entry = value.to_storage_entry(self)?;
     self.write(ptr, Some(&entry))?;
@@ -91,14 +111,14 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     Ok(ptr)
   }
 
-  fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), SB::InTxError> {
+  fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), StorageError<SB>> {
     let ref_delta = self.ref_deltas().entry(ptr.data).or_insert(0);
     *ref_delta += delta;
 
     Ok(())
   }
 
-  fn flush_ref_deltas(&mut self) -> Result<(), SB::InTxError> {
+  fn flush_ref_deltas(&mut self) -> Result<(), StorageError<SB>> {
     while !self.ref_deltas().is_empty() {
       let ref_deltas = take(self.ref_deltas());
 
@@ -164,7 +184,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     &mut self,
     value: &SE,
     key: RcKey,
-  ) -> Result<StorageEntryPtr, SB::InTxError> {
+  ) -> Result<StorageEntryPtr, StorageError<SB>> {
     let ptr = self.store(value)?;
 
     let pre_existing = self.cache().insert(key, ptr);

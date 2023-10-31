@@ -5,7 +5,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use storage::{
   RcKey, StorageBackend, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter,
-  StorageTx,
+  StorageError, StorageTx,
 };
 
 use crate::{
@@ -49,7 +49,7 @@ impl Tag {
 }
 
 impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> for Val {
-  fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, SB::InTxError> {
+  fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, StorageError<SB>> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
     assert!(reader.done());
@@ -57,7 +57,7 @@ impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> fo
     res
   }
 
-  fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, SB::InTxError> {
+  fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, StorageError<SB>> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: vec![],
@@ -161,7 +161,7 @@ fn write_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   val: &Val,
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
-) -> Result<(), SB::InTxError> {
+) -> Result<(), StorageError<SB>> {
   match val {
     Val::Void => {
       writer.write_u8(Tag::Void.to_byte());
@@ -252,7 +252,7 @@ fn write_ptr_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   writer: &mut StorageEntryWriter,
   key: RcKey,
   val: &Val,
-) -> Result<(), SB::InTxError> {
+) -> Result<(), StorageError<SB>> {
   if let Some(ptr) = tx.cache_get(key.clone()) {
     writer.write_u8(Tag::StoragePtr.to_byte());
     writer.entry.refs.push(ptr);
@@ -268,7 +268,7 @@ fn write_ptr_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
 fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
-) -> Result<Val, SB::InTxError> {
+) -> Result<Val, StorageError<SB>> {
   let tag = Tag::from_byte(reader.read_u8().unwrap());
 
   Ok(match tag {
@@ -426,7 +426,7 @@ fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> VsSymbol {
 fn read_ref_bytecode_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
-) -> Result<Rc<Bytecode>, SB::InTxError> {
+) -> Result<Rc<Bytecode>, StorageError<SB>> {
   let ptr = reader.read_ref().unwrap();
   let entry = tx.read(ptr)?.unwrap();
 
@@ -438,7 +438,7 @@ fn write_ref_bytecode_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   bytecode: &Rc<Bytecode>,
-) -> Result<(), SB::InTxError> {
+) -> Result<(), StorageError<SB>> {
   let key = RcKey::from(bytecode.clone());
 
   if let Some(ptr) = tx.cache_get(key.clone()) {

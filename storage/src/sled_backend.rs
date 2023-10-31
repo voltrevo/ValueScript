@@ -1,7 +1,8 @@
 use std::{collections::HashMap, error::Error};
 
 use crate::{
-  rc_key::RcKey, storage_ptr::StorageEntryPtr, storage_tx::StorageTx, StorageBackend, StoragePtr,
+  rc_key::RcKey, storage_backend::StorageError, storage_ptr::StorageEntryPtr,
+  storage_tx::StorageTx, StorageBackend, StoragePtr,
 };
 
 pub struct SledBackend {
@@ -26,12 +27,12 @@ impl SledBackend {
 }
 
 impl StorageBackend for SledBackend {
-  type InTxError = sled::transaction::ConflictableTransactionError<Box<dyn Error>>;
+  type CustomError = sled::transaction::ConflictableTransactionError<Box<dyn Error>>;
   type Tx<'a> = SledTx<'a>;
 
   fn transaction<F, T>(&mut self, f: F) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::Tx<'_>) -> Result<T, Self::InTxError>,
+    F: Fn(&mut Self::Tx<'_>) -> Result<T, StorageError<Self>>,
   {
     self
       .db
@@ -42,8 +43,15 @@ impl StorageBackend for SledBackend {
           tx,
         };
 
-        let res = f(&mut handle)?;
-        handle.flush_ref_deltas()?;
+        let res = f(&mut handle).map_err(|e| match e {
+          StorageError::CustomError(e) => e,
+          StorageError::Error(e) => Self::CustomError::Abort(e),
+        })?;
+
+        handle.flush_ref_deltas().map_err(|e| match e {
+          StorageError::CustomError(e) => e,
+          StorageError::Error(e) => Self::CustomError::Abort(e),
+        })?;
 
         Ok(res)
       })
@@ -81,8 +89,13 @@ impl<'a> StorageTx<'a, SledBackend> for SledTx<'a> {
   fn read_bytes<T>(
     &self,
     ptr: StoragePtr<T>,
-  ) -> Result<Option<Vec<u8>>, <SledBackend as StorageBackend>::InTxError> {
-    let value = self.tx.get(ptr.to_bytes())?.map(|value| value.to_vec());
+  ) -> Result<Option<Vec<u8>>, StorageError<SledBackend>> {
+    let value = self
+      .tx
+      .get(ptr.to_bytes())
+      .map_err(|e| StorageError::<SledBackend>::CustomError(e.into()))?
+      .map(|value| value.to_vec());
+
     Ok(value)
   }
 
@@ -90,10 +103,16 @@ impl<'a> StorageTx<'a, SledBackend> for SledTx<'a> {
     &mut self,
     ptr: StoragePtr<T>,
     data: Option<Vec<u8>>,
-  ) -> Result<(), <SledBackend as StorageBackend>::InTxError> {
+  ) -> Result<(), StorageError<SledBackend>> {
     match data {
-      Some(data) => self.tx.insert(ptr.to_bytes(), data)?,
-      None => self.tx.remove(ptr.to_bytes())?,
+      Some(data) => self
+        .tx
+        .insert(ptr.to_bytes(), data)
+        .map_err(|e| StorageError::<SledBackend>::CustomError(e.into()))?,
+      None => self
+        .tx
+        .remove(ptr.to_bytes())
+        .map_err(|e| StorageError::<SledBackend>::CustomError(e.into()))?,
     };
 
     Ok(())
