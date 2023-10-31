@@ -27,12 +27,12 @@ impl SledBackend {
 
 impl StorageBackend for SledBackend {
   type Error<E: DebugTrait> = sled::transaction::TransactionError<E>;
-  type InTransactionError<E> = sled::transaction::ConflictableTransactionError<E>;
+  type InTxError<E> = sled::transaction::ConflictableTransactionError<E>;
   type Tx<'a, E> = SledTx<'a>;
 
   fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
   where
-    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTransactionError<E>>,
+    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTxError<E>>,
   {
     self.db.transaction(|tx| {
       let mut handle = SledTx {

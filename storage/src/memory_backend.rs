@@ -20,12 +20,12 @@ impl MemoryBackend {
 
 impl StorageBackend for MemoryBackend {
   type Error<E: DebugTrait> = E;
-  type InTransactionError<E> = E;
+  type InTxError<E> = E;
   type Tx<'a, E> = MemoryTx<'a>;
 
   fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
   where
-    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTransactionError<E>>,
+    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTxError<E>>,
   {
     let mut handle = MemoryTx {
       ref_deltas: Default::default(),
