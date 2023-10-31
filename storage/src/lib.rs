@@ -7,15 +7,15 @@ mod demo_val;
 mod rc_key;
 mod sled_backend;
 mod storage_backend;
-mod storage_backend_handle;
 mod storage_entity;
 mod storage_entry;
 mod storage_ptr;
+mod storage_tx;
 mod tests;
 
 pub use self::storage::Storage;
 pub use self::storage_backend::StorageBackend;
-pub use self::storage_backend_handle::StorageBackendHandle;
+pub use self::storage_tx::StorageTx;
 pub use memory_backend::MemoryBackend;
 pub use rc_key::RcKey;
 pub use sled_backend::SledBackend;

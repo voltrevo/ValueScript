@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{RcKey, StorageEntity, StorageEntryPtr, StorageHeadPtr, StoragePtr};
 
-pub trait StorageBackendHandle<'a, E>: Sized {
+pub trait StorageTx<'a, E>: Sized {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
   fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;

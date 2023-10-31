@@ -1,6 +1,6 @@
-use crate::storage_backend_handle::StorageBackendHandle;
 use crate::storage_entity::StorageEntity;
 use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
+use crate::storage_tx::StorageTx;
 use crate::StorageBackend;
 
 pub struct Storage<SB: StorageBackend> {
@@ -12,14 +12,14 @@ impl<SB: StorageBackend> Storage<SB> {
     Self { sb }
   }
 
-  pub fn get_head<SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Handle<'a, ()>>>(
+  pub fn get_head<SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Tx<'a, ()>>>(
     &mut self,
     ptr: StorageHeadPtr,
   ) -> Result<Option<SE>, SB::Error<()>> {
     self.sb.transaction(|sb| sb.get_head(ptr))
   }
 
-  pub fn set_head<SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Handle<'a, ()>>>(
+  pub fn set_head<SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Tx<'a, ()>>>(
     &mut self,
     ptr: StorageHeadPtr,
     value: &SE,
@@ -31,9 +31,7 @@ impl<SB: StorageBackend> Storage<SB> {
     self.sb.transaction(|sb| sb.remove_head(ptr))
   }
 
-  pub fn store_tmp<
-    SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Handle<'a, ()>>,
-  >(
+  pub fn store_tmp<SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Tx<'a, ()>>>(
     &mut self,
     value: &SE,
   ) -> Result<StorageEntryPtr, SB::Error<()>> {

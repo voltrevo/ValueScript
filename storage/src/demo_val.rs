@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
 use crate::rc_key::RcKey;
-use crate::storage_backend_handle::StorageBackendHandle;
 use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
 use crate::storage_ptr::StorageEntryPtr;
+use crate::storage_tx::StorageTx;
 use crate::{Storage, StorageBackend};
 
 const NUMBER_TAG: u8 = 0;
@@ -26,7 +26,7 @@ impl DemoVal {
     storage.sb.transaction(|sb| self.numbers_impl(sb))
   }
 
-  fn write_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+  fn write_to_entry<'a, E, Tx: StorageTx<'a, E>>(
     &self,
     tx: &mut Tx,
     entry: &mut StorageEntry,
@@ -58,7 +58,7 @@ impl DemoVal {
     Ok(())
   }
 
-  fn read_from_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+  fn read_from_entry<'a, E, Tx: StorageTx<'a, E>>(
     _tx: &mut Tx,
     reader: &mut StorageEntryReader,
   ) -> Result<DemoVal, E> {
@@ -87,10 +87,7 @@ impl DemoVal {
     })
   }
 
-  fn numbers_impl<'a, E, Tx: StorageBackendHandle<'a, E>>(
-    &self,
-    tx: &mut Tx,
-  ) -> Result<Vec<u64>, E> {
+  fn numbers_impl<'a, E, Tx: StorageTx<'a, E>>(&self, tx: &mut Tx) -> Result<Vec<u64>, E> {
     match &self {
       DemoVal::Number(n) => Ok(vec![*n]),
       DemoVal::Ptr(ptr) => {
@@ -110,7 +107,7 @@ impl DemoVal {
   }
 }
 
-impl<'a, E, Tx: StorageBackendHandle<'a, E>> StorageEntity<'a, E, Tx> for DemoVal {
+impl<'a, E, Tx: StorageTx<'a, E>> StorageEntity<'a, E, Tx> for DemoVal {
   fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, E> {
     let mut entry = StorageEntry {
       ref_count: 1,

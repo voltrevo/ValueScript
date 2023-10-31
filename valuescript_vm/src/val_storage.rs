@@ -4,7 +4,7 @@ use num_bigint::BigInt;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use storage::{
-  RcKey, StorageBackendHandle, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter,
+  RcKey, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter, StorageTx,
 };
 
 use crate::{
@@ -47,7 +47,7 @@ impl Tag {
   }
 }
 
-impl<'a, E, Tx: StorageBackendHandle<'a, E>> StorageEntity<'a, E, Tx> for Val {
+impl<'a, E, Tx: StorageTx<'a, E>> StorageEntity<'a, E, Tx> for Val {
   fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, E> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
@@ -156,7 +156,7 @@ impl<'a, E, Tx: StorageBackendHandle<'a, E>> StorageEntity<'a, E, Tx> for Val {
   }
 }
 
-fn write_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+fn write_to_entry<'a, E, Tx: StorageTx<'a, E>>(
   val: &Val,
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
@@ -246,7 +246,7 @@ fn write_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
   Ok(())
 }
 
-fn write_ptr_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+fn write_ptr_to_entry<'a, E, Tx: StorageTx<'a, E>>(
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   key: RcKey,
@@ -264,7 +264,7 @@ fn write_ptr_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
   Ok(())
 }
 
-fn read_from_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+fn read_from_entry<'a, E, Tx: StorageTx<'a, E>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Val, E> {
@@ -422,7 +422,7 @@ fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> VsSymbol {
   FromPrimitive::from_u64(reader.read_vlq().unwrap()).unwrap()
 }
 
-fn read_ref_bytecode_from_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+fn read_ref_bytecode_from_entry<'a, E, Tx: StorageTx<'a, E>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Rc<Bytecode>, E> {
@@ -433,7 +433,7 @@ fn read_ref_bytecode_from_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
   Ok(Rc::new(Bytecode::from_storage_entry(tx, entry)?))
 }
 
-fn write_ref_bytecode_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+fn write_ref_bytecode_to_entry<'a, E, Tx: StorageTx<'a, E>>(
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   bytecode: &Rc<Bytecode>,

@@ -2,8 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug as DebugTrait;
 
 use crate::{
-  rc_key::RcKey, storage_backend_handle::StorageBackendHandle, storage_ptr::StorageEntryPtr,
-  StorageBackend, StoragePtr,
+  rc_key::RcKey, storage_ptr::StorageEntryPtr, storage_tx::StorageTx, StorageBackend, StoragePtr,
 };
 
 #[derive(Default)]
@@ -22,13 +21,13 @@ impl MemoryBackend {
 impl StorageBackend for MemoryBackend {
   type Error<E: DebugTrait> = E;
   type InTransactionError<E> = E;
-  type Handle<'a, E> = MemoryStorageHandle<'a>;
+  type Tx<'a, E> = MemoryTx<'a>;
 
   fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
   where
-    F: Fn(&mut Self::Handle<'_, E>) -> Result<T, Self::InTransactionError<E>>,
+    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTransactionError<E>>,
   {
-    let mut handle = MemoryStorageHandle {
+    let mut handle = MemoryTx {
       ref_deltas: Default::default(),
       cache: Default::default(),
       storage: self,
@@ -50,13 +49,13 @@ impl StorageBackend for MemoryBackend {
   }
 }
 
-pub struct MemoryStorageHandle<'a> {
+pub struct MemoryTx<'a> {
   ref_deltas: HashMap<(u64, u64, u64), i64>,
   cache: HashMap<RcKey, StorageEntryPtr>,
   storage: &'a mut MemoryBackend,
 }
 
-impl<'a, E> StorageBackendHandle<'a, E> for MemoryStorageHandle<'a> {
+impl<'a, E> StorageTx<'a, E> for MemoryTx<'a> {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
   }

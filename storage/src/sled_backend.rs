@@ -1,8 +1,7 @@
 use std::{collections::HashMap, fmt::Debug as DebugTrait};
 
 use crate::{
-  rc_key::RcKey, storage_backend_handle::StorageBackendHandle, storage_ptr::StorageEntryPtr,
-  StorageBackend, StoragePtr,
+  rc_key::RcKey, storage_ptr::StorageEntryPtr, storage_tx::StorageTx, StorageBackend, StoragePtr,
 };
 
 pub struct SledBackend {
@@ -29,14 +28,14 @@ impl SledBackend {
 impl StorageBackend for SledBackend {
   type Error<E: DebugTrait> = sled::transaction::TransactionError<E>;
   type InTransactionError<E> = sled::transaction::ConflictableTransactionError<E>;
-  type Handle<'a, E> = SledBackendHandle<'a>;
+  type Tx<'a, E> = SledTx<'a>;
 
   fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
   where
-    F: Fn(&mut Self::Handle<'_, E>) -> Result<T, Self::InTransactionError<E>>,
+    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTransactionError<E>>,
   {
     self.db.transaction(|tx| {
-      let mut handle = SledBackendHandle {
+      let mut handle = SledTx {
         ref_deltas: Default::default(),
         cache: Default::default(),
         tx,
@@ -59,15 +58,13 @@ impl StorageBackend for SledBackend {
   }
 }
 
-pub struct SledBackendHandle<'a> {
+pub struct SledTx<'a> {
   ref_deltas: HashMap<(u64, u64, u64), i64>,
   cache: HashMap<RcKey, StorageEntryPtr>,
   tx: &'a sled::transaction::TransactionalTree,
 }
 
-impl<'a, E> StorageBackendHandle<'a, sled::transaction::ConflictableTransactionError<E>>
-  for SledBackendHandle<'a>
-{
+impl<'a, E> StorageTx<'a, sled::transaction::ConflictableTransactionError<E>> for SledTx<'a> {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
   }
