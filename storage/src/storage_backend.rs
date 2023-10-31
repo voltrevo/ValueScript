@@ -1,15 +1,14 @@
-use std::fmt::Debug as DebugTrait;
+use std::error::Error;
 
 use crate::storage_tx::StorageTx;
 
-pub trait StorageBackend {
-  type Error<E: DebugTrait>: DebugTrait;
-  type InTxError<E>;
-  type Tx<'a, E>: StorageTx<'a, Self::InTxError<E>>;
+pub trait StorageBackend: Sized {
+  type InTxError;
+  type Tx<'a>: StorageTx<'a, Self>;
 
-  fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
+  fn transaction<F, T>(&mut self, f: F) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTxError<E>>;
+    F: Fn(&mut Self::Tx<'_>) -> Result<T, Self::InTxError>;
 
   fn is_empty(&self) -> bool;
 

@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::fmt::Debug as DebugTrait;
+use std::{collections::HashMap, error::Error};
 
 use crate::{
   rc_key::RcKey, storage_ptr::StorageEntryPtr, storage_tx::StorageTx, StorageBackend, StoragePtr,
@@ -19,13 +18,12 @@ impl MemoryBackend {
 }
 
 impl StorageBackend for MemoryBackend {
-  type Error<E: DebugTrait> = E;
-  type InTxError<E> = E;
-  type Tx<'a, E> = MemoryTx<'a>;
+  type InTxError = Box<dyn Error>;
+  type Tx<'a> = MemoryTx<'a>;
 
-  fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
+  fn transaction<F, T>(&mut self, f: F) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTxError<E>>,
+    F: Fn(&mut Self::Tx<'_>) -> Result<T, Self::InTxError>,
   {
     let mut handle = MemoryTx {
       ref_deltas: Default::default(),
@@ -55,7 +53,7 @@ pub struct MemoryTx<'a> {
   storage: &'a mut MemoryBackend,
 }
 
-impl<'a, E> StorageTx<'a, E> for MemoryTx<'a> {
+impl<'a> StorageTx<'a, MemoryBackend> for MemoryTx<'a> {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
   }
@@ -64,11 +62,15 @@ impl<'a, E> StorageTx<'a, E> for MemoryTx<'a> {
     &mut self.cache
   }
 
-  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, E> {
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, Box<dyn Error>> {
     Ok(self.storage.data.get(&ptr.data).cloned())
   }
 
-  fn write_bytes<T>(&mut self, ptr: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E> {
+  fn write_bytes<T>(
+    &mut self,
+    ptr: StoragePtr<T>,
+    data: Option<Vec<u8>>,
+  ) -> Result<(), Box<dyn Error>> {
     match data {
       Some(data) => self.storage.data.insert(ptr.data, data),
       None => self.storage.data.remove(&ptr.data),

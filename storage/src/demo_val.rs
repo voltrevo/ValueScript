@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::rc::Rc;
 
 use crate::rc_key::RcKey;
@@ -22,15 +23,15 @@ impl DemoVal {
   pub(crate) fn numbers<SB: StorageBackend>(
     &self,
     storage: &mut Storage<SB>,
-  ) -> Result<Vec<u64>, SB::Error<()>> {
+  ) -> Result<Vec<u64>, Box<dyn Error>> {
     storage.sb.transaction(|sb| self.numbers_impl(sb))
   }
 
-  fn write_to_entry<'a, E, Tx: StorageTx<'a, E>>(
+  fn write_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
     &self,
     tx: &mut Tx,
     entry: &mut StorageEntry,
-  ) -> Result<(), E> {
+  ) -> Result<(), SB::InTxError> {
     match self {
       DemoVal::Number(n) => {
         entry.data.push(NUMBER_TAG);
@@ -58,10 +59,10 @@ impl DemoVal {
     Ok(())
   }
 
-  fn read_from_entry<'a, E, Tx: StorageTx<'a, E>>(
+  fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
     _tx: &mut Tx,
     reader: &mut StorageEntryReader,
-  ) -> Result<DemoVal, E> {
+  ) -> Result<DemoVal, SB::InTxError> {
     let tag = reader.read_u8().unwrap();
 
     Ok(match tag {
@@ -87,7 +88,10 @@ impl DemoVal {
     })
   }
 
-  fn numbers_impl<'a, E, Tx: StorageTx<'a, E>>(&self, tx: &mut Tx) -> Result<Vec<u64>, E> {
+  fn numbers_impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+    &self,
+    tx: &mut Tx,
+  ) -> Result<Vec<u64>, SB::InTxError> {
     match &self {
       DemoVal::Number(n) => Ok(vec![*n]),
       DemoVal::Ptr(ptr) => {
@@ -107,8 +111,8 @@ impl DemoVal {
   }
 }
 
-impl<'a, E, Tx: StorageTx<'a, E>> StorageEntity<'a, E, Tx> for DemoVal {
-  fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, E> {
+impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> for DemoVal {
+  fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, SB::InTxError> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: Vec::new(),
@@ -135,7 +139,7 @@ impl<'a, E, Tx: StorageTx<'a, E>> StorageEntity<'a, E, Tx> for DemoVal {
     Ok(entry)
   }
 
-  fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, E> {
+  fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, SB::InTxError> {
     Self::read_from_entry(tx, &mut StorageEntryReader::new(&entry))
   }
 }

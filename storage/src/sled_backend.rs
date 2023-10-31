@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug as DebugTrait};
+use std::{collections::HashMap, error::Error};
 
 use crate::{
   rc_key::RcKey, storage_ptr::StorageEntryPtr, storage_tx::StorageTx, StorageBackend, StoragePtr,
@@ -26,26 +26,31 @@ impl SledBackend {
 }
 
 impl StorageBackend for SledBackend {
-  type Error<E: DebugTrait> = sled::transaction::TransactionError<E>;
-  type InTxError<E> = sled::transaction::ConflictableTransactionError<E>;
-  type Tx<'a, E> = SledTx<'a>;
+  type InTxError = sled::transaction::ConflictableTransactionError<Box<dyn Error>>;
+  type Tx<'a> = SledTx<'a>;
 
-  fn transaction<F, T, E: DebugTrait>(&mut self, f: F) -> Result<T, Self::Error<E>>
+  fn transaction<F, T>(&mut self, f: F) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::Tx<'_, E>) -> Result<T, Self::InTxError<E>>,
+    F: Fn(&mut Self::Tx<'_>) -> Result<T, Self::InTxError>,
   {
-    self.db.transaction(|tx| {
-      let mut handle = SledTx {
-        ref_deltas: Default::default(),
-        cache: Default::default(),
-        tx,
-      };
+    self
+      .db
+      .transaction(|tx| {
+        let mut handle = SledTx {
+          ref_deltas: Default::default(),
+          cache: Default::default(),
+          tx,
+        };
 
-      let res = f(&mut handle)?;
-      handle.flush_ref_deltas()?;
+        let res = f(&mut handle)?;
+        handle.flush_ref_deltas()?;
 
-      Ok(res)
-    })
+        Ok(res)
+      })
+      .map_err(|e| match e {
+        sled::transaction::TransactionError::Abort(e) => e,
+        sled::transaction::TransactionError::Storage(e) => e.into(),
+      })
   }
 
   fn is_empty(&self) -> bool {
@@ -64,7 +69,7 @@ pub struct SledTx<'a> {
   tx: &'a sled::transaction::TransactionalTree,
 }
 
-impl<'a, E> StorageTx<'a, sled::transaction::ConflictableTransactionError<E>> for SledTx<'a> {
+impl<'a> StorageTx<'a, SledBackend> for SledTx<'a> {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
   }
@@ -76,7 +81,7 @@ impl<'a, E> StorageTx<'a, sled::transaction::ConflictableTransactionError<E>> fo
   fn read_bytes<T>(
     &self,
     ptr: StoragePtr<T>,
-  ) -> Result<Option<Vec<u8>>, sled::transaction::ConflictableTransactionError<E>> {
+  ) -> Result<Option<Vec<u8>>, <SledBackend as StorageBackend>::InTxError> {
     let value = self.tx.get(ptr.to_bytes())?.map(|value| value.to_vec());
     Ok(value)
   }
@@ -85,7 +90,7 @@ impl<'a, E> StorageTx<'a, sled::transaction::ConflictableTransactionError<E>> fo
     &mut self,
     ptr: StoragePtr<T>,
     data: Option<Vec<u8>>,
-  ) -> Result<(), sled::transaction::ConflictableTransactionError<E>> {
+  ) -> Result<(), <SledBackend as StorageBackend>::InTxError> {
     match data {
       Some(data) => self.tx.insert(ptr.to_bytes(), data)?,
       None => self.tx.remove(ptr.to_bytes())?,

@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use crate::storage_entity::StorageEntity;
 use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
 use crate::storage_tx::StorageTx;
@@ -12,29 +14,29 @@ impl<SB: StorageBackend> Storage<SB> {
     Self { sb }
   }
 
-  pub fn get_head<SE: for<'a> StorageEntity<'a, SB::InTxError<()>, SB::Tx<'a, ()>>>(
+  pub fn get_head<SE: for<'a> StorageEntity<'a, SB, SB::Tx<'a>>>(
     &mut self,
     ptr: StorageHeadPtr,
-  ) -> Result<Option<SE>, SB::Error<()>> {
+  ) -> Result<Option<SE>, Box<dyn Error>> {
     self.sb.transaction(|sb| sb.get_head(ptr))
   }
 
-  pub fn set_head<SE: for<'a> StorageEntity<'a, SB::InTxError<()>, SB::Tx<'a, ()>>>(
+  pub fn set_head<SE: for<'a> StorageEntity<'a, SB, SB::Tx<'a>>>(
     &mut self,
     ptr: StorageHeadPtr,
     value: &SE,
-  ) -> Result<(), SB::Error<()>> {
+  ) -> Result<(), Box<dyn Error>> {
     self.sb.transaction(|sb| sb.set_head(ptr, value))
   }
 
-  pub fn remove_head(&mut self, ptr: StorageHeadPtr) -> Result<(), SB::Error<()>> {
+  pub fn remove_head(&mut self, ptr: StorageHeadPtr) -> Result<(), Box<dyn Error>> {
     self.sb.transaction(|sb| sb.remove_head(ptr))
   }
 
-  pub fn store_tmp<SE: for<'a> StorageEntity<'a, SB::InTxError<()>, SB::Tx<'a, ()>>>(
+  pub fn store_tmp<SE: for<'a> StorageEntity<'a, SB, SB::Tx<'a>>>(
     &mut self,
     value: &SE,
-  ) -> Result<StorageEntryPtr, SB::Error<()>> {
+  ) -> Result<StorageEntryPtr, Box<dyn Error>> {
     self.sb.transaction(|sb| {
       let tmp_count = sb.read(tmp_count_ptr())?.unwrap_or(0);
       let tmp_ptr = tmp_at_ptr(tmp_count);
@@ -48,7 +50,7 @@ impl<SB: StorageBackend> Storage<SB> {
     })
   }
 
-  pub fn clear_tmp(&mut self) -> Result<(), SB::Error<()>> {
+  pub fn clear_tmp(&mut self) -> Result<(), Box<dyn Error>> {
     self.sb.transaction(|sb| {
       let tmp_count = sb.read(tmp_count_ptr())?.unwrap_or(0);
 
@@ -70,7 +72,7 @@ impl<SB: StorageBackend> Storage<SB> {
   pub(crate) fn get_ref_count(
     &mut self,
     ptr: StorageEntryPtr,
-  ) -> Result<Option<u64>, SB::Error<()>> {
+  ) -> Result<Option<u64>, Box<dyn Error>> {
     self
       .sb
       .transaction(|sb| Ok(sb.read(ptr)?.map(|entry| entry.ref_count)))

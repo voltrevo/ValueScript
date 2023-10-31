@@ -3,15 +3,22 @@ use std::{collections::HashMap, mem::take};
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
-use crate::{RcKey, StorageEntity, StorageEntryPtr, StorageHeadPtr, StoragePtr};
+use crate::{RcKey, StorageBackend, StorageEntity, StorageEntryPtr, StorageHeadPtr, StoragePtr};
 
-pub trait StorageTx<'a, E>: Sized {
+pub trait StorageTx<'a, SB: StorageBackend>: Sized {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
   fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
-  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
-  fn write_bytes<T>(&mut self, ptr: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, SB::InTxError>;
+  fn write_bytes<T>(
+    &mut self,
+    ptr: StoragePtr<T>,
+    data: Option<Vec<u8>>,
+  ) -> Result<(), SB::InTxError>;
 
-  fn read<T: for<'de> Deserialize<'de>>(&mut self, ptr: StoragePtr<T>) -> Result<Option<T>, E> {
+  fn read<T: for<'de> Deserialize<'de>>(
+    &mut self,
+    ptr: StoragePtr<T>,
+  ) -> Result<Option<T>, SB::InTxError> {
     let data = match self.read_bytes(ptr)? {
       Some(data) => data,
       None => return Ok(None),
@@ -20,14 +27,18 @@ pub trait StorageTx<'a, E>: Sized {
     Ok(Some(bincode::deserialize(&data).unwrap()))
   }
 
-  fn write<T: Serialize>(&mut self, ptr: StoragePtr<T>, data: Option<&T>) -> Result<(), E> {
+  fn write<T: Serialize>(
+    &mut self,
+    ptr: StoragePtr<T>,
+    data: Option<&T>,
+  ) -> Result<(), SB::InTxError> {
     self.write_bytes(ptr, data.map(|data| bincode::serialize(&data).unwrap()))
   }
 
-  fn get_head<SE: StorageEntity<'a, E, Self>>(
+  fn get_head<SE: StorageEntity<'a, SB, Self>>(
     &mut self,
     head_ptr: StorageHeadPtr,
-  ) -> Result<Option<SE>, E> {
+  ) -> Result<Option<SE>, SB::InTxError> {
     let entry_ptr = match self.read(head_ptr)? {
       Some(entry_ptr) => entry_ptr,
       None => return Ok(None),
@@ -41,11 +52,11 @@ pub trait StorageTx<'a, E>: Sized {
     SE::from_storage_entry(self, entry).map(Some)
   }
 
-  fn set_head<SE: StorageEntity<'a, E, Self>>(
+  fn set_head<SE: StorageEntity<'a, SB, Self>>(
     &mut self,
     head_ptr: StorageHeadPtr,
     value: &SE,
-  ) -> Result<(), E> {
+  ) -> Result<(), SB::InTxError> {
     let entry_ptr = self.store(value)?;
     self.ref_delta(entry_ptr, 1)?;
 
@@ -56,7 +67,7 @@ pub trait StorageTx<'a, E>: Sized {
     self.write(head_ptr, Some(&entry_ptr))
   }
 
-  fn remove_head(&mut self, head_ptr: StorageHeadPtr) -> Result<(), E> {
+  fn remove_head(&mut self, head_ptr: StorageHeadPtr) -> Result<(), SB::InTxError> {
     if let Some(old_entry_ptr) = self.read(head_ptr)? {
       self.ref_delta(old_entry_ptr, -1)?;
     }
@@ -64,7 +75,10 @@ pub trait StorageTx<'a, E>: Sized {
     self.write(head_ptr, None)
   }
 
-  fn store<SE: StorageEntity<'a, E, Self>>(&mut self, value: &SE) -> Result<StorageEntryPtr, E> {
+  fn store<SE: StorageEntity<'a, SB, Self>>(
+    &mut self,
+    value: &SE,
+  ) -> Result<StorageEntryPtr, SB::InTxError> {
     let ptr = StoragePtr::random(&mut thread_rng());
     let entry = value.to_storage_entry(self)?;
     self.write(ptr, Some(&entry))?;
@@ -77,14 +91,14 @@ pub trait StorageTx<'a, E>: Sized {
     Ok(ptr)
   }
 
-  fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), E> {
+  fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), SB::InTxError> {
     let ref_delta = self.ref_deltas().entry(ptr.data).or_insert(0);
     *ref_delta += delta;
 
     Ok(())
   }
 
-  fn flush_ref_deltas(&mut self) -> Result<(), E> {
+  fn flush_ref_deltas(&mut self) -> Result<(), SB::InTxError> {
     while !self.ref_deltas().is_empty() {
       let ref_deltas = take(self.ref_deltas());
 
@@ -146,11 +160,11 @@ pub trait StorageTx<'a, E>: Sized {
     self.cache().get(&key).cloned()
   }
 
-  fn store_and_cache<SE: StorageEntity<'a, E, Self>>(
+  fn store_and_cache<SE: StorageEntity<'a, SB, Self>>(
     &mut self,
     value: &SE,
     key: RcKey,
-  ) -> Result<StorageEntryPtr, E> {
+  ) -> Result<StorageEntryPtr, SB::InTxError> {
     let ptr = self.store(value)?;
 
     let pre_existing = self.cache().insert(key, ptr);
