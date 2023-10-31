@@ -24,7 +24,10 @@ pub trait StorageBackendHandle<'a, E>: Sized {
     self.write_bytes(ptr, data.map(|data| bincode::serialize(&data).unwrap()))
   }
 
-  fn get_head<SE: StorageEntity>(&mut self, head_ptr: StorageHeadPtr) -> Result<Option<SE>, E> {
+  fn get_head<SE: StorageEntity<'a, E, Self>>(
+    &mut self,
+    head_ptr: StorageHeadPtr,
+  ) -> Result<Option<SE>, E> {
     let entry_ptr = match self.read(head_ptr)? {
       Some(entry_ptr) => entry_ptr,
       None => return Ok(None),
@@ -38,7 +41,11 @@ pub trait StorageBackendHandle<'a, E>: Sized {
     SE::from_storage_entry(self, entry).map(Some)
   }
 
-  fn set_head<SE: StorageEntity>(&mut self, head_ptr: StorageHeadPtr, value: &SE) -> Result<(), E> {
+  fn set_head<SE: StorageEntity<'a, E, Self>>(
+    &mut self,
+    head_ptr: StorageHeadPtr,
+    value: &SE,
+  ) -> Result<(), E> {
     let entry_ptr = self.store(value)?;
     self.ref_delta(entry_ptr, 1)?;
 
@@ -57,7 +64,7 @@ pub trait StorageBackendHandle<'a, E>: Sized {
     self.write(head_ptr, None)
   }
 
-  fn store<SE: StorageEntity>(&mut self, value: &SE) -> Result<StorageEntryPtr, E> {
+  fn store<SE: StorageEntity<'a, E, Self>>(&mut self, value: &SE) -> Result<StorageEntryPtr, E> {
     let ptr = StoragePtr::random(&mut thread_rng());
     let entry = value.to_storage_entry(self)?;
     self.write(ptr, Some(&entry))?;
@@ -139,7 +146,7 @@ pub trait StorageBackendHandle<'a, E>: Sized {
     self.cache().get(&key).cloned()
   }
 
-  fn store_and_cache<SE: StorageEntity>(
+  fn store_and_cache<SE: StorageEntity<'a, E, Self>>(
     &mut self,
     value: &SE,
     key: RcKey,

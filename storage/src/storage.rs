@@ -12,14 +12,14 @@ impl<SB: StorageBackend> Storage<SB> {
     Self { sb }
   }
 
-  pub fn get_head<SE: StorageEntity>(
+  pub fn get_head<SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Handle<'a, ()>>>(
     &mut self,
     ptr: StorageHeadPtr,
   ) -> Result<Option<SE>, SB::Error<()>> {
     self.sb.transaction(|sb| sb.get_head(ptr))
   }
 
-  pub fn set_head<SE: StorageEntity>(
+  pub fn set_head<SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Handle<'a, ()>>>(
     &mut self,
     ptr: StorageHeadPtr,
     value: &SE,
@@ -31,7 +31,9 @@ impl<SB: StorageBackend> Storage<SB> {
     self.sb.transaction(|sb| sb.remove_head(ptr))
   }
 
-  pub fn store_tmp<SE: StorageEntity>(
+  pub fn store_tmp<
+    SE: for<'a> StorageEntity<'a, SB::InTransactionError<()>, SB::Handle<'a, ()>>,
+  >(
     &mut self,
     value: &SE,
   ) -> Result<StorageEntryPtr, SB::Error<()>> {

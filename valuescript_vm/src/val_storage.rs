@@ -47,11 +47,8 @@ impl Tag {
   }
 }
 
-impl StorageEntity for Val {
-  fn from_storage_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
-    tx: &mut Tx,
-    entry: StorageEntry,
-  ) -> Result<Self, E> {
+impl<'a, E, Tx: StorageBackendHandle<'a, E>> StorageEntity<'a, E, Tx> for Val {
+  fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, E> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
     assert!(reader.done());
@@ -59,10 +56,7 @@ impl StorageEntity for Val {
     res
   }
 
-  fn to_storage_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
-    &self,
-    tx: &mut Tx,
-  ) -> Result<StorageEntry, E> {
+  fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, E> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: vec![],

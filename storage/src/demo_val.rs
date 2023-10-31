@@ -110,11 +110,8 @@ impl DemoVal {
   }
 }
 
-impl StorageEntity for DemoVal {
-  fn to_storage_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
-    &self,
-    tx: &mut Tx,
-  ) -> Result<StorageEntry, E> {
+impl<'a, E, Tx: StorageBackendHandle<'a, E>> StorageEntity<'a, E, Tx> for DemoVal {
+  fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, E> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: Vec::new(),
@@ -141,10 +138,7 @@ impl StorageEntity for DemoVal {
     Ok(entry)
   }
 
-  fn from_storage_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
-    tx: &mut Tx,
-    entry: StorageEntry,
-  ) -> Result<Self, E> {
+  fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, E> {
     Self::read_from_entry(tx, &mut StorageEntryReader::new(&entry))
   }
 }
