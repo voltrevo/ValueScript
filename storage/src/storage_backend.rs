@@ -1,18 +1,6 @@
-use std::{collections::HashMap, fmt::Debug as DebugTrait};
+use std::fmt::Debug as DebugTrait;
 
-use crate::{
-  rc_key::RcKey,
-  storage_ptr::{StorageEntryPtr, StoragePtr},
-};
-
-pub trait StorageBackendHandle<'a, E> {
-  fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
-  fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
-  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
-  fn write_bytes<T>(&mut self, ptr: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
-
-  // TODO: StorageOps should just be methods here
-}
+use crate::storage_backend_handle::StorageBackendHandle;
 
 pub trait StorageBackend {
   type Error<E: DebugTrait>: DebugTrait;

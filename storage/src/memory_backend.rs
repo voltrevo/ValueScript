@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fmt::Debug as DebugTrait;
 
 use crate::{
-  rc_key::RcKey, storage_backend::StorageBackendHandle, storage_ops::StorageOps,
-  storage_ptr::StorageEntryPtr, StorageBackend, StoragePtr,
+  rc_key::RcKey, storage_backend_handle::StorageBackendHandle, storage_ptr::StorageEntryPtr,
+  StorageBackend, StoragePtr,
 };
 
 #[derive(Default)]

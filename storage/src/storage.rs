@@ -1,5 +1,5 @@
+use crate::storage_backend_handle::StorageBackendHandle;
 use crate::storage_entity::StorageEntity;
-use crate::storage_ops::StorageOps;
 use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
 use crate::StorageBackend;
 

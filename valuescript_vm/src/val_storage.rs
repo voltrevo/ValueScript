@@ -4,7 +4,7 @@ use num_bigint::BigInt;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use storage::{
-  RcKey, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter, StorageOps,
+  RcKey, StorageBackendHandle, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter,
 };
 
 use crate::{
@@ -48,7 +48,10 @@ impl Tag {
 }
 
 impl StorageEntity for Val {
-  fn from_storage_entry<E, Tx: StorageOps<E>>(tx: &mut Tx, entry: StorageEntry) -> Result<Self, E> {
+  fn from_storage_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+    tx: &mut Tx,
+    entry: StorageEntry,
+  ) -> Result<Self, E> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
     assert!(reader.done());
@@ -56,7 +59,10 @@ impl StorageEntity for Val {
     res
   }
 
-  fn to_storage_entry<E, Tx: StorageOps<E>>(&self, tx: &mut Tx) -> Result<StorageEntry, E> {
+  fn to_storage_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+    &self,
+    tx: &mut Tx,
+  ) -> Result<StorageEntry, E> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: vec![],
@@ -156,9 +162,9 @@ impl StorageEntity for Val {
   }
 }
 
-fn write_to_entry<E, SO: StorageOps<E>>(
+fn write_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
   val: &Val,
-  tx: &mut SO,
+  tx: &mut Tx,
   writer: &mut StorageEntryWriter,
 ) -> Result<(), E> {
   match val {
@@ -246,8 +252,8 @@ fn write_to_entry<E, SO: StorageOps<E>>(
   Ok(())
 }
 
-fn write_ptr_to_entry<E, SO: StorageOps<E>>(
-  tx: &mut SO,
+fn write_ptr_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+  tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   key: RcKey,
   val: &Val,
@@ -264,8 +270,8 @@ fn write_ptr_to_entry<E, SO: StorageOps<E>>(
   Ok(())
 }
 
-fn read_from_entry<E, SO: StorageOps<E>>(
-  tx: &mut SO,
+fn read_from_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+  tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Val, E> {
   let tag = Tag::from_byte(reader.read_u8().unwrap());
@@ -422,8 +428,8 @@ fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> VsSymbol {
   FromPrimitive::from_u64(reader.read_vlq().unwrap()).unwrap()
 }
 
-fn read_ref_bytecode_from_entry<E, SO: StorageOps<E>>(
-  tx: &mut SO,
+fn read_ref_bytecode_from_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+  tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Rc<Bytecode>, E> {
   let ptr = reader.read_ref().unwrap();
@@ -433,8 +439,8 @@ fn read_ref_bytecode_from_entry<E, SO: StorageOps<E>>(
   Ok(Rc::new(Bytecode::from_storage_entry(tx, entry)?))
 }
 
-fn write_ref_bytecode_to_entry<E, SO: StorageOps<E>>(
-  tx: &mut SO,
+fn write_ref_bytecode_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+  tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   bytecode: &Rc<Bytecode>,
 ) -> Result<(), E> {

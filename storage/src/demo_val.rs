@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
 use crate::rc_key::RcKey;
+use crate::storage_backend_handle::StorageBackendHandle;
 use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
-use crate::storage_ops::StorageOps;
 use crate::storage_ptr::StorageEntryPtr;
 use crate::{Storage, StorageBackend};
 
@@ -26,9 +26,9 @@ impl DemoVal {
     storage.sb.transaction(|sb| self.numbers_impl(sb))
   }
 
-  fn write_to_entry<E, SO: StorageOps<E>>(
+  fn write_to_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
     &self,
-    tx: &mut SO,
+    tx: &mut Tx,
     entry: &mut StorageEntry,
   ) -> Result<(), E> {
     match self {
@@ -58,8 +58,8 @@ impl DemoVal {
     Ok(())
   }
 
-  fn read_from_entry<E, SO: StorageOps<E>>(
-    _tx: &mut SO,
+  fn read_from_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+    _tx: &mut Tx,
     reader: &mut StorageEntryReader,
   ) -> Result<DemoVal, E> {
     let tag = reader.read_u8().unwrap();
@@ -87,7 +87,10 @@ impl DemoVal {
     })
   }
 
-  fn numbers_impl<E, SO: StorageOps<E>>(&self, tx: &mut SO) -> Result<Vec<u64>, E> {
+  fn numbers_impl<'a, E, Tx: StorageBackendHandle<'a, E>>(
+    &self,
+    tx: &mut Tx,
+  ) -> Result<Vec<u64>, E> {
     match &self {
       DemoVal::Number(n) => Ok(vec![*n]),
       DemoVal::Ptr(ptr) => {
@@ -108,7 +111,10 @@ impl DemoVal {
 }
 
 impl StorageEntity for DemoVal {
-  fn to_storage_entry<E, Tx: StorageOps<E>>(&self, tx: &mut Tx) -> Result<StorageEntry, E> {
+  fn to_storage_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+    &self,
+    tx: &mut Tx,
+  ) -> Result<StorageEntry, E> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: Vec::new(),
@@ -135,7 +141,10 @@ impl StorageEntity for DemoVal {
     Ok(entry)
   }
 
-  fn from_storage_entry<E, Tx: StorageOps<E>>(tx: &mut Tx, entry: StorageEntry) -> Result<Self, E> {
+  fn from_storage_entry<'a, E, Tx: StorageBackendHandle<'a, E>>(
+    tx: &mut Tx,
+    entry: StorageEntry,
+  ) -> Result<Self, E> {
     Self::read_from_entry(tx, &mut StorageEntryReader::new(&entry))
   }
 }

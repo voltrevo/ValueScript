@@ -1,40 +1,16 @@
-use std::mem::take;
+use std::{collections::HashMap, mem::take};
 
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-  rc_key::RcKey,
-  storage_backend::StorageBackendHandle,
-  storage_entity::StorageEntity,
-  storage_ptr::{StorageEntryPtr, StorageHeadPtr, StoragePtr},
-};
+use crate::{RcKey, StorageEntity, StorageEntryPtr, StorageHeadPtr, StoragePtr};
 
-pub trait StorageOps<E> {
-  fn read<T: for<'de> Deserialize<'de>>(&mut self, ptr: StoragePtr<T>) -> Result<Option<T>, E>;
-  fn write<T: Serialize>(&mut self, ptr: StoragePtr<T>, data: Option<&T>) -> Result<(), E>;
+pub trait StorageBackendHandle<'a, E>: Sized {
+  fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
+  fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, E>;
+  fn write_bytes<T>(&mut self, ptr: StoragePtr<T>, data: Option<Vec<u8>>) -> Result<(), E>;
 
-  fn get_head<SE: StorageEntity>(&mut self, ptr: StorageHeadPtr) -> Result<Option<SE>, E>;
-  fn set_head<SE: StorageEntity>(&mut self, ptr: StorageHeadPtr, value: &SE) -> Result<(), E>;
-  fn remove_head(&mut self, ptr: StorageHeadPtr) -> Result<(), E>;
-
-  fn store<SE: StorageEntity>(&mut self, value: &SE) -> Result<StorageEntryPtr, E>;
-
-  fn ref_delta<T>(&mut self, ptr: StoragePtr<T>, delta: i64) -> Result<(), E>;
-  fn flush_ref_deltas(&mut self) -> Result<(), E>;
-
-  fn cache_get(&mut self, key: RcKey) -> Option<StorageEntryPtr>;
-  fn store_and_cache<SE: StorageEntity>(
-    &mut self,
-    value: &SE,
-    key: RcKey,
-  ) -> Result<StorageEntryPtr, E>;
-}
-
-impl<'a, Handle, E> StorageOps<E> for Handle
-where
-  Handle: StorageBackendHandle<'a, E>,
-{
   fn read<T: for<'de> Deserialize<'de>>(&mut self, ptr: StoragePtr<T>) -> Result<Option<T>, E> {
     let data = match self.read_bytes(ptr)? {
       Some(data) => data,
