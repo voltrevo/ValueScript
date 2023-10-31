@@ -21,10 +21,14 @@ pub enum StorageError<SB: StorageBackend> {
   Error(Box<dyn Error>),
 }
 
-pub fn to_storage_error<SB: StorageBackend, E: Error + 'static>(e: Box<E>) -> StorageError<SB> {
-  StorageError::Error(e)
+impl<SB: StorageBackend> From<Box<dyn Error>> for StorageError<SB> {
+  fn from(e: Box<dyn Error>) -> Self {
+    StorageError::Error(e)
+  }
 }
 
-pub fn box_to_storage_error<SB: StorageBackend, E: Error + 'static>(e: E) -> StorageError<SB> {
-  StorageError::Error(Box::new(e))
+impl<SB: StorageBackend> StorageError<SB> {
+  pub fn from<E: Error + 'static>(e: E) -> Self {
+    StorageError::Error(Box::new(e))
+  }
 }

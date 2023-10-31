@@ -2,7 +2,7 @@ use std::error::Error;
 use std::rc::Rc;
 
 use crate::rc_key::RcKey;
-use crate::storage_backend::{box_to_storage_error, StorageError};
+use crate::storage_backend::StorageError;
 use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
 use crate::storage_ptr::StorageEntryPtr;
@@ -64,15 +64,15 @@ impl DemoVal {
     _tx: &mut Tx,
     reader: &mut StorageEntryReader,
   ) -> Result<DemoVal, StorageError<SB>> {
-    let tag = reader.read_u8().map_err(box_to_storage_error)?;
+    let tag = reader.read_u8().map_err(StorageError::from)?;
 
     Ok(match tag {
       NUMBER_TAG => {
-        let n = reader.read_u64().map_err(box_to_storage_error)?;
+        let n = reader.read_u64().map_err(StorageError::from)?;
         DemoVal::Number(n)
       }
       ARRAY_TAG => {
-        let len = reader.read_u64().map_err(box_to_storage_error)?;
+        let len = reader.read_u64().map_err(StorageError::from)?;
         let mut items = Vec::new();
 
         for _ in 0..len {
@@ -82,7 +82,7 @@ impl DemoVal {
         DemoVal::Array(Rc::new(items))
       }
       PTR_TAG => {
-        let ptr = reader.read_ref().map_err(box_to_storage_error)?;
+        let ptr = reader.read_ref().map_err(StorageError::from)?;
         DemoVal::Ptr(ptr)
       }
       _ => panic!("Invalid tag"),

@@ -4,8 +4,8 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  storage_backend::{to_storage_error, StorageError},
-  RcKey, StorageBackend, StorageEntity, StorageEntryPtr, StorageHeadPtr, StoragePtr,
+  storage_backend::StorageError, RcKey, StorageBackend, StorageEntity, StorageEntryPtr,
+  StorageHeadPtr, StoragePtr,
 };
 
 pub trait StorageTx<'a, SB: StorageBackend>: Sized {
@@ -29,7 +29,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
 
     bincode::deserialize(&data)
       .map(Some)
-      .map_err(to_storage_error)
+      .map_err(StorageError::from)
   }
 
   fn read_or_err<T: for<'de> Deserialize<'de>>(
@@ -48,7 +48,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     data: Option<&T>,
   ) -> Result<(), StorageError<SB>> {
     let bytes = match data {
-      Some(data) => Some(bincode::serialize(&data).map_err(to_storage_error)?),
+      Some(data) => Some(bincode::serialize(&data).map_err(StorageError::from)?),
       None => None,
     };
 

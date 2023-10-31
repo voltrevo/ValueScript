@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io::Read, rc::Rc};
+use std::{collections::BTreeMap, error::Error, io::Read, rc::Rc};
 
 use num_bigint::BigInt;
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -43,8 +43,8 @@ impl Tag {
     ToPrimitive::to_u8(self).unwrap()
   }
 
-  fn from_byte(byte: u8) -> Tag {
-    FromPrimitive::from_u8(byte).unwrap()
+  fn from_byte(byte: u8) -> Result<Tag, Box<dyn Error>> {
+    FromPrimitive::from_u8(byte).ok_or("Invalid tag byte".into())
   }
 }
 
@@ -269,37 +269,39 @@ fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Val, StorageError<SB>> {
-  let tag = Tag::from_byte(reader.read_u8().unwrap());
+  let tag = Tag::from_byte(reader.read_u8().map_err(StorageError::from)?)?;
 
   Ok(match tag {
     Tag::Void => Val::Void,
     Tag::Undefined => Val::Undefined,
     Tag::Null => Val::Null,
-    Tag::Bool => Val::Bool(match reader.read_u8().unwrap() {
+    Tag::Bool => Val::Bool(match reader.read_u8().map_err(StorageError::from)? {
       0 => false,
       1 => true,
       _ => panic!("Invalid bool byte"),
     }),
     Tag::Number => {
       let mut bytes = [0; 8];
-      reader.read_exact(&mut bytes).unwrap();
+      reader.read_exact(&mut bytes).map_err(StorageError::from)?;
       Val::Number(f64::from_le_bytes(bytes))
     }
     Tag::BigInt => {
-      let len = reader.read_vlq().unwrap();
+      let len = reader.read_vlq().map_err(StorageError::from)?;
       let mut bytes = vec![0; len as usize];
-      reader.read_exact(&mut bytes).unwrap();
+      reader.read_exact(&mut bytes).map_err(StorageError::from)?;
       Val::BigInt(BigInt::from_signed_bytes_le(&bytes))
     }
-    Tag::Symbol => Val::Symbol(FromPrimitive::from_u64(reader.read_vlq().unwrap()).unwrap()),
+    Tag::Symbol => {
+      Val::Symbol(FromPrimitive::from_u64(reader.read_vlq().map_err(StorageError::from)?).unwrap())
+    }
     Tag::String => {
-      let len = reader.read_vlq().unwrap();
+      let len = reader.read_vlq().map_err(StorageError::from)?;
       let mut bytes = vec![0; len as usize];
-      reader.read_exact(&mut bytes).unwrap();
-      Val::String(String::from_utf8(bytes).unwrap().into())
+      reader.read_exact(&mut bytes).map_err(StorageError::from)?;
+      Val::String(String::from_utf8(bytes).map_err(StorageError::from)?.into())
     }
     Tag::Array => {
-      let len = reader.read_vlq().unwrap();
+      let len = reader.read_vlq().map_err(StorageError::from)?;
       let mut items = Vec::new();
 
       for _ in 0..len {
@@ -309,21 +311,21 @@ fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
       VsArray::from(items).to_val()
     }
     Tag::Object => {
-      let len = reader.read_vlq().unwrap();
+      let len = reader.read_vlq().map_err(StorageError::from)?;
       let mut string_map = BTreeMap::<String, Val>::new();
 
       for _ in 0..len {
-        let key = read_string_from_entry(reader);
+        let key = read_string_from_entry(reader)?;
         let value = read_from_entry(tx, reader)?;
 
         string_map.insert(key, value);
       }
 
-      let len = reader.read_vlq().unwrap();
+      let len = reader.read_vlq().map_err(StorageError::from)?;
       let mut symbol_map = BTreeMap::<VsSymbol, Val>::new();
 
       for _ in 0..len {
-        let key = read_symbol_from_entry(reader);
+        let key = read_symbol_from_entry(reader)?;
         let value = read_from_entry(tx, reader)?;
 
         symbol_map.insert(key, value);
@@ -344,23 +346,23 @@ fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
     Tag::Function => {
       let bytecode = read_ref_bytecode_from_entry(tx, reader)?;
 
-      let meta_pos = match reader.read_u8().unwrap() {
+      let meta_pos = match reader.read_u8().map_err(StorageError::from)? {
         0 => None,
-        1 => Some(reader.read_vlq().unwrap() as usize),
+        1 => Some(reader.read_vlq().map_err(StorageError::from)? as usize),
         _ => panic!("Invalid meta_pos byte"),
       };
 
-      let is_generator = match reader.read_u8().unwrap() {
+      let is_generator = match reader.read_u8().map_err(StorageError::from)? {
         0 => false,
         1 => true,
         _ => panic!("Invalid is_generator byte"),
       };
 
-      let register_count = reader.read_vlq().unwrap() as usize;
-      let parameter_count = reader.read_vlq().unwrap() as usize;
-      let start = reader.read_vlq().unwrap() as usize;
+      let register_count = reader.read_vlq().map_err(StorageError::from)? as usize;
+      let parameter_count = reader.read_vlq().map_err(StorageError::from)? as usize;
+      let start = reader.read_vlq().map_err(StorageError::from)? as usize;
 
-      let len = reader.read_vlq().unwrap();
+      let len = reader.read_vlq().map_err(StorageError::from)?;
       let mut binds = Vec::new();
 
       for _ in 0..len {
@@ -379,13 +381,13 @@ fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
       .to_val()
     }
     Tag::Class => {
-      let name = read_string_from_entry(reader);
+      let name = read_string_from_entry(reader)?;
 
-      let content_hash = match reader.read_u8().unwrap() {
+      let content_hash = match reader.read_u8().map_err(StorageError::from)? {
         0 => None,
         1 => {
           let mut res = [0u8; 32];
-          reader.read_exact(&mut res).unwrap();
+          reader.read_exact(&mut res).map_err(StorageError::from)?;
 
           Some(res)
         }
@@ -408,27 +410,29 @@ fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
     Tag::Static => todo!(),
     Tag::Dynamic => todo!(),
     Tag::CopyCounter => todo!(),
-    Tag::StoragePtr => VsStoragePtr::from_ptr(reader.read_ref().unwrap()).to_val(),
+    Tag::StoragePtr => {
+      VsStoragePtr::from_ptr(reader.read_ref().map_err(StorageError::from)?).to_val()
+    }
   })
 }
 
-fn read_string_from_entry(reader: &mut StorageEntryReader) -> String {
-  let len = reader.read_vlq().unwrap();
+fn read_string_from_entry(reader: &mut StorageEntryReader) -> Result<String, Box<dyn Error>> {
+  let len = reader.read_vlq()?;
   let mut bytes = vec![0; len as usize];
-  reader.read_exact(&mut bytes).unwrap();
-  String::from_utf8(bytes).unwrap()
+  reader.read_exact(&mut bytes)?;
+  Ok(String::from_utf8(bytes)?)
 }
 
-fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> VsSymbol {
-  FromPrimitive::from_u64(reader.read_vlq().unwrap()).unwrap()
+fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> Result<VsSymbol, Box<dyn Error>> {
+  Ok(FromPrimitive::from_u64(reader.read_vlq()?).unwrap())
 }
 
 fn read_ref_bytecode_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Rc<Bytecode>, StorageError<SB>> {
-  let ptr = reader.read_ref().unwrap();
-  let entry = tx.read(ptr)?.unwrap();
+  let ptr = reader.read_ref().map_err(StorageError::from)?;
+  let entry = tx.read_or_err(ptr)?;
 
   // TODO: Cached reads
   Ok(Rc::new(Bytecode::from_storage_entry(tx, entry)?))
