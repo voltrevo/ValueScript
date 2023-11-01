@@ -12,6 +12,7 @@ use crate::{
   vs_class::VsClass,
   vs_function::VsFunction,
   vs_object::VsObject,
+  vs_storage_ptr::VsStoragePtr,
   vs_value::{ToVal, Val},
   Bytecode, VsSymbol,
 };
@@ -46,7 +47,7 @@ impl Tag {
   }
 }
 
-impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> for Val {
+impl<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> for Val {
   fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, StorageError<SB>> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
@@ -155,7 +156,7 @@ impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> fo
   }
 }
 
-fn write_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+fn write_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>>(
   val: &Val,
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
@@ -238,14 +239,14 @@ fn write_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
     }
     Val::StoragePtr(ptr) => {
       writer.write_u8(Tag::StoragePtr.to_byte());
-      writer.entry.refs.push(ptr.ptr);
+      writer.entry.refs.push(ptr.resolver.ptr());
     }
   };
 
   Ok(())
 }
 
-fn write_ptr_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+fn write_ptr_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>>(
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   key: RcKey,
@@ -263,7 +264,7 @@ fn write_ptr_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   Ok(())
 }
 
-fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+fn read_from_entry<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Val, StorageError<SB>> {
@@ -389,7 +390,7 @@ fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
     Tag::Static => todo!(),
     Tag::Dynamic => todo!(),
     Tag::CopyCounter => todo!(),
-    Tag::StoragePtr => reader.read_ref()?.to_val(),
+    Tag::StoragePtr => VsStoragePtr::new(tx.get_auto_ptr(reader.read_ref()?)).to_val(),
   })
 }
 

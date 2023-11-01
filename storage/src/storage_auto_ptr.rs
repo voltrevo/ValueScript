@@ -1,3 +1,4 @@
+use std::fmt::{self, Debug};
 use std::{cell::RefCell, error::Error, rc::Weak};
 
 use crate::{StorageBackend, StorageEntity, StorageEntryPtr, StorageTx};
@@ -5,7 +6,17 @@ use crate::{StorageBackend, StorageEntity, StorageEntryPtr, StorageTx};
 pub struct StorageAutoPtr<SB: StorageBackend, SE: for<'a> StorageEntity<'a, SB, SB::Tx<'a>>> {
   pub(crate) _marker: std::marker::PhantomData<SE>,
   pub(crate) sb: Weak<RefCell<SB>>, // TODO: Does this need to be weak?
-  pub(crate) ptr: StorageEntryPtr,
+  pub ptr: StorageEntryPtr,
+}
+
+impl<SB: StorageBackend, SE: for<'a> StorageEntity<'a, SB, SB::Tx<'a>>> Debug
+  for StorageAutoPtr<SB, SE>
+{
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("StorageAutoPtr")
+      .field("ptr", &self.ptr)
+      .finish()
+  }
 }
 
 impl<SB: StorageBackend, SE: for<'a> StorageEntity<'a, SB, SB::Tx<'a>>> StorageAutoPtr<SB, SE> {
