@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::error::Error;
 
 use serde::{Deserialize, Serialize};
 
@@ -30,9 +30,38 @@ impl<'a> StorageEntryReader<'a> {
     self.refs_i == self.entry.refs.len() && self.data_i == self.entry.data.len()
   }
 
-  pub fn read_ref(&mut self) -> std::io::Result<StorageEntryPtr> {
+  pub fn read_u8_array<const L: usize>(&mut self) -> Result<[u8; L], Box<dyn Error>> {
+    if self.data_i + L > self.entry.data.len() {
+      return Err(eof().into());
+    }
+
+    let mut bytes = [0; L];
+    bytes.copy_from_slice(&self.entry.data[self.data_i..self.data_i + L]);
+
+    self.data_i += L;
+
+    Ok(bytes)
+  }
+
+  pub fn read_buf(&mut self, len: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    if self.data_i + len > self.entry.data.len() {
+      return Err(eof().into());
+    }
+
+    let buf = self.entry.data[self.data_i..self.data_i + len].to_vec();
+    self.data_i += len;
+
+    Ok(buf)
+  }
+
+  pub fn read_vlq_buf(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
+    let len = self.read_vlq()?;
+    self.read_buf(len)
+  }
+
+  pub fn read_ref(&mut self) -> Result<StorageEntryPtr, Box<dyn Error>> {
     if self.refs_i >= self.entry.refs.len() {
-      return Err(eof());
+      return Err(eof().into());
     }
 
     let ptr = self.entry.refs[self.refs_i];
@@ -40,9 +69,9 @@ impl<'a> StorageEntryReader<'a> {
     Ok(ptr)
   }
 
-  pub fn read_u8(&mut self) -> std::io::Result<u8> {
+  pub fn read_u8(&mut self) -> Result<u8, Box<dyn Error>> {
     if self.data_i >= self.entry.data.len() {
-      return Err(eof());
+      return Err(eof().into());
     }
 
     let byte = self.entry.data[self.data_i];
@@ -50,28 +79,26 @@ impl<'a> StorageEntryReader<'a> {
     Ok(byte)
   }
 
-  pub fn peek_u8(&self) -> std::io::Result<u8> {
+  pub fn peek_u8(&self) -> Result<u8, Box<dyn Error>> {
     if self.data_i >= self.entry.data.len() {
-      return Err(eof());
+      return Err(eof().into());
     }
 
     Ok(self.entry.data[self.data_i])
   }
 
-  pub fn read_u64(&mut self) -> std::io::Result<u64> {
-    let mut bytes = [0; 8];
-    self.read_exact(&mut bytes)?;
-    Ok(u64::from_le_bytes(bytes))
+  pub fn read_u64(&mut self) -> Result<u64, Box<dyn Error>> {
+    self.read_u8_array().map(u64::from_le_bytes)
   }
 
-  pub fn read_vlq(&mut self) -> std::io::Result<u64> {
+  pub fn read_vlq(&mut self) -> Result<usize, Box<dyn Error>> {
     let mut result = 0;
     let mut shift = 0;
 
     loop {
       let byte = self.read_u8()?;
 
-      result |= ((byte & 0x7f) as u64) << shift;
+      result |= ((byte & 0x7f) as usize) << shift;
 
       if byte & 0x80 == 0 {
         break;
@@ -81,21 +108,6 @@ impl<'a> StorageEntryReader<'a> {
     }
 
     Ok(result)
-  }
-}
-
-impl Read for StorageEntryReader<'_> {
-  fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-    let bytes = self
-      .entry
-      .data
-      .get(self.data_i..self.data_i + buf.len())
-      .ok_or(eof())?;
-
-    buf.copy_from_slice(bytes);
-    self.data_i += buf.len();
-
-    Ok(buf.len())
   }
 }
 
@@ -120,7 +132,7 @@ impl<'a> StorageEntryWriter<'a> {
     self.entry.data.extend_from_slice(bytes);
   }
 
-  pub fn write_vlq(&mut self, mut num: u64) {
+  pub fn write_vlq(&mut self, mut num: usize) {
     loop {
       let mut byte = (num & 0x7f) as u8;
 

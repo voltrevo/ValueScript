@@ -38,3 +38,9 @@ impl ToVal for VsStoragePtr {
     Val::StoragePtr(Rc::new(self))
   }
 }
+
+impl ToVal for StorageEntryPtr {
+  fn to_val(self) -> Val {
+    VsStoragePtr::from_ptr(self).to_val()
+  }
+}

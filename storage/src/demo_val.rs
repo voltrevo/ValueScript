@@ -64,15 +64,15 @@ impl DemoVal {
     _tx: &mut Tx,
     reader: &mut StorageEntryReader,
   ) -> Result<DemoVal, StorageError<SB>> {
-    let tag = reader.read_u8().map_err(StorageError::from)?;
+    let tag = reader.read_u8()?;
 
     Ok(match tag {
       NUMBER_TAG => {
-        let n = reader.read_u64().map_err(StorageError::from)?;
+        let n = reader.read_u64()?;
         DemoVal::Number(n)
       }
       ARRAY_TAG => {
-        let len = reader.read_u64().map_err(StorageError::from)?;
+        let len = reader.read_u64()?;
         let mut items = Vec::new();
 
         for _ in 0..len {
@@ -82,7 +82,7 @@ impl DemoVal {
         DemoVal::Array(Rc::new(items))
       }
       PTR_TAG => {
-        let ptr = reader.read_ref().map_err(StorageError::from)?;
+        let ptr = reader.read_ref()?;
         DemoVal::Ptr(ptr)
       }
       _ => panic!("Invalid tag"),
