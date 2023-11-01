@@ -15,33 +15,17 @@ use run_command::run_command;
 fn main() {
   let args: Vec<String> = env::args().collect();
 
-  if args.len() < 2 {
-    std::panic!("Not implemented: ValueScript repl");
+  match args.get(1).map(|s| s.as_str()) {
+    Some("help") | Some("-h") | Some("--help") | None => show_help(),
+    Some("assemble") => assemble_command(&args),
+    Some("run") => run_command(&args),
+    Some("compile") => compile_command(&args),
+    _ => {
+      println!("ERROR: Unrecognized command\n");
+      show_help();
+      exit(1);
+    }
   }
-
-  if args.len() == 2 && (args[1] == "-h" || args[1] == "--help" || args[1] == "help") {
-    show_help();
-    return;
-  }
-
-  if args.len() >= 2 && args[1] == "assemble" {
-    assemble_command(&args);
-    return;
-  }
-
-  if args.len() >= 2 && args[1] == "run" {
-    run_command(&args);
-    return;
-  }
-
-  if args.len() >= 2 && args[1] == "compile" {
-    compile_command(&args);
-    return;
-  }
-
-  println!("ERROR: Unrecognized command\n");
-  show_help();
-  exit(1);
 }
 
 fn show_help() {
