@@ -28,7 +28,7 @@ pub fn db_command(args: &[String]) {
   };
 
   match args.get(3).map(|s| s.as_str()) {
-    Some("new") => println!("TODO: create database {} using {:?}", path, args.get(4)),
+    Some("new") => db_new(&path, args.get(4..).unwrap_or_default()),
     Some("call") => println!("TODO: on database {}, call {:?}", path, args.get(4)),
     Some("-i") => println!("TODO: use database {} interactively", path),
     arg => {
@@ -47,7 +47,9 @@ pub fn db_command(args: &[String]) {
 }
 
 fn show_help() {
-  println!("Usage: vstc db [DB_PATH] [COMMAND] [ARGS]");
+  println!("vstc db [DB_PATH] [COMMAND] [ARGS]");
+  println!();
+  println!("ValueScript database functionality");
   println!();
   println!("Commands:");
   println!("  help, -h, --help          Show this message");
@@ -61,4 +63,8 @@ fn show_help() {
   println!("  vstc db path/widget.vsdb call useWidget.ts   Call useWidget.ts on the widget");
   println!("  vstc db path/widget.vsdb 'this.info()'       Call info method");
   println!("  vstc db path/widget.vsdb -i                  Enter interactive mode");
+}
+
+fn db_new(path: &str, args: &[String]) {
+  println!("TODO: create database {} with args {:?}", path, args);
 }
