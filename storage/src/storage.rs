@@ -3,7 +3,7 @@ use std::error::Error;
 use crate::storage_entity::StorageEntity;
 use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
 use crate::storage_tx::StorageTx;
-use crate::StorageBackend;
+use crate::{StorageBackend, StorageError};
 
 pub struct Storage<SB: StorageBackend> {
   pub(crate) sb: SB,
@@ -19,6 +19,20 @@ impl<SB: StorageBackend> Storage<SB> {
     ptr: StorageHeadPtr,
   ) -> Result<Option<SE>, Box<dyn Error>> {
     self.sb.transaction(|sb| sb.get_head(ptr))
+  }
+
+  pub fn get<SE: for<'a> StorageEntity<'a, SB, SB::Tx<'a>>>(
+    &mut self,
+    ptr: StorageEntryPtr,
+  ) -> Result<SE, Box<dyn Error>> {
+    // TODO: Avoid going through a transaction when read-only
+    self.sb.transaction(|sb| {
+      let entry = sb
+        .read(ptr)?
+        .ok_or(StorageError::Error("Ptr not found".into()))?;
+
+      SE::from_storage_entry(sb, entry)
+    })
   }
 
   pub fn set_head<SE: for<'a> StorageEntity<'a, SB, SB::Tx<'a>>>(
