@@ -1,5 +1,6 @@
 mod assemble_command;
 mod compile_command;
+mod db_command;
 mod handle_diagnostics_cli;
 mod resolve_entry_path;
 mod run_command;
@@ -10,6 +11,7 @@ use std::process::exit;
 
 use assemble_command::assemble_command;
 use compile_command::compile_command;
+use db_command::db_command;
 use run_command::run_command;
 
 fn main() {
@@ -20,6 +22,7 @@ fn main() {
     Some("assemble") => assemble_command(&args),
     Some("run") => run_command(&args),
     Some("compile") => compile_command(&args),
+    Some("db") => db_command(&args),
     _ => {
       println!("ERROR: Unrecognized command\n");
       show_help();
