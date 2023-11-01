@@ -17,7 +17,7 @@ impl std::fmt::Display for ResolvedPath {
   }
 }
 
-pub fn resolve_path(importer_path: &ResolvedPath, path: &String) -> ResolvedPath {
+pub fn resolve_path(importer_path: &ResolvedPath, path: &str) -> ResolvedPath {
   let importer_path_buf = PathBuf::from(&importer_path.path);
   let parent = importer_path_buf.parent().unwrap_or_else(|| Path::new("/"));
 

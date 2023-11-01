@@ -54,12 +54,8 @@ mod tests {
             failed_paths.insert(rel_file_path.clone());
           }
 
-          let resolved_path = resolve_entry_path(
-            &file_path
-              .to_str()
-              .expect("Failed to convert to str")
-              .to_string(),
-          );
+          let resolved_path =
+            resolve_entry_path(file_path.to_str().expect("Failed to convert to str"));
 
           let compile_result = compile(resolved_path, |path| {
             fs::read_to_string(path).map_err(|err| err.to_string())

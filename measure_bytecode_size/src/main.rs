@@ -34,12 +34,7 @@ pub fn main() {
         continue;
       }
 
-      let resolved_path = resolve_entry_path(
-        &file_path
-          .to_str()
-          .expect("Failed to convert to str")
-          .to_string(),
-      );
+      let resolved_path = resolve_entry_path(file_path.to_str().expect("Failed to convert to str"));
 
       let compile_result = compile(resolved_path, |path| {
         fs::read_to_string(path).map_err(|err| err.to_string())
@@ -85,7 +80,7 @@ fn get_files_recursively(dir_path: impl AsRef<Path>) -> Result<Vec<PathBuf>, std
   Ok(files)
 }
 
-fn resolve_entry_path(entry_path: &String) -> ResolvedPath {
+fn resolve_entry_path(entry_path: &str) -> ResolvedPath {
   // Like cwd (current working dir), but it's cwd/file.
   // This is a bit of a hack so we can use resolve_path to get the absolute path of the entry point.
   let cwd_file = ResolvedPath {

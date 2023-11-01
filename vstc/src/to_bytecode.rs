@@ -7,7 +7,7 @@ use crate::{
   handle_diagnostics_cli::handle_diagnostics_cli, resolve_entry_path::resolve_entry_path,
 };
 
-pub fn to_bytecode(format: RunFormat, file_path: &String) -> Bytecode {
+pub fn to_bytecode(format: RunFormat, file_path: &str) -> Bytecode {
   Bytecode::new(match format {
     RunFormat::TypeScript => {
       let resolved_entry_path = resolve_entry_path(file_path);
@@ -47,7 +47,7 @@ pub enum RunFormat {
   Bytecode,
 }
 
-pub fn format_from_path(file_path: &String) -> RunFormat {
+pub fn format_from_path(file_path: &str) -> RunFormat {
   let ext = Path::new(&file_path)
     .extension()
     .and_then(OsStr::to_str)
