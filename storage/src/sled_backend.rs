@@ -1,8 +1,8 @@
-use std::{collections::HashMap, error::Error};
+use std::{cell::RefCell, collections::HashMap, error::Error, rc::Weak};
 
 use crate::{
   rc_key::RcKey, storage_backend::StorageError, storage_ptr::StorageEntryPtr,
-  storage_tx::StorageTx, StorageBackend, StoragePtr,
+  storage_tx::StorageTx, StorageAutoPtr, StorageBackend, StoragePtr,
 };
 
 pub struct SledBackend {
@@ -30,7 +30,7 @@ impl StorageBackend for SledBackend {
   type CustomError = sled::transaction::ConflictableTransactionError<Box<dyn Error>>;
   type Tx<'a> = SledTx<'a>;
 
-  fn transaction<F, T>(&mut self, f: F) -> Result<T, Box<dyn Error>>
+  fn transaction<F, T>(&mut self, self_weak: Weak<RefCell<Self>>, f: F) -> Result<T, Box<dyn Error>>
   where
     F: Fn(&mut Self::Tx<'_>) -> Result<T, StorageError<Self>>,
   {
@@ -38,6 +38,7 @@ impl StorageBackend for SledBackend {
       .db
       .transaction(|tx| {
         let mut handle = SledTx {
+          backend: self_weak.clone(),
           ref_deltas: Default::default(),
           cache: Default::default(),
           tx,
@@ -72,6 +73,7 @@ impl StorageBackend for SledBackend {
 }
 
 pub struct SledTx<'a> {
+  backend: Weak<RefCell<SledBackend>>,
   ref_deltas: HashMap<(u64, u64, u64), i64>,
   cache: HashMap<RcKey, StorageEntryPtr>,
   tx: &'a sled::transaction::TransactionalTree,
@@ -97,6 +99,19 @@ impl<'a> StorageTx<'a, SledBackend> for SledTx<'a> {
       .map(|value| value.to_vec());
 
     Ok(value)
+  }
+
+  fn get_auto_ptr<
+    SE: for<'b> crate::StorageEntity<'b, SledBackend, <SledBackend as StorageBackend>::Tx<'b>>,
+  >(
+    &mut self,
+    ptr: StorageEntryPtr,
+  ) -> crate::StorageAutoPtr<SledBackend, SE> {
+    StorageAutoPtr {
+      _marker: std::marker::PhantomData,
+      sb: self.backend.clone(),
+      ptr,
+    }
   }
 
   fn write_bytes<T>(

@@ -4,8 +4,8 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  storage_backend::StorageError, RcKey, StorageBackend, StorageEntity, StorageEntryPtr,
-  StorageHeadPtr, StoragePtr,
+  storage_backend::StorageError, RcKey, StorageAutoPtr, StorageBackend, StorageEntity,
+  StorageEntryPtr, StorageHeadPtr, StoragePtr,
 };
 
 pub trait StorageTx<'a, SB: StorageBackend>: Sized {
@@ -31,6 +31,11 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
       .map(Some)
       .map_err(StorageError::from)
   }
+
+  fn get_auto_ptr<SE: for<'b> StorageEntity<'b, SB, SB::Tx<'b>>>(
+    &mut self,
+    ptr: StorageEntryPtr,
+  ) -> StorageAutoPtr<SB, SE>;
 
   fn read_or_err<T: for<'de> Deserialize<'de>>(
     &mut self,

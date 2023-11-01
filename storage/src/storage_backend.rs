@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{cell::RefCell, error::Error, rc::Weak};
 
 use crate::storage_tx::StorageTx;
 
@@ -6,7 +6,11 @@ pub trait StorageBackend: Sized {
   type CustomError;
   type Tx<'a>: StorageTx<'a, Self>;
 
-  fn transaction<F, T>(&mut self, f: F) -> Result<T, Box<dyn Error>>
+  fn transaction<F, T>(
+    &mut self,
+    self_weak: Weak<RefCell<Self>>,
+    f: F,
+  ) -> Result<T, Box<dyn Error>>
   where
     F: Fn(&mut Self::Tx<'_>) -> Result<T, StorageError<Self>>;
 

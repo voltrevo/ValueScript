@@ -25,7 +25,10 @@ impl DemoVal {
     &self,
     storage: &mut Storage<SB>,
   ) -> Result<Vec<u64>, Box<dyn Error>> {
-    storage.sb.transaction(|sb| self.numbers_impl(sb))
+    storage
+      .sb
+      .borrow_mut()
+      .transaction(Rc::downgrade(&storage.sb), |sb| self.numbers_impl(sb))
   }
 
   fn write_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(

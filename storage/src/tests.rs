@@ -120,7 +120,7 @@ mod tests_ {
 
       storage.remove_head(storage_head_ptr(b"test")).unwrap();
 
-      assert_eq!(storage.sb.len(), 0);
+      assert_eq!(storage.sb.borrow().len(), 0);
       assert!(storage.is_empty());
     }
 
