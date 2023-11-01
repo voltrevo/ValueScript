@@ -5,6 +5,7 @@ mod handle_diagnostics_cli;
 mod resolve_entry_path;
 mod run_command;
 mod test_inputs;
+mod to_bytecode;
 
 use std::env;
 use std::process::exit;

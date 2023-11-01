@@ -1,14 +1,10 @@
-use std::fs;
+use std::process::exit;
 use std::rc::Rc;
-use std::{ffi::OsStr, path::Path, process::exit};
 
-use valuescript_compiler::{assemble, compile, parse_module};
 use valuescript_vm::vs_value::Val;
-use valuescript_vm::{Bytecode, VirtualMachine};
+use valuescript_vm::VirtualMachine;
 
-use crate::resolve_entry_path::resolve_entry_path;
-
-use super::handle_diagnostics_cli::handle_diagnostics_cli;
+use crate::to_bytecode::{format_from_path, to_bytecode, RunFormat};
 
 pub fn run_command(args: &Vec<String>) {
   if args.len() < 3 {
@@ -46,7 +42,7 @@ pub fn run_command(args: &Vec<String>) {
     .collect();
 
   match vm.run(bytecode, None, &val_args) {
-    Ok(Val::Undefined) => {},
+    Ok(Val::Undefined) => {}
     Ok(result) => {
       println!("{}", result.pretty());
     }
@@ -57,12 +53,6 @@ pub fn run_command(args: &Vec<String>) {
   }
 }
 
-enum RunFormat {
-  TypeScript,
-  Assembly,
-  Bytecode,
-}
-
 fn format_from_option(option: &String) -> RunFormat {
   return match option.as_str() {
     "--typescript" => RunFormat::TypeScript,
@@ -70,57 +60,6 @@ fn format_from_option(option: &String) -> RunFormat {
     "--bytecode" => RunFormat::Bytecode,
     _ => std::panic!("Unrecognized option {}", option),
   };
-}
-
-fn format_from_path(file_path: &String) -> RunFormat {
-  let ext = Path::new(&file_path)
-    .extension()
-    .and_then(OsStr::to_str)
-    .unwrap_or("");
-
-  match ext {
-    "ts" => RunFormat::TypeScript,
-    "mts" => RunFormat::TypeScript,
-    "js" => RunFormat::TypeScript,
-    "mjs" => RunFormat::TypeScript,
-    "vsm" => RunFormat::Assembly,
-    "vsb" => RunFormat::Bytecode,
-    _ => std::panic!("Unrecognized file extension \"{}\"", ext),
-  }
-}
-
-fn to_bytecode(format: RunFormat, file_path: &String) -> Bytecode {
-  Bytecode::new(match format {
-    RunFormat::TypeScript => {
-      let resolved_entry_path = resolve_entry_path(file_path);
-
-      let compile_result = compile(resolved_entry_path, |path| {
-        std::fs::read_to_string(path).map_err(|err| err.to_string())
-      });
-
-      for (path, diagnostics) in compile_result.diagnostics.iter() {
-        handle_diagnostics_cli(&path.path, diagnostics);
-      }
-
-      assemble(
-        &compile_result
-          .module
-          .expect("Should have exited if module is None"),
-      )
-    }
-
-    RunFormat::Assembly => {
-      let file_content = std::fs::read_to_string(file_path)
-        .unwrap_or_else(|_| panic!("Failed to read file {}", file_path));
-
-      let module = parse_module(&file_content);
-      assemble(&module)
-    }
-
-    RunFormat::Bytecode => {
-      fs::read(file_path).unwrap_or_else(|_| panic!("Failed to read file {}", file_path))
-    }
-  })
 }
 
 fn show_help() {
