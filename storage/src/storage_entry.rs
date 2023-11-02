@@ -149,4 +149,9 @@ impl<'a> StorageEntryWriter<'a> {
       num >>= 7;
     }
   }
+
+  pub fn write_vlq_buf(&mut self, buf: &[u8]) {
+    self.write_vlq(buf.len());
+    self.write_bytes(buf);
+  }
 }

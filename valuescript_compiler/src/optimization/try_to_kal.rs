@@ -1,4 +1,7 @@
-use valuescript_vm::{vs_value::Val, VsSymbol};
+use valuescript_vm::{
+  vs_value::{Val, VsType},
+  ValTrait, VsSymbol,
+};
 
 use crate::asm::{Builtin, Number};
 
@@ -33,7 +36,7 @@ impl TryToKal for Val {
         Kal::Array(Box::new(Array { values }))
       }
       Val::Object(obj) => {
-        if obj.prototype.is_some() {
+        if obj.prototype.typeof_() != VsType::Undefined {
           // TODO: convert object with prototype to Kal
           return None;
         }

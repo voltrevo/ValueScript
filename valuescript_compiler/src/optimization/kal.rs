@@ -250,7 +250,7 @@ impl Kal {
         VsObject {
           string_map,
           symbol_map: Default::default(),
-          prototype: None,
+          prototype: Val::Void,
         }
         .to_val()
       }

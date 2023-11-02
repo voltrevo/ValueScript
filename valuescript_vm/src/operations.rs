@@ -115,6 +115,7 @@ pub fn op_exp(left: &Val, right: &Val) -> Result<Val, Val> {
 
 pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
   Ok(match (left, right) {
+    (Val::Void, Val::Void) => true,
     (left, Val::Undefined | Val::Null) => matches!(left, Val::Undefined | Val::Null),
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool == right_bool,
     (Val::Number(left_number), Val::Number(right_number)) => left_number == right_number,
@@ -146,18 +147,13 @@ pub fn op_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
       true
     }
     (Val::Object(left_object), Val::Object(right_object)) => 'b: {
-      match (&left_object.prototype, &right_object.prototype) {
-        (None, None) => {}
-        (None, Some(_)) => return Ok(false),
-        (Some(_), None) => return Ok(false),
-        (Some(ref left_proto), Some(ref right_proto)) => {
-          if !op_eq_impl(left_proto, right_proto)? {
-            return Ok(false);
-          }
-        }
+      if !op_eq_impl(&left_object.prototype, &right_object.prototype)? {
+        return Ok(false);
       }
 
-      if left_object.prototype.is_some() || right_object.prototype.is_some() {
+      if left_object.prototype.typeof_() != VsType::Undefined
+        || right_object.prototype.typeof_() != VsType::Undefined
+      {
         return Err("TODO: class instance comparison".to_internal_error());
       }
 
@@ -260,6 +256,7 @@ pub fn op_ne(left: &Val, right: &Val) -> Result<Val, Val> {
 
 pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
   Ok(match (left, right) {
+    (Val::Void, Val::Void) => true,
     (Val::Undefined, Val::Undefined) => true,
     (Val::Null, Val::Null) => true,
     (Val::Bool(left_bool), Val::Bool(right_bool)) => left_bool == right_bool,
@@ -286,15 +283,8 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
       true
     }
     (Val::Object(left_object), Val::Object(right_object)) => 'b: {
-      match (&left_object.prototype, &right_object.prototype) {
-        (None, None) => {}
-        (None, Some(_)) => return Ok(false),
-        (Some(_), None) => return Ok(false),
-        (Some(ref left_proto), Some(ref right_proto)) => {
-          if !op_triple_eq_impl(left_proto, right_proto)? {
-            return Ok(false);
-          }
-        }
+      if !op_triple_eq_impl(&left_object.prototype, &right_object.prototype)? {
+        return Ok(false);
       }
 
       if std::ptr::eq(&**left_object, &**right_object) {
@@ -591,8 +581,8 @@ pub fn op_instance_of(left: &Val, right: &Val) -> Result<Val, Val> {
 
   let left_prototype = match left {
     Val::Object(obj) => match &obj.prototype {
-      Some(proto) => proto,
-      None => return Ok(false.to_val()),
+      Val::Void => return Ok(false.to_val()),
+      proto => proto,
     },
     Val::Null => return Ok(false.to_val()),
     _ => match left.typeof_() {

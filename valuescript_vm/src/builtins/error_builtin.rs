@@ -64,7 +64,7 @@ impl ToError for Val {
     VsObject {
       string_map: BTreeMap::from([("message".to_string(), self.to_val_string())]),
       symbol_map: Default::default(),
-      prototype: Some(make_error_prototype()),
+      prototype: make_error_prototype(),
     }
     .to_val()
   }
@@ -90,7 +90,7 @@ fn make_error_prototype() -> Val {
       ("toString".to_string(), ERROR_TO_STRING.to_val()),
     ]),
     symbol_map: Default::default(),
-    prototype: None,
+    prototype: Val::Void,
   }
   .to_val()
 }

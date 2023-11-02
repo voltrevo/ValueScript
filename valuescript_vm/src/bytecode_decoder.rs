@@ -131,7 +131,7 @@ impl BytecodeDecoder {
         VsObject {
           string_map,
           symbol_map,
-          prototype: None,
+          prototype: Val::Void,
         }
         .to_val()
       }

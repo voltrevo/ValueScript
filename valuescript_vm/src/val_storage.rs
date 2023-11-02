@@ -54,6 +54,10 @@ impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
   ) -> Result<Self, StorageError<SB>> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
+    match &res {
+      Ok(val) => println!("val: {}", val.pretty()),
+      Err(_) => println!("error"),
+    }
     assert!(reader.done());
 
     res
@@ -86,9 +90,7 @@ impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
         writer.write_vlq(obj.string_map.len());
 
         for (key, value) in obj.string_map.iter() {
-          let key_bytes = key.as_bytes();
-          writer.write_vlq(key_bytes.len());
-          writer.write_bytes(key_bytes);
+          writer.write_vlq_buf(key.as_bytes());
           write_to_entry(value, tx, writer)?;
         }
 
@@ -99,13 +101,7 @@ impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
           write_to_entry(value, tx, writer)?;
         }
 
-        match &obj.prototype {
-          None => writer.write_u8(0),
-          Some(val) => {
-            writer.write_u8(1);
-            write_to_entry(val, tx, writer)?
-          }
-        };
+        write_to_entry(&obj.prototype, tx, writer)?;
       }
       Val::Function(f) => {
         let VsFunction {
@@ -322,10 +318,7 @@ fn read_from_entry<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>>(
         symbol_map.insert(key, value);
       }
 
-      let prototype = match read_from_entry(tx, reader)? {
-        Val::Void => None,
-        val => Some(val),
-      };
+      let prototype = read_from_entry(tx, reader)?;
 
       VsObject {
         string_map,

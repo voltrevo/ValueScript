@@ -436,25 +436,23 @@ impl ValTrait for Val {
       Val::Object(object) => match key {
         Val::Symbol(symbol) => {
           if object.symbol_map.contains_key(symbol) {
-            return Some(true);
+            Some(true)
+          } else {
+            match &object.prototype {
+              Val::Void => Some(false),
+              prototype => prototype.has(key),
+            }
           }
-
-          if let Some(proto) = &object.prototype {
-            return proto.has(key);
-          }
-
-          Some(false)
         }
         _ => {
           if object.string_map.contains_key(&key.to_string()) {
-            return Some(true);
+            Some(true)
+          } else {
+            match &object.prototype {
+              Val::Void => Some(false),
+              prototype => prototype.has(key),
+            }
           }
-
-          if let Some(proto) = &object.prototype {
-            return proto.has(key);
-          }
-
-          Some(false)
         }
       },
       Val::Function(_) => Some(false),
@@ -507,11 +505,9 @@ impl ValTrait for Val {
       Val::Object(object) => {
         let mut res = String::new();
 
-        if let Some(proto) = &object.prototype {
-          if let Ok(name) = proto.sub(&"name".to_val()) {
-            if name.typeof_() == VsType::String {
-              res += &name.to_string();
-            }
+        if let Ok(name) = object.prototype.sub(&"name".to_val()) {
+          if name.typeof_() == VsType::String {
+            res += &name.to_string();
           }
         }
 
@@ -736,11 +732,9 @@ impl<'a> std::fmt::Display for PrettyVal<'a> {
         write!(f, " ]")
       }
       Val::Object(object) => {
-        if let Some(proto) = &object.prototype {
-          if let Ok(name) = proto.sub(&"name".to_val()) {
-            if name.typeof_() == VsType::String {
-              write!(f, "{} ", name)?;
-            }
+        if let Ok(name) = object.prototype.sub(&"name".to_val()) {
+          if name.typeof_() == VsType::String {
+            write!(f, "{} ", name)?;
           }
         }
 

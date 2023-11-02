@@ -11,7 +11,7 @@ use super::vs_value::Val;
 pub struct VsObject {
   pub string_map: BTreeMap<String, Val>,
   pub symbol_map: BTreeMap<VsSymbol, Val>,
-  pub prototype: Option<Val>, // TODO: Why optional? (Just use void/undefined?)
+  pub prototype: Val,
 }
 
 impl VsObject {
@@ -27,8 +27,8 @@ impl VsObject {
     }
 
     match &self.prototype {
-      Some(prototype) => prototype.sub(key).map_err(|e| e.to_string()).unwrap(), // TODO: Exception
-      None => Val::Undefined,
+      Val::Void => Val::Undefined,
+      prototype => prototype.sub(key).map_err(|e| e.to_string()).unwrap(), // TODO: Exception
     }
   }
 }

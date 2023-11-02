@@ -54,7 +54,7 @@ fn make_range_error_prototype() -> Val {
       ("toString".to_string(), Val::Static(&RANGE_ERROR_TO_STRING)),
     ]),
     symbol_map: Default::default(),
-    prototype: None,
+    prototype: Val::Void,
   }
   .to_val()
 }
@@ -81,7 +81,7 @@ pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
         },
       )]),
       symbol_map: Default::default(),
-      prototype: Some(make_range_error_prototype()),
+      prototype: make_range_error_prototype(),
     }
     .to_val(),
   )
@@ -113,7 +113,7 @@ impl ToRangeError for Val {
     VsObject {
       string_map: BTreeMap::from([("message".to_string(), self)]),
       symbol_map: Default::default(),
-      prototype: Some(make_range_error_prototype()),
+      prototype: make_range_error_prototype(),
     }
     .to_val()
   }
