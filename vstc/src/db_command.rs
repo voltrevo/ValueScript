@@ -1,13 +1,16 @@
 use std::{process::exit, rc::Rc};
 
 use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
-use valuescript_compiler::asm;
+use valuescript_compiler::{asm, assemble, compile_str};
 use valuescript_vm::{
   vs_value::{ToVal, Val},
-  DecoderMaker, VirtualMachine,
+  Bytecode, DecoderMaker, VirtualMachine,
 };
 
-use crate::to_bytecode::{format_from_path, to_bytecode};
+use crate::{
+  handle_diagnostics_cli::handle_diagnostics_cli,
+  to_bytecode::{format_from_path, to_bytecode},
+};
 
 pub fn db_command(args: &[String]) {
   let mut help_case = false;
@@ -40,11 +43,10 @@ pub fn db_command(args: &[String]) {
     Some("new") => db_new(&path, args.get(4..).unwrap_or_default()),
     Some("call") => db_call(&path, args.get(4..).unwrap_or_default()),
     Some("-i") => println!("TODO: use database {} interactively", path),
-    arg => {
+    arg => 'b: {
       if let Some(arg) = arg {
         if arg.starts_with("this.") {
-          println!("TODO: on database {}, run {}", path, arg);
-          return;
+          break 'b db_run_inline(&path, arg);
         }
       }
 
@@ -158,6 +160,49 @@ fn db_call(path: &str, args: &[String]) {
     .unwrap();
 
   match vm.run(None, &mut instance, fn_, args) {
+    Ok(res) => {
+      println!("{}", res.pretty());
+    }
+    Err(err) => {
+      println!("Uncaught exception: {}", err.pretty());
+      exit(1);
+    }
+  }
+
+  storage
+    .set_head(storage_head_ptr(b"state"), &instance)
+    .unwrap();
+}
+
+fn db_run_inline(path: &str, source: &str) {
+  let mut storage = Storage::new(SledBackend::open(path).unwrap());
+
+  let mut vm = VirtualMachine::default();
+
+  let mut instance = storage
+    .get_head::<Val>(storage_head_ptr(b"state"))
+    .unwrap()
+    .unwrap();
+
+  let compile_result = compile_str(&format!(
+    "export default function() {{ return (\n  {}\n); }}",
+    source
+  ));
+
+  for (path, diagnostics) in compile_result.diagnostics.iter() {
+    // TODO: Fix exit call
+    handle_diagnostics_cli(&path.path, diagnostics);
+  }
+
+  let bytecode = Rc::new(Bytecode::new(assemble(
+    &compile_result
+      .module
+      .expect("Should have exited if module is None"),
+  )));
+
+  let fn_ = bytecode.decoder(0).decode_val(&mut vec![]);
+
+  match vm.run(None, &mut instance, fn_, vec![]) {
     Ok(res) => {
       println!("{}", res.pretty());
     }

@@ -6,25 +6,45 @@ use url::Url;
 use valuescript_compiler::{Diagnostic, DiagnosticLevel};
 
 pub fn handle_diagnostics_cli(file_path: &String, diagnostics: &Vec<Diagnostic>) {
-  let current_dir = std::env::current_dir().expect("Failed to get current directory");
-  let abs_path = PathBuf::from(file_path);
-  let path = abs_path.strip_prefix(&current_dir).unwrap_or(&abs_path);
+  let path = 'b: {
+    if file_path == "(str)" {
+      // TODO: Fix this hack
+      break 'b None;
+    }
+
+    let current_dir = std::env::current_dir().expect("Failed to get current directory");
+    let abs_path = PathBuf::from(file_path);
+
+    Some(match abs_path.strip_prefix(&current_dir) {
+      Ok(p) => p.into(),
+      Err(_) => abs_path,
+    })
+  };
+
+  let path_str = match path {
+    Some(path) => path.to_string_lossy().to_string(),
+    None => file_path.clone(),
+  };
 
   let mut level_counts = HashMap::<DiagnosticLevel, usize>::new();
 
-  let text = std::fs::read_to_string(file_path).unwrap();
+  let text = if file_path == "(str)" {
+    None
+  } else {
+    Some(std::fs::read_to_string(file_path).unwrap())
+  };
+
   let mut lines = Vec::<String>::new();
 
   for diagnostic in diagnostics {
-    let (line, col) = pos_to_line_col(&text, diagnostic.span.lo.0);
+    let (line, col) = match &text {
+      Some(text) => pos_to_line_col(text, diagnostic.span.lo.0),
+      None => (0, 0),
+    };
 
     let line = format!(
       "{}:{}:{}: {}: {}",
-      path.display(),
-      line,
-      col,
-      diagnostic.level,
-      diagnostic.message
+      path_str, line, col, diagnostic.level, diagnostic.message
     );
 
     println!("{}", line);
