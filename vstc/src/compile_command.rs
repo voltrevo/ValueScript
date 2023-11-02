@@ -42,5 +42,5 @@ fn show_help() {
   println!("Compile ValueScript");
   println!();
   println!("USAGE:");
-  println!("    vstc compile <entry point>");
+  println!("  vstc compile <entry point>");
 }

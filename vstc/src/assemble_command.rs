@@ -41,5 +41,5 @@ fn show_help() {
   println!("Convert ValueScript assembly to bytecode");
   println!();
   println!("USAGE:");
-  println!("    vstc assemble <file>");
+  println!("  vstc assemble <file>");
 }

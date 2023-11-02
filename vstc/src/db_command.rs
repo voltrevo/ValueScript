@@ -56,9 +56,12 @@ pub fn db_command(args: &[String]) {
 }
 
 fn show_help() {
-  println!("vstc db [DB_PATH] [COMMAND] [ARGS]");
+  println!("vstc db");
   println!();
   println!("ValueScript database functionality");
+  println!();
+  println!("USAGE:");
+  println!("  vstc db [DB_PATH] [COMMAND] [ARGS]");
   println!();
   println!("Commands:");
   println!("  help, -h, --help          Show this message");

@@ -73,18 +73,18 @@ fn show_help() {
   println!("Run a ValueScript program");
   println!();
   println!("USAGE:");
-  println!("    vstc run [OPTIONS] <file>");
+  println!("  vstc run [OPTIONS] <file>");
   println!();
   println!("OPTIONS:");
-  println!("    --assembly");
-  println!("            Interpret <file> as assembly");
+  println!("  --assembly");
+  println!("    Interpret <file> as assembly");
   println!();
-  println!("    --bytecode");
-  println!("            Interpret <file> as bytecode");
+  println!("  --bytecode");
+  println!("    Interpret <file> as bytecode");
   println!();
-  println!("    --typescript");
-  println!("            Interpret <file> as typescript");
+  println!("  --typescript");
+  println!("    Interpret <file> as typescript");
   println!();
   println!("NOTE:");
-  println!("    <file> will be interpreted based on file extension if not otherwise specified");
+  println!("  <file> will be interpreted based on file extension if not otherwise specified");
 }
