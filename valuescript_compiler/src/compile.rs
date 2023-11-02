@@ -27,3 +27,21 @@ where
 
   result
 }
+
+pub fn compile_str(source: &str) -> CompileResult {
+  compile(
+    ResolvedPath {
+      path: "(str)".into(),
+    },
+    |path| {
+      if path == "(str)" {
+        Ok(source.into())
+      } else {
+        Err(format!(
+          "Unknown path {} (no filesystem access for compile_str)",
+          path
+        ))
+      }
+    },
+  )
+}

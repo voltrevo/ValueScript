@@ -2,12 +2,15 @@ use std::{
   collections::HashMap,
   fmt::Write,
   hash::{Hash as HashTrait, Hasher},
+  rc::Rc,
 };
 
 use num_bigint::BigInt;
+use valuescript_vm::{vs_value::Val, Bytecode, DecoderMaker};
 
 use crate::{
-  assembler::ValueType, expression_compiler::CompiledExpression, instruction::RegisterVisitMut,
+  assemble, assembler::ValueType, expression_compiler::CompiledExpression,
+  instruction::RegisterVisitMut, parse_module,
 };
 
 pub use crate::instruction::{Instruction, InstructionFieldMut};
@@ -327,6 +330,14 @@ pub enum ContentHashable {
 #[derive(Hash, PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct Pointer {
   pub name: String,
+}
+
+impl From<&str> for Pointer {
+  fn from(name: &str) -> Self {
+    Pointer {
+      name: name.to_string(),
+    }
+  }
 }
 
 impl StructuredFormattable for Pointer {
@@ -853,4 +864,10 @@ impl Object {
 
     result
   }
+}
+
+pub fn inline(source: &str) -> Val {
+  let bytecode = Rc::new(Bytecode::new(assemble(&parse_module(source))));
+
+  bytecode.decoder(0).decode_val(&mut vec![])
 }

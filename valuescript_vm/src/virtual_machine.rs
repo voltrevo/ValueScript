@@ -1,9 +1,11 @@
+use std::mem::take;
 use std::rc::Rc;
 
 use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::bytecode::Bytecode;
 use crate::bytecode::DecoderMaker;
 use crate::first_stack_frame::FirstStackFrame;
+use crate::stack_frame::CallResult;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::StackFrame;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
@@ -25,27 +27,26 @@ impl Default for VirtualMachine {
 impl VirtualMachine {
   pub fn run(
     &mut self,
-    bytecode: Rc<Bytecode>,
     step_limit: Option<usize>,
-    params: &[Val],
+    this: &mut Val,
+    fn_: Val,
+    args: Vec<Val>,
   ) -> Result<Val, Val> {
-    let mut bd = bytecode.decoder(0);
-
-    let main_fn = bd.decode_val(&mut Vec::new());
-
-    let mut frame = match main_fn.load_function() {
+    let mut frame = match fn_.load_function() {
       LoadFunctionResult::StackFrame(f) => f,
       _ => return Err("bytecode does start with function".to_internal_error()),
     };
 
-    for p in params {
-      frame.write_param(p.clone());
+    frame.write_param(take(this));
+
+    for a in args {
+      frame.write_param(a);
     }
 
     self.push(frame);
 
-    match step_limit {
-      Some(step_limit) => {
+    let res = match step_limit {
+      Some(step_limit) => 'b: {
         let mut step_count = 0;
 
         while step_count < step_limit {
@@ -53,20 +54,29 @@ impl VirtualMachine {
           step_count += 1;
 
           if self.stack.is_empty() {
-            return Ok(self.frame.get_call_result().return_);
+            break 'b self.frame.get_call_result();
           }
         }
 
-        Err("step limit reached".to_internal_error())
+        return Err("step limit reached".to_internal_error());
       }
       None => {
         while !self.stack.is_empty() {
           self.step()?;
         }
 
-        Ok(self.frame.get_call_result().return_)
+        self.frame.get_call_result()
       }
-    }
+    };
+
+    let CallResult {
+      return_,
+      this: updated_this,
+    } = res;
+
+    *this = updated_this;
+
+    Ok(return_)
   }
 
   pub fn step(&mut self) -> Result<(), Val> {

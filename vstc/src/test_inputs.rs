@@ -9,8 +9,9 @@ mod tests {
   use valuescript_compiler::asm::Structured;
   use valuescript_compiler::compile;
   use valuescript_compiler::{assemble, parse_module};
-  use valuescript_vm::VirtualMachine;
+  use valuescript_vm::vs_value::Val;
   use valuescript_vm::{Bytecode, ValTrait};
+  use valuescript_vm::{DecoderMaker, VirtualMachine};
 
   use crate::handle_diagnostics_cli::handle_diagnostics_cli;
   use crate::resolve_entry_path::resolve_entry_path;
@@ -111,7 +112,12 @@ mod tests {
 
           let mut vm = VirtualMachine::default();
 
-          let result = vm.run(bytecode, Some(2_000_000), &[]);
+          let result = vm.run(
+            Some(2_000_000),
+            &mut Val::Undefined,
+            bytecode.decoder(0).decode_val(&mut vec![]),
+            vec![],
+          );
 
           let result_string = match result {
             Ok(val) => val.codify(),

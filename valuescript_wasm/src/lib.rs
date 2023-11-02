@@ -8,7 +8,7 @@ use valuescript_compiler::{
 };
 use valuescript_vm::{
   vs_value::{ToVal, Val},
-  Bytecode, LoadFunctionResult, ValTrait, VirtualMachine,
+  Bytecode, DecoderMaker, LoadFunctionResult, ValTrait, VirtualMachine,
 };
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -130,7 +130,12 @@ fn run_to_result(entry_point: &str, read_file: &js_sys::Function, args: &str) ->
     }
   };
 
-  let vm_result = vm.run(bytecode, None, &val_args);
+  let vm_result = vm.run(
+    None,
+    &mut Val::Undefined,
+    bytecode.decoder(0).decode_val(&mut vec![]),
+    val_args,
+  );
 
   RunResult {
     diagnostics: HashMap::default(),

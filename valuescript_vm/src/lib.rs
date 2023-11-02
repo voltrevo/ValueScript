@@ -29,7 +29,7 @@ mod vs_storage_ptr;
 mod vs_symbol;
 pub mod vs_value;
 
-pub use bytecode::Bytecode;
+pub use bytecode::{Bytecode, DecoderMaker};
 pub use string_methods::unicode_at;
 pub use virtual_machine::VirtualMachine;
 pub use vs_symbol::VsSymbol;

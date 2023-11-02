@@ -1,8 +1,8 @@
 use std::process::exit;
 use std::rc::Rc;
 
-use valuescript_vm::vs_value::Val;
 use valuescript_vm::VirtualMachine;
+use valuescript_vm::{vs_value::Val, DecoderMaker};
 
 use crate::to_bytecode::{format_from_path, to_bytecode, RunFormat};
 
@@ -41,7 +41,12 @@ pub fn run_command(args: &Vec<String>) {
     .map(|a| Val::String(Rc::from(a.clone())))
     .collect();
 
-  match vm.run(bytecode, None, &val_args) {
+  match vm.run(
+    None,
+    &mut Val::Undefined,
+    bytecode.decoder(0).decode_val(&mut vec![]),
+    val_args,
+  ) {
     Ok(Val::Undefined) => {}
     Ok(result) => {
       println!("{}", result.pretty());

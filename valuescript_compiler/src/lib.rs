@@ -24,8 +24,8 @@ mod visit_pointers;
 
 pub use assembler::assemble;
 pub use assembly_parser::parse_module;
-pub use compile::compile;
 pub use compile::CompileResult;
+pub use compile::{compile, compile_str};
 pub use diagnostic::Diagnostic;
 pub use diagnostic::DiagnosticLevel;
 pub use gather_modules::gather_modules;
