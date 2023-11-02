@@ -1,7 +1,7 @@
 use std::fmt::{self, Debug};
 use std::{cell::RefCell, error::Error, rc::Weak};
 
-use crate::storage_tx::StorageTx;
+use crate::storage_tx::StorageReader;
 use crate::{StorageBackend, StorageEntity, StorageEntryPtr};
 
 pub struct StorageAutoPtr<SB: StorageBackend, SE: StorageEntity<SB>> {

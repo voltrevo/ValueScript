@@ -16,7 +16,7 @@ mod tests;
 
 pub use self::storage::Storage;
 pub use self::storage_backend::{StorageBackend, StorageError};
-pub use self::storage_tx::{StorageTx, StorageTxMut};
+pub use self::storage_tx::{StorageReader, StorageTxMut};
 pub use memory_backend::MemoryBackend;
 pub use rc_key::RcKey;
 pub use sled_backend::SledBackend;

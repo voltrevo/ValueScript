@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::storage_auto_ptr::StorageAutoPtr;
 use crate::storage_entity::StorageEntity;
 use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
-use crate::{StorageBackend, StorageError, StorageTx, StorageTxMut};
+use crate::{StorageBackend, StorageError, StorageReader, StorageTxMut};
 
 pub struct Storage<SB: StorageBackend> {
   pub(crate) sb: Rc<RefCell<SB>>,

@@ -1,10 +1,10 @@
 use std::{cell::RefCell, error::Error, rc::Weak};
 
-use crate::storage_tx::{StorageTx, StorageTxMut};
+use crate::storage_tx::{StorageReader, StorageTxMut};
 
 pub trait StorageBackend: Sized {
   type CustomError;
-  type Tx<'a>: StorageTx<'a, Self>;
+  type Tx<'a>: StorageReader<'a, Self>;
   type TxMut<'a>: StorageTxMut<'a, Self>;
 
   fn transaction<F, T>(&self, self_weak: Weak<RefCell<Self>>, f: F) -> Result<T, Box<dyn Error>>

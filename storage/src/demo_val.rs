@@ -6,7 +6,7 @@ use crate::storage_backend::StorageError;
 use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
 use crate::storage_ptr::StorageEntryPtr;
-use crate::storage_tx::{StorageTx, StorageTxMut};
+use crate::storage_tx::{StorageReader, StorageTxMut};
 use crate::{Storage, StorageBackend};
 
 const NUMBER_TAG: u8 = 0;
@@ -63,7 +63,7 @@ impl DemoVal {
     Ok(())
   }
 
-  fn read_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+  fn read_from_entry<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
     _tx: &mut Tx,
     reader: &mut StorageEntryReader,
   ) -> Result<DemoVal, StorageError<SB>> {
@@ -92,7 +92,7 @@ impl DemoVal {
     })
   }
 
-  fn numbers_impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+  fn numbers_impl<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
     &self,
     tx: &mut Tx,
   ) -> Result<Vec<u64>, StorageError<SB>> {
@@ -146,7 +146,7 @@ impl<SB: StorageBackend> StorageEntity<SB> for DemoVal {
     Ok(entry)
   }
 
-  fn from_storage_entry<'a, Tx: StorageTx<'a, SB>>(
+  fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
     tx: &mut Tx,
     entry: StorageEntry,
   ) -> Result<Self, StorageError<SB>> {

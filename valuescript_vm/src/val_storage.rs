@@ -5,7 +5,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use storage::{
   RcKey, StorageBackend, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter,
-  StorageError, StorageTx, StorageTxMut,
+  StorageError, StorageReader, StorageTxMut,
 };
 
 use crate::{
@@ -48,7 +48,7 @@ impl Tag {
 }
 
 impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
-  fn from_storage_entry<'a, Tx: StorageTx<'a, SB>>(
+  fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
     tx: &mut Tx,
     entry: StorageEntry,
   ) -> Result<Self, StorageError<SB>> {
@@ -266,7 +266,7 @@ fn write_ptr_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>
   Ok(())
 }
 
-fn read_from_entry<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>>(
+fn read_from_entry<'a, SB: StorageBackend + 'static, Tx: StorageReader<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Val, StorageError<SB>> {
@@ -401,7 +401,7 @@ fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> Result<VsSymbol, B
   Ok(FromPrimitive::from_usize(reader.read_vlq()?).unwrap())
 }
 
-fn read_ref_bytecode_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+fn read_ref_bytecode_from_entry<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Rc<Bytecode>, StorageError<SB>> {

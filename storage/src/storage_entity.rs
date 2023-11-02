@@ -1,7 +1,7 @@
 use crate::{
   storage_backend::StorageError,
   storage_entry::StorageEntry,
-  storage_tx::{StorageTx, StorageTxMut},
+  storage_tx::{StorageReader, StorageTxMut},
   StorageBackend,
 };
 
@@ -11,7 +11,7 @@ pub trait StorageEntity<SB: StorageBackend>: Sized {
     tx: &mut Tx,
   ) -> Result<StorageEntry, StorageError<SB>>;
 
-  fn from_storage_entry<'a, Tx: StorageTx<'a, SB>>(
+  fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
     tx: &mut Tx,
     entry: StorageEntry,
   ) -> Result<Self, StorageError<SB>>;

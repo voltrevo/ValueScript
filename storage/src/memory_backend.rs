@@ -4,7 +4,7 @@ use crate::{
   rc_key::RcKey,
   storage_backend::StorageError,
   storage_ptr::StorageEntryPtr,
-  storage_tx::{StorageTx, StorageTxMut},
+  storage_tx::{StorageReader, StorageTxMut},
   StorageAutoPtr, StorageBackend, StorageEntity, StoragePtr,
 };
 
@@ -84,7 +84,7 @@ pub struct MemoryTx<'a> {
   storage: &'a MemoryBackend,
 }
 
-impl StorageTx<'_, MemoryBackend> for MemoryTx<'_> {
+impl StorageReader<'_, MemoryBackend> for MemoryTx<'_> {
   fn read_bytes<T>(
     &self,
     ptr: StoragePtr<T>,

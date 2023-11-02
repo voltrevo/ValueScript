@@ -8,7 +8,7 @@ use crate::{
   StorageEntryPtr, StorageHeadPtr, StoragePtr,
 };
 
-pub trait StorageTx<'a, SB: StorageBackend>: Sized {
+pub trait StorageReader<'a, SB: StorageBackend>: Sized {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>>;
 
   fn read<T: for<'de> Deserialize<'de>>(
@@ -245,7 +245,7 @@ pub trait StorageTxMut<'a, SB: StorageBackend>: Sized {
   }
 }
 
-impl<'a, SB: StorageBackend, TxMut: StorageTxMut<'a, SB>> StorageTx<'a, SB> for TxMut {
+impl<'a, SB: StorageBackend, TxMut: StorageTxMut<'a, SB>> StorageReader<'a, SB> for TxMut {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>> {
     TxMut::read_bytes(self, ptr)
   }

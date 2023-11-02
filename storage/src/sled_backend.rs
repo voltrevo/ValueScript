@@ -4,7 +4,7 @@ use crate::{
   rc_key::RcKey,
   storage_backend::StorageError,
   storage_ptr::StorageEntryPtr,
-  storage_tx::{StorageTx, StorageTxMut},
+  storage_tx::{StorageReader, StorageTxMut},
   StorageAutoPtr, StorageBackend, StorageEntity, StoragePtr,
 };
 
@@ -108,7 +108,7 @@ pub struct SledTx<'a> {
   tx: &'a sled::transaction::TransactionalTree,
 }
 
-impl<'a> StorageTx<'a, SledBackend> for SledTx<'a> {
+impl<'a> StorageReader<'a, SledBackend> for SledTx<'a> {
   fn read_bytes<T>(
     &self,
     ptr: StoragePtr<T>,
