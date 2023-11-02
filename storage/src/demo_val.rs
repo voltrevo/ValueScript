@@ -6,7 +6,7 @@ use crate::storage_backend::StorageError;
 use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
 use crate::storage_ptr::StorageEntryPtr;
-use crate::storage_tx::StorageTx;
+use crate::storage_tx::{StorageTx, StorageTxMut};
 use crate::{Storage, StorageBackend};
 
 const NUMBER_TAG: u8 = 0;
@@ -27,11 +27,11 @@ impl DemoVal {
   ) -> Result<Vec<u64>, Box<dyn Error>> {
     storage
       .sb
-      .borrow_mut()
+      .borrow()
       .transaction(Rc::downgrade(&storage.sb), |sb| self.numbers_impl(sb))
   }
 
-  fn write_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+  fn write_to_entry<'a, SB: StorageBackend, Tx: StorageTxMut<'a, SB>>(
     &self,
     tx: &mut Tx,
     entry: &mut StorageEntry,
@@ -115,8 +115,11 @@ impl DemoVal {
   }
 }
 
-impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> for DemoVal {
-  fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, StorageError<SB>> {
+impl<SB: StorageBackend> StorageEntity<SB> for DemoVal {
+  fn to_storage_entry<'a, Tx: StorageTxMut<'a, SB>>(
+    &self,
+    tx: &mut Tx,
+  ) -> Result<StorageEntry, StorageError<SB>> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: Vec::new(),
@@ -143,7 +146,10 @@ impl<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> fo
     Ok(entry)
   }
 
-  fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, StorageError<SB>> {
+  fn from_storage_entry<'a, Tx: StorageTx<'a, SB>>(
+    tx: &mut Tx,
+    entry: StorageEntry,
+  ) -> Result<Self, StorageError<SB>> {
     Self::read_from_entry(tx, &mut StorageEntryReader::new(&entry))
   }
 }

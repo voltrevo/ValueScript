@@ -5,7 +5,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use storage::{
   RcKey, StorageBackend, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter,
-  StorageError, StorageTx,
+  StorageError, StorageTx, StorageTxMut,
 };
 
 use crate::{
@@ -47,8 +47,11 @@ impl Tag {
   }
 }
 
-impl<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>> StorageEntity<'a, SB, Tx> for Val {
-  fn from_storage_entry(tx: &mut Tx, entry: StorageEntry) -> Result<Self, StorageError<SB>> {
+impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
+  fn from_storage_entry<'a, Tx: StorageTx<'a, SB>>(
+    tx: &mut Tx,
+    entry: StorageEntry,
+  ) -> Result<Self, StorageError<SB>> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
     assert!(reader.done());
@@ -56,7 +59,10 @@ impl<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>> StorageEntity<'a, 
     res
   }
 
-  fn to_storage_entry(&self, tx: &mut Tx) -> Result<StorageEntry, StorageError<SB>> {
+  fn to_storage_entry<'a, TxMut: StorageTxMut<'a, SB>>(
+    &self,
+    tx: &mut TxMut,
+  ) -> Result<StorageEntry, StorageError<SB>> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: vec![],
@@ -156,7 +162,7 @@ impl<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>> StorageEntity<'a, 
   }
 }
 
-fn write_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>>(
+fn write_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>>(
   val: &Val,
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
@@ -246,7 +252,7 @@ fn write_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>>(
   Ok(())
 }
 
-fn write_ptr_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTx<'a, SB>>(
+fn write_ptr_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>>(
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   key: RcKey,
@@ -413,7 +419,7 @@ fn read_ref_bytecode_from_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
   Ok(Rc::new(Bytecode::from_storage_entry(tx, entry)?))
 }
 
-fn write_ref_bytecode_to_entry<'a, SB: StorageBackend, Tx: StorageTx<'a, SB>>(
+fn write_ref_bytecode_to_entry<'a, SB: StorageBackend, Tx: StorageTxMut<'a, SB>>(
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   bytecode: &Rc<Bytecode>,

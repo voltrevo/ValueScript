@@ -7,7 +7,7 @@ use std::{
 };
 
 use valuescript_compiler::{assemble, compile, resolve_path, ResolvedPath};
-use valuescript_vm::{Bytecode, ValTrait, VirtualMachine};
+use valuescript_vm::{vs_value::Val, Bytecode, DecoderMaker, ValTrait, VirtualMachine};
 
 fn main() {
   let exe_path = std::env::current_exe().unwrap();
@@ -82,7 +82,12 @@ fn main() {
 
     while Instant::now() - start < Duration::from_secs(1) {
       let before = Instant::now();
-      let result = vm.run(bytecode.clone(), None, &[]);
+      let result = vm.run(
+        None,
+        &mut Val::Undefined,
+        bytecode.decoder(0).decode_val(&mut vec![]),
+        vec![],
+      );
       let after = Instant::now();
 
       let duration_ms = after.duration_since(before).as_millis();

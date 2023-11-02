@@ -9,6 +9,54 @@ use crate::{
 };
 
 pub trait StorageTx<'a, SB: StorageBackend>: Sized {
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>>;
+
+  fn read<T: for<'de> Deserialize<'de>>(
+    &mut self,
+    ptr: StoragePtr<T>,
+  ) -> Result<Option<T>, StorageError<SB>> {
+    let data = match self.read_bytes(ptr)? {
+      Some(data) => data,
+      None => return Ok(None),
+    };
+
+    bincode::deserialize(&data)
+      .map(Some)
+      .map_err(StorageError::from)
+  }
+
+  fn get_auto_ptr<SE: StorageEntity<SB>>(&mut self, ptr: StorageEntryPtr)
+    -> StorageAutoPtr<SB, SE>;
+
+  fn read_or_err<T: for<'de> Deserialize<'de>>(
+    &mut self,
+    ptr: StoragePtr<T>,
+  ) -> Result<T, StorageError<SB>> {
+    match self.read(ptr)? {
+      Some(data) => Ok(data),
+      None => Err(StorageError::Error("Ptr not found".into())),
+    }
+  }
+
+  fn get_head<SE: StorageEntity<SB>>(
+    &mut self,
+    head_ptr: StorageHeadPtr,
+  ) -> Result<Option<SE>, StorageError<SB>> {
+    let entry_ptr = match self.read(head_ptr)? {
+      Some(entry_ptr) => entry_ptr,
+      None => return Ok(None),
+    };
+
+    let entry = match self.read(entry_ptr)? {
+      Some(entry) => entry,
+      None => return Ok(None),
+    };
+
+    SE::from_storage_entry(self, entry).map(Some)
+  }
+}
+
+pub trait StorageTxMut<'a, SB: StorageBackend>: Sized {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
   fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>>;
@@ -32,10 +80,8 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
       .map_err(StorageError::from)
   }
 
-  fn get_auto_ptr<SE: for<'b> StorageEntity<'b, SB, SB::Tx<'b>>>(
-    &mut self,
-    ptr: StorageEntryPtr,
-  ) -> StorageAutoPtr<SB, SE>;
+  fn get_auto_ptr<SE: StorageEntity<SB>>(&mut self, ptr: StorageEntryPtr)
+    -> StorageAutoPtr<SB, SE>;
 
   fn read_or_err<T: for<'de> Deserialize<'de>>(
     &mut self,
@@ -60,7 +106,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     self.write_bytes(ptr, bytes)
   }
 
-  fn get_head<SE: StorageEntity<'a, SB, Self>>(
+  fn get_head<SE: StorageEntity<SB>>(
     &mut self,
     head_ptr: StorageHeadPtr,
   ) -> Result<Option<SE>, StorageError<SB>> {
@@ -77,7 +123,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     SE::from_storage_entry(self, entry).map(Some)
   }
 
-  fn set_head<SE: StorageEntity<'a, SB, Self>>(
+  fn set_head<SE: StorageEntity<SB>>(
     &mut self,
     head_ptr: StorageHeadPtr,
     value: &SE,
@@ -100,7 +146,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     self.write(head_ptr, None)
   }
 
-  fn store<SE: StorageEntity<'a, SB, Self>>(
+  fn store<SE: StorageEntity<SB>>(
     &mut self,
     value: &SE,
   ) -> Result<StorageEntryPtr, StorageError<SB>> {
@@ -185,7 +231,7 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     self.cache().get(&key).cloned()
   }
 
-  fn store_and_cache<SE: StorageEntity<'a, SB, Self>>(
+  fn store_and_cache<SE: StorageEntity<SB>>(
     &mut self,
     value: &SE,
     key: RcKey,
@@ -196,5 +242,18 @@ pub trait StorageTx<'a, SB: StorageBackend>: Sized {
     assert!(pre_existing.is_none());
 
     Ok(ptr)
+  }
+}
+
+impl<'a, SB: StorageBackend, TxMut: StorageTxMut<'a, SB>> StorageTx<'a, SB> for TxMut {
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>> {
+    TxMut::read_bytes(self, ptr)
+  }
+
+  fn get_auto_ptr<SE: StorageEntity<SB>>(
+    &mut self,
+    ptr: StorageEntryPtr,
+  ) -> StorageAutoPtr<SB, SE> {
+    TxMut::get_auto_ptr(self, ptr)
   }
 }

@@ -1,18 +1,23 @@
 use std::{cell::RefCell, error::Error, rc::Weak};
 
-use crate::storage_tx::StorageTx;
+use crate::storage_tx::{StorageTx, StorageTxMut};
 
 pub trait StorageBackend: Sized {
   type CustomError;
   type Tx<'a>: StorageTx<'a, Self>;
+  type TxMut<'a>: StorageTxMut<'a, Self>;
 
-  fn transaction<F, T>(
+  fn transaction<F, T>(&self, self_weak: Weak<RefCell<Self>>, f: F) -> Result<T, Box<dyn Error>>
+  where
+    F: Fn(&mut Self::Tx<'_>) -> Result<T, StorageError<Self>>;
+
+  fn transaction_mut<F, T>(
     &mut self,
     self_weak: Weak<RefCell<Self>>,
     f: F,
   ) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::Tx<'_>) -> Result<T, StorageError<Self>>;
+    F: Fn(&mut Self::TxMut<'_>) -> Result<T, StorageError<Self>>;
 
   fn is_empty(&self) -> bool;
 
