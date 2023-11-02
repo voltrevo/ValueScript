@@ -4,6 +4,7 @@ mod storage;
 #[cfg(test)]
 mod demo_val;
 
+mod errors;
 mod rc_key;
 mod sled_backend;
 mod storage_auto_ptr;
@@ -15,8 +16,9 @@ mod storage_tx;
 mod tests;
 
 pub use self::storage::Storage;
-pub use self::storage_backend::{StorageBackend, StorageError};
+pub use self::storage_backend::StorageBackend;
 pub use self::storage_tx::{StorageReader, StorageTxMut};
+pub use errors::GenericError;
 pub use memory_backend::MemoryBackend;
 pub use rc_key::RcKey;
 pub use sled_backend::SledBackend;

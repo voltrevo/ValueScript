@@ -2,10 +2,11 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 
+use crate::errors::error_str;
 use crate::storage_auto_ptr::StorageAutoPtr;
 use crate::storage_entity::StorageEntity;
 use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
-use crate::{StorageBackend, StorageError, StorageReader, StorageTxMut};
+use crate::{StorageBackend, StorageReader, StorageTxMut};
 
 pub struct Storage<SB: StorageBackend> {
   pub(crate) sb: Rc<RefCell<SB>>,
@@ -31,9 +32,7 @@ impl<SB: StorageBackend> Storage<SB> {
   pub fn get<SE: StorageEntity<SB>>(&self, ptr: StorageEntryPtr) -> Result<SE, Box<dyn Error>> {
     // TODO: Avoid going through a transaction when read-only
     self.sb.borrow().transaction(Rc::downgrade(&self.sb), |sb| {
-      let entry = sb
-        .read(ptr)?
-        .ok_or(StorageError::Error("Ptr not found".into()))?;
+      let entry = sb.read(ptr)?.ok_or(error_str("Ptr not found"))?;
 
       SE::from_storage_entry(sb, entry)
     })

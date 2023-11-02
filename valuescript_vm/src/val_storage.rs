@@ -4,8 +4,8 @@ use num_bigint::BigInt;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use storage::{
-  RcKey, StorageBackend, StorageEntity, StorageEntry, StorageEntryReader, StorageEntryWriter,
-  StorageError, StorageReader, StorageTxMut,
+  GenericError, RcKey, StorageBackend, StorageEntity, StorageEntry, StorageEntryReader,
+  StorageEntryWriter, StorageReader, StorageTxMut,
 };
 
 use crate::{
@@ -51,7 +51,7 @@ impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
   fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
     tx: &mut Tx,
     entry: StorageEntry,
-  ) -> Result<Self, StorageError<SB>> {
+  ) -> Result<Self, GenericError> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
     match &res {
@@ -66,7 +66,7 @@ impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
   fn to_storage_entry<'a, TxMut: StorageTxMut<'a, SB>>(
     &self,
     tx: &mut TxMut,
-  ) -> Result<StorageEntry, StorageError<SB>> {
+  ) -> Result<StorageEntry, GenericError> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: vec![],
@@ -162,7 +162,7 @@ fn write_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>>(
   val: &Val,
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
-) -> Result<(), StorageError<SB>> {
+) -> Result<(), GenericError> {
   match val {
     Val::Void => {
       writer.write_u8(Tag::Void.to_byte());
@@ -253,7 +253,7 @@ fn write_ptr_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>
   writer: &mut StorageEntryWriter,
   key: RcKey,
   val: &Val,
-) -> Result<(), StorageError<SB>> {
+) -> Result<(), GenericError> {
   if let Some(ptr) = tx.cache_get(key.clone()) {
     writer.write_u8(Tag::StoragePtr.to_byte());
     writer.entry.refs.push(ptr);
@@ -269,7 +269,7 @@ fn write_ptr_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>
 fn read_from_entry<'a, SB: StorageBackend + 'static, Tx: StorageReader<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
-) -> Result<Val, StorageError<SB>> {
+) -> Result<Val, GenericError> {
   let tag = Tag::from_byte(reader.read_u8()?)?;
 
   Ok(match tag {
@@ -284,9 +284,7 @@ fn read_from_entry<'a, SB: StorageBackend + 'static, Tx: StorageReader<'a, SB>>(
     Tag::Number => Val::Number(reader.read_u8_array().map(f64::from_le_bytes)?),
     Tag::BigInt => BigInt::from_signed_bytes_le(&reader.read_vlq_buf()?).to_val(),
     Tag::Symbol => Val::Symbol(FromPrimitive::from_usize(reader.read_vlq()?).unwrap()),
-    Tag::String => String::from_utf8(reader.read_vlq_buf()?)
-      .map_err(StorageError::from)?
-      .to_val(),
+    Tag::String => String::from_utf8(reader.read_vlq_buf()?)?.to_val(),
     Tag::Array => {
       let len = reader.read_vlq()?;
       let mut items = Vec::new();
@@ -404,7 +402,7 @@ fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> Result<VsSymbol, B
 fn read_ref_bytecode_from_entry<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
-) -> Result<Rc<Bytecode>, StorageError<SB>> {
+) -> Result<Rc<Bytecode>, GenericError> {
   let ptr = reader.read_ref()?;
   let entry = tx.read_or_err(ptr)?;
 
@@ -416,7 +414,7 @@ fn write_ref_bytecode_to_entry<'a, SB: StorageBackend, Tx: StorageTxMut<'a, SB>>
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   bytecode: &Rc<Bytecode>,
-) -> Result<(), StorageError<SB>> {
+) -> Result<(), GenericError> {
   let key = RcKey::from(bytecode.clone());
 
   if let Some(ptr) = tx.cache_get(key.clone()) {

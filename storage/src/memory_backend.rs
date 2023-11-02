@@ -2,10 +2,9 @@ use std::{cell::RefCell, collections::HashMap, error::Error, rc::Weak};
 
 use crate::{
   rc_key::RcKey,
-  storage_backend::StorageError,
   storage_ptr::StorageEntryPtr,
   storage_tx::{StorageReader, StorageTxMut},
-  StorageBackend, StoragePtr,
+  GenericError, StorageBackend, StoragePtr,
 };
 
 #[derive(Default)]
@@ -28,17 +27,14 @@ impl StorageBackend for MemoryBackend {
 
   fn transaction<F, T>(&self, self_weak: Weak<RefCell<Self>>, f: F) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::Tx<'_>) -> Result<T, StorageError<Self>>,
+    F: Fn(&mut Self::Tx<'_>) -> Result<T, GenericError>,
   {
     let mut handle = MemoryTx {
       backend: self_weak,
       storage: self,
     };
 
-    f(&mut handle).map_err(|e| match e {
-      StorageError::<MemoryBackend>::CustomError(e) => e,
-      StorageError::<MemoryBackend>::Error(e) => e,
-    })
+    f(&mut handle)
   }
 
   fn transaction_mut<F, T>(
@@ -47,7 +43,7 @@ impl StorageBackend for MemoryBackend {
     f: F,
   ) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::TxMut<'_>) -> Result<T, StorageError<Self>>,
+    F: Fn(&mut Self::TxMut<'_>) -> Result<T, GenericError>,
   {
     let mut handle = MemoryTxMut {
       backend: self_weak,
@@ -56,15 +52,9 @@ impl StorageBackend for MemoryBackend {
       storage: self,
     };
 
-    let res = f(&mut handle).map_err(|e| match e {
-      StorageError::<MemoryBackend>::CustomError(e) => e,
-      StorageError::<MemoryBackend>::Error(e) => e,
-    })?;
+    let res = f(&mut handle)?;
 
-    handle.flush_ref_deltas().map_err(|e| match e {
-      StorageError::<MemoryBackend>::CustomError(e) => e,
-      StorageError::<MemoryBackend>::Error(e) => e,
-    })?;
+    handle.flush_ref_deltas()?;
 
     Ok(res)
   }
@@ -85,10 +75,7 @@ pub struct MemoryTx<'a> {
 }
 
 impl StorageReader<'_, MemoryBackend> for MemoryTx<'_> {
-  fn read_bytes<T>(
-    &self,
-    ptr: StoragePtr<T>,
-  ) -> Result<Option<Vec<u8>>, StorageError<MemoryBackend>> {
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
     Ok(self.storage.data.get(&ptr.data).cloned())
   }
 
@@ -105,10 +92,7 @@ pub struct MemoryTxMut<'a> {
 }
 
 impl<'a> StorageReader<'a, MemoryBackend> for MemoryTxMut<'a> {
-  fn read_bytes<T>(
-    &self,
-    ptr: StoragePtr<T>,
-  ) -> Result<Option<Vec<u8>>, StorageError<MemoryBackend>> {
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
     Ok(self.storage.data.get(&ptr.data).cloned())
   }
 
@@ -130,7 +114,7 @@ impl<'a> StorageTxMut<'a, MemoryBackend> for MemoryTxMut<'a> {
     &mut self,
     ptr: StoragePtr<T>,
     data: Option<Vec<u8>>,
-  ) -> Result<(), StorageError<MemoryBackend>> {
+  ) -> Result<(), GenericError> {
     match data {
       Some(data) => self.storage.data.insert(ptr.data, data),
       None => self.storage.data.remove(&ptr.data),

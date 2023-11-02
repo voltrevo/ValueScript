@@ -2,12 +2,11 @@ use std::error::Error;
 use std::rc::Rc;
 
 use crate::rc_key::RcKey;
-use crate::storage_backend::StorageError;
 use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
 use crate::storage_ptr::StorageEntryPtr;
 use crate::storage_tx::{StorageReader, StorageTxMut};
-use crate::{Storage, StorageBackend};
+use crate::{GenericError, Storage, StorageBackend};
 
 const NUMBER_TAG: u8 = 0;
 const ARRAY_TAG: u8 = 1;
@@ -35,7 +34,7 @@ impl DemoVal {
     &self,
     tx: &mut Tx,
     entry: &mut StorageEntry,
-  ) -> Result<(), StorageError<SB>> {
+  ) -> Result<(), GenericError> {
     match self {
       DemoVal::Number(n) => {
         entry.data.push(NUMBER_TAG);
@@ -66,7 +65,7 @@ impl DemoVal {
   fn read_from_entry<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
     _tx: &mut Tx,
     reader: &mut StorageEntryReader,
-  ) -> Result<DemoVal, StorageError<SB>> {
+  ) -> Result<DemoVal, GenericError> {
     let tag = reader.read_u8()?;
 
     Ok(match tag {
@@ -95,7 +94,7 @@ impl DemoVal {
   fn numbers_impl<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
     &self,
     tx: &mut Tx,
-  ) -> Result<Vec<u64>, StorageError<SB>> {
+  ) -> Result<Vec<u64>, GenericError> {
     match &self {
       DemoVal::Number(n) => Ok(vec![*n]),
       DemoVal::Ptr(ptr) => {
@@ -119,7 +118,7 @@ impl<SB: StorageBackend> StorageEntity<SB> for DemoVal {
   fn to_storage_entry<'a, Tx: StorageTxMut<'a, SB>>(
     &self,
     tx: &mut Tx,
-  ) -> Result<StorageEntry, StorageError<SB>> {
+  ) -> Result<StorageEntry, GenericError> {
     let mut entry = StorageEntry {
       ref_count: 1,
       refs: Vec::new(),
@@ -149,7 +148,7 @@ impl<SB: StorageBackend> StorageEntity<SB> for DemoVal {
   fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
     tx: &mut Tx,
     entry: StorageEntry,
-  ) -> Result<Self, StorageError<SB>> {
+  ) -> Result<Self, GenericError> {
     Self::read_from_entry(tx, &mut StorageEntryReader::new(&entry))
   }
 }

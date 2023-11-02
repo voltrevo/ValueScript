@@ -1,11 +1,14 @@
-use std::{cell::RefCell, collections::HashMap, error::Error, rc::Weak};
+use std::{cell::RefCell, collections::HashMap, error::Error, fmt::Display, rc::Weak};
+
+use sled::transaction::{
+  ConflictableTransactionError, TransactionError, UnabortableTransactionError,
+};
 
 use crate::{
   rc_key::RcKey,
-  storage_backend::StorageError,
   storage_ptr::StorageEntryPtr,
   storage_tx::{StorageReader, StorageTxMut},
-  StorageBackend, StoragePtr,
+  GenericError, StorageBackend, StoragePtr,
 };
 
 pub struct SledBackend {
@@ -36,7 +39,7 @@ impl StorageBackend for SledBackend {
 
   fn transaction<F, T>(&self, self_weak: Weak<RefCell<Self>>, f: F) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::Tx<'_>) -> Result<T, StorageError<Self>>,
+    F: Fn(&mut Self::Tx<'_>) -> Result<T, GenericError>,
   {
     self
       .db
@@ -46,15 +49,9 @@ impl StorageBackend for SledBackend {
           tx,
         };
 
-        f(&mut handle).map_err(|e| match e {
-          StorageError::CustomError(e) => e,
-          StorageError::Error(e) => Self::CustomError::Abort(e),
-        })
+        f(&mut handle).map_err(to_sled_conflictable_error)
       })
-      .map_err(|e| match e {
-        sled::transaction::TransactionError::Abort(e) => e,
-        sled::transaction::TransactionError::Storage(e) => e.into(),
-      })
+      .map_err(from_sled_tx_error)
   }
 
   fn transaction_mut<F, T>(
@@ -63,7 +60,7 @@ impl StorageBackend for SledBackend {
     f: F,
   ) -> Result<T, Box<dyn Error>>
   where
-    F: Fn(&mut Self::TxMut<'_>) -> Result<T, StorageError<Self>>,
+    F: Fn(&mut Self::TxMut<'_>) -> Result<T, GenericError>,
   {
     self
       .db
@@ -75,22 +72,15 @@ impl StorageBackend for SledBackend {
           tx,
         };
 
-        let res = f(&mut handle).map_err(|e| match e {
-          StorageError::CustomError(e) => e,
-          StorageError::Error(e) => Self::CustomError::Abort(e),
-        })?;
+        let res = f(&mut handle).map_err(to_sled_conflictable_error)?;
 
-        handle.flush_ref_deltas().map_err(|e| match e {
-          StorageError::CustomError(e) => e,
-          StorageError::Error(e) => Self::CustomError::Abort(e),
-        })?;
+        handle
+          .flush_ref_deltas()
+          .map_err(to_sled_conflictable_error)?;
 
         Ok(res)
       })
-      .map_err(|e| match e {
-        sled::transaction::TransactionError::Abort(e) => e,
-        sled::transaction::TransactionError::Storage(e) => e.into(),
-      })
+      .map_err(from_sled_tx_error)
   }
 
   fn is_empty(&self) -> bool {
@@ -109,14 +99,11 @@ pub struct SledTx<'a> {
 }
 
 impl<'a> StorageReader<'a, SledBackend> for SledTx<'a> {
-  fn read_bytes<T>(
-    &self,
-    ptr: StoragePtr<T>,
-  ) -> Result<Option<Vec<u8>>, StorageError<SledBackend>> {
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
     let value = self
       .tx
       .get(ptr.to_bytes())
-      .map_err(|e| StorageError::<SledBackend>::CustomError(e.into()))?
+      .map_err(from_sled_unabortable_error)?
       .map(|value| value.to_vec());
 
     Ok(value)
@@ -135,14 +122,11 @@ pub struct SledTxMut<'a> {
 }
 
 impl<'a> StorageReader<'a, SledBackend> for SledTxMut<'a> {
-  fn read_bytes<T>(
-    &self,
-    ptr: StoragePtr<T>,
-  ) -> Result<Option<Vec<u8>>, StorageError<SledBackend>> {
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
     let value = self
       .tx
       .get(ptr.to_bytes())
-      .map_err(|e| StorageError::<SledBackend>::CustomError(e.into()))?
+      .map_err(from_sled_unabortable_error)?
       .map(|value| value.to_vec());
 
     Ok(value)
@@ -166,18 +150,55 @@ impl<'a> StorageTxMut<'a, SledBackend> for SledTxMut<'a> {
     &mut self,
     ptr: StoragePtr<T>,
     data: Option<Vec<u8>>,
-  ) -> Result<(), StorageError<SledBackend>> {
+  ) -> Result<(), GenericError> {
     match data {
       Some(data) => self
         .tx
         .insert(ptr.to_bytes(), data)
-        .map_err(|e| StorageError::<SledBackend>::CustomError(e.into()))?,
+        .map_err(from_sled_unabortable_error)?,
       None => self
         .tx
         .remove(ptr.to_bytes())
-        .map_err(|e| StorageError::<SledBackend>::CustomError(e.into()))?,
+        .map_err(from_sled_unabortable_error)?,
     };
 
     Ok(())
+  }
+}
+
+fn to_sled_conflictable_error(e: Box<dyn Error>) -> ConflictableTransactionError<GenericError> {
+  match e.downcast::<GenericSledError>() {
+    Ok(e) => e.0,
+    Err(e) => ConflictableTransactionError::Abort(e),
+  }
+}
+
+fn from_sled_tx_error(e: TransactionError<GenericError>) -> GenericError {
+  match e {
+    TransactionError::Abort(e) => e,
+    TransactionError::Storage(e) => e.into(),
+  }
+}
+
+fn from_sled_unabortable_error(e: UnabortableTransactionError) -> GenericError {
+  let conflictable = Into::<ConflictableTransactionError<GenericError>>::into(e);
+
+  GenericSledError(conflictable).into()
+}
+
+#[derive(Debug)]
+pub struct GenericSledError(pub sled::transaction::ConflictableTransactionError<GenericError>);
+
+impl Error for GenericSledError {}
+
+impl Display for GenericSledError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.0)
+  }
+}
+
+impl From<sled::transaction::ConflictableTransactionError<GenericError>> for GenericSledError {
+  fn from(e: sled::transaction::ConflictableTransactionError<GenericError>) -> Self {
+    Self(e)
   }
 }
