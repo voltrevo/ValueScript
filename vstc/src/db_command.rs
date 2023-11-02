@@ -45,7 +45,8 @@ pub fn db_command(args: &[String]) {
     Some("-i") => println!("TODO: use database {} interactively", path),
     arg => 'b: {
       if let Some(arg) = arg {
-        if arg.starts_with("this.") {
+        // TODO: Document variations here
+        if arg.starts_with("this.") || arg.starts_with('{') || arg.starts_with('(') {
           break 'b db_run_inline(&path, arg);
         }
       }
@@ -184,10 +185,17 @@ fn db_run_inline(path: &str, source: &str) {
     .unwrap()
     .unwrap();
 
-  let compile_result = compile_str(&format!(
-    "export default function() {{ return (\n  {}\n); }}",
-    source
-  ));
+  let full_source = {
+    if source.starts_with("this.") || source.starts_with('(') {
+      format!("export default function() {{ return (\n  {}\n); }}", source)
+    } else if source.starts_with('{') {
+      format!("export default function() {}", source)
+    } else {
+      panic!("Unrecognized inline code: {}", source);
+    }
+  };
+
+  let compile_result = compile_str(&full_source);
 
   for (path, diagnostics) in compile_result.diagnostics.iter() {
     // TODO: Fix exit call
