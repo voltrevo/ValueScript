@@ -118,3 +118,16 @@ impl<SB: StorageBackend> Storage<SB> {
     })
   }
 }
+
+impl<SB: StorageBackend> StorageReader<SB> for Storage<SB> {
+  fn read_bytes<T>(
+    &self,
+    ptr: crate::StoragePtr<T>,
+  ) -> Result<Option<Vec<u8>>, crate::GenericError> {
+    self.sb.borrow().read_bytes(ptr)
+  }
+
+  fn get_backend(&self) -> std::rc::Weak<RefCell<SB>> {
+    Rc::downgrade(&self.sb)
+  }
+}

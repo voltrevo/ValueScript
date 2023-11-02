@@ -37,6 +37,10 @@ impl StorageBackend for SledBackend {
   type Tx<'a> = SledTx<'a>;
   type TxMut<'a> = SledTxMut<'a>;
 
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
+    Ok(self.db.get(ptr.to_bytes())?.map(|value| value.to_vec()))
+  }
+
   fn transaction<F, T>(&self, self_weak: Weak<RefCell<Self>>, f: F) -> Result<T, Box<dyn Error>>
   where
     F: Fn(&mut Self::Tx<'_>) -> Result<T, GenericError>,

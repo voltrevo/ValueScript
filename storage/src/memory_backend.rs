@@ -25,6 +25,10 @@ impl StorageBackend for MemoryBackend {
   type Tx<'a> = MemoryTx<'a>;
   type TxMut<'a> = MemoryTxMut<'a>;
 
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
+    Ok(self.data.get(&ptr.data).cloned())
+  }
+
   fn transaction<F, T>(&self, self_weak: Weak<RefCell<Self>>, f: F) -> Result<T, Box<dyn Error>>
   where
     F: Fn(&mut Self::Tx<'_>) -> Result<T, GenericError>,

@@ -10,7 +10,6 @@ use crate::{
 
 pub trait StorageReader<SB: StorageBackend>: Sized {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError>;
-
   fn get_backend(&self) -> Weak<RefCell<SB>>;
 
   fn get_auto_ptr<SE: StorageEntity<SB>>(
