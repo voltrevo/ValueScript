@@ -30,7 +30,7 @@ impl DemoVal {
       .transaction(Rc::downgrade(&storage.sb), |sb| self.numbers_impl(sb))
   }
 
-  fn write_to_entry<'a, SB: StorageBackend, Tx: StorageTxMut<'a, SB>>(
+  fn write_to_entry<SB: StorageBackend, Tx: StorageTxMut<SB>>(
     &self,
     tx: &mut Tx,
     entry: &mut StorageEntry,
@@ -62,7 +62,7 @@ impl DemoVal {
     Ok(())
   }
 
-  fn read_from_entry<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
+  fn read_from_entry<SB: StorageBackend, Tx: StorageReader<SB>>(
     _tx: &mut Tx,
     reader: &mut StorageEntryReader,
   ) -> Result<DemoVal, GenericError> {
@@ -91,7 +91,7 @@ impl DemoVal {
     })
   }
 
-  fn numbers_impl<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
+  fn numbers_impl<SB: StorageBackend, Tx: StorageReader<SB>>(
     &self,
     tx: &mut Tx,
   ) -> Result<Vec<u64>, GenericError> {
@@ -115,7 +115,7 @@ impl DemoVal {
 }
 
 impl<SB: StorageBackend> StorageEntity<SB> for DemoVal {
-  fn to_storage_entry<'a, Tx: StorageTxMut<'a, SB>>(
+  fn to_storage_entry<'a, Tx: StorageTxMut<SB>>(
     &self,
     tx: &mut Tx,
   ) -> Result<StorageEntry, GenericError> {
@@ -145,7 +145,7 @@ impl<SB: StorageBackend> StorageEntity<SB> for DemoVal {
     Ok(entry)
   }
 
-  fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
+  fn from_storage_entry<'a, Tx: StorageReader<SB>>(
     tx: &mut Tx,
     entry: StorageEntry,
   ) -> Result<Self, GenericError> {

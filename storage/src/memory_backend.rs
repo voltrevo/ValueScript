@@ -74,7 +74,7 @@ pub struct MemoryTx<'a> {
   storage: &'a MemoryBackend,
 }
 
-impl StorageReader<'_, MemoryBackend> for MemoryTx<'_> {
+impl<'a> StorageReader<MemoryBackend> for MemoryTx<'a> {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
     Ok(self.storage.data.get(&ptr.data).cloned())
   }
@@ -91,7 +91,7 @@ pub struct MemoryTxMut<'a> {
   storage: &'a mut MemoryBackend,
 }
 
-impl<'a> StorageReader<'a, MemoryBackend> for MemoryTxMut<'a> {
+impl<'a> StorageReader<MemoryBackend> for MemoryTxMut<'a> {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
     Ok(self.storage.data.get(&ptr.data).cloned())
   }
@@ -101,7 +101,7 @@ impl<'a> StorageReader<'a, MemoryBackend> for MemoryTxMut<'a> {
   }
 }
 
-impl<'a> StorageTxMut<'a, MemoryBackend> for MemoryTxMut<'a> {
+impl<'a> StorageTxMut<MemoryBackend> for MemoryTxMut<'a> {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
   }

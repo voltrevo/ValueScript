@@ -46,7 +46,7 @@ impl DecoderMaker for Rc<Bytecode> {
 }
 
 impl<SB: StorageBackend> StorageEntity<SB> for Bytecode {
-  fn to_storage_entry<'a, TxMut: StorageTxMut<'a, SB>>(
+  fn to_storage_entry<TxMut: StorageTxMut<SB>>(
     &self,
     _tx: &mut TxMut,
   ) -> Result<storage::StorageEntry, GenericError> {
@@ -57,7 +57,7 @@ impl<SB: StorageBackend> StorageEntity<SB> for Bytecode {
     })
   }
 
-  fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
+  fn from_storage_entry<Tx: StorageReader<SB>>(
     _tx: &mut Tx,
     entry: storage::StorageEntry,
   ) -> Result<Self, GenericError> {

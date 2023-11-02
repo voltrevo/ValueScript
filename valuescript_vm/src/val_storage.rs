@@ -48,7 +48,7 @@ impl Tag {
 }
 
 impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
-  fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
+  fn from_storage_entry<Tx: StorageReader<SB>>(
     tx: &mut Tx,
     entry: StorageEntry,
   ) -> Result<Self, GenericError> {
@@ -63,7 +63,7 @@ impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
     res
   }
 
-  fn to_storage_entry<'a, TxMut: StorageTxMut<'a, SB>>(
+  fn to_storage_entry<'a, TxMut: StorageTxMut<SB>>(
     &self,
     tx: &mut TxMut,
   ) -> Result<StorageEntry, GenericError> {
@@ -158,7 +158,7 @@ impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
   }
 }
 
-fn write_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>>(
+fn write_to_entry<SB: StorageBackend + 'static, Tx: StorageTxMut<SB>>(
   val: &Val,
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
@@ -248,7 +248,7 @@ fn write_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>>(
   Ok(())
 }
 
-fn write_ptr_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>>(
+fn write_ptr_to_entry<SB: StorageBackend + 'static, Tx: StorageTxMut<SB>>(
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   key: RcKey,
@@ -266,7 +266,7 @@ fn write_ptr_to_entry<'a, SB: StorageBackend + 'static, Tx: StorageTxMut<'a, SB>
   Ok(())
 }
 
-fn read_from_entry<'a, SB: StorageBackend + 'static, Tx: StorageReader<'a, SB>>(
+fn read_from_entry<SB: StorageBackend + 'static, Tx: StorageReader<SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Val, GenericError> {
@@ -399,7 +399,7 @@ fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> Result<VsSymbol, B
   Ok(FromPrimitive::from_usize(reader.read_vlq()?).unwrap())
 }
 
-fn read_ref_bytecode_from_entry<'a, SB: StorageBackend, Tx: StorageReader<'a, SB>>(
+fn read_ref_bytecode_from_entry<SB: StorageBackend, Tx: StorageReader<SB>>(
   tx: &mut Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Rc<Bytecode>, GenericError> {
@@ -410,7 +410,7 @@ fn read_ref_bytecode_from_entry<'a, SB: StorageBackend, Tx: StorageReader<'a, SB
   Ok(Rc::new(Bytecode::from_storage_entry(tx, entry)?))
 }
 
-fn write_ref_bytecode_to_entry<'a, SB: StorageBackend, Tx: StorageTxMut<'a, SB>>(
+fn write_ref_bytecode_to_entry<SB: StorageBackend, Tx: StorageTxMut<SB>>(
   tx: &mut Tx,
   writer: &mut StorageEntryWriter,
   bytecode: &Rc<Bytecode>,

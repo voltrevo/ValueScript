@@ -7,8 +7,8 @@ use crate::{
 
 pub trait StorageBackend: Sized {
   type CustomError;
-  type Tx<'a>: StorageReader<'a, Self>;
-  type TxMut<'a>: StorageTxMut<'a, Self>;
+  type Tx<'a>: StorageReader<Self>;
+  type TxMut<'a>: StorageTxMut<Self>;
 
   fn transaction<F, T>(&self, self_weak: Weak<RefCell<Self>>, f: F) -> Result<T, Box<dyn Error>>
   where

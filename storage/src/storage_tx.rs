@@ -8,7 +8,7 @@ use crate::{
   StorageHeadPtr, StoragePtr,
 };
 
-pub trait StorageReader<'a, SB: StorageBackend>: Sized {
+pub trait StorageReader<SB: StorageBackend>: Sized {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError>;
 
   fn get_backend(&self) -> Weak<RefCell<SB>>;
@@ -64,7 +64,7 @@ pub trait StorageReader<'a, SB: StorageBackend>: Sized {
   }
 }
 
-pub trait StorageTxMut<'a, SB: StorageBackend>: StorageReader<'a, SB> + Sized {
+pub trait StorageTxMut<SB: StorageBackend>: StorageReader<SB> + Sized {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
   fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
   fn write_bytes<T>(

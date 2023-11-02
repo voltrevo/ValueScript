@@ -5,12 +5,12 @@ use crate::{
 };
 
 pub trait StorageEntity<SB: StorageBackend>: Sized {
-  fn to_storage_entry<'a, Tx: StorageTxMut<'a, SB>>(
+  fn to_storage_entry<Tx: StorageTxMut<SB>>(
     &self,
     tx: &mut Tx,
   ) -> Result<StorageEntry, GenericError>;
 
-  fn from_storage_entry<'a, Tx: StorageReader<'a, SB>>(
+  fn from_storage_entry<Tx: StorageReader<SB>>(
     tx: &mut Tx,
     entry: StorageEntry,
   ) -> Result<Self, GenericError>;

@@ -98,7 +98,7 @@ pub struct SledTx<'a> {
   tx: &'a sled::transaction::TransactionalTree,
 }
 
-impl<'a> StorageReader<'a, SledBackend> for SledTx<'a> {
+impl<'a> StorageReader<SledBackend> for SledTx<'a> {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
     let value = self
       .tx
@@ -121,7 +121,7 @@ pub struct SledTxMut<'a> {
   tx: &'a sled::transaction::TransactionalTree,
 }
 
-impl<'a> StorageReader<'a, SledBackend> for SledTxMut<'a> {
+impl<'a> StorageReader<SledBackend> for SledTxMut<'a> {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
     let value = self
       .tx
@@ -137,7 +137,7 @@ impl<'a> StorageReader<'a, SledBackend> for SledTxMut<'a> {
   }
 }
 
-impl<'a> StorageTxMut<'a, SledBackend> for SledTxMut<'a> {
+impl<'a> StorageTxMut<SledBackend> for SledTxMut<'a> {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
     &mut self.ref_deltas
   }
