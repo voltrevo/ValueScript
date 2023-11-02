@@ -38,7 +38,7 @@ pub fn db_command(args: &[String]) {
 
   match args.get(3).map(|s| s.as_str()) {
     Some("new") => db_new(&path, args.get(4..).unwrap_or_default()),
-    Some("call") => println!("TODO: on database {}, call {:?}", path, args.get(4)),
+    Some("call") => db_call(&path, args.get(4..).unwrap_or_default()),
     Some("-i") => println!("TODO: use database {} interactively", path),
     arg => {
       if let Some(arg) = arg {
@@ -125,4 +125,49 @@ fn db_new(path: &str, args: &[String]) {
     .unwrap();
 
   println!("Created database at {}", path);
+}
+
+fn db_call(path: &str, args: &[String]) {
+  let fn_file = match args.get(0) {
+    Some(fn_file) => fn_file,
+    None => {
+      println!("ERROR: Missing function file\n");
+      show_help();
+      exit(1);
+    }
+  };
+
+  let fn_ = Rc::new(to_bytecode(format_from_path(fn_file), fn_file))
+    .decoder(0)
+    .decode_val(&mut vec![]);
+
+  let args = args
+    .get(1..)
+    .unwrap_or_default()
+    .iter()
+    .map(|s| s.clone().to_val())
+    .collect::<Vec<_>>();
+
+  let mut storage = Storage::new(SledBackend::open(path).unwrap());
+
+  let mut vm = VirtualMachine::default();
+
+  let mut instance = storage
+    .get_head(storage_head_ptr(b"state"))
+    .unwrap()
+    .unwrap();
+
+  match vm.run(None, &mut instance, fn_, args) {
+    Ok(res) => {
+      println!("{}", res.pretty());
+    }
+    Err(err) => {
+      println!("Uncaught exception: {}", err.pretty());
+      exit(1);
+    }
+  }
+
+  storage
+    .set_head(storage_head_ptr(b"state"), &instance)
+    .unwrap();
 }
