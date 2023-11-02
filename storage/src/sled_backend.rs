@@ -5,7 +5,7 @@ use crate::{
   storage_backend::StorageError,
   storage_ptr::StorageEntryPtr,
   storage_tx::{StorageReader, StorageTxMut},
-  StorageAutoPtr, StorageBackend, StorageEntity, StoragePtr,
+  StorageBackend, StoragePtr,
 };
 
 pub struct SledBackend {
@@ -122,15 +122,8 @@ impl<'a> StorageReader<'a, SledBackend> for SledTx<'a> {
     Ok(value)
   }
 
-  fn get_auto_ptr<SE: StorageEntity<SledBackend>>(
-    &mut self,
-    ptr: StorageEntryPtr,
-  ) -> crate::StorageAutoPtr<SledBackend, SE> {
-    StorageAutoPtr {
-      _marker: std::marker::PhantomData,
-      sb: self.backend.clone(),
-      ptr,
-    }
+  fn get_backend(&self) -> Weak<RefCell<SledBackend>> {
+    self.backend.clone()
   }
 }
 
@@ -141,15 +134,7 @@ pub struct SledTxMut<'a> {
   tx: &'a sled::transaction::TransactionalTree,
 }
 
-impl<'a> StorageTxMut<'a, SledBackend> for SledTxMut<'a> {
-  fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
-    &mut self.ref_deltas
-  }
-
-  fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr> {
-    &mut self.cache
-  }
-
+impl<'a> StorageReader<'a, SledBackend> for SledTxMut<'a> {
   fn read_bytes<T>(
     &self,
     ptr: StoragePtr<T>,
@@ -163,15 +148,18 @@ impl<'a> StorageTxMut<'a, SledBackend> for SledTxMut<'a> {
     Ok(value)
   }
 
-  fn get_auto_ptr<SE: StorageEntity<SledBackend>>(
-    &mut self,
-    ptr: StorageEntryPtr,
-  ) -> crate::StorageAutoPtr<SledBackend, SE> {
-    StorageAutoPtr {
-      _marker: std::marker::PhantomData,
-      sb: self.backend.clone(),
-      ptr,
-    }
+  fn get_backend(&self) -> Weak<RefCell<SledBackend>> {
+    self.backend.clone()
+  }
+}
+
+impl<'a> StorageTxMut<'a, SledBackend> for SledTxMut<'a> {
+  fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
+    &mut self.ref_deltas
+  }
+
+  fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr> {
+    &mut self.cache
   }
 
   fn write_bytes<T>(

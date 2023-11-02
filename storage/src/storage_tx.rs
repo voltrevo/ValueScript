@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem::take};
+use std::{cell::RefCell, collections::HashMap, mem::take, rc::Weak};
 
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,19 @@ use crate::{
 
 pub trait StorageReader<'a, SB: StorageBackend>: Sized {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>>;
+
+  fn get_backend(&self) -> Weak<RefCell<SB>>;
+
+  fn get_auto_ptr<SE: StorageEntity<SB>>(
+    &mut self,
+    ptr: StorageEntryPtr,
+  ) -> StorageAutoPtr<SB, SE> {
+    StorageAutoPtr {
+      _marker: std::marker::PhantomData,
+      sb: self.get_backend(),
+      ptr,
+    }
+  }
 
   fn read<T: for<'de> Deserialize<'de>>(
     &mut self,
@@ -24,9 +37,6 @@ pub trait StorageReader<'a, SB: StorageBackend>: Sized {
       .map(Some)
       .map_err(StorageError::from)
   }
-
-  fn get_auto_ptr<SE: StorageEntity<SB>>(&mut self, ptr: StorageEntryPtr)
-    -> StorageAutoPtr<SB, SE>;
 
   fn read_or_err<T: for<'de> Deserialize<'de>>(
     &mut self,
@@ -56,32 +66,14 @@ pub trait StorageReader<'a, SB: StorageBackend>: Sized {
   }
 }
 
-pub trait StorageTxMut<'a, SB: StorageBackend>: Sized {
+pub trait StorageTxMut<'a, SB: StorageBackend>: StorageReader<'a, SB> + Sized {
   fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64>;
   fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr>;
-  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>>;
   fn write_bytes<T>(
     &mut self,
     ptr: StoragePtr<T>,
     data: Option<Vec<u8>>,
   ) -> Result<(), StorageError<SB>>;
-
-  fn read<T: for<'de> Deserialize<'de>>(
-    &mut self,
-    ptr: StoragePtr<T>,
-  ) -> Result<Option<T>, StorageError<SB>> {
-    let data = match self.read_bytes(ptr)? {
-      Some(data) => data,
-      None => return Ok(None),
-    };
-
-    bincode::deserialize(&data)
-      .map(Some)
-      .map_err(StorageError::from)
-  }
-
-  fn get_auto_ptr<SE: StorageEntity<SB>>(&mut self, ptr: StorageEntryPtr)
-    -> StorageAutoPtr<SB, SE>;
 
   fn read_or_err<T: for<'de> Deserialize<'de>>(
     &mut self,
@@ -242,18 +234,5 @@ pub trait StorageTxMut<'a, SB: StorageBackend>: Sized {
     assert!(pre_existing.is_none());
 
     Ok(ptr)
-  }
-}
-
-impl<'a, SB: StorageBackend, TxMut: StorageTxMut<'a, SB>> StorageReader<'a, SB> for TxMut {
-  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, StorageError<SB>> {
-    TxMut::read_bytes(self, ptr)
-  }
-
-  fn get_auto_ptr<SE: StorageEntity<SB>>(
-    &mut self,
-    ptr: StorageEntryPtr,
-  ) -> StorageAutoPtr<SB, SE> {
-    TxMut::get_auto_ptr(self, ptr)
   }
 }

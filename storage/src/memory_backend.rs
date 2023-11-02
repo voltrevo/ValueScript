@@ -5,7 +5,7 @@ use crate::{
   storage_backend::StorageError,
   storage_ptr::StorageEntryPtr,
   storage_tx::{StorageReader, StorageTxMut},
-  StorageAutoPtr, StorageBackend, StorageEntity, StoragePtr,
+  StorageBackend, StoragePtr,
 };
 
 #[derive(Default)]
@@ -92,15 +92,8 @@ impl StorageReader<'_, MemoryBackend> for MemoryTx<'_> {
     Ok(self.storage.data.get(&ptr.data).cloned())
   }
 
-  fn get_auto_ptr<SE: StorageEntity<MemoryBackend>>(
-    &mut self,
-    ptr: StorageEntryPtr,
-  ) -> StorageAutoPtr<MemoryBackend, SE> {
-    StorageAutoPtr {
-      _marker: std::marker::PhantomData,
-      sb: self.backend.clone(),
-      ptr,
-    }
+  fn get_backend(&self) -> Weak<RefCell<MemoryBackend>> {
+    self.backend.clone()
   }
 }
 
@@ -111,15 +104,7 @@ pub struct MemoryTxMut<'a> {
   storage: &'a mut MemoryBackend,
 }
 
-impl<'a> StorageTxMut<'a, MemoryBackend> for MemoryTxMut<'a> {
-  fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
-    &mut self.ref_deltas
-  }
-
-  fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr> {
-    &mut self.cache
-  }
-
+impl<'a> StorageReader<'a, MemoryBackend> for MemoryTxMut<'a> {
   fn read_bytes<T>(
     &self,
     ptr: StoragePtr<T>,
@@ -127,15 +112,18 @@ impl<'a> StorageTxMut<'a, MemoryBackend> for MemoryTxMut<'a> {
     Ok(self.storage.data.get(&ptr.data).cloned())
   }
 
-  fn get_auto_ptr<SE: StorageEntity<MemoryBackend>>(
-    &mut self,
-    ptr: StorageEntryPtr,
-  ) -> StorageAutoPtr<MemoryBackend, SE> {
-    StorageAutoPtr {
-      _marker: std::marker::PhantomData,
-      sb: self.backend.clone(),
-      ptr,
-    }
+  fn get_backend(&self) -> Weak<RefCell<MemoryBackend>> {
+    self.backend.clone()
+  }
+}
+
+impl<'a> StorageTxMut<'a, MemoryBackend> for MemoryTxMut<'a> {
+  fn ref_deltas(&mut self) -> &mut HashMap<(u64, u64, u64), i64> {
+    &mut self.ref_deltas
+  }
+
+  fn cache(&mut self) -> &mut HashMap<RcKey, StorageEntryPtr> {
+    &mut self.cache
   }
 
   fn write_bytes<T>(

@@ -76,13 +76,13 @@ impl<SB: StorageBackend> Storage<SB> {
       .sb
       .borrow_mut()
       .transaction_mut(Rc::downgrade(&self.sb), |sb| {
-        let tmp_count = StorageTxMut::read(sb, tmp_count_ptr())?.unwrap_or(0);
+        let tmp_count = sb.read(tmp_count_ptr())?.unwrap_or(0);
         let tmp_ptr = tmp_at_ptr(tmp_count);
         sb.set_head(tmp_ptr, value)?;
 
         sb.write(tmp_count_ptr(), Some(&(tmp_count + 1)))?;
 
-        let ptr = StorageTxMut::read(sb, tmp_ptr)?.unwrap_or_else(|| panic!("Ptr not found"));
+        let ptr = sb.read(tmp_ptr)?.unwrap_or_else(|| panic!("Ptr not found"));
 
         Ok(ptr)
       })
@@ -93,7 +93,7 @@ impl<SB: StorageBackend> Storage<SB> {
       .sb
       .borrow_mut()
       .transaction_mut(Rc::downgrade(&self.sb), |sb| {
-        let tmp_count = StorageTxMut::read(sb, tmp_count_ptr())?.unwrap_or(0);
+        let tmp_count = sb.read(tmp_count_ptr())?.unwrap_or(0);
 
         for i in 0..tmp_count {
           sb.remove_head(tmp_at_ptr(i))?;
