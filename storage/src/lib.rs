@@ -11,13 +11,13 @@ mod storage_auto_ptr;
 mod storage_backend;
 mod storage_entity;
 mod storage_entry;
+mod storage_io;
 mod storage_ptr;
-mod storage_tx;
 mod tests;
 
 pub use self::storage::Storage;
 pub use self::storage_backend::StorageBackend;
-pub use self::storage_tx::{StorageReader, StorageTxMut};
+pub use self::storage_io::{StorageReader, StorageTxMut};
 pub use errors::GenericError;
 pub use memory_backend::MemoryBackend;
 pub use rc_key::RcKey;

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, error::Error, rc::Weak};
 
 use crate::{
-  storage_tx::{StorageReader, StorageTxMut},
+  storage_io::{StorageReader, StorageTxMut},
   GenericError,
 };
 

@@ -6,8 +6,8 @@ use sled::transaction::{
 
 use crate::{
   rc_key::RcKey,
+  storage_io::{StorageReader, StorageTxMut},
   storage_ptr::StorageEntryPtr,
-  storage_tx::{StorageReader, StorageTxMut},
   GenericError, StorageBackend, StoragePtr,
 };
 

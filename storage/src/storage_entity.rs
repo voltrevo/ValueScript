@@ -1,6 +1,6 @@
 use crate::{
   storage_entry::StorageEntry,
-  storage_tx::{StorageReader, StorageTxMut},
+  storage_io::{StorageReader, StorageTxMut},
   GenericError, StorageBackend,
 };
 

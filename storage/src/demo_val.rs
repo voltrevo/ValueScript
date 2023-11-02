@@ -4,8 +4,8 @@ use std::rc::Rc;
 use crate::rc_key::RcKey;
 use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
+use crate::storage_io::{StorageReader, StorageTxMut};
 use crate::storage_ptr::StorageEntryPtr;
-use crate::storage_tx::{StorageReader, StorageTxMut};
 use crate::{GenericError, Storage, StorageBackend};
 
 const NUMBER_TAG: u8 = 0;
