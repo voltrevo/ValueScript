@@ -2452,6 +2452,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_qs",
+ "storage",
  "url",
  "valuescript_compiler",
  "valuescript_vm",

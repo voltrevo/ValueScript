@@ -37,7 +37,7 @@ impl VirtualMachine {
       _ => return Err("bytecode does start with function".to_internal_error()),
     };
 
-    frame.write_param(take(this));
+    frame.write_this(false, take(this))?;
 
     for a in args {
       frame.write_param(a);
