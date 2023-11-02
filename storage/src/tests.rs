@@ -4,7 +4,7 @@ mod tests_ {
 
   use crate::{
     demo_val::DemoVal, memory_backend::MemoryBackend, sled_backend::SledBackend, storage::Storage,
-    storage_ptr::storage_head_ptr, StorageBackend,
+    storage_ptr::storage_head_ptr, StorageBackend, StorageReader,
   };
 
   fn run(impl_memory: fn(&mut Storage<MemoryBackend>), impl_sled: fn(&mut Storage<SledBackend>)) {

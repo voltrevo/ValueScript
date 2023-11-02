@@ -2,8 +2,6 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 
-use crate::errors::error_str;
-use crate::storage_auto_ptr::StorageAutoPtr;
 use crate::storage_entity::StorageEntity;
 use crate::storage_ptr::{tmp_at_ptr, tmp_count_ptr, StorageEntryPtr, StorageHeadPtr};
 use crate::{StorageBackend, StorageReader, StorageTxMut};
@@ -16,36 +14,6 @@ impl<SB: StorageBackend> Storage<SB> {
   pub fn new(sb: SB) -> Self {
     Self {
       sb: Rc::new(RefCell::new(sb)),
-    }
-  }
-
-  pub fn get_head<SE: StorageEntity<SB>>(
-    &mut self,
-    ptr: StorageHeadPtr,
-  ) -> Result<Option<SE>, Box<dyn Error>> {
-    self
-      .sb
-      .borrow()
-      .transaction(Rc::downgrade(&self.sb), |sb| sb.get_head(ptr))
-  }
-
-  pub fn get<SE: StorageEntity<SB>>(&self, ptr: StorageEntryPtr) -> Result<SE, Box<dyn Error>> {
-    // TODO: Avoid going through a transaction when read-only
-    self.sb.borrow().transaction(Rc::downgrade(&self.sb), |sb| {
-      let entry = sb.read(ptr)?.ok_or(error_str("Ptr not found"))?;
-
-      SE::from_storage_entry(sb, entry)
-    })
-  }
-
-  pub fn get_auto_ptr<SE: StorageEntity<SB>>(
-    &mut self,
-    ptr: StorageEntryPtr,
-  ) -> StorageAutoPtr<SB, SE> {
-    StorageAutoPtr {
-      _marker: std::marker::PhantomData,
-      sb: Rc::downgrade(&self.sb),
-      ptr,
     }
   }
 
@@ -113,9 +81,10 @@ impl<SB: StorageBackend> Storage<SB> {
     &mut self,
     ptr: StorageEntryPtr,
   ) -> Result<Option<u64>, Box<dyn Error>> {
-    self.sb.borrow().transaction(Rc::downgrade(&self.sb), |sb| {
-      Ok(sb.read(ptr)?.map(|entry| entry.ref_count))
-    })
+    self
+      .sb
+      .read(ptr)
+      .map(|entry| entry.map(|entry| entry.ref_count))
   }
 }
 

@@ -778,7 +778,7 @@ static BOOL_TO_STRING: NativeFunction = native_fn(|this, _params| {
 
 static BOOL_VALUE_OF: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
-    Val::Bool(b) => Val::Bool(*b),
+    Val::Bool(b) => Val::Bool(b),
     _ => return Err("bool indirection".to_type_error()),
   })
 });

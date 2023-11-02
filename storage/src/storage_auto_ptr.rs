@@ -25,13 +25,11 @@ impl<SB: StorageBackend, SE: StorageEntity<SB>> StorageAutoPtr<SB, SE> {
       None => return Err("Storage backend dropped".into()),
     };
 
-    let res = sb.borrow().transaction(self.sb.clone(), |sb| {
-      Ok(match sb.read(self.ptr)? {
-        Some(entry) => Some(SE::from_storage_entry(sb, entry)?),
-        None => None,
-      })
-    });
+    let res = match sb.read(self.ptr)? {
+      Some(entry) => Some(SE::from_storage_entry(&sb, entry)?),
+      None => None,
+    };
 
-    res
+    Ok(res)
   }
 }

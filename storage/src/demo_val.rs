@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::rc::Rc;
 
 use crate::rc_key::RcKey;
@@ -6,7 +5,7 @@ use crate::storage_entity::StorageEntity;
 use crate::storage_entry::{StorageEntry, StorageEntryReader};
 use crate::storage_io::{StorageReader, StorageTxMut};
 use crate::storage_ptr::StorageEntryPtr;
-use crate::{GenericError, Storage, StorageBackend};
+use crate::{GenericError, StorageBackend};
 
 const NUMBER_TAG: u8 = 0;
 const ARRAY_TAG: u8 = 1;
@@ -20,16 +19,6 @@ pub enum DemoVal {
 }
 
 impl DemoVal {
-  pub(crate) fn numbers<SB: StorageBackend>(
-    &self,
-    storage: &mut Storage<SB>,
-  ) -> Result<Vec<u64>, Box<dyn Error>> {
-    storage
-      .sb
-      .borrow()
-      .transaction(Rc::downgrade(&storage.sb), |sb| self.numbers_impl(sb))
-  }
-
   fn write_to_entry<SB: StorageBackend, Tx: StorageTxMut<SB>>(
     &self,
     tx: &mut Tx,
@@ -63,7 +52,7 @@ impl DemoVal {
   }
 
   fn read_from_entry<SB: StorageBackend, Tx: StorageReader<SB>>(
-    _tx: &mut Tx,
+    _tx: &Tx,
     reader: &mut StorageEntryReader,
   ) -> Result<DemoVal, GenericError> {
     let tag = reader.read_u8()?;
@@ -91,7 +80,7 @@ impl DemoVal {
     })
   }
 
-  fn numbers_impl<SB: StorageBackend, Tx: StorageReader<SB>>(
+  pub fn numbers<SB: StorageBackend, Tx: StorageReader<SB>>(
     &self,
     tx: &mut Tx,
   ) -> Result<Vec<u64>, GenericError> {
@@ -99,13 +88,13 @@ impl DemoVal {
       DemoVal::Number(n) => Ok(vec![*n]),
       DemoVal::Ptr(ptr) => {
         let entry = tx.read_or_err(*ptr)?;
-        Self::from_storage_entry(tx, entry)?.numbers_impl(tx)
+        Self::from_storage_entry(tx, entry)?.numbers(tx)
       }
       DemoVal::Array(arr) => {
         let mut numbers = Vec::new();
 
         for item in arr.iter() {
-          numbers.extend(item.numbers_impl(tx)?);
+          numbers.extend(item.numbers(tx)?);
         }
 
         Ok(numbers)
@@ -146,7 +135,7 @@ impl<SB: StorageBackend> StorageEntity<SB> for DemoVal {
   }
 
   fn from_storage_entry<'a, Tx: StorageReader<SB>>(
-    tx: &mut Tx,
+    tx: &Tx,
     entry: StorageEntry,
   ) -> Result<Self, GenericError> {
     Self::read_from_entry(tx, &mut StorageEntryReader::new(&entry))

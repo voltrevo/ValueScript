@@ -63,9 +63,9 @@ static TO_EXPONENTIAL: NativeFunction = native_fn(|this, params| {
           return Err("precision must be between 0 and 100".to_range_error());
         }
 
-        format_exponential(*number, Some(precision as usize))
+        format_exponential(number, Some(precision as usize))
       }
-      None => format_exponential(*number, None),
+      None => format_exponential(number, None),
     },
     _ => return Err("number indirection".to_internal_error()),
   })
@@ -91,7 +91,7 @@ static TO_STRING: NativeFunction = native_fn(|this, params| {
 
 static VALUE_OF: NativeFunction = native_fn(|this, _params| {
   Ok(match this.get() {
-    Val::Number(number) => Val::Number(*number),
+    Val::Number(number) => Val::Number(number),
     _ => return Err("number indirection".to_internal_error()),
   })
 });

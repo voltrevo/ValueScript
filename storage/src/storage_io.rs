@@ -4,18 +4,15 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-  GenericError, RcKey, StorageAutoPtr, StorageBackend, StorageEntity, StorageEntryPtr,
-  StorageHeadPtr, StoragePtr,
+  errors::error_str, GenericError, RcKey, StorageAutoPtr, StorageBackend, StorageEntity,
+  StorageEntryPtr, StorageHeadPtr, StoragePtr,
 };
 
 pub trait StorageReader<SB: StorageBackend>: Sized {
   fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError>;
   fn get_backend(&self) -> Weak<RefCell<SB>>;
 
-  fn get_auto_ptr<SE: StorageEntity<SB>>(
-    &mut self,
-    ptr: StorageEntryPtr,
-  ) -> StorageAutoPtr<SB, SE> {
+  fn get_auto_ptr<SE: StorageEntity<SB>>(&self, ptr: StorageEntryPtr) -> StorageAutoPtr<SB, SE> {
     StorageAutoPtr {
       _marker: std::marker::PhantomData,
       sb: self.get_backend(),
@@ -24,7 +21,7 @@ pub trait StorageReader<SB: StorageBackend>: Sized {
   }
 
   fn read<T: for<'de> Deserialize<'de>>(
-    &mut self,
+    &self,
     ptr: StoragePtr<T>,
   ) -> Result<Option<T>, GenericError> {
     let data = match self.read_bytes(ptr)? {
@@ -36,7 +33,7 @@ pub trait StorageReader<SB: StorageBackend>: Sized {
   }
 
   fn read_or_err<T: for<'de> Deserialize<'de>>(
-    &mut self,
+    &self,
     ptr: StoragePtr<T>,
   ) -> Result<T, GenericError> {
     match self.read(ptr)? {
@@ -46,7 +43,7 @@ pub trait StorageReader<SB: StorageBackend>: Sized {
   }
 
   fn get_head<SE: StorageEntity<SB>>(
-    &mut self,
+    &self,
     head_ptr: StorageHeadPtr,
   ) -> Result<Option<SE>, GenericError> {
     let entry_ptr = match self.read(head_ptr)? {
@@ -60,6 +57,12 @@ pub trait StorageReader<SB: StorageBackend>: Sized {
     };
 
     SE::from_storage_entry(self, entry).map(Some)
+  }
+
+  fn get<SE: StorageEntity<SB>>(&self, ptr: StorageEntryPtr) -> Result<SE, GenericError> {
+    let entry = self.read(ptr)?.ok_or(error_str("Ptr not found"))?;
+
+    SE::from_storage_entry(self, entry)
   }
 }
 

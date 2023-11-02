@@ -58,7 +58,7 @@ impl<SB: StorageBackend> StorageEntity<SB> for Bytecode {
   }
 
   fn from_storage_entry<Tx: StorageReader<SB>>(
-    _tx: &mut Tx,
+    _tx: &Tx,
     entry: storage::StorageEntry,
   ) -> Result<Self, GenericError> {
     Ok(Bytecode::new(entry.data))

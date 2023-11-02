@@ -1,6 +1,6 @@
 use std::{process::exit, rc::Rc};
 
-use storage::{storage_head_ptr, SledBackend, Storage};
+use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
 use valuescript_compiler::asm;
 use valuescript_vm::{
   vs_value::{ToVal, Val},

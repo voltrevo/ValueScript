@@ -11,7 +11,7 @@ pub trait StorageEntity<SB: StorageBackend>: Sized {
   ) -> Result<StorageEntry, GenericError>;
 
   fn from_storage_entry<Tx: StorageReader<SB>>(
-    tx: &mut Tx,
+    tx: &Tx,
     entry: StorageEntry,
   ) -> Result<Self, GenericError>;
 }

@@ -1,4 +1,8 @@
-use std::{cell::RefCell, error::Error, rc::Weak};
+use std::{
+  cell::RefCell,
+  error::Error,
+  rc::{Rc, Weak},
+};
 
 use crate::{
   storage_io::{StorageReader, StorageTxMut},
@@ -28,4 +32,14 @@ pub trait StorageBackend: Sized {
 
   #[cfg(test)]
   fn len(&self) -> usize;
+}
+
+impl<SB: StorageBackend> StorageReader<SB> for Rc<RefCell<SB>> {
+  fn read_bytes<T>(&self, ptr: StoragePtr<T>) -> Result<Option<Vec<u8>>, GenericError> {
+    self.borrow().read_bytes(ptr)
+  }
+
+  fn get_backend(&self) -> Weak<RefCell<SB>> {
+    Rc::downgrade(self)
+  }
 }

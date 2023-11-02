@@ -404,7 +404,7 @@ static PAD_START: NativeFunction = native_fn(|this, params| {
         }
       }
 
-      prefix.push_str(string_data);
+      prefix.push_str(&string_data);
 
       prefix.to_val()
     }
@@ -426,7 +426,7 @@ static REPEAT: NativeFunction = native_fn(|this, params| {
       let mut result = String::new();
 
       for _ in 0..count {
-        result.push_str(string_data);
+        result.push_str(&string_data);
       }
 
       result.to_val()

@@ -49,15 +49,11 @@ impl Tag {
 
 impl<SB: StorageBackend + 'static> StorageEntity<SB> for Val {
   fn from_storage_entry<Tx: StorageReader<SB>>(
-    tx: &mut Tx,
+    tx: &Tx,
     entry: StorageEntry,
   ) -> Result<Self, GenericError> {
     let mut reader = StorageEntryReader::new(&entry);
     let res = read_from_entry(tx, &mut reader);
-    match &res {
-      Ok(val) => println!("val: {}", val.pretty()),
-      Err(_) => println!("error"),
-    }
     assert!(reader.done());
 
     res
@@ -267,7 +263,7 @@ fn write_ptr_to_entry<SB: StorageBackend + 'static, Tx: StorageTxMut<SB>>(
 }
 
 fn read_from_entry<SB: StorageBackend + 'static, Tx: StorageReader<SB>>(
-  tx: &mut Tx,
+  tx: &Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Val, GenericError> {
   let tag = Tag::from_byte(reader.read_u8()?)?;
@@ -400,7 +396,7 @@ fn read_symbol_from_entry(reader: &mut StorageEntryReader) -> Result<VsSymbol, B
 }
 
 fn read_ref_bytecode_from_entry<SB: StorageBackend, Tx: StorageReader<SB>>(
-  tx: &mut Tx,
+  tx: &Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Rc<Bytecode>, GenericError> {
   let ptr = reader.read_ref()?;

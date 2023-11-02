@@ -368,6 +368,7 @@ impl ValTrait for Val {
       Function(f) => LoadFunctionResult::StackFrame(f.make_frame()),
       Static(s) => s.load_function(),
       Dynamic(val) => val.load_function(),
+      StoragePtr(ptr) => ptr.get().load_function(),
 
       _ => LoadFunctionResult::NotAFunction,
     };
