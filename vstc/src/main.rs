@@ -2,6 +2,7 @@ mod assemble_command;
 mod compile_command;
 mod db_command;
 mod handle_diagnostics_cli;
+mod parse_command_line;
 mod resolve_entry_path;
 mod run_command;
 mod test_inputs;
