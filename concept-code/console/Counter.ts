@@ -1,4 +1,4 @@
-import ConsoleApp from "./ConsoleApp.ts";
+import type ConsoleApp from "./ConsoleApp.ts";
 
 type View = {
   offset: number;

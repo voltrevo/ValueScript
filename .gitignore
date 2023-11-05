@@ -4,3 +4,4 @@
 /baz.*
 /out.*
 .DS_Store
+*.vsdb

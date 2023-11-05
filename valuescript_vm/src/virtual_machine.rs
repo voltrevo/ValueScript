@@ -34,7 +34,7 @@ impl VirtualMachine {
   ) -> Result<Val, Val> {
     let mut frame = match fn_.load_function() {
       LoadFunctionResult::StackFrame(f) => f,
-      _ => return Err("bytecode does start with function".to_internal_error()),
+      _ => return Err("fn_ is not a function".to_internal_error()),
     };
 
     frame.write_this(false, take(this))?;

@@ -1,13 +1,14 @@
 use std::{io::Write, process::exit, rc::Rc};
 
 use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
-use valuescript_compiler::{asm, assemble, compile_str};
+use valuescript_compiler::{assemble, compile_str};
 use valuescript_vm::{
   vs_value::{ToVal, Val},
   Bytecode, DecoderMaker, VirtualMachine,
 };
 
 use crate::{
+  create_db::create_db,
   exit_command_failed::exit_command_failed,
   handle_diagnostics_cli::handle_diagnostics_cli,
   parse_command_line::parse_command_line,
@@ -83,47 +84,21 @@ fn show_help() {
 }
 
 fn db_new(storage: &mut Storage<SledBackend>, args: &[String]) {
-  let class_file = match args.get(0) {
-    Some(class_file) => class_file,
+  let class_path = match args.get(0) {
+    Some(class_path) => class_path,
     None => {
       exit_command_failed(args, Some("Missing class file"), "vstc db help");
     }
   };
-
-  let class = Rc::new(to_bytecode(format_from_path(class_file), class_file))
-    .decoder(0)
-    .decode_val(&mut vec![]);
 
   let args = args
     .get(1..)
     .unwrap_or_default()
     .iter()
     .map(|s| s.clone().to_val())
-    .collect::<Vec<_>>()
-    .to_val();
+    .collect::<Vec<_>>();
 
-  // TODO: Use compile_str instead. Need to implement rest params: `new Class(...args)`.
-  let create = asm::inline(
-    "export @create {}
-
-    @create = function (%class, %args) {
-      new %class %args %return
-    }",
-  );
-
-  let mut vm = VirtualMachine::default();
-
-  let instance = match vm.run(None, &mut Val::Undefined, create, vec![class, args]) {
-    Ok(instance) => instance,
-    Err(err) => {
-      println!("Uncaught exception: {}", err.pretty());
-      exit(1);
-    }
-  };
-
-  storage
-    .set_head(storage_head_ptr(b"state"), &instance)
-    .unwrap();
+  create_db(storage, class_path, &args).expect("Failed to write to db");
 
   println!("Created database");
 }

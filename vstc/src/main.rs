@@ -1,6 +1,7 @@
 mod assemble_command;
 mod compile_command;
 mod console_command;
+mod create_db;
 mod db_command;
 mod exit_command_failed;
 mod handle_diagnostics_cli;
