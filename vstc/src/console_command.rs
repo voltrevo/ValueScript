@@ -113,6 +113,7 @@ fn console_start(args: &[String]) {
   let mut app = ConsoleApp {
     ctx,
     stdout: MouseTerminal::from(stdout().into_raw_mode().unwrap()),
+    storage,
   };
 
   app.run();
@@ -121,6 +122,7 @@ fn console_start(args: &[String]) {
 struct ConsoleApp {
   ctx: Val,
   stdout: MouseTerminal<RawTerminal<Stdout>>,
+  storage: Storage<SledBackend>,
 }
 
 impl ConsoleApp {
@@ -154,6 +156,13 @@ impl ConsoleApp {
             .or_exit_uncaught();
 
           self.render();
+
+          let db = self.ctx.sub(&"db".to_val()).or_exit_uncaught();
+
+          self
+            .storage
+            .set_head(storage_head_ptr(b"state"), &db)
+            .unwrap();
         }
         termion::event::Event::Mouse(_) => {}
         termion::event::Event::Unsupported(_) => todo!(),
