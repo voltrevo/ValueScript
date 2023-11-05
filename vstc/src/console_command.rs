@@ -9,6 +9,7 @@ use std::{
 
 use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
 use termion::{
+  event::Key,
   input::{MouseTerminal, TermRead},
   raw::{IntoRawMode, RawTerminal},
 };
@@ -91,9 +92,9 @@ fn console_start(args: &[String]) {
       &mut db,
       inline_valuescript(
         "export default function() {
-        const db = this;
-        return db.createView();
-      }",
+          const db = this;
+          return db.createView();
+        }",
       ),
       vec![],
     )
@@ -132,23 +133,27 @@ impl ConsoleApp {
       match evt {
         termion::event::Event::Key(k) => {
           let key_str = match k {
-            termion::event::Key::Left => "ArrowLeft".to_string(),
-            termion::event::Key::Right => "ArrowRight".to_string(),
-            termion::event::Key::Up => "ArrowUp".to_string(),
-            termion::event::Key::Down => "ArrowDown".to_string(),
+            Key::Ctrl('c') | Key::Ctrl('d') => break,
+            Key::Left => "ArrowLeft".to_string(),
+            Key::Right => "ArrowRight".to_string(),
+            Key::Up => "ArrowUp".to_string(),
+            Key::Down => "ArrowDown".to_string(),
             _ => continue,
           };
 
-          write!(
-            self.stdout,
-            "{}{}{}",
-            termion::clear::All,
-            termion::cursor::Goto(1, 1),
-            key_str
-          )
-          .unwrap();
+          let on_key_down = self
+            .ctx
+            .sub(&"db".to_val())
+            .or_exit_uncaught()
+            .sub(&"onKeyDown".to_val())
+            .or_exit_uncaught();
 
-          self.stdout.flush().unwrap();
+          let mut vm = VirtualMachine::default();
+
+          vm.run(None, &mut self.ctx, on_key_down, vec![key_str.to_val()])
+            .or_exit_uncaught();
+
+          self.render();
         }
         termion::event::Event::Mouse(_) => {}
         termion::event::Event::Unsupported(_) => todo!(),
