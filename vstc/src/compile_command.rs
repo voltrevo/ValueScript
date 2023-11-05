@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::Write;
-use std::process::exit;
 
+use crate::exit_command_failed::exit_command_failed;
 use crate::resolve_entry_path::resolve_entry_path;
 
 use super::handle_diagnostics_cli::handle_diagnostics_cli;
@@ -10,9 +10,15 @@ use valuescript_compiler::compile;
 
 pub fn compile_command(args: &Vec<String>) {
   if args.len() != 3 {
-    println!("ERROR: Unrecognized command\n");
-    show_help();
-    exit(1);
+    exit_command_failed(args, None, "vstc compile --help");
+  }
+
+  match args.get(2).map(String::as_str) {
+    Some("--help") | Some("-h") => {
+      show_help();
+      return;
+    }
+    _ => {}
   }
 
   let resolved_entry_path = resolve_entry_path(&args[2]);

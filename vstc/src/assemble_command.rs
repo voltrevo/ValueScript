@@ -1,12 +1,10 @@
-use std::process::exit;
-
 use valuescript_compiler::{assemble, parse_module};
+
+use crate::exit_command_failed::exit_command_failed;
 
 pub fn assemble_command(args: &Vec<String>) {
   if args.len() != 3 {
-    println!("ERROR: Unrecognized command\n");
-    show_help();
-    exit(1);
+    exit_command_failed(args, None, "vstc assemble --help");
   }
 
   if args[2] == "-h" || args[2] == "--help" {

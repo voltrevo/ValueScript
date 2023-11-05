@@ -8,6 +8,7 @@ use valuescript_vm::{
 };
 
 use crate::{
+  exit_command_failed::exit_command_failed,
   handle_diagnostics_cli::handle_diagnostics_cli,
   parse_command_line::parse_command_line,
   to_bytecode::{format_from_path, to_bytecode},
@@ -34,9 +35,7 @@ pub fn db_command(args: &[String]) {
   let path = match args.get(2) {
     Some(path) => path.clone(),
     None => {
-      println!("ERROR: Missing db path\n");
-      show_help();
-      exit(1);
+      exit_command_failed(args, Some("Missing db path"), "vstc db help");
     }
   };
 
@@ -53,9 +52,7 @@ pub fn db_command(args: &[String]) {
         }
       }
 
-      println!("ERROR: Unrecognized db command {:?}\n", args);
-      show_help();
-      exit(1);
+      exit_command_failed(args, None, "vstc db help");
     }
   }
 }
@@ -89,9 +86,7 @@ fn db_new(storage: &mut Storage<SledBackend>, args: &[String]) {
   let class_file = match args.get(0) {
     Some(class_file) => class_file,
     None => {
-      println!("ERROR: Missing class file\n");
-      show_help();
-      exit(1);
+      exit_command_failed(args, Some("Missing class file"), "vstc db help");
     }
   };
 
@@ -136,11 +131,7 @@ fn db_new(storage: &mut Storage<SledBackend>, args: &[String]) {
 fn db_call(storage: &mut Storage<SledBackend>, args: &[String]) {
   let fn_file = match args.get(0) {
     Some(fn_file) => fn_file,
-    None => {
-      println!("ERROR: Missing function file\n");
-      show_help();
-      exit(1);
-    }
+    None => exit_command_failed(args, Some("Missing function file"), "vstc db help"),
   };
 
   let fn_ = Rc::new(to_bytecode(format_from_path(fn_file), fn_file))
@@ -236,7 +227,10 @@ fn db_interactive(storage: &mut Storage<SledBackend>) {
     let args = parse_command_line(&input);
 
     match args.get(0).map(|s| s.as_str()) {
-      // TODO: help (it's a bit different - code isn't quoted (TODO: quoted should work too))
+      Some("help") => {
+        // TODO: help (it's a bit different - code isn't quoted (TODO: quoted should work too))
+        println!("TODO: help");
+      }
       Some("exit" | "quit") => break,
       Some("new") => db_new(storage, args.get(1..).unwrap_or_default()),
       Some("call") => db_call(storage, args.get(1..).unwrap_or_default()),
@@ -245,7 +239,8 @@ fn db_interactive(storage: &mut Storage<SledBackend>) {
           break 'b db_run_inline(storage, &input);
         }
 
-        println!("ERROR: Unrecognized db command {:?}\n", args);
+        println!("Command failed: {:?}", args);
+        println!("  For help: help");
       }
     }
   }

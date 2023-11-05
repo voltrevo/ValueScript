@@ -2,6 +2,7 @@ mod assemble_command;
 mod compile_command;
 mod console_command;
 mod db_command;
+mod exit_command_failed;
 mod handle_diagnostics_cli;
 mod parse_command_line;
 mod resolve_entry_path;
@@ -11,7 +12,6 @@ mod test_inputs;
 mod to_bytecode;
 
 use std::env;
-use std::process::exit;
 
 use assemble_command::assemble_command;
 use compile_command::compile_command;
@@ -19,6 +19,8 @@ use console_command::console_command;
 use db_command::db_command;
 use run_command::run_command;
 use termion_test::termion_test;
+
+use crate::exit_command_failed::exit_command_failed;
 
 fn main() {
   let args: Vec<String> = env::args().collect();
@@ -31,11 +33,7 @@ fn main() {
     Some("db") => db_command(&args),
     Some("termion") => termion_test(),
     Some("console") => console_command(&args),
-    _ => {
-      println!("ERROR: Unrecognized command\n");
-      show_help();
-      exit(1);
-    }
+    _ => exit_command_failed(&args, None, "vstc help"),
   }
 }
 
