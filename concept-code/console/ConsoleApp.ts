@@ -9,7 +9,7 @@ type ConsoleApp<Db, View> = {
   render: (
     this: { db: Db; view: View },
     info: RenderInfo,
-  ) => string;
+  ) => string[] | undefined;
 
   onKeyDown: (this: { db: Db; view: View }, key: string) => void;
 };

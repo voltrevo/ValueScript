@@ -3,10 +3,9 @@ import type { RenderInfo } from "./ConsoleApp.ts";
 
 type View = {
   offset: number;
-};
+} | undefined;
 
-export default class ConsoleAppDemo
-  implements ConsoleApp<ConsoleAppDemo, View> {
+export default class Counter implements ConsoleApp<Counter, View> {
   value = 0;
 
   createView(): View {
@@ -14,18 +13,40 @@ export default class ConsoleAppDemo
   }
 
   render = function (
-    this: { db: ConsoleAppDemo; view: View },
+    this: { db: Counter; view: View },
     { screenWidth, screenHeight }: RenderInfo,
   ) {
-    return `${
-      " ".repeat(this.view.offset)
-    }${this.db.value}\n${screenWidth}x${screenHeight}`;
+    if (this.view === undefined) {
+      return undefined;
+    }
+
+    let wCenter = Math.floor(screenWidth / 2);
+    let hCenter = Math.floor(screenHeight / 2);
+
+    let lines = [];
+
+    for (let i = 0; i < hCenter; i++) {
+      lines.push("");
+    }
+
+    lines.push(" ".repeat(wCenter + this.view.offset) + this.db.value);
+
+    return lines;
   };
 
-  onKeyDown = function (this: { db: ConsoleAppDemo; view: View }, key: string) {
+  onKeyDown = function (this: { db: Counter; view: View }, key: string) {
+    if (this.view === undefined) {
+      return;
+    }
+
     switch (key) {
+      case "q": {
+        this.view = undefined;
+        break;
+      }
+
       case "ArrowLeft": {
-        this.view.offset = Math.max(0, this.view.offset - 1);
+        this.view.offset--;
         break;
       }
 

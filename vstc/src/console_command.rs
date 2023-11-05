@@ -141,6 +141,7 @@ impl ConsoleApp {
             Key::Right => "ArrowRight".to_string(),
             Key::Up => "ArrowUp".to_string(),
             Key::Down => "ArrowDown".to_string(),
+            Key::Char(c) => c.to_string(),
             _ => continue,
           };
 
@@ -200,20 +201,38 @@ impl ConsoleApp {
       .run(None, &mut self.ctx, render, vec![info])
       .or_exit_uncaught()
     {
-      Val::String(s) => {
+      Val::Array(arr) => {
         write!(
           self.stdout,
-          "{}{}{}",
+          "{}{}",
           termion::clear::All,
           termion::cursor::Goto(1, 1),
-          s
         )
         .unwrap();
 
+        for (i, line) in arr.elements.iter().enumerate() {
+          match line {
+            Val::String(s) => {
+              write!(
+                self.stdout,
+                "{}{}",
+                termion::cursor::Goto(1, (i as u16) + 1),
+                s
+              )
+              .unwrap();
+            }
+            line => {
+              println!("ERROR: Non-string line: {}", line.pretty());
+              exit(1);
+            }
+          }
+        }
+
         self.stdout.flush().unwrap();
       }
+      Val::Undefined => exit(0),
       non_str => {
-        println!("ERROR: Non-string render: {}", non_str.pretty());
+        println!("ERROR: Non-array render: {}", non_str.pretty());
         exit(1);
       }
     }
