@@ -12,3 +12,4 @@ storage = { path = "../storage" }
 url = "2.2.1"
 serde = "1.0"
 serde_qs = "0.8.0"
+termion = "2.0.1"
