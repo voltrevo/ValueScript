@@ -12,6 +12,7 @@ use termion::{
   event::Key,
   input::{MouseTerminal, TermRead},
   raw::{IntoRawMode, RawTerminal},
+  terminal_size,
 };
 use valuescript_compiler::{assemble, compile_str};
 use valuescript_vm::{
@@ -180,8 +181,23 @@ impl ConsoleApp {
       .sub(&"render".to_val())
       .or_exit_uncaught();
 
+    let (width, height) = terminal_size().unwrap();
+
+    let info = VsObject {
+      string_map: [
+        ("screenWidth".to_string(), (width as f64).to_val()),
+        ("screenHeight".to_string(), (height as f64).to_val()),
+      ]
+      .iter()
+      .cloned()
+      .collect(),
+      symbol_map: Default::default(),
+      prototype: Val::Void,
+    }
+    .to_val();
+
     match vm
-      .run(None, &mut self.ctx, render, vec![])
+      .run(None, &mut self.ctx, render, vec![info])
       .or_exit_uncaught()
     {
       Val::String(s) => {

@@ -1,4 +1,5 @@
 import type ConsoleApp from "./ConsoleApp.ts";
+import type { RenderInfo } from "./ConsoleApp.ts";
 
 type View = {
   offset: number;
@@ -12,8 +13,13 @@ export default class ConsoleAppDemo
     return { offset: 0 };
   }
 
-  render = function (this: { db: ConsoleAppDemo; view: View }) {
-    return `${" ".repeat(this.view.offset)}${this.db.value}`;
+  render = function (
+    this: { db: ConsoleAppDemo; view: View },
+    { screenWidth, screenHeight }: RenderInfo,
+  ) {
+    return `${
+      " ".repeat(this.view.offset)
+    }${this.db.value}\n${screenWidth}x${screenHeight}`;
   };
 
   onKeyDown = function (this: { db: ConsoleAppDemo; view: View }, key: string) {
