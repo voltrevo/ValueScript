@@ -8,7 +8,6 @@ mod handle_diagnostics_cli;
 mod parse_command_line;
 mod resolve_entry_path;
 mod run_command;
-mod termion_test;
 mod test_inputs;
 mod to_bytecode;
 
@@ -19,7 +18,6 @@ use compile_command::compile_command;
 use console_command::console_command;
 use db_command::db_command;
 use run_command::run_command;
-use termion_test::termion_test;
 
 use crate::exit_command_failed::exit_command_failed;
 
@@ -32,7 +30,6 @@ fn main() {
     Some("run") => run_command(&args),
     Some("compile") => compile_command(&args),
     Some("db") => db_command(&args),
-    Some("termion") => termion_test(),
     Some("console") => console_command(&args),
     _ => exit_command_failed(&args, None, "vstc help"),
   }
