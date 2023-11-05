@@ -1,12 +1,17 @@
 // use storage::{SledBackend, Storage};
 
 use std::{
+  io::{stdin, stdout, Stdout, Write},
   path::{Path, PathBuf},
   process::exit,
   rc::Rc,
 };
 
 use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
+use termion::{
+  input::{MouseTerminal, TermRead},
+  raw::{IntoRawMode, RawTerminal},
+};
 use valuescript_compiler::{assemble, compile_str};
 use valuescript_vm::{
   vs_object::VsObject,
@@ -94,7 +99,7 @@ fn console_start(args: &[String]) {
     )
     .or_exit_uncaught();
 
-  let mut ctx = VsObject {
+  let ctx = VsObject {
     string_map: [("db".to_string(), db), ("view".to_string(), view)]
       .iter()
       .cloned()
@@ -104,25 +109,84 @@ fn console_start(args: &[String]) {
   }
   .to_val();
 
-  loop {
-    let render = ctx
+  let mut app = ConsoleApp {
+    ctx,
+    stdout: MouseTerminal::from(stdout().into_raw_mode().unwrap()),
+  };
+
+  app.run();
+}
+
+struct ConsoleApp {
+  ctx: Val,
+  stdout: MouseTerminal<RawTerminal<Stdout>>,
+}
+
+impl ConsoleApp {
+  fn run(&mut self) {
+    self.render();
+
+    for c in stdin().events() {
+      let evt = c.unwrap();
+
+      match evt {
+        termion::event::Event::Key(k) => {
+          let key_str = match k {
+            termion::event::Key::Left => "ArrowLeft".to_string(),
+            termion::event::Key::Right => "ArrowRight".to_string(),
+            termion::event::Key::Up => "ArrowUp".to_string(),
+            termion::event::Key::Down => "ArrowDown".to_string(),
+            _ => continue,
+          };
+
+          write!(
+            self.stdout,
+            "{}{}{}",
+            termion::clear::All,
+            termion::cursor::Goto(1, 1),
+            key_str
+          )
+          .unwrap();
+
+          self.stdout.flush().unwrap();
+        }
+        termion::event::Event::Mouse(_) => {}
+        termion::event::Event::Unsupported(_) => todo!(),
+      }
+    }
+  }
+
+  fn render(&mut self) {
+    let mut vm = VirtualMachine::default();
+
+    let render = self
+      .ctx
       .sub(&"db".to_val())
       .or_exit_uncaught()
       .sub(&"render".to_val())
       .or_exit_uncaught();
 
-    match vm.run(None, &mut ctx, render, vec![]).or_exit_uncaught() {
+    match vm
+      .run(None, &mut self.ctx, render, vec![])
+      .or_exit_uncaught()
+    {
       Val::String(s) => {
-        println!("{}", s);
+        write!(
+          self.stdout,
+          "{}{}{}",
+          termion::clear::All,
+          termion::cursor::Goto(1, 1),
+          s
+        )
+        .unwrap();
+
+        self.stdout.flush().unwrap();
       }
       non_str => {
         println!("ERROR: Non-string render: {}", non_str.pretty());
         exit(1);
       }
     }
-
-    println!("TODO: handle events");
-    exit(1);
   }
 }
 
