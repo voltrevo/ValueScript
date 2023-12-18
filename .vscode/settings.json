@@ -1,7 +1,7 @@
 {
   "editor.rulers": [100],
   "editor.codeActionsOnSave": {
-    "source.fixAll": false
+    "source.fixAll": "explicit"
   },
   "editor.tabSize": 2,
   "deno.config": "./.vscode/deno.jsonc",
