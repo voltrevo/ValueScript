@@ -228,6 +228,29 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
     un_exp: &swc_ecma_ast::UnaryExpr,
     target_register: Option<Register>,
   ) -> CompiledExpression {
+    match UnaryOpType::from_unary_op(un_exp.op) {
+      UnaryOpType::Ordinary(ordinary_op) => {
+        self.ordinary_unary_expression(un_exp, ordinary_op, target_register)
+      }
+      UnaryOpType::Void => {
+        let arg = self.compile(&un_exp.arg, None);
+        self.fnc.release_ce(arg);
+
+        CompiledExpression::new(Value::Undefined, vec![])
+      }
+      UnaryOpType::Delete => {
+        self.todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
+        CompiledExpression::default()
+      }
+    }
+  }
+
+  pub fn ordinary_unary_expression(
+    &mut self,
+    un_exp: &swc_ecma_ast::UnaryExpr,
+    op: OrdinaryUnaryOp,
+    target_register: Option<Register>,
+  ) -> CompiledExpression {
     let mut nested_registers = Vec::<Register>::new();
 
     let arg = self.compile(&un_exp.arg, None);
@@ -241,16 +264,9 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
       Some(t) => t.clone(),
     };
 
-    self.fnc.push(
-      match make_unary_op(un_exp.op, arg.value.clone(), target.clone()) {
-        Some(i) => i,
-        None => {
-          self.todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
-
-          return CompiledExpression::empty();
-        }
-      },
-    );
+    self
+      .fnc
+      .push(op.make_instruction(arg.value.clone(), target.clone()));
 
     self.fnc.release_ce(arg);
 
@@ -1546,17 +1562,43 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
   }
 }
 
-pub fn make_unary_op(op: swc_ecma_ast::UnaryOp, arg: Value, dst: Register) -> Option<Instruction> {
-  use swc_ecma_ast::UnaryOp::*;
+pub enum UnaryOpType {
+  Ordinary(OrdinaryUnaryOp),
+  Void,
+  Delete,
+}
 
-  match op {
-    Minus => Some(Instruction::UnaryMinus(arg, dst)),
-    Plus => Some(Instruction::UnaryPlus(arg, dst)),
-    Bang => Some(Instruction::OpNot(arg, dst)),
-    Tilde => Some(Instruction::OpBitNot(arg, dst)),
-    TypeOf => Some(Instruction::TypeOf(arg, dst)),
-    Void => None,   // TODO
-    Delete => None, // TODO
+impl UnaryOpType {
+  fn from_unary_op(op: swc_ecma_ast::UnaryOp) -> Self {
+    match op {
+      swc_ecma_ast::UnaryOp::Minus => UnaryOpType::Ordinary(OrdinaryUnaryOp::Minus),
+      swc_ecma_ast::UnaryOp::Plus => UnaryOpType::Ordinary(OrdinaryUnaryOp::Plus),
+      swc_ecma_ast::UnaryOp::Bang => UnaryOpType::Ordinary(OrdinaryUnaryOp::Bang),
+      swc_ecma_ast::UnaryOp::Tilde => UnaryOpType::Ordinary(OrdinaryUnaryOp::Tilde),
+      swc_ecma_ast::UnaryOp::TypeOf => UnaryOpType::Ordinary(OrdinaryUnaryOp::TypeOf),
+      swc_ecma_ast::UnaryOp::Void => UnaryOpType::Void,
+      swc_ecma_ast::UnaryOp::Delete => UnaryOpType::Delete,
+    }
+  }
+}
+
+pub enum OrdinaryUnaryOp {
+  Minus,
+  Plus,
+  Bang,
+  Tilde,
+  TypeOf,
+}
+
+impl OrdinaryUnaryOp {
+  fn make_instruction(self, arg: Value, dst: Register) -> Instruction {
+    match self {
+      OrdinaryUnaryOp::Minus => Instruction::UnaryMinus(arg, dst),
+      OrdinaryUnaryOp::Plus => Instruction::UnaryPlus(arg, dst),
+      OrdinaryUnaryOp::Bang => Instruction::OpNot(arg, dst),
+      OrdinaryUnaryOp::Tilde => Instruction::OpBitNot(arg, dst),
+      OrdinaryUnaryOp::TypeOf => Instruction::TypeOf(arg, dst),
+    }
   }
 }
 

@@ -326,6 +326,11 @@ impl Assembler {
         self.value(value);
         self.register(dst);
       }
+      Delete(obj, sub, dst) => {
+        self.register(obj);
+        self.value(sub);
+        self.register(dst);
+      }
     }
   }
 

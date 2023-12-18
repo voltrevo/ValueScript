@@ -63,6 +63,7 @@ pub enum Instruction {
   Cat(Value, Register),
   Yield(Value, Register),
   YieldStar(Value, Register),
+  Delete(Register, Value, Register),
 }
 
 pub enum InstructionFieldMut<'a> {
@@ -218,6 +219,12 @@ impl Instruction {
       }
 
       UnsetCatch | RequireMutableThis => {}
+
+      Delete(obj, sub, dst) => {
+        visit(InstructionFieldMut::Register(obj));
+        visit(InstructionFieldMut::Value(sub));
+        visit(InstructionFieldMut::Register(dst));
+      }
     }
   }
 
@@ -351,6 +358,12 @@ impl Instruction {
       }
 
       UnsetCatch | RequireMutableThis => {}
+
+      Delete(obj, sub, dst) => {
+        visit(RegisterVisitMut::read_and_write(obj));
+        sub.visit_registers_mut_rev(visit);
+        visit(RegisterVisitMut::write(dst));
+      }
     }
   }
 
@@ -418,6 +431,7 @@ impl Instruction {
       Cat(..) => InstructionByte::Cat,
       Yield(..) => InstructionByte::Yield,
       YieldStar(..) => InstructionByte::YieldStar,
+      Delete(..) => InstructionByte::Delete,
     }
   }
 }
@@ -582,6 +596,7 @@ impl StructuredFormattable for Instruction {
       Instruction::YieldStar(value, register) => {
         sf.write_slice_joined(" ", &[&"yield*", value, register])
       }
+      Instruction::Delete(obj, sub, dst) => sf.write_slice_joined(" ", &[&"delete", obj, sub, dst]),
     }
   }
 }

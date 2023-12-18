@@ -202,6 +202,9 @@ where
       JmpIf(arg, _) | JmpIfNot(arg, _) => {
         self.value(Some(owner), arg);
       }
+      Delete(_obj, sub, _dst) => {
+        self.value(Some(owner), sub);
+      }
     };
   }
 

@@ -603,6 +603,10 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         return Ok(FrameStepOk::YieldStar(val));
       }
+
+      Delete => {
+        todo!()
+      }
     };
 
     Ok(FrameStepOk::Continue)

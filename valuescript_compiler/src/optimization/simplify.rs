@@ -238,6 +238,7 @@ fn is_jmp_instr(instr: &Instruction) -> bool {
     | Instruction::UnpackIterRes(..)
     | Instruction::Cat(..)
     | Instruction::Yield(..)
-    | Instruction::YieldStar(..) => false,
+    | Instruction::YieldStar(..)
+    | Instruction::Delete(..) => false,
   }
 }

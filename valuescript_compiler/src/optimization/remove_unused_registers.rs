@@ -256,7 +256,7 @@ fn identify_primary_registers(fn_: &mut Function) -> HashSet<String> {
       Instruction::Next(reg, _) => {
         primary_registers.insert(reg.name.clone());
       }
-      Instruction::Cat(value, _)
+      Instruction::Cat(value, _) // TODO: Why is the argument to cat a source of primary registers?
       | Instruction::Yield(value, _)
       | Instruction::YieldStar(value, _)
       | Instruction::JmpIf(value, _)

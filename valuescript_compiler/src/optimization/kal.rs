@@ -680,6 +680,11 @@ impl FnState {
         self.set(value_reg.name.clone(), Kal::Unknown);
         self.set(done.name.clone(), Kal::Unknown);
       }
+      Delete(obj, sub, dst) => {
+        self.set(obj.name.clone(), Kal::Unknown);
+        self.eval_arg(sub);
+        self.set(dst.name.clone(), Kal::Bool(true));
+      }
     }
 
     match instr {
@@ -746,7 +751,8 @@ impl FnState {
       | UnpackIterRes(_, _, _)
       | Cat(_, _)
       | Yield(_, _)
-      | YieldStar(_, _) => {}
+      | YieldStar(_, _)
+      | Delete(..) => {}
     }
   }
 
