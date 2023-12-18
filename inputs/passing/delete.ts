@@ -1,4 +1,4 @@
-// //! test_output({})
+//! test_output({})
 
 export default function main() {
   let x: Record<string, unknown> = { y: 3 };
