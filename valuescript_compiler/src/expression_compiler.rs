@@ -239,8 +239,48 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
         CompiledExpression::new(Value::Undefined, vec![])
       }
       UnaryOpType::Delete => {
-        self.todo(un_exp.span, &format!("Unary operator {:?}", un_exp.op));
-        CompiledExpression::default()
+        let member_expr = match &*un_exp.arg {
+          swc_ecma_ast::Expr::Member(e) => e,
+          _ => {
+            self.error(
+              un_exp.arg.span(),
+              "Cannot apply delete operator to non-member expression (ie bad: `delete x`, good: \
+                `delete x.y`)",
+            );
+
+            return CompiledExpression::new(
+              Value::Register(self.fnc.allocate_numbered_reg("_bad_delete")),
+              vec![],
+            );
+          }
+        };
+
+        let mut ta = TargetAccessor::compile(self, &member_expr.obj, true);
+        let obj_target = ta.read(self);
+
+        let prop = self.member_prop(&member_expr.prop, None);
+        let mut nested_registers = Vec::<Register>::new();
+
+        let dst = match target_register {
+          Some(t) => t,
+          None => {
+            let dst = self.fnc.allocate_tmp();
+            nested_registers.push(dst.clone());
+            dst
+          }
+        };
+
+        self.fnc.push(Instruction::Delete(
+          obj_target.clone(),
+          prop.value.clone(),
+          dst.clone(),
+        ));
+
+        self.fnc.release_ce(prop);
+
+        ta.packup(self, false);
+
+        CompiledExpression::new(Value::Register(dst), nested_registers)
       }
     }
   }
