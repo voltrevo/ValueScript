@@ -9,6 +9,7 @@ use crate::bytecode_decoder::BytecodeType;
 use crate::cat_stack_frame::CatStackFrame;
 use crate::native_function::ThisWrapper;
 use crate::operations;
+use crate::operations::op_delete;
 use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, StackFrame, StackFrameTrait};
@@ -605,7 +606,24 @@ impl StackFrameTrait for BytecodeStackFrame {
       }
 
       Delete => {
-        todo!()
+        let obj_i = self
+          .decoder
+          .decode_register_index()
+          .expect("Need reg index for delete");
+
+        let mut obj = take(&mut self.registers[obj_i]);
+
+        let prop = self.decoder.decode_val(&mut self.registers);
+
+        op_delete(&mut obj, &prop)?;
+
+        if let Some(i) = self.decoder.decode_register_index() {
+          self.registers[i] = Val::Bool(true);
+        }
+
+        self.registers[obj_i] = obj;
+
+        return Ok(FrameStepOk::Continue);
       }
     };
 

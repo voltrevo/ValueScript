@@ -693,6 +693,57 @@ pub fn op_submov(target: &mut Val, subscript: &Val, value: Val) -> Result<(), Va
   }
 }
 
+pub fn op_delete(target: &mut Val, subscript: &Val) -> Result<(), Val> {
+  match target {
+    Val::Void => Err("Internal: Shouldn't happen".to_internal_error()), // TODO: Internal errors
+    Val::Undefined => Err("Cannot delete from undefined".to_type_error()),
+    Val::Null => Err("Cannot delete from null".to_type_error()),
+    Val::Bool(_) => Err("Cannot delete from bool".to_type_error()),
+    Val::Number(_) => Err("Cannot delete from number".to_type_error()),
+    Val::BigInt(_) => Err("Cannot delete from bigint".to_type_error()),
+    Val::Symbol(_) => Err("Cannot delete from symbol".to_type_error()),
+    Val::String(_) => Err("Cannot delete from string".to_type_error()),
+    Val::Array(array_data) => {
+      let subscript_index = match subscript.to_index() {
+        // TODO: Internal errors
+        None => return Err("TODO: non-uint array subscript deletion".to_type_error()),
+        Some(i) => i,
+      };
+
+      let array_data_mut = Rc::make_mut(array_data);
+
+      if subscript_index < array_data_mut.elements.len() {
+        array_data_mut.elements[subscript_index] = Val::Void;
+      }
+
+      Ok(())
+    }
+    Val::Object(object_data) => {
+      let object_data_mut = Rc::make_mut(object_data);
+
+      match subscript {
+        Val::String(string) => object_data_mut.string_map.remove(&string.to_string()),
+        Val::Symbol(symbol) => object_data_mut.symbol_map.remove(symbol),
+        _ => object_data_mut.string_map.remove(&subscript.to_string()),
+      };
+
+      Ok(())
+    }
+    Val::Function(_) => Err("TODO: function subscript assignment".to_type_error()),
+    Val::Class(_) => Err("Cannot delete from class".to_type_error()),
+    Val::Static(_) => Err("Cannot delete from static value".to_type_error()),
+    Val::Dynamic(_) => Err("TODO: Delete from dynamic value".to_type_error()),
+    Val::CopyCounter(_) => Err("Cannot delete from CopyCounter".to_type_error()),
+    Val::StoragePtr(ptr) => {
+      let mut val = ptr.get();
+      op_delete(&mut val, subscript)?;
+      *target = val;
+
+      Ok(())
+    }
+  }
+}
+
 pub fn ecma_is_less_than(x: &Val, y: &Val) -> Option<bool> {
   let px = x.to_primitive();
   let py = y.to_primitive();
