@@ -25,7 +25,7 @@ impl<SB: StorageBackend> ValResolver for StorageValAutoPtr<SB> {
     };
 
     let borrow = sb.borrow();
-    let mut read_cache = borrow.get_read_cache();
+    let read_cache = borrow.get_read_cache();
 
     if let Some(cache_box) = read_cache.get(&self.ptr.ptr.data) {
       if let Some(cache_val) = cache_box.downcast_ref::<Val>() {
@@ -33,8 +33,12 @@ impl<SB: StorageBackend> ValResolver for StorageValAutoPtr<SB> {
       }
     }
 
+    drop(read_cache);
+
     let entry = sb.read(self.ptr.ptr).unwrap().expect("Unresolved ptr");
     let res = Val::from_storage_entry(&sb, entry).expect("Failed to deserialize Val");
+
+    let mut read_cache = borrow.get_read_cache();
 
     read_cache.insert(self.ptr.ptr.data, Box::new(res.clone()));
 
@@ -64,6 +68,9 @@ impl VsStoragePtr {
   pub fn new<SB: StorageBackend + 'static>(auto_ptr: StorageAutoPtr<SB, Val>) -> Self {
     Self {
       resolver: Box::new(StorageValAutoPtr { ptr: auto_ptr }),
+
+      // TODO: Since there's also caching in the storage backend's read_cache, is it worthwhile to
+      // cache here too? (Perf test.)
       cache: RefCell::new(None),
     }
   }

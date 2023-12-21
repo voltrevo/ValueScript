@@ -399,11 +399,29 @@ fn read_ref_bytecode_from_entry<SB: StorageBackend, Tx: StorageReader<SB>>(
   tx: &Tx,
   reader: &mut StorageEntryReader,
 ) -> Result<Rc<Bytecode>, GenericError> {
+  let ref_cell = tx
+    .get_backend()
+    .upgrade()
+    .ok_or(Into::<Box<dyn Error>>::into("Storage backend missing"))?;
+
   let ptr = reader.read_ref()?;
+
+  let borrow = ref_cell.borrow();
+  let mut read_cache = borrow.get_read_cache();
+
+  if let Some(cache_box) = read_cache.get(&ptr.data) {
+    if let Some(cache_val) = cache_box.downcast_ref::<Rc<Bytecode>>() {
+      return Ok(cache_val.clone());
+    }
+  }
+
   let entry = tx.read_or_err(ptr)?;
 
-  // TODO: Cached reads
-  Ok(Rc::new(Bytecode::from_storage_entry(tx, entry)?))
+  let res = Rc::new(Bytecode::from_storage_entry(tx, entry)?);
+
+  read_cache.insert(ptr.data, Box::new(res.clone()));
+
+  Ok(res)
 }
 
 fn write_ref_bytecode_to_entry<SB: StorageBackend, Tx: StorageTxMut<SB>>(
