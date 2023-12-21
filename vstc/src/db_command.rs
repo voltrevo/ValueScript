@@ -1,4 +1,11 @@
-use std::{io::Write, process::exit, rc::Rc};
+use std::{
+  io::Write,
+  process::exit,
+  rc::Rc,
+  sync::{Arc, Mutex},
+};
+
+use actix_web::{web, App, HttpRequest, HttpServer, Responder};
 
 use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
 use valuescript_compiler::{assemble, compile_str};
@@ -40,16 +47,17 @@ pub fn db_command(args: &[String]) {
     }
   };
 
-  let mut storage = Storage::new(SledBackend::open(path).unwrap());
+  // let mut storage = Storage::new(SledBackend::open(path).unwrap());
 
   match args.get(3).map(|s| s.as_str()) {
-    Some("new") => db_new(&mut storage, args.get(4..).unwrap_or_default()),
-    Some("call") => db_call(&mut storage, args.get(4..).unwrap_or_default()),
-    Some("-i") => db_interactive(&mut storage),
+    Some("new") => db_new(&path, args.get(4..).unwrap_or_default()),
+    Some("call") => db_call(&path, args.get(4..).unwrap_or_default()),
+    Some("host") => db_host(&path, args.get(4..).unwrap_or_default()),
+    Some("-i") => db_interactive(&path),
     arg => 'b: {
       if let Some(arg) = arg {
         if arg.starts_with('{') || arg.starts_with('(') {
-          break 'b db_run_inline(&mut storage, arg);
+          break 'b db_run_inline(&path, arg);
         }
       }
 
@@ -83,7 +91,11 @@ fn show_help() {
   println!("  vstc db path/widget.vsdb -i                  Enter interactive mode");
 }
 
-fn db_new(storage: &mut Storage<SledBackend>, args: &[String]) {
+fn make_storage(path: &String) -> Storage<SledBackend> {
+  Storage::new(SledBackend::open(path).unwrap())
+}
+
+fn db_new(path: &String, args: &[String]) {
   let class_path = match args.get(0) {
     Some(class_path) => class_path,
     None => {
@@ -98,12 +110,12 @@ fn db_new(storage: &mut Storage<SledBackend>, args: &[String]) {
     .map(|s| s.clone().to_val())
     .collect::<Vec<_>>();
 
-  create_db(storage, class_path, &args).expect("Failed to write to db");
+  create_db(&mut make_storage(path), class_path, &args).expect("Failed to write to db");
 
   println!("Created database");
 }
 
-fn db_call(storage: &mut Storage<SledBackend>, args: &[String]) {
+fn db_call(path: &String, args: &[String]) {
   let fn_file = match args.get(0) {
     Some(fn_file) => fn_file,
     None => exit_command_failed(args, Some("Missing function file"), "vstc db help"),
@@ -121,6 +133,8 @@ fn db_call(storage: &mut Storage<SledBackend>, args: &[String]) {
     .collect::<Vec<_>>();
 
   let mut vm = VirtualMachine::default();
+
+  let mut storage = make_storage(path);
 
   let mut instance = storage
     .get_head(storage_head_ptr(b"state"))
@@ -142,8 +156,66 @@ fn db_call(storage: &mut Storage<SledBackend>, args: &[String]) {
     .unwrap();
 }
 
-fn db_run_inline(storage: &mut Storage<SledBackend>, source: &str) {
+async fn handle_request(req: HttpRequest) -> impl Responder {
+  let path = req.path();
+  let method = req.method();
+  format!("Handled {} request for {}", method, path)
+}
+
+fn db_host(path: &String, args: &[String]) {
+  if !args.is_empty() {
+    // TODO
+    exit_command_failed(
+      args,
+      Some("Not implemented: host arguments"),
+      "vstc db help",
+    );
+  }
+
+  // let storage = Arc::new(Mutex::new(make_storage(path)));
+
+  let runtime = tokio::runtime::Builder::new_current_thread() // TODO: Multi-thread?
+    .enable_all()
+    .build()
+    .unwrap();
+
+  runtime.block_on(async {
+    HttpServer::new(|| {
+      App::new()
+        //.app_data(web::Data::new(storage.clone()))
+        .default_service(web::route().to(handle_request))
+    })
+    .bind("127.0.0.1:8080")
+    .unwrap()
+    .run()
+    .await
+    .unwrap();
+  });
+
+  // let mut instance = storage
+  //   .get_head(storage_head_ptr(b"state"))
+  //   .unwrap()
+  //   .unwrap();
+
+  // match vm.run(None, &mut instance, fn_, args) {
+  //   Ok(res) => {
+  //     println!("{}", res.pretty());
+  //   }
+  //   Err(err) => {
+  //     println!("Uncaught exception: {}", err.pretty());
+  //     exit(1);
+  //   }
+  // }
+
+  // storage
+  //   .set_head(storage_head_ptr(b"state"), &instance)
+  //   .unwrap();
+}
+
+fn db_run_inline(path: &String, source: &str) {
   let mut vm = VirtualMachine::default();
+
+  let mut storage = make_storage(path);
 
   let mut instance = storage
     .get_head::<Val>(storage_head_ptr(b"state"))
@@ -190,7 +262,7 @@ fn db_run_inline(storage: &mut Storage<SledBackend>, source: &str) {
     .unwrap();
 }
 
-fn db_interactive(storage: &mut Storage<SledBackend>) {
+fn db_interactive(path: &String) {
   loop {
     let mut input = String::new();
 
@@ -207,11 +279,11 @@ fn db_interactive(storage: &mut Storage<SledBackend>) {
         println!("TODO: help");
       }
       Some("exit" | "quit") => break,
-      Some("new") => db_new(storage, args.get(1..).unwrap_or_default()),
-      Some("call") => db_call(storage, args.get(1..).unwrap_or_default()),
+      Some("new") => db_new(path, args.get(1..).unwrap_or_default()),
+      Some("call") => db_call(path, args.get(1..).unwrap_or_default()),
       _ => 'b: {
         if input.starts_with('{') || input.starts_with('(') {
-          break 'b db_run_inline(storage, &input);
+          break 'b db_run_inline(path, &input);
         }
 
         println!("Command failed: {:?}", args);
