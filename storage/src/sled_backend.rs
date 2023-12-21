@@ -1,4 +1,10 @@
-use std::{cell::RefCell, collections::HashMap, error::Error, fmt::Display, rc::Weak};
+use std::{
+  cell::{RefCell, RefMut},
+  collections::HashMap,
+  error::Error,
+  fmt::Display,
+  rc::Weak,
+};
 
 use sled::transaction::{
   ConflictableTransactionError, TransactionError, UnabortableTransactionError,
@@ -8,11 +14,12 @@ use crate::{
   rc_key::RcKey,
   storage_io::{StorageReader, StorageTxMut},
   storage_ptr::StorageEntryPtr,
-  GenericError, StorageBackend, StoragePtr,
+  GenericError, ReadCache, StorageBackend, StoragePtr,
 };
 
 pub struct SledBackend {
   db: sled::Db,
+  read_cache: RefCell<ReadCache>,
 }
 
 impl SledBackend {
@@ -22,12 +29,14 @@ impl SledBackend {
   {
     Ok(Self {
       db: sled::open(path)?,
+      read_cache: Default::default(),
     })
   }
 
   pub fn open_in_memory() -> Result<Self, sled::Error> {
     Ok(Self {
       db: sled::Config::new().temporary(true).open()?,
+      read_cache: Default::default(),
     })
   }
 }
@@ -89,6 +98,10 @@ impl StorageBackend for SledBackend {
 
   fn is_empty(&self) -> bool {
     self.db.is_empty()
+  }
+
+  fn get_read_cache(&self) -> RefMut<ReadCache> {
+    self.read_cache.borrow_mut()
   }
 
   #[cfg(test)]

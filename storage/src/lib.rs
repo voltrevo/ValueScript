@@ -6,6 +6,7 @@ mod demo_val;
 
 mod errors;
 mod rc_key;
+mod read_cache;
 mod sled_backend;
 mod storage_auto_ptr;
 mod storage_backend;
@@ -21,6 +22,7 @@ pub use self::storage_io::{StorageReader, StorageTxMut};
 pub use errors::GenericError;
 pub use memory_backend::MemoryBackend;
 pub use rc_key::RcKey;
+pub use read_cache::ReadCache;
 pub use sled_backend::SledBackend;
 pub use storage_auto_ptr::StorageAutoPtr;
 pub use storage_entity::StorageEntity;

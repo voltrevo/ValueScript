@@ -1,21 +1,28 @@
-use std::{cell::RefCell, collections::HashMap, error::Error, rc::Weak};
+use std::{
+  cell::{RefCell, RefMut},
+  collections::HashMap,
+  error::Error,
+  rc::Weak,
+};
 
 use crate::{
   rc_key::RcKey,
   storage_io::{StorageReader, StorageTxMut},
   storage_ptr::StorageEntryPtr,
-  GenericError, StorageBackend, StoragePtr,
+  GenericError, ReadCache, StorageBackend, StoragePtr,
 };
 
 #[derive(Default)]
 pub struct MemoryBackend {
   data: HashMap<(u64, u64, u64), Vec<u8>>,
+  read_cache: RefCell<ReadCache>,
 }
 
 impl MemoryBackend {
   pub fn new() -> Self {
     Self {
       data: HashMap::new(),
+      read_cache: Default::default(),
     }
   }
 }
@@ -65,6 +72,10 @@ impl StorageBackend for MemoryBackend {
 
   fn is_empty(&self) -> bool {
     self.data.is_empty()
+  }
+
+  fn get_read_cache(&self) -> RefMut<ReadCache> {
+    self.read_cache.borrow_mut()
   }
 
   #[cfg(test)]

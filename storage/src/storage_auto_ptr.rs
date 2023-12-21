@@ -6,7 +6,7 @@ use crate::{StorageBackend, StorageEntity, StorageEntryPtr};
 
 pub struct StorageAutoPtr<SB: StorageBackend, SE: StorageEntity<SB>> {
   pub(crate) _marker: std::marker::PhantomData<SE>,
-  pub(crate) sb: Weak<RefCell<SB>>, // TODO: Does this need to be weak?
+  pub sb: Weak<RefCell<SB>>, // TODO: Does this need to be weak?
   pub ptr: StorageEntryPtr,
 }
 

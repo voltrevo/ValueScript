@@ -1,12 +1,12 @@
 use std::{
-  cell::RefCell,
+  cell::{RefCell, RefMut},
   error::Error,
   rc::{Rc, Weak},
 };
 
 use crate::{
   storage_io::{StorageReader, StorageTxMut},
-  GenericError, StoragePtr,
+  GenericError, ReadCache, StoragePtr,
 };
 
 pub trait StorageBackend: Sized {
@@ -29,6 +29,8 @@ pub trait StorageBackend: Sized {
     F: Fn(&mut Self::TxMut<'_>) -> Result<T, GenericError>;
 
   fn is_empty(&self) -> bool;
+
+  fn get_read_cache(&self) -> RefMut<ReadCache>;
 
   #[cfg(test)]
   fn len(&self) -> usize;

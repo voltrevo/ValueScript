@@ -4,7 +4,7 @@ use std::{
   rc::Rc,
 };
 
-use storage::{StorageAutoPtr, StorageBackend, StorageEntryPtr};
+use storage::{StorageAutoPtr, StorageBackend, StorageEntity, StorageEntryPtr, StorageReader};
 
 use crate::vs_value::{ToVal, Val};
 
@@ -19,7 +19,26 @@ pub struct StorageValAutoPtr<SB: StorageBackend + 'static> {
 
 impl<SB: StorageBackend> ValResolver for StorageValAutoPtr<SB> {
   fn resolve(&self) -> Val {
-    self.ptr.resolve().unwrap().unwrap()
+    let sb = match self.ptr.sb.upgrade() {
+      Some(sb) => sb,
+      None => panic!("Storage backend dropped"),
+    };
+
+    let borrow = sb.borrow();
+    let mut read_cache = borrow.get_read_cache();
+
+    if let Some(cache_box) = read_cache.get(&self.ptr.ptr.data) {
+      if let Some(cache_val) = cache_box.downcast_ref::<Val>() {
+        return cache_val.clone();
+      }
+    }
+
+    let entry = sb.read(self.ptr.ptr).unwrap().expect("Unresolved ptr");
+    let res = Val::from_storage_entry(&sb, entry).expect("Failed to deserialize Val");
+
+    read_cache.insert(self.ptr.ptr.data, Box::new(res.clone()));
+
+    res
   }
 
   fn ptr(&self) -> StorageEntryPtr {
