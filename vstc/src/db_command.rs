@@ -1,15 +1,14 @@
-use std::{
-  io::Write,
-  process::exit,
-  rc::Rc,
-  sync::{Arc, Mutex},
+use std::{io::Write, process::exit, rc::Rc};
+
+use actix_web::{
+  web::{self},
+  App, HttpRequest, HttpResponse, HttpServer, Responder,
 };
 
-use actix_web::{web, App, HttpRequest, HttpServer, Responder};
-
 use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
-use valuescript_compiler::{assemble, compile_str};
+use valuescript_compiler::{assemble, compile_str, inline_valuescript};
 use valuescript_vm::{
+  vs_object::VsObject,
   vs_value::{ToVal, Val},
   Bytecode, DecoderMaker, VirtualMachine,
 };
@@ -156,13 +155,82 @@ fn db_call(path: &String, args: &[String]) {
     .unwrap();
 }
 
-async fn handle_request(req: HttpRequest) -> impl Responder {
+async fn handle_request(req: HttpRequest, data: web::Data<String>) -> impl Responder {
   let path = req.path();
   let method = req.method();
-  format!("Handled {} request for {}", method, path)
+  let mut storage = Storage::new(SledBackend::open(data.as_ref()).unwrap());
+
+  // let body = Val::from_json(
+  //   &web::Json::<serde_json::Value>::from_request(&req, &mut Payload::None)
+  //     .await
+  //     .unwrap()
+  //     .into_inner(),
+  // );
+  let body = Val::Undefined;
+
+  let mut instance: Val = storage
+    .get_head(storage_head_ptr(b"state"))
+    .unwrap()
+    .unwrap();
+
+  let fn_ = inline_valuescript(
+    r#"
+      export default function(req) {
+        if ("handleRequest" in this) {
+          return this.handleRequest(req);
+        }
+
+        const handlerName = `${req.method} ${req.path}`;
+
+        if (!this[handlerName]) {
+          throw new Error("No handler for request");
+        }
+
+        if (req.method === "GET") {
+          // Enforce GET as read-only
+          const state = this;
+          return state[handlerName](req.body);
+        }
+
+        return this[handlerName](req.body);
+      }
+    "#,
+  );
+
+  let req_val = VsObject {
+    string_map: vec![
+      ("path".to_string(), path.to_val()),
+      ("method".to_string(), method.to_string().to_val()),
+      ("body".to_string(), body),
+    ]
+    .into_iter()
+    .collect(),
+    symbol_map: vec![].into_iter().collect(),
+    prototype: Val::Void,
+  }
+  .to_val();
+
+  let mut vm = VirtualMachine::default();
+
+  let res = match vm.run(None, &mut instance, fn_, vec![req_val]) {
+    Ok(res) => match res.to_json() {
+      Some(json) => HttpResponse::Ok().json(json),
+      None => HttpResponse::InternalServerError().body("Failed to serialize response"),
+    },
+    Err(err) => {
+      println!("Uncaught exception: {}", err.pretty());
+      HttpResponse::InternalServerError().body("Uncaught exception")
+    }
+  };
+
+  storage
+    .set_head(storage_head_ptr(b"state"), &instance)
+    .unwrap();
+
+  res
 }
 
-fn db_host(path: &String, args: &[String]) {
+fn db_host(path: &str, args: &[String]) {
   if !args.is_empty() {
     // TODO
     exit_command_failed(
@@ -172,17 +240,18 @@ fn db_host(path: &String, args: &[String]) {
     );
   }
 
-  // let storage = Arc::new(Mutex::new(make_storage(path)));
+  let path = path.to_owned();
 
-  let runtime = tokio::runtime::Builder::new_current_thread() // TODO: Multi-thread?
+  // TODO: Multi-thread?
+  let runtime = tokio::runtime::Builder::new_current_thread()
     .enable_all()
     .build()
     .unwrap();
 
   runtime.block_on(async {
-    HttpServer::new(|| {
+    HttpServer::new(move || {
       App::new()
-        //.app_data(web::Data::new(storage.clone()))
+        .app_data(web::Data::new(path.clone()))
         .default_service(web::route().to(handle_request))
     })
     .bind("127.0.0.1:8080")
@@ -191,25 +260,6 @@ fn db_host(path: &String, args: &[String]) {
     .await
     .unwrap();
   });
-
-  // let mut instance = storage
-  //   .get_head(storage_head_ptr(b"state"))
-  //   .unwrap()
-  //   .unwrap();
-
-  // match vm.run(None, &mut instance, fn_, args) {
-  //   Ok(res) => {
-  //     println!("{}", res.pretty());
-  //   }
-  //   Err(err) => {
-  //     println!("Uncaught exception: {}", err.pretty());
-  //     exit(1);
-  //   }
-  // }
-
-  // storage
-  //   .set_head(storage_head_ptr(b"state"), &instance)
-  //   .unwrap();
 }
 
 fn db_run_inline(path: &String, source: &str) {

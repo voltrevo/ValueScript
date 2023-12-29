@@ -4,7 +4,6 @@ use std::{
   io::{stdin, stdout, Stdout, Write},
   path::{Path, PathBuf},
   process::exit,
-  rc::Rc,
 };
 
 use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
@@ -14,11 +13,11 @@ use termion::{
   raw::{IntoRawMode, RawTerminal},
   terminal_size,
 };
-use valuescript_compiler::{assemble, compile_str};
+use valuescript_compiler::inline_valuescript;
 use valuescript_vm::{
   vs_object::VsObject,
   vs_value::{ToVal, Val},
-  Bytecode, DecoderMaker, ValTrait, VirtualMachine,
+  ValTrait, VirtualMachine,
 };
 
 use crate::{create_db::create_db, exit_command_failed::exit_command_failed};
@@ -268,14 +267,6 @@ fn make_db_path(class_path: &str) -> String {
 
   // Convert the PathBuf back to a String and return it
   new_path.to_str().unwrap_or_default().to_string()
-}
-
-fn inline_valuescript(source: &str) -> Val {
-  Rc::new(Bytecode::new(assemble(
-    &compile_str(source).module.unwrap(),
-  )))
-  .decoder(0)
-  .decode_val(&mut vec![])
 }
 
 trait OrExitUncaught {

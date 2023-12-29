@@ -1820,9 +1820,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.79"
+version = "1.0.108"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e8d9fa5c3b304765ce1fd9c4c8a3de2c8db365a5b91be52f186efc675681d95"
+checksum = "3d1c7e3eac408d115102c4c24ad393e0821bb3a5df4d506a80f85f7a742a526b"
 dependencies = [
  "itoa",
  "ryu",
@@ -3045,6 +3045,7 @@ dependencies = [
  "num-bigint",
  "num-derive",
  "num-traits",
+ "serde_json",
  "storage",
  "valuescript_common",
 ]
@@ -3082,6 +3083,7 @@ version = "0.1.0"
 dependencies = [
  "actix-web",
  "serde",
+ "serde_json",
  "serde_qs",
  "storage",
  "termion",

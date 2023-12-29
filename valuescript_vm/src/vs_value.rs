@@ -1,5 +1,6 @@
 use core::fmt;
 use std::any::Any;
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -163,6 +164,86 @@ impl Val {
     match self {
       Val::String(_) => self,
       _ => self.to_string().to_val(),
+    }
+  }
+
+  pub fn from_json(json: &serde_json::Value) -> Val {
+    match json {
+      serde_json::Value::Null => Val::Null,
+      serde_json::Value::Bool(b) => Val::Bool(*b),
+      serde_json::Value::Number(n) => {
+        if let Some(n) = n.as_f64() {
+          Val::Number(n)
+        } else {
+          // TODO: Is this possible? If so, handle without panicking.
+          panic!("Non-f64 number")
+        }
+      }
+      serde_json::Value::String(s) => s.clone().to_val(),
+      serde_json::Value::Array(arr) => {
+        let mut elements = Vec::new();
+
+        for elem in arr {
+          elements.push(Val::from_json(elem));
+        }
+
+        elements.to_val()
+      }
+      serde_json::Value::Object(obj) => {
+        let mut string_map = BTreeMap::new();
+
+        for (k, v) in obj {
+          string_map.insert(k.clone(), Val::from_json(v));
+        }
+
+        VsObject {
+          string_map,
+          symbol_map: BTreeMap::new(),
+          prototype: Val::Void,
+        }
+        .to_val()
+      }
+    }
+  }
+
+  pub fn to_json(&self) -> Option<serde_json::Value> {
+    match self {
+      Val::Void => Some(serde_json::Value::Null),
+      Val::Undefined => Some(serde_json::Value::Null),
+      Val::Null => Some(serde_json::Value::Null),
+      Val::Bool(b) => Some(serde_json::Value::Bool(*b)),
+      Val::Number(n) => Some(serde_json::Value::Number(serde_json::Number::from_f64(*n)?)),
+      Val::BigInt(_) => None,
+      Val::Symbol(_) => None,
+      Val::String(s) => Some(serde_json::Value::String(s.to_string())),
+      Val::Array(arr) => {
+        let mut elements = Vec::new();
+
+        for elem in &arr.elements {
+          if let Some(elem) = elem.to_json() {
+            elements.push(elem);
+          } else {
+            return None;
+          }
+        }
+
+        Some(serde_json::Value::Array(elements))
+      }
+      Val::Object(obj) => {
+        let mut string_map = serde_json::Map::new();
+
+        for (k, v) in &obj.string_map {
+          string_map.insert(k.clone(), v.to_json()?);
+        }
+
+        Some(serde_json::Value::Object(string_map))
+      }
+      Val::Function(_) => None,
+      Val::Class(_) => None,
+      Val::Static(_) => None,
+      Val::Dynamic(_) => None,
+      Val::CopyCounter(_) => None,
+      Val::StoragePtr(ptr) => ptr.get().to_json(),
     }
   }
 }
