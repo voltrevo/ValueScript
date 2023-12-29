@@ -1,8 +1,6 @@
 use std::{io::Write, process::exit, rc::Rc};
 
-use actix_web::{
-  dev::Payload, web, App, FromRequest, HttpRequest, HttpResponse, HttpServer, Responder,
-};
+use actix_web::{dev, web, App, FromRequest, HttpRequest, HttpResponse, HttpServer, Responder};
 
 use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
 use valuescript_compiler::{assemble, compile_str, inline_valuescript};
@@ -154,8 +152,8 @@ fn db_call(path: &String, args: &[String]) {
     .unwrap();
 }
 
-async fn get_body(req: &HttpRequest) -> Result<Val, actix_web::Error> {
-  let payload = web::Payload::from_request(req, &mut Payload::None).await?;
+async fn get_body(req: &HttpRequest, mut payload: dev::Payload) -> Result<Val, actix_web::Error> {
+  let payload = web::Payload::from_request(req, &mut payload).await?;
 
   let body = payload
     .to_bytes_limited(1_024 * 1_024)
@@ -172,12 +170,16 @@ async fn get_body(req: &HttpRequest) -> Result<Val, actix_web::Error> {
   }
 }
 
-async fn handle_request(req: HttpRequest, data: web::Data<String>) -> impl Responder {
+async fn handle_request(
+  req: HttpRequest,
+  payload: web::Payload,
+  data: web::Data<String>,
+) -> impl Responder {
   let path = req.path();
   let method = req.method();
   let mut storage = Storage::new(SledBackend::open(data.as_ref()).unwrap());
 
-  let body = match get_body(&req).await {
+  let body = match get_body(&req, payload.into_inner()).await {
     Ok(body) => body,
     Err(e) => return e.into(),
   };
@@ -190,7 +192,6 @@ async fn handle_request(req: HttpRequest, data: web::Data<String>) -> impl Respo
   let fn_ = inline_valuescript(
     r#"
       export default function(req) {
-        console.log('req', req.path, req.method, req.body);
         if ("handleRequest" in this) {
           return this.handleRequest(req);
         }
