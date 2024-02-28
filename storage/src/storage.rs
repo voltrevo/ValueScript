@@ -35,6 +35,10 @@ impl<SB: StorageBackend> Storage<SB> {
       .transaction_mut(Rc::downgrade(&self.sb), |sb| sb.remove_head(ptr))
   }
 
+  pub fn clear_read_cache(&mut self) {
+    self.sb.borrow_mut().get_read_cache().clear()
+  }
+
   pub fn store_tmp<SE: StorageEntity<SB>>(
     &mut self,
     value: &SE,

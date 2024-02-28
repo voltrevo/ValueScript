@@ -107,7 +107,6 @@ impl DbActor {
     Self {
       storage,
       apply_fn: inline_valuescript(
-        // TODO: store in actor
         r#"
           export default function(req) {
             if ("handleRequest" in this) {
@@ -196,6 +195,9 @@ impl Handler<DbRequest> for DbActor {
       .storage
       .set_head(storage_head_ptr(b"state"), &instance)
       .unwrap();
+
+    // TODO: Consider more cache retention
+    self.storage.clear_read_cache();
 
     res
   }
