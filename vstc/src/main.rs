@@ -3,6 +3,7 @@ mod compile_command;
 mod console_command;
 mod create_db;
 mod db_command;
+mod db_host;
 mod exit_command_failed;
 mod handle_diagnostics_cli;
 mod parse_command_line;
