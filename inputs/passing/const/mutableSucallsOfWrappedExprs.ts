@@ -1,10 +1,14 @@
-//! test_output(4)
+//! test_output(3)
 
 export default function main() {
   let counter = new Counter();
 
-  (counter).inc();
-  (<Counter> counter).inc();
+  counter.inc();
+
+  // This syntax breaks when jsx is enabled. It's highly unusual and might be removed from
+  // ValueScript entirely.
+  // (<Counter> counter).inc();
+
   counter!.inc();
   (counter as Counter).inc();
 
