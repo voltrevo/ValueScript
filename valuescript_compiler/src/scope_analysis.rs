@@ -1121,14 +1121,72 @@ impl ScopeAnalysis {
       }
       Expr::SuperProp(super_prop) => self.todo(super_prop.span, "super_prop"),
       Expr::JSXEmpty(_) => {}
-      Expr::JSXNamespacedName(_)
-      | Expr::JSXElement(_)
-      | Expr::JSXFragment(_)
-      | Expr::JSXMember(_) => self.todo(expr.span(), "JSX"),
+      Expr::JSXNamespacedName(_) => self.todo(expr.span(), "JSXNamespacedName"),
+      Expr::JSXMember(_) => self.todo(expr.span(), "JSXMember"),
+      Expr::JSXElement(jsx_element) => self.jsx_element(scope, jsx_element),
+      Expr::JSXFragment(fragment) => self.jsx_fragment(scope, fragment),
       Expr::TsInstantiation(ts_instantiation) => {
         self.todo(ts_instantiation.span, "TsInstantiation")
       }
       Expr::PrivateName(private_name) => self.todo(private_name.span, "PrivateName"),
+    }
+  }
+
+  fn jsx_element(&mut self, scope: &Scope, jsx_element: &swc_ecma_ast::JSXElement) {
+    for attr in &jsx_element.opening.attrs {
+      match attr {
+        swc_ecma_ast::JSXAttrOrSpread::JSXAttr(attr) => {
+          if let Some(value) = &attr.value {
+            match value {
+              swc_ecma_ast::JSXAttrValue::Lit(_) => {}
+              swc_ecma_ast::JSXAttrValue::JSXExprContainer(jsx_expr_container) => {
+                match &jsx_expr_container.expr {
+                  swc_ecma_ast::JSXExpr::JSXEmptyExpr(_) => {}
+                  swc_ecma_ast::JSXExpr::Expr(expr) => {
+                    self.expr(scope, expr);
+                  }
+                }
+              }
+              swc_ecma_ast::JSXAttrValue::JSXElement(el) => self.jsx_element(scope, el),
+              swc_ecma_ast::JSXAttrValue::JSXFragment(fragment) => {
+                self.jsx_fragment(scope, fragment)
+              }
+            }
+          }
+        }
+        swc_ecma_ast::JSXAttrOrSpread::SpreadElement(spread_el) => {
+          self.expr(scope, &spread_el.expr);
+        }
+      }
+    }
+
+    for child in &jsx_element.children {
+      self.jsx_element_child(scope, child);
+    }
+  }
+
+  fn jsx_fragment(&mut self, scope: &Scope, fragment: &swc_ecma_ast::JSXFragment) {
+    for child in &fragment.children {
+      self.jsx_element_child(scope, child);
+    }
+  }
+
+  fn jsx_element_child(&mut self, scope: &Scope, child: &swc_ecma_ast::JSXElementChild) {
+    match child {
+      swc_ecma_ast::JSXElementChild::JSXText(_) => {}
+      swc_ecma_ast::JSXElementChild::JSXExprContainer(jsx_expr_container) => {
+        match &jsx_expr_container.expr {
+          swc_ecma_ast::JSXExpr::JSXEmptyExpr(_) => {}
+          swc_ecma_ast::JSXExpr::Expr(expr) => {
+            self.expr(scope, expr);
+          }
+        }
+      }
+      swc_ecma_ast::JSXElementChild::JSXSpreadChild(spread_child) => {
+        self.expr(scope, &spread_child.expr);
+      }
+      swc_ecma_ast::JSXElementChild::JSXElement(el) => self.jsx_element(scope, el),
+      swc_ecma_ast::JSXElementChild::JSXFragment(fragment) => self.jsx_fragment(scope, fragment),
     }
   }
 

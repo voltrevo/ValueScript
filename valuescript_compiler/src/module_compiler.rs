@@ -54,7 +54,12 @@ pub fn parse(source: &str) -> (Option<swc_ecma_ast::Program>, Vec<Diagnostic>) {
     file,
     &handler,
     EsVersion::Es2022,
-    Syntax::Typescript(TsConfig::default()),
+    Syntax::Typescript(TsConfig {
+      tsx: true,
+      decorators: false,
+      dts: false,
+      no_early_errors: false,
+    }),
     swc::config::IsModule::Bool(true),
     None,
   );

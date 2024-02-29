@@ -167,14 +167,8 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
         self.todo(jsx_empty.span(), "JSXEmpty expression");
         CompiledExpression::empty()
       }
-      JSXElement(jsx_element) => {
-        self.todo(jsx_element.span(), "JSXElement expression");
-        CompiledExpression::empty()
-      }
-      JSXFragment(jsx_fragment) => {
-        self.todo(jsx_fragment.span(), "JSXFragment expression");
-        CompiledExpression::empty()
-      }
+      JSXElement(jsx_element) => self.jsx_element(jsx_element, target_register),
+      JSXFragment(jsx_fragment) => self.jsx_fragment(jsx_fragment, target_register),
       TsTypeAssertion(ts_type_assertion) => self.compile(&ts_type_assertion.expr, target_register),
       TsConstAssertion(ts_const_assertion) => {
         self.compile(&ts_const_assertion.expr, target_register)
@@ -1284,6 +1278,150 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
     CompiledExpression::new(Value::Register(dst), nested_registers)
   }
 
+  pub fn jsx_element(
+    &mut self,
+    jsx_element: &swc_ecma_ast::JSXElement,
+    target_register: Option<Register>,
+  ) -> CompiledExpression {
+    let tag = self.get_tag(&jsx_element.opening.name);
+
+    if let Some(closing) = &jsx_element.closing {
+      if self.get_tag(&closing.name) != tag {
+        self.error(
+          closing.name.span(),
+          "JSX closing tag does not match opening tag",
+        );
+      }
+    }
+
+    self.jsx(
+      Some(tag),
+      &jsx_element.opening.attrs,
+      &jsx_element.children,
+      target_register,
+    )
+  }
+
+  pub fn jsx_fragment(
+    &mut self,
+    jsx_fragment: &swc_ecma_ast::JSXFragment,
+    target_register: Option<Register>,
+  ) -> CompiledExpression {
+    self.jsx(None, &vec![], &jsx_fragment.children, target_register)
+  }
+
+  fn jsx(
+    &mut self,
+    tag: Option<String>,
+    jsx_attrs: &Vec<swc_ecma_ast::JSXAttrOrSpread>,
+    jsx_children: &Vec<swc_ecma_ast::JSXElementChild>,
+    target_register: Option<Register>,
+  ) -> CompiledExpression {
+    let mut sub_nested_registers = Vec::<Register>::new();
+
+    let mut attrs = Vec::<Value>::new();
+
+    for attr in jsx_attrs {
+      match attr {
+        swc_ecma_ast::JSXAttrOrSpread::JSXAttr(attr) => {
+          let key = match &attr.name {
+            swc_ecma_ast::JSXAttrName::Ident(ident) => Value::String(ident.sym.to_string()),
+            swc_ecma_ast::JSXAttrName::JSXNamespacedName(_) => {
+              self.todo(attr.name.span(), "JSXNamespacedName attribute name");
+              Value::String("(error)".to_owned())
+            }
+          };
+
+          let mut compiled_value = match &attr.value {
+            Some(value) => match value {
+              swc_ecma_ast::JSXAttrValue::Lit(lit) => self.compile_literal(lit).to_ce(),
+              swc_ecma_ast::JSXAttrValue::JSXExprContainer(jsx_expr_container) => {
+                match &jsx_expr_container.expr {
+                  swc_ecma_ast::JSXExpr::JSXEmptyExpr(empty) => {
+                    self.error(empty.span, "Empty jsx expression");
+                    CompiledExpression::empty()
+                  }
+                  swc_ecma_ast::JSXExpr::Expr(expr) => self.compile(expr, None),
+                }
+              }
+              swc_ecma_ast::JSXAttrValue::JSXElement(el) => self.jsx_element(el, None),
+              swc_ecma_ast::JSXAttrValue::JSXFragment(fragment) => {
+                self.jsx_fragment(fragment, None)
+              }
+            },
+            None => CompiledExpression::empty(),
+          };
+
+          attrs.push(Value::Array(Box::new(Array {
+            values: vec![key, compiled_value.value],
+          })));
+
+          sub_nested_registers.append(&mut compiled_value.nested_registers);
+          compiled_value.release_checker.has_unreleased_registers = false;
+        }
+        swc_ecma_ast::JSXAttrOrSpread::SpreadElement(_) => {
+          self.todo(attr.span(), "JSXSpreadElement");
+        }
+      }
+    }
+
+    let mut children = Vec::<Value>::new();
+
+    for child in jsx_children {
+      let mut compiled_child = match child {
+        swc_ecma_ast::JSXElementChild::JSXText(text) => {
+          Value::String(text.value.to_string()).to_ce()
+        }
+        swc_ecma_ast::JSXElementChild::JSXExprContainer(jsx_expr_container) => {
+          match &jsx_expr_container.expr {
+            swc_ecma_ast::JSXExpr::JSXEmptyExpr(empty) => {
+              self.error(empty.span, "Empty jsx expression");
+              CompiledExpression::empty()
+            }
+            swc_ecma_ast::JSXExpr::Expr(expr) => self.compile(expr, None),
+          }
+        }
+        swc_ecma_ast::JSXElementChild::JSXSpreadChild(_) => {
+          self.todo(child.span(), "JSXSpreadChild");
+          CompiledExpression::empty()
+        }
+        swc_ecma_ast::JSXElementChild::JSXElement(el) => self.jsx_element(el, None),
+        swc_ecma_ast::JSXElementChild::JSXFragment(fragment) => self.jsx_fragment(fragment, None),
+      };
+
+      children.push(compiled_child.value);
+      sub_nested_registers.append(&mut compiled_child.nested_registers);
+      compiled_child.release_checker.has_unreleased_registers = false;
+    }
+
+    let mut nested_registers = Vec::<Register>::new();
+
+    let dest = match target_register {
+      Some(tr) => tr,
+      None => {
+        let tmp = self.fnc.allocate_tmp();
+        nested_registers.push(tmp.clone());
+        tmp
+      }
+    };
+
+    self.fnc.push(Instruction::Jsx(
+      match tag {
+        Some(tag_str) => Value::String(tag_str),
+        None => Value::Void,
+      },
+      Value::Array(Box::new(Array { values: attrs })),
+      Value::Array(Box::new(Array { values: children })),
+      dest.clone(),
+    ));
+
+    for reg in sub_nested_registers {
+      self.fnc.release_reg(&reg);
+    }
+
+    CompiledExpression::new(Value::Register(dest), nested_registers)
+  }
+
   pub fn ident(
     &mut self,
     ident: &CrateIdent,
@@ -1599,6 +1737,20 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
     }
 
     CompiledExpression::new(Value::Register(res_reg), nested_registers)
+  }
+
+  pub fn get_tag(&mut self, jsx_element_name: &swc_ecma_ast::JSXElementName) -> String {
+    match jsx_element_name {
+      swc_ecma_ast::JSXElementName::Ident(ident) => ident.sym.to_string(),
+      swc_ecma_ast::JSXElementName::JSXMemberExpr(member_expr) => {
+        self.todo(member_expr.span(), "JSXMemberExpr");
+        "(error)".to_string()
+      }
+      swc_ecma_ast::JSXElementName::JSXNamespacedName(namespaced_name) => {
+        self.todo(namespaced_name.span(), "JSXNamespacedName");
+        "(error)".to_string()
+      }
+    }
   }
 }
 
