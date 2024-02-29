@@ -205,6 +205,11 @@ where
       Delete(_obj, sub, _dst) => {
         self.value(Some(owner), sub);
       }
+      Jsx(tag, attrs, children, _dst) => {
+        self.value(Some(owner), tag);
+        self.value(Some(owner), attrs);
+        self.value(Some(owner), children);
+      }
     };
   }
 

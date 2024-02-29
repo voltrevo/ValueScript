@@ -239,6 +239,7 @@ fn is_jmp_instr(instr: &Instruction) -> bool {
     | Instruction::Cat(..)
     | Instruction::Yield(..)
     | Instruction::YieldStar(..)
-    | Instruction::Delete(..) => false,
+    | Instruction::Delete(..)
+    | Instruction::Jsx(..) => false,
   }
 }

@@ -685,6 +685,12 @@ impl FnState {
         self.eval_arg(sub);
         self.set(dst.name.clone(), Kal::Bool(true));
       }
+      Jsx(tag, attrs, children, dst) => {
+        self.eval_arg(tag);
+        self.eval_arg(attrs);
+        self.eval_arg(children);
+        self.set(dst.name.clone(), Kal::Unknown);
+      }
     }
 
     match instr {
@@ -752,7 +758,8 @@ impl FnState {
       | Cat(_, _)
       | Yield(_, _)
       | YieldStar(_, _)
-      | Delete(..) => {}
+      | Delete(..)
+      | Jsx(..) => {}
     }
   }
 

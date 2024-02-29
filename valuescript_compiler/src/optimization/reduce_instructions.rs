@@ -27,7 +27,7 @@ fn reduce(instr: Instruction) -> Option<Instruction> {
   match &instr {
     End | OpInc(..) | OpDec(..) | Call(..) | Apply(..) | ConstApply(..) | SubCall(..) | Jmp(..)
     | New(..) | Throw(..) | SetCatch(..) | UnsetCatch | ConstSubCall(..) | RequireMutableThis
-    | ThisSubCall(..) | Next(..) | Yield(..) | YieldStar(..) | Delete(..) => Some(instr),
+    | ThisSubCall(..) | Next(..) | Yield(..) | YieldStar(..) | Delete(..) | Jsx(..) => Some(instr),
 
     Mov(arg, dst) => 'b: {
       if dst.is_ignore() {

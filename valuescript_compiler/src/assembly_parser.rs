@@ -261,6 +261,7 @@ impl<'a> AssemblyParser<'a> {
       ("yield", InstructionByte::Yield),
       ("yield*", InstructionByte::YieldStar),
       ("delete", InstructionByte::Delete),
+      ("jsx", InstructionByte::Jsx),
     ]);
 
     for (word, instruction) in instruction_word_map {
@@ -831,6 +832,12 @@ impl<'a> AssemblyParser<'a> {
       YieldStar => Instruction::YieldStar(self.assemble_value(), self.assemble_register()),
       Delete => Instruction::Delete(
         self.assemble_register(),
+        self.assemble_value(),
+        self.assemble_register(),
+      ),
+      Jsx => Instruction::Jsx(
+        self.assemble_value(),
+        self.assemble_value(),
         self.assemble_value(),
         self.assemble_register(),
       ),

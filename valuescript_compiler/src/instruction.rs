@@ -64,6 +64,7 @@ pub enum Instruction {
   Yield(Value, Register),
   YieldStar(Value, Register),
   Delete(Register, Value, Register),
+  Jsx(Value, Value, Value, Register),
 }
 
 pub enum InstructionFieldMut<'a> {
@@ -225,6 +226,13 @@ impl Instruction {
         visit(InstructionFieldMut::Value(sub));
         visit(InstructionFieldMut::Register(dst));
       }
+
+      Jsx(tag, attrs, children, dst) => {
+        visit(InstructionFieldMut::Value(tag));
+        visit(InstructionFieldMut::Value(attrs));
+        visit(InstructionFieldMut::Value(children));
+        visit(InstructionFieldMut::Register(dst));
+      }
     }
   }
 
@@ -360,9 +368,17 @@ impl Instruction {
       UnsetCatch | RequireMutableThis => {}
 
       Delete(obj, sub, dst) => {
+        // TODO: Shouldn't these be reversed?
         visit(RegisterVisitMut::read_and_write(obj));
         sub.visit_registers_mut_rev(visit);
         visit(RegisterVisitMut::write(dst));
+      }
+
+      Jsx(tag, attrs, children, dst) => {
+        visit(RegisterVisitMut::write(dst));
+        children.visit_registers_mut_rev(visit);
+        attrs.visit_registers_mut_rev(visit);
+        tag.visit_registers_mut_rev(visit);
       }
     }
   }
@@ -432,6 +448,7 @@ impl Instruction {
       Yield(..) => InstructionByte::Yield,
       YieldStar(..) => InstructionByte::YieldStar,
       Delete(..) => InstructionByte::Delete,
+      Jsx(..) => InstructionByte::Jsx,
     }
   }
 }
@@ -597,6 +614,9 @@ impl StructuredFormattable for Instruction {
         sf.write_slice_joined(" ", &[&"yield*", value, register])
       }
       Instruction::Delete(obj, sub, dst) => sf.write_slice_joined(" ", &[&"delete", obj, sub, dst]),
+      Instruction::Jsx(tag, attrs, children, dst) => {
+        sf.write_slice_joined(" ", &[&"jsx", tag, attrs, children, dst])
+      }
     }
   }
 }

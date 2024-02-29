@@ -331,6 +331,12 @@ impl Assembler {
         self.value(sub);
         self.register(dst);
       }
+      Jsx(tag, attrs, children, dst) => {
+        self.value(tag);
+        self.value(attrs);
+        self.value(children);
+        self.register(dst);
+      }
     }
   }
 

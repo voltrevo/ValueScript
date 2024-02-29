@@ -60,6 +60,7 @@ pub enum InstructionByte {
   Yield = 0x39,
   YieldStar = 0x3a,
   Delete = 0x3b,
+  Jsx = 0x3c,
 }
 
 impl InstructionByte {
@@ -127,6 +128,7 @@ impl InstructionByte {
       0x39 => Yield,
       0x3a => YieldStar,
       0x3b => Delete,
+      0x3c => Jsx,
 
       _ => panic!("Unrecognized instruction: {}", byte),
     }

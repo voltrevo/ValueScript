@@ -625,6 +625,8 @@ impl StackFrameTrait for BytecodeStackFrame {
 
         return Ok(FrameStepOk::Continue);
       }
+
+      Jsx => todo!(),
     };
 
     Ok(FrameStepOk::Continue)
