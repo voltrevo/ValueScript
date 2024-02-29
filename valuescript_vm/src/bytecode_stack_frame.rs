@@ -7,6 +7,7 @@ use crate::builtins::type_error_builtin::ToTypeError;
 use crate::bytecode_decoder::BytecodeDecoder;
 use crate::bytecode_decoder::BytecodeType;
 use crate::cat_stack_frame::CatStackFrame;
+use crate::jsx_element::JsxElement;
 use crate::native_function::ThisWrapper;
 use crate::operations;
 use crate::operations::op_delete;
@@ -14,6 +15,7 @@ use crate::stack_frame::FrameStepOk;
 use crate::stack_frame::FrameStepResult;
 use crate::stack_frame::{CallResult, StackFrame, StackFrameTrait};
 use crate::vs_object::VsObject;
+use crate::vs_value::ToDynamicVal;
 use crate::vs_value::ToVal;
 use crate::vs_value::{LoadFunctionResult, Val, ValTrait};
 
@@ -626,7 +628,60 @@ impl StackFrameTrait for BytecodeStackFrame {
         return Ok(FrameStepOk::Continue);
       }
 
-      Jsx => todo!(),
+      Jsx => {
+        let tag = self.decoder.decode_val(&mut self.registers);
+        let attrs_val = self.decoder.decode_val(&mut self.registers);
+        let children_val = self.decoder.decode_val(&mut self.registers);
+
+        let mut attrs = Vec::<(String, Val)>::new();
+
+        match attrs_val {
+          Val::Array(array) => {
+            for attr in &array.elements {
+              match attr {
+                Val::Array(array) => {
+                  if array.elements.len() != 2 {
+                    return Err("Unexpected non-pair attribute".to_type_error());
+                  }
+
+                  let name = match &array.elements[0] {
+                    Val::String(str) => str.to_string(),
+                    _ => return Err("Unexpected non-string attribute name".to_type_error()),
+                  };
+
+                  let value = array.elements[1].clone();
+
+                  attrs.push((name, value));
+                }
+                _ => return Err("Unexpected non-array attrs".to_type_error()),
+              }
+            }
+          }
+          _ => return Err("Unexpected non-array attrs".to_type_error()),
+        }
+
+        let children = match children_val {
+          Val::Array(array) => array.elements.clone(),
+          _ => return Err("Unexpected non-array children".to_type_error()),
+        };
+
+        let res = JsxElement {
+          tag: match tag {
+            Val::Void => None,
+            Val::String(str) => Some(str.to_string()),
+            _ => return Err("Unexpected non-string tag".to_type_error()),
+          },
+          attrs,
+          children,
+        }
+        .to_dynamic_val();
+
+        if let Some(i) = self.decoder.decode_register_index() {
+          self.registers[i] = res;
+        }
+
+        return Ok(FrameStepOk::Continue);
+      }
     };
 
     Ok(FrameStepOk::Continue)

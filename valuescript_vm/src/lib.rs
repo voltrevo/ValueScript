@@ -11,6 +11,7 @@ mod first_stack_frame;
 mod generator;
 mod helpers;
 mod iteration;
+mod jsx_element;
 mod make_generator_frame;
 mod native_frame_function;
 mod native_function;

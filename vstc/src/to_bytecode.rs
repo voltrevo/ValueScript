@@ -54,10 +54,7 @@ pub fn format_from_path(file_path: &str) -> RunFormat {
     .unwrap_or("");
 
   match ext {
-    "ts" => RunFormat::TypeScript,
-    "mts" => RunFormat::TypeScript,
-    "js" => RunFormat::TypeScript,
-    "mjs" => RunFormat::TypeScript,
+    "ts" | "tsx" | "mts" | "js" | "jsx" | "mjs" => RunFormat::TypeScript,
     "vsm" => RunFormat::Assembly,
     "vsb" => RunFormat::Bytecode,
     _ => std::panic!("Unrecognized file extension \"{}\"", ext),
