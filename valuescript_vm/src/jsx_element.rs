@@ -94,8 +94,8 @@ impl ValTrait for JsxElement {
       write!(f, "\x1b[36m>\x1b[39m")?;
 
       for child in &self.children {
-        if let Some(jsx_child) = try_to_jsx_element(child) {
-          jsx_child.pretty_fmt(f)?;
+        if is_jsx_element(child) {
+          write!(f, "{}", child.pretty())?;
         } else {
           write!(f, "{}", child)?;
         }
@@ -137,7 +137,7 @@ impl fmt::Display for JsxElement {
 
 fn write_attributes(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> fmt::Result {
   for (key, val) in attrs {
-    write!(f, " {}=\x1b[33m{}\x1b[39m", key, val)?;
+    write!(f, " {}=\x1b[33m\"{}\"\x1b[39m", key, val)?;
   }
 
   Ok(())
@@ -145,16 +145,16 @@ fn write_attributes(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> f
 
 fn write_attributes_pretty(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> fmt::Result {
   for (key, val) in attrs {
-    write!(f, " {}=\x1b[33m{}\x1b[39m", key, val)?;
+    write!(f, " {}=\x1b[33m\"{}\"\x1b[39m", key, val)?;
   }
 
   Ok(())
 }
 
-pub fn try_to_jsx_element(val: &Val) -> Option<Rc<JsxElement>> {
+pub fn is_jsx_element(val: &Val) -> bool {
   match val {
-    Val::Dynamic(dynamic) => dynamic.as_any().downcast_ref().cloned(),
-    Val::StoragePtr(ptr) => try_to_jsx_element(&ptr.get()),
-    _ => None,
+    Val::Dynamic(dynamic) => dynamic.as_any().is::<JsxElement>(),
+    Val::StoragePtr(ptr) => is_jsx_element(&ptr.get()),
+    _ => false,
   }
 }
