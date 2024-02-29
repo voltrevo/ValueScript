@@ -10,6 +10,7 @@ use storage::{storage_head_ptr, SledBackend, Storage, StorageReader};
 use tokio::task::LocalSet;
 use valuescript_compiler::inline_valuescript;
 use valuescript_vm::{
+  is_jsx_element,
   vs_object::VsObject,
   vs_value::{ToVal, Val},
   VirtualMachine,
@@ -64,9 +65,9 @@ async fn handle_request(
   };
 
   match data.send(req_val).await {
-    Ok(Ok(res)) => HttpResponse::Ok()
-      .content_type("application/json")
-      .body(res),
+    Ok(Ok(res)) => HttpResponse::build(StatusCode::from_u16(res.status).unwrap())
+      .content_type(res.content_type)
+      .body(res.body),
     Ok(Err(err)) => {
       println!("{}", err.message);
       HttpResponse::build(StatusCode::from_u16(err.code).unwrap()).body(err.message)
@@ -84,13 +85,19 @@ struct DbRequest {
   body: Bytes,
 }
 
+struct DbResponse {
+  status: u16,
+  content_type: String,
+  body: String,
+}
+
 struct HttpError {
   code: u16,
   message: String,
 }
 
 impl Message for DbRequest {
-  type Result = Result<String, HttpError>;
+  type Result = Result<DbResponse, HttpError>;
 }
 
 struct DbActor {
@@ -134,7 +141,7 @@ impl DbActor {
 }
 
 impl Handler<DbRequest> for DbActor {
-  type Result = Result<String, HttpError>;
+  type Result = Result<DbResponse, HttpError>;
 
   fn handle(&mut self, msg: DbRequest, _ctx: &mut Self::Context) -> Self::Result {
     let mut instance: Val = self
@@ -175,13 +182,27 @@ impl Handler<DbRequest> for DbActor {
     let mut vm = VirtualMachine::default();
 
     let res = match vm.run(None, &mut instance, self.apply_fn.clone(), vec![req_val]) {
-      Ok(res) => match res.to_json() {
-        Some(json) => Ok(json.to_string()),
-        None => Err(HttpError {
-          code: 500,
-          message: "Failed to serialize response".to_owned(),
-        }),
-      },
+      Ok(res) => 'b: {
+        if is_jsx_element(&res) {
+          break 'b Ok(DbResponse {
+            status: 200,
+            content_type: "text/html".to_owned(),
+            body: res.to_string(),
+          });
+        }
+
+        match res.to_json() {
+          Some(json) => Ok(DbResponse {
+            status: 200,
+            content_type: "application/json".to_owned(),
+            body: json.to_string(),
+          }),
+          None => Err(HttpError {
+            code: 500,
+            message: "Failed to serialize response".to_owned(),
+          }),
+        }
+      }
       Err(err) => {
         println!("Uncaught exception: {}", err.pretty());
         Err(HttpError {
