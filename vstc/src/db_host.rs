@@ -191,10 +191,12 @@ impl Handler<DbRequest> for DbActor {
       }
     };
 
-    self
-      .storage
-      .set_head(storage_head_ptr(b"state"), &instance)
-      .unwrap();
+    if res.is_ok() {
+      self
+        .storage
+        .set_head(storage_head_ptr(b"state"), &instance)
+        .unwrap();
+    }
 
     // TODO: Consider more cache retention
     self.storage.clear_read_cache();
