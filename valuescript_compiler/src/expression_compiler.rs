@@ -1370,7 +1370,10 @@ impl<'a, 'fnc> ExpressionCompiler<'a, 'fnc> {
     for child in jsx_children {
       let mut compiled_child = match child {
         swc_ecma_ast::JSXElementChild::JSXText(text) => {
-          Value::String(text.value.to_string()).to_ce()
+          // For some reason using text.value.to_string() duplicates the line breaks. I can only
+          // guess this is an swc bug.
+          let actual_text = get_span_text(text.span, &self.fnc.mc.source);
+          Value::String(actual_text).to_ce()
         }
         swc_ecma_ast::JSXElementChild::JSXExprContainer(jsx_expr_container) => {
           match &jsx_expr_container.expr {
@@ -1878,4 +1881,16 @@ pub fn value_from_literal(lit: &swc_ecma_ast::Lit) -> Result<Value, &'static str
     Regex(_) => return Err("Regex literals"),
     JSXText(_) => return Err("JSXText literals"),
   })
+}
+
+fn get_span_text(span: swc_common::Span, source: &str) -> String {
+  let swc_common::BytePos(start) = span.lo;
+  let swc_common::BytePos(end) = span.hi;
+
+  let chars = source
+    .chars()
+    .skip(start as usize)
+    .take((end - start) as usize);
+
+  chars.collect::<String>()
 }
