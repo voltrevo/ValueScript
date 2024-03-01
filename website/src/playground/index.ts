@@ -174,7 +174,13 @@ let currentFile = "";
 
     renderJob(runJob, outcomeEl, (el, runResult) => {
       if ("Ok" in runResult.output) {
-        el.textContent = runResult.output.Ok;
+        if (/^\s*</.test(runResult.output.Ok)) {
+          el.style.whiteSpace = "normal";
+          el.innerHTML = runResult.output.Ok;
+        } else {
+          el.style.whiteSpace = "";
+          el.textContent = runResult.output.Ok;
+        }
       } else if ("Err" in runResult.output) {
         el.textContent = `Uncaught exception: ${runResult.output.Err}`;
       } else {
