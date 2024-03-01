@@ -137,7 +137,12 @@ impl fmt::Display for JsxElement {
 
 fn write_attributes(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> fmt::Result {
   for (key, val) in attrs {
-    write!(f, " {}=\"{}\"", key, val)?;
+    let val_str = match key.as_str() {
+      "style" => render_css(val),
+      _ => val.to_string(),
+    };
+
+    write!(f, " {}=\"{}\"", key, val_str)?;
   }
 
   Ok(())
@@ -145,7 +150,12 @@ fn write_attributes(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> f
 
 fn write_attributes_pretty(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> fmt::Result {
   for (key, val) in attrs {
-    write!(f, " {}=\x1b[33m\"{}\"\x1b[39m", key, val)?;
+    let val_str = match key.as_str() {
+      "style" => render_css(val),
+      _ => val.to_string(),
+    };
+
+    write!(f, " {}=\x1b[33m\"{}\"\x1b[39m", key, val_str)?;
   }
 
   Ok(())
@@ -157,4 +167,41 @@ pub fn is_jsx_element(val: &Val) -> bool {
     Val::StoragePtr(ptr) => is_jsx_element(&ptr.get()),
     _ => false,
   }
+}
+
+fn render_css(val: &Val) -> String {
+  if let Val::Object(obj) = val {
+    let mut css_str = String::new();
+
+    for (key, val) in &obj.string_map {
+      css_str.push_str(&format!("{}: {}; ", to_kebab_case(key), val));
+    }
+
+    return css_str;
+  }
+
+  val.to_string()
+}
+
+fn to_kebab_case(key: &str) -> String {
+  // eg: backgroundColor -> background-color
+
+  let mut kebab = String::new();
+  let mut last_was_upper = false;
+
+  for c in key.chars() {
+    if c.is_uppercase() {
+      if !last_was_upper {
+        kebab.push('-');
+      }
+
+      kebab.push_str(c.to_lowercase().collect::<String>().as_str());
+      last_was_upper = true;
+    } else {
+      kebab.push(c);
+      last_was_upper = false;
+    }
+  }
+
+  kebab
 }

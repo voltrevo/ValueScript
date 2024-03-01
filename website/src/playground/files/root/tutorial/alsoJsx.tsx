@@ -8,7 +8,7 @@ function greet(name: string) {
   return (
     <h1>
       Hello
-      <span style="color: green;">{name}</span>!
+      <span style={{ color: "green" }}>{name}</span>!
     </h1>
   );
 }
