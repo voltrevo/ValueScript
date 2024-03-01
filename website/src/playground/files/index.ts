@@ -4,6 +4,7 @@ import raw from "./raw.ts";
 export const orderedFiles = [
   "/tutorial/hello.ts",
   "/tutorial/alsoJavaScript.js",
+  "/tutorial/alsoJsx.tsx",
   "/tutorial/valueSemantics.ts",
   "/tutorial/cantMutateCaptures.ts",
   "/tutorial/classBehavior.ts",

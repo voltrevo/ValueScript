@@ -137,7 +137,7 @@ impl fmt::Display for JsxElement {
 
 fn write_attributes(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> fmt::Result {
   for (key, val) in attrs {
-    write!(f, " {}=\x1b[33m\"{}\"\x1b[39m", key, val)?;
+    write!(f, " {}=\"{}\"", key, val)?;
   }
 
   Ok(())
