@@ -144,6 +144,10 @@ mod tests {
   }
 
   fn get_files_recursively(dir_path: &PathBuf) -> Result<Vec<PathBuf>, std::io::Error> {
+    if dir_path.extension().map_or(false, |ext| ext == "vsdb") {
+      return Ok(vec![]);
+    }
+
     let mut files = vec![];
 
     for entry in fs::read_dir(dir_path)? {
