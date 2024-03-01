@@ -186,7 +186,7 @@ impl Handler<DbRequest> for DbActor {
         if is_jsx_element(&res) {
           break 'b Ok(DbResponse {
             status: 200,
-            content_type: "text/html".to_owned(),
+            content_type: "text/html; charset=UTF-8".to_owned(),
             body: res.to_string(),
           });
         }

@@ -1,4 +1,8 @@
 {
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "https://esm.sh/preact@10.11.2"
+  },
   "lint": {
     "rules": {
       "exclude": ["require-await", "prefer-const"]

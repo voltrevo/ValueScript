@@ -246,6 +246,13 @@ impl Val {
       Val::StoragePtr(ptr) => ptr.get().to_json(),
     }
   }
+
+  pub fn not_ptr(&self) -> Val {
+    match self {
+      Val::StoragePtr(ptr) => ptr.get(),
+      _ => self.clone(),
+    }
+  }
 }
 
 impl ValTrait for Val {
@@ -425,6 +432,7 @@ impl ValTrait for Val {
     match self {
       Array(a) => Some(a.clone()),
       Dynamic(val) => val.as_array_data(),
+      StoragePtr(ptr) => ptr.get().as_array_data(),
 
       _ => None,
     }
@@ -437,6 +445,7 @@ impl ValTrait for Val {
       Class(class) => Some(class.clone()),
       Static(s) => s.as_class_data(),
       Dynamic(val) => val.as_class_data(),
+      StoragePtr(ptr) => ptr.get().as_class_data(),
 
       _ => None,
     }
@@ -872,7 +881,7 @@ pub fn number_to_index(x: f64) -> Option<usize> {
   Some(x as usize)
 }
 
-fn stringify_string(str: &str) -> String {
+pub fn stringify_string(str: &str) -> String {
   let mut res: String = "\"".into();
 
   for c in str.chars() {

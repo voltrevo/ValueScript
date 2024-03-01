@@ -6,7 +6,7 @@ use crate::{
   builtins::type_error_builtin::ToTypeError,
   vs_array::VsArray,
   vs_class::VsClass,
-  vs_value::{Val, VsType},
+  vs_value::{stringify_string, Val, VsType},
   LoadFunctionResult, ValTrait,
 };
 
@@ -86,11 +86,11 @@ impl ValTrait for JsxElement {
 
     if self.children.is_empty() {
       write!(f, "\x1b[36m<{}\x1b[39m", tag_str)?;
-      write_attributes_pretty(f, &self.attrs)?;
+      write_attributes(f, &self.attrs, true)?;
       write!(f, " \x1b[36m/>\x1b[39m")
     } else {
       write!(f, "\x1b[36m<{}\x1b[39m", tag_str)?;
-      write_attributes_pretty(f, &self.attrs)?;
+      write_attributes(f, &self.attrs, true)?;
       write!(f, "\x1b[36m>\x1b[39m")?;
 
       for child in &self.children {
@@ -119,15 +119,23 @@ impl fmt::Display for JsxElement {
 
     if self.children.is_empty() {
       write!(f, "<{}", tag_str)?;
-      write_attributes(f, &self.attrs)?;
+      write_attributes(f, &self.attrs, false)?;
       write!(f, " />")
     } else {
       write!(f, "<{}", tag_str)?;
-      write_attributes(f, &self.attrs)?;
+      write_attributes(f, &self.attrs, false)?;
       write!(f, ">")?;
 
       for child in &self.children {
-        write!(f, "{}", child)?;
+        match child.not_ptr() {
+          Val::Void | Val::Undefined | Val::Null => {}
+          Val::Array(arr) => {
+            for val in &arr.elements {
+              write!(f, "{}", val)?;
+            }
+          }
+          _ => write!(f, "{}", child)?,
+        };
       }
 
       write!(f, "</{}>", tag_str)
@@ -135,27 +143,31 @@ impl fmt::Display for JsxElement {
   }
 }
 
-fn write_attributes(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> fmt::Result {
+fn write_attributes(
+  f: &mut fmt::Formatter<'_>,
+  attrs: &Vec<(String, Val)>,
+  pretty: bool,
+) -> fmt::Result {
   for (key, val) in attrs {
+    if key == "checked" {
+      match val.is_truthy() {
+        true => write!(f, " checked")?,
+        false => {}
+      }
+
+      continue;
+    }
+
     let val_str = match key.as_str() {
       "style" => render_css(val),
       _ => val.to_string(),
     };
 
-    write!(f, " {}=\"{}\"", key, val_str)?;
-  }
-
-  Ok(())
-}
-
-fn write_attributes_pretty(f: &mut fmt::Formatter<'_>, attrs: &Vec<(String, Val)>) -> fmt::Result {
-  for (key, val) in attrs {
-    let val_str = match key.as_str() {
-      "style" => render_css(val),
-      _ => val.to_string(),
-    };
-
-    write!(f, " {}=\x1b[33m\"{}\"\x1b[39m", key, val_str)?;
+    if pretty {
+      write!(f, " {}=\x1b[33m{}\x1b[39m", key, val_str)?;
+    } else {
+      write!(f, " {}={}", key, stringify_string(&val_str))?;
+    }
   }
 
   Ok(())
