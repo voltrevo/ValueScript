@@ -7,6 +7,7 @@ mod diagnostic;
 mod expression_compiler;
 mod function_compiler;
 mod gather_modules;
+mod get_span_text;
 mod ident;
 mod import_pattern;
 mod inline_valuescript;

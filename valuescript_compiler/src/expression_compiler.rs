@@ -6,6 +6,7 @@ use swc_common::Spanned;
 use crate::asm::{Array, Instruction, Label, Number, Object, Register, Structured, Value};
 use crate::diagnostic::{Diagnostic, DiagnosticContainer, DiagnosticReporter};
 use crate::function_compiler::{FunctionCompiler, Functionish};
+use crate::get_span_text::get_span_text;
 use crate::ident::Ident as CrateIdent;
 use crate::scope::{NameId, OwnerId};
 use crate::scope_analysis::{fn_to_owner_id, NameType};
@@ -1881,16 +1882,4 @@ pub fn value_from_literal(lit: &swc_ecma_ast::Lit) -> Result<Value, &'static str
     Regex(_) => return Err("Regex literals"),
     JSXText(_) => return Err("JSXText literals"),
   })
-}
-
-fn get_span_text(span: swc_common::Span, source: &str) -> String {
-  let swc_common::BytePos(start) = span.lo;
-  let swc_common::BytePos(end) = span.hi;
-
-  let chars = source
-    .chars()
-    .skip(start as usize)
-    .take((end - start) as usize);
-
-  chars.collect::<String>()
 }
