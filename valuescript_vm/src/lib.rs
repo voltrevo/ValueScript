@@ -1,7 +1,7 @@
 mod array_higher_functions;
 mod array_methods;
 mod bigint_methods;
-mod binary_op;
+pub mod binary_op;
 mod builtins;
 mod bytecode;
 mod bytecode_decoder;
@@ -21,7 +21,7 @@ pub mod operations;
 mod stack_frame;
 mod string_methods;
 mod todo_fn;
-mod unary_op;
+pub mod unary_op;
 mod val_storage;
 mod virtual_machine;
 pub mod vs_array;
