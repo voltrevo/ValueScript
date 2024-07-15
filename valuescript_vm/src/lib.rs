@@ -32,6 +32,8 @@ mod vs_storage_ptr;
 mod vs_symbol;
 pub mod vs_value;
 
+pub use builtins::error_builtin;
+pub use builtins::type_error_builtin;
 pub use bytecode::{Bytecode, DecoderMaker};
 pub use jsx_element::is_jsx_element;
 pub use string_methods::unicode_at;
