@@ -9,10 +9,12 @@ use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::Zero;
 
+use crate::binary_op::BinaryOp;
 use crate::copy_counter::CopyCounter;
 use crate::native_function::ThisWrapper;
 use crate::operations::{op_sub, op_submov};
 use crate::stack_frame::StackFrame;
+use crate::unary_op::UnaryOp;
 use crate::vs_array::VsArray;
 use crate::vs_class::VsClass;
 use crate::vs_function::VsFunction;
@@ -99,6 +101,14 @@ pub trait ValTrait: fmt::Display {
   fn sub(&self, key: &Val) -> Result<Val, Val>;
   fn has(&self, key: &Val) -> Option<bool>;
   fn submov(&mut self, key: &Val, value: Val) -> Result<(), Val>;
+
+  fn override_binary_op(&self, _op: BinaryOp, _right: &Val) -> Option<Result<Val, Val>> {
+    None
+  }
+
+  fn override_unary_op(&self, _op: UnaryOp) -> Option<Result<Val, Val>> {
+    None
+  }
 
   fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result;
   fn codify(&self) -> String;
@@ -454,14 +464,14 @@ impl ValTrait for Val {
   fn load_function(&self) -> LoadFunctionResult {
     use Val::*;
 
-    return match self {
+    match self {
       Function(f) => LoadFunctionResult::StackFrame(f.make_frame()),
       Static(s) => s.load_function(),
       Dynamic(val) => val.load_function(),
       StoragePtr(ptr) => ptr.get().load_function(),
 
       _ => LoadFunctionResult::NotAFunction,
-    };
+    }
   }
 
   fn sub(&self, key: &Val) -> Result<Val, Val> {

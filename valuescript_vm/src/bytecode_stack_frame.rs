@@ -38,12 +38,14 @@ pub struct CatchSetting {
 }
 
 impl BytecodeStackFrame {
-  pub fn apply_unary_op(&mut self, op: fn(input: &Val) -> Val) {
+  pub fn apply_unary_op(&mut self, op: fn(input: &Val) -> Result<Val, Val>) -> Result<(), Val> {
     let input = self.decoder.decode_val(&mut self.registers);
 
     if let Some(register_index) = self.decoder.decode_register_index() {
-      self.registers[register_index] = op(&input);
+      self.registers[register_index] = op(&input)?;
     }
+
+    Ok(())
   }
 
   pub fn apply_binary_op(
@@ -184,7 +186,7 @@ impl StackFrameTrait for BytecodeStackFrame {
       OpAnd => self.apply_binary_op(operations::op_and)?,
       OpOr => self.apply_binary_op(operations::op_or)?,
 
-      OpNot => self.apply_unary_op(operations::op_not),
+      OpNot => self.apply_unary_op(operations::op_not)?,
 
       OpLess => self.apply_binary_op(operations::op_less)?,
       OpLessEq => self.apply_binary_op(operations::op_less_eq)?,
@@ -202,14 +204,14 @@ impl StackFrameTrait for BytecodeStackFrame {
       OpBitAnd => self.apply_binary_op(operations::op_bit_and)?,
       OpBitOr => self.apply_binary_op(operations::op_bit_or)?,
 
-      OpBitNot => self.apply_unary_op(operations::op_bit_not),
+      OpBitNot => self.apply_unary_op(operations::op_bit_not)?,
 
       OpBitXor => self.apply_binary_op(operations::op_bit_xor)?,
       OpLeftShift => self.apply_binary_op(operations::op_left_shift)?,
       OpRightShift => self.apply_binary_op(operations::op_right_shift)?,
       OpRightShiftUnsigned => self.apply_binary_op(operations::op_right_shift_unsigned)?,
 
-      TypeOf => self.apply_unary_op(operations::op_typeof),
+      TypeOf => self.apply_unary_op(operations::op_typeof)?,
 
       InstanceOf => self.apply_binary_op(operations::op_instance_of)?,
       In => self.apply_binary_op(operations::op_in)?,
@@ -415,8 +417,8 @@ impl StackFrameTrait for BytecodeStackFrame {
         }
       }
 
-      UnaryPlus => self.apply_unary_op(operations::op_unary_plus),
-      UnaryMinus => self.apply_unary_op(operations::op_unary_minus),
+      UnaryPlus => self.apply_unary_op(operations::op_unary_plus)?,
+      UnaryMinus => self.apply_unary_op(operations::op_unary_minus)?,
 
       New => {
         // TODO: new Array

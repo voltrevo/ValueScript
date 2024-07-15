@@ -835,7 +835,12 @@ impl FnState {
     }
   }
 
-  fn apply_unary_op(&mut self, arg: &mut Value, dst: &Register, op: fn(input: &Val) -> Val) {
+  fn apply_unary_op(
+    &mut self,
+    arg: &mut Value,
+    dst: &Register,
+    op: fn(input: &Val) -> Result<Val, Val>,
+  ) {
     match self.apply_unary_op_impl(arg, dst, op) {
       Some(_) => {}
       None => {
@@ -848,10 +853,14 @@ impl FnState {
     &mut self,
     arg: &mut Value,
     dst: &Register,
-    op: fn(input: &Val) -> Val,
+    op: fn(input: &Val) -> Result<Val, Val>,
   ) -> Option<()> {
     let arg = self.eval_arg(arg).try_to_val()?;
-    let kal = op(&arg).try_to_kal()?;
+
+    let kal = match op(&arg) {
+      Ok(res) => res.try_to_kal()?,
+      Err(_) => return None,
+    };
 
     self.set(dst.name.clone(), kal);
 

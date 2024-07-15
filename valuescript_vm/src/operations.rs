@@ -9,6 +9,7 @@ use num_traits::ToPrimitive;
 
 use crate::array_methods::op_sub_array;
 use crate::bigint_methods::op_sub_bigint;
+use crate::binary_op::BinaryOp;
 use crate::builtins::internal_error_builtin::ToInternalError;
 use crate::builtins::range_error_builtin::ToRangeError;
 use crate::builtins::type_error_builtin::ToTypeError;
@@ -16,12 +17,17 @@ use crate::native_function::native_fn;
 use crate::native_function::NativeFunction;
 use crate::number_methods::op_sub_number;
 use crate::string_methods::op_sub_string;
+use crate::unary_op::UnaryOp;
 use crate::vs_value::ToVal;
 use crate::vs_value::Val;
 use crate::vs_value::ValTrait;
 use crate::vs_value::VsType;
 
 pub fn op_plus(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Plus, right) {
+    return res;
+  }
+
   let left_prim = left.to_primitive();
   let right_prim = right.to_primitive();
 
@@ -48,14 +54,22 @@ pub fn op_plus(left: &Val, right: &Val) -> Result<Val, Val> {
   Ok(Val::Number(left_prim.to_number() + right_prim.to_number()))
 }
 
-pub fn op_unary_plus(input: &Val) -> Val {
-  match input.as_bigint_data() {
+pub fn op_unary_plus(input: &Val) -> Result<Val, Val> {
+  if let Some(res) = input.override_unary_op(UnaryOp::Plus) {
+    return res;
+  }
+
+  Ok(match input.as_bigint_data() {
     Some(bigint) => Val::BigInt(bigint),
     _ => Val::Number(input.to_number()),
-  }
+  })
 }
 
 pub fn op_minus(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Minus, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint - right_bigint)),
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -63,14 +77,22 @@ pub fn op_minus(left: &Val, right: &Val) -> Result<Val, Val> {
   }
 }
 
-pub fn op_unary_minus(input: &Val) -> Val {
-  match input.as_bigint_data() {
+pub fn op_unary_minus(input: &Val) -> Result<Val, Val> {
+  if let Some(res) = input.override_unary_op(UnaryOp::Minus) {
+    return res;
+  }
+
+  Ok(match input.as_bigint_data() {
     Some(bigint) => Val::BigInt(-bigint),
     _ => Val::Number(-input.to_number()),
-  }
+  })
 }
 
 pub fn op_mul(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Mul, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint * right_bigint)),
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -79,6 +101,10 @@ pub fn op_mul(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_div(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Div, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint / right_bigint)),
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -87,6 +113,10 @@ pub fn op_div(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_mod(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Mod, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint % right_bigint)),
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -95,6 +125,10 @@ pub fn op_mod(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_exp(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Exp, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => {
       if right_bigint.sign() == Sign::Minus {
@@ -247,10 +281,18 @@ where
 }
 
 pub fn op_eq(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::LooseEq, right) {
+    return res;
+  }
+
   Ok(Val::Bool(op_eq_impl(left, right)?))
 }
 
 pub fn op_ne(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::LooseNe, right) {
+    return res;
+  }
+
   Ok(Val::Bool(!op_eq_impl(left, right)?))
 }
 
@@ -358,32 +400,56 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
 }
 
 pub fn op_triple_eq(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Eq, right) {
+    return res;
+  }
+
   let is_eq = op_triple_eq_impl(left, right)?;
   Ok(Val::Bool(is_eq))
 }
 
 pub fn op_triple_ne(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Ne, right) {
+    return res;
+  }
+
   let is_eq = op_triple_eq_impl(left, right)?;
   Ok(Val::Bool(!is_eq))
 }
 
 pub fn op_and(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::And, right) {
+    return res;
+  }
+
   let truthy = left.is_truthy();
 
   Ok((if truthy { right } else { left }).clone())
 }
 
 pub fn op_or(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Or, right) {
+    return res;
+  }
+
   let truthy = left.is_truthy();
 
   Ok((if truthy { left } else { right }).clone())
 }
 
-pub fn op_not(input: &Val) -> Val {
-  Val::Bool(!input.is_truthy())
+pub fn op_not(input: &Val) -> Result<Val, Val> {
+  if let Some(res) = input.override_unary_op(UnaryOp::Not) {
+    return res;
+  }
+
+  Ok(Val::Bool(!input.is_truthy()))
 }
 
 pub fn op_less(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Less, right) {
+    return res;
+  }
+
   Ok(Val::Bool(match (left, right) {
     (_, Val::Undefined) | (Val::Undefined, _) => false,
     (Val::Null, Val::Null) => false,
@@ -396,6 +462,10 @@ pub fn op_less(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_less_eq(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::LessEq, right) {
+    return res;
+  }
+
   Ok(Val::Bool(match (left, right) {
     (_, Val::Undefined) | (Val::Undefined, _) => false,
     (Val::Null, Val::Null) => true,
@@ -411,6 +481,10 @@ pub fn op_less_eq(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_greater(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::Greater, right) {
+    return res;
+  }
+
   Ok(Val::Bool(match (left, right) {
     (_, Val::Undefined) | (Val::Undefined, _) => false,
     (Val::Null, Val::Null) => false,
@@ -423,6 +497,10 @@ pub fn op_greater(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_greater_eq(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::GreaterEq, right) {
+    return res;
+  }
+
   Ok(Val::Bool(match (left, right) {
     (_, Val::Undefined) | (Val::Undefined, _) => false,
     (Val::Null, Val::Null) => true,
@@ -472,6 +550,10 @@ pub fn to_u32(x: f64) -> u32 {
 }
 
 pub fn op_bit_and(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::BitAnd, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint & right_bigint)),
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -483,6 +565,10 @@ pub fn op_bit_and(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_bit_or(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::BitOr, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint | right_bigint)),
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -493,17 +579,25 @@ pub fn op_bit_or(left: &Val, right: &Val) -> Result<Val, Val> {
   }
 }
 
-pub fn op_bit_not(input: &Val) -> Val {
-  match input.as_bigint_data() {
+pub fn op_bit_not(input: &Val) -> Result<Val, Val> {
+  if let Some(res) = input.override_unary_op(UnaryOp::BitNot) {
+    return res;
+  }
+
+  Ok(match input.as_bigint_data() {
     Some(bigint) => Val::BigInt(!bigint),
     None => {
       let res_i32 = !to_i32(input.to_number());
       Val::Number(res_i32 as f64)
     }
-  }
+  })
 }
 
 pub fn op_bit_xor(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::BitXor, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(left_bigint ^ right_bigint)),
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -515,6 +609,10 @@ pub fn op_bit_xor(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_left_shift(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::LeftShift, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => Ok(Val::BigInt(
       left_bigint << right_bigint.to_i64().expect("TODO"),
@@ -528,6 +626,10 @@ pub fn op_left_shift(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_right_shift(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::RightShift, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(left_bigint), Some(right_bigint)) => {
       let right_i64 = right_bigint
@@ -544,6 +646,10 @@ pub fn op_right_shift(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_right_shift_unsigned(left: &Val, right: &Val) -> Result<Val, Val> {
+  if let Some(res) = left.override_binary_op(BinaryOp::RightShiftUnsigned, right) {
+    return res;
+  }
+
   match (left.as_bigint_data(), right.as_bigint_data()) {
     (Some(_), Some(_)) => Err("BigInts don't support unsigned right shift".to_type_error()),
     (Some(_), None) | (None, Some(_)) => Err("Cannot mix BigInt with other types".to_type_error()),
@@ -554,23 +660,25 @@ pub fn op_right_shift_unsigned(left: &Val, right: &Val) -> Result<Val, Val> {
   }
 }
 
-pub fn op_typeof(input: &Val) -> Val {
+pub fn op_typeof(input: &Val) -> Result<Val, Val> {
   use VsType::*;
 
-  match input.typeof_() {
-    Undefined => "undefined",
-    Null => "object",
-    Bool => "boolean",
-    Number => "number",
-    BigInt => "bigint",
-    Symbol => "symbol",
-    String => "string",
-    Array => "object",
-    Object => "object",
-    Function => "function",
-    Class => "function",
-  }
-  .to_val()
+  Ok(
+    match input.typeof_() {
+      Undefined => "undefined",
+      Null => "object",
+      Bool => "boolean",
+      Number => "number",
+      BigInt => "bigint",
+      Symbol => "symbol",
+      String => "string",
+      Array => "object",
+      Object => "object",
+      Function => "function",
+      Class => "function",
+    }
+    .to_val(),
+  )
 }
 
 pub fn op_instance_of(left: &Val, right: &Val) -> Result<Val, Val> {
