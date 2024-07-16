@@ -41,7 +41,7 @@ impl BuiltinObject for NumberBuiltin {
 
   fn bo_load_function() -> LoadFunctionResult {
     LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-      Ok(if let Some(value) = params.get(0) {
+      Ok(if let Some(value) = params.first() {
         Val::Number(value.to_number())
       } else {
         Val::Number(0.0)
@@ -61,7 +61,7 @@ impl fmt::Display for NumberBuiltin {
 }
 
 pub static IS_FINITE: NativeFunction = native_fn(|_this, params| {
-  Ok(if let Some(value) = params.get(0) {
+  Ok(if let Some(value) = params.first() {
     let number = value.to_number();
     Val::Bool(number.is_finite())
   } else {
@@ -70,7 +70,7 @@ pub static IS_FINITE: NativeFunction = native_fn(|_this, params| {
 });
 
 static IS_INTEGER: NativeFunction = native_fn(|_this, params| {
-  let num = match params.get(0) {
+  let num = match params.first() {
     Some(n) => n.to_number(),
     None => return Ok(Val::Bool(false)),
   };
@@ -82,7 +82,7 @@ static IS_INTEGER: NativeFunction = native_fn(|_this, params| {
 });
 
 pub static IS_NAN: NativeFunction = native_fn(|_this, params| {
-  Ok(if let Some(value) = params.get(0) {
+  Ok(if let Some(value) = params.first() {
     let number = value.to_number();
     Val::Bool(number.is_nan())
   } else {
@@ -91,7 +91,7 @@ pub static IS_NAN: NativeFunction = native_fn(|_this, params| {
 });
 
 static IS_SAFE_INTEGER: NativeFunction = native_fn(|_this, params| {
-  let num = match params.get(0) {
+  let num = match params.first() {
     Some(n) => n.to_number(),
     None => return Ok(Val::Bool(false)),
   };
@@ -106,7 +106,7 @@ static IS_SAFE_INTEGER: NativeFunction = native_fn(|_this, params| {
 });
 
 pub static PARSE_FLOAT: NativeFunction = native_fn(|_this, params| {
-  Ok(if let Some(value) = params.get(0) {
+  Ok(if let Some(value) = params.first() {
     let string_value = value.to_string().trim().to_string();
 
     match string_value.parse::<f64>() {
@@ -119,7 +119,7 @@ pub static PARSE_FLOAT: NativeFunction = native_fn(|_this, params| {
 });
 
 pub static PARSE_INT: NativeFunction = native_fn(|_this, params| {
-  Ok(if let Some(value) = params.get(0) {
+  Ok(if let Some(value) = params.first() {
     let string_value = value.to_string().trim_start().to_string();
     let radix = params.get(1).and_then(|v| v.to_index()).unwrap_or(10);
 

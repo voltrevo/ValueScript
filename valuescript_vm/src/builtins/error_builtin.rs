@@ -29,7 +29,7 @@ impl BuiltinObject for ErrorBuiltin {
   fn bo_load_function() -> LoadFunctionResult {
     LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
       Ok(
-        match params.get(0) {
+        match params.first() {
           Some(param) => param.clone().to_val_string(),
           None => "".to_val(),
         }
@@ -96,7 +96,7 @@ fn make_error_prototype() -> Val {
 }
 
 static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
-  let message = match params.get(0) {
+  let message = match params.first() {
     Some(param) => param.to_string(),
     None => "".to_string(),
   };

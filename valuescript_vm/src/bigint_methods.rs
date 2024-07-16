@@ -19,7 +19,7 @@ pub fn op_sub_bigint(_bigint: &BigInt, subscript: &Val) -> Val {
 
 static TO_STRING: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
-    Val::BigInt(bigint) => match params.get(0) {
+    Val::BigInt(bigint) => match params.first() {
       Some(_) => {
         return Err("TODO: toString with radix".to_internal_error());
       }

@@ -89,178 +89,178 @@ fn param_to_number(param: Option<&Val>) -> f64 {
 }
 
 static ABS: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.abs()))
 });
 
 static ACOS: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.acos()))
 });
 
 static ACOSH: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.acosh()))
 });
 
 static ASIN: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.asin()))
 });
 
 static ASINH: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.sinh()))
 });
 
 static ATAN: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.atan()))
 });
 
 static ATAN2: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   let y = param_to_number(params.get(1));
 
   Ok(Val::Number(x.atan2(y)))
 });
 
 static ATANH: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.atanh()))
 });
 
 static CBRT: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.cbrt()))
 });
 
 static CEIL: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.ceil()))
 });
 
 static CLZ32: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(to_u32(x).leading_zeros() as f64))
 });
 
 static COS: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.cos()))
 });
 
 static COSH: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.cosh()))
 });
 
 static EXP: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.exp()))
 });
 
 static EXPM1: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.exp_m1()))
 });
 
 static FLOOR: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.floor()))
 });
 
 static FROUND: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x as f32 as f64))
 });
 
 static HYPOT: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   let y = param_to_number(params.get(1));
   Ok(Val::Number(x.hypot(y)))
 });
 
 static IMUL: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   let y = param_to_number(params.get(1));
   Ok(Val::Number((to_u32(x) * to_u32(y)) as i32 as f64))
 });
 
 static LOG: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.ln()))
 });
 
 static LOG10: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.log10()))
 });
 
 static LOG1P: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.ln_1p()))
 });
 
 static LOG2: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.log2()))
 });
 
 static MAX: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   let y = param_to_number(params.get(1));
   Ok(Val::Number(x.max(y)))
 });
 
 static MIN: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   let y = param_to_number(params.get(1));
   Ok(Val::Number(x.min(y)))
 });
 
 static POW: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   let y = param_to_number(params.get(1));
   Ok(Val::Number(x.powf(y)))
 });
 
 static ROUND: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.round()))
 });
 
 static SIGN: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.signum()))
 });
 
 static SIN: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.sin()))
 });
 
 static SINH: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.sinh()))
 });
 
 static SQRT: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.sqrt()))
 });
 
 static TAN: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.tan()))
 });
 
 static TANH: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.tanh()))
 });
 
 static TRUNC: NativeFunction = native_fn(|_this, params| {
-  let x = param_to_number(params.get(0));
+  let x = param_to_number(params.first());
   Ok(Val::Number(x.trunc()))
 });

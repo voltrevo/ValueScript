@@ -89,7 +89,7 @@ pub fn op_sub_array_index(array: &mut Rc<VsArray>, index: usize) -> Result<Val, 
 
 static AT: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
-    Val::Array(array_data) => match to_wrapping_index(params.get(0), array_data.elements.len()) {
+    Val::Array(array_data) => match to_wrapping_index(params.first(), array_data.elements.len()) {
       None => Val::Undefined,
       Some(i) => array_data.elements[i].clone(),
     },
@@ -133,7 +133,7 @@ static COPY_WITHIN: NativeFunction = native_fn(|mut this, params| {
         return Err("TODO: array len exceeds isize".to_internal_error());
       }
 
-      let mut target = match params.get(0) {
+      let mut target = match params.first() {
         None => 0,
         Some(p) => to_wrapping_index_clamped(p, ulen),
       };
@@ -205,7 +205,7 @@ static FILL: NativeFunction = native_fn(|mut this, params| {
       let array_data_mut = Rc::make_mut(array_data);
       let len = array_data_mut.elements.len();
 
-      let fill_val = params.get(0).unwrap_or(&Val::Undefined);
+      let fill_val = params.first().unwrap_or(&Val::Undefined);
 
       let start = match params.get(1) {
         None => 0,
@@ -258,7 +258,7 @@ static FLAT: NativeFunction = native_fn(|this, params| {
 static INCLUDES: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(array_data) => {
-      let search_param = params.get(0).unwrap_or(&Val::Undefined);
+      let search_param = params.first().unwrap_or(&Val::Undefined);
 
       for elem in &array_data.elements {
         let is_eq = op_triple_eq_impl(elem, search_param)
@@ -279,7 +279,7 @@ static INCLUDES: NativeFunction = native_fn(|this, params| {
 static INDEX_OF: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(array_data) => {
-      let search_param = params.get(0).unwrap_or(&Val::Undefined);
+      let search_param = params.first().unwrap_or(&Val::Undefined);
 
       for i in 0..array_data.elements.len() {
         let is_eq = op_triple_eq_impl(&array_data.elements[i], search_param)
@@ -308,7 +308,7 @@ static JOIN: NativeFunction = native_fn(|this, params| {
         return Ok(vals.elements[0].clone().to_val_string());
       }
 
-      let separator = match params.get(0) {
+      let separator = match params.first() {
         None => ",".to_string(),
         Some(v) => v.to_string(),
       };
@@ -336,7 +336,7 @@ static JOIN: NativeFunction = native_fn(|this, params| {
 static LAST_INDEX_OF: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::Array(array_data) => {
-      let search_param = params.get(0).unwrap_or(&Val::Undefined);
+      let search_param = params.first().unwrap_or(&Val::Undefined);
 
       for i in (0..array_data.elements.len()).rev() {
         let is_eq = op_triple_eq_impl(&array_data.elements[i], search_param)
@@ -440,7 +440,7 @@ static SLICE: NativeFunction = native_fn(|this, params| {
     Val::Array(array_data) => {
       let mut new_elems = Vec::<Val>::new();
 
-      let start = match params.get(0) {
+      let start = match params.first() {
         None => 0,
         Some(v) => to_wrapping_index_clamped(v, array_data.elements.len()),
       };
@@ -468,7 +468,7 @@ static SPLICE: NativeFunction = native_fn(|mut this, params| {
       let array_data_mut = Rc::make_mut(array_data);
       let len = array_data_mut.elements.len();
 
-      let start = match params.get(0) {
+      let start = match params.first() {
         None => 0,
         Some(v) => to_wrapping_index_clamped(v, len),
       } as usize;

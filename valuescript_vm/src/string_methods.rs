@@ -94,7 +94,7 @@ static AT: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let index = match to_wrapping_index(params.get(0), string_bytes.len()) {
+      let index = match to_wrapping_index(params.first(), string_bytes.len()) {
         None => return Ok(Val::Undefined),
         Some(i) => i,
       };
@@ -113,7 +113,7 @@ static CODE_POINT_AT: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let index = match params.get(0) {
+      let index = match params.first() {
         Some(i) => match i.to_index() {
           None => return Ok(Val::Undefined),
           Some(i) => i,
@@ -153,7 +153,7 @@ static ENDS_WITH: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let search_string = match params.get(0) {
+      let search_string = match params.first() {
         Some(s) => s.to_string(),
         _ => return Ok(Val::Bool(false)),
       };
@@ -194,7 +194,7 @@ static INCLUDES: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let search_string = match params.get(0) {
+      let search_string = match params.first() {
         Some(s) => s.to_string(),
         _ => return Ok(Val::Bool(false)),
       };
@@ -224,7 +224,7 @@ static INDEX_OF: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let search_string = match params.get(0) {
+      let search_string = match params.first() {
         Some(s) => s.to_string(),
         _ => return Ok(Val::Number(-1.0)),
       };
@@ -254,7 +254,7 @@ static LAST_INDEX_OF: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let search_string = match params.get(0) {
+      let search_string = match params.first() {
         Some(s) => s.to_string(),
         _ => return Ok(Val::Number(-1.0)),
       };
@@ -310,7 +310,7 @@ static NORMALIZE: NativeFunction = native_fn(|this, _params| {
 static PAD_END: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::String(string_data) => {
-      let target_length = match params.get(0) {
+      let target_length = match params.first() {
         Some(p) => match p.to_index() {
           Some(i) => i,
           None => return Ok(Val::String(string_data.clone())),
@@ -362,7 +362,7 @@ static PAD_END: NativeFunction = native_fn(|this, params| {
 static PAD_START: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::String(string_data) => {
-      let target_length = match params.get(0) {
+      let target_length = match params.first() {
         Some(p) => match p.to_index() {
           Some(i) => i,
           None => return Ok(Val::String(string_data.clone())),
@@ -415,7 +415,7 @@ static PAD_START: NativeFunction = native_fn(|this, params| {
 static REPEAT: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::String(string_data) => {
-      let count = match params.get(0) {
+      let count = match params.first() {
         Some(p) => match p.to_index() {
           Some(i) => i,
           None => return Ok(Val::String(string_data.clone())),
@@ -440,7 +440,7 @@ static SLICE: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let start = match params.get(0) {
+      let start = match params.first() {
         None => 0,
         Some(v) => to_wrapping_index_clamped(v, string_bytes.len()),
       };
@@ -469,7 +469,7 @@ static SLICE: NativeFunction = native_fn(|this, params| {
 static SPLIT: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
     Val::String(string_data) => {
-      let separator = match params.get(0) {
+      let separator = match params.first() {
         Some(s) => s.to_string(), // TODO: Regexes
         None => return Ok(Val::String(string_data.clone())),
       };
@@ -535,7 +535,7 @@ static STARTS_WITH: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let search_string = match params.get(0) {
+      let search_string = match params.first() {
         Some(s) => s.to_string(),
         _ => return Ok(Val::Bool(false)),
       };
@@ -574,7 +574,7 @@ static SUBSTRING: NativeFunction = native_fn(|this, params| {
     Val::String(string_data) => {
       let string_bytes = string_data.as_bytes();
 
-      let start = match params.get(0) {
+      let start = match params.first() {
         Some(v) => match v.to_index() {
           Some(i) => std::cmp::min(i, string_bytes.len()),
           None => 0,

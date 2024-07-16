@@ -35,7 +35,7 @@ static TO_FIXED: NativeFunction = native_fn(|this, params| {
         );
       }
 
-      let mut precision = match params.get(0) {
+      let mut precision = match params.first() {
         Some(p) => p.to_number(),
         _ => return Ok(number.to_val().to_string().to_val()),
       };
@@ -54,7 +54,7 @@ static TO_FIXED: NativeFunction = native_fn(|this, params| {
 
 static TO_EXPONENTIAL: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
-    Val::Number(number) => match params.get(0) {
+    Val::Number(number) => match params.first() {
       Some(p) => {
         let mut precision = p.to_number();
         precision = f64::floor(precision);
@@ -78,7 +78,7 @@ static TODO_LOCALE: NativeFunction = native_fn(|this, _params| match this.get() 
 
 static TO_STRING: NativeFunction = native_fn(|this, params| {
   Ok(match this.get() {
-    Val::Number(number) => match params.get(0) {
+    Val::Number(number) => match params.first() {
       Some(_) => {
         return Err("TODO: toString with radix".to_internal_error());
       }

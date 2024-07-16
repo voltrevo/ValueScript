@@ -90,7 +90,7 @@ fn make_storage(path: &String) -> Storage<SledBackend> {
 }
 
 fn db_new(path: &String, args: &[String]) {
-  let class_path = match args.get(0) {
+  let class_path = match args.first() {
     Some(class_path) => class_path,
     None => {
       exit_command_failed(args, Some("Missing class file"), "vstc db help");
@@ -110,7 +110,7 @@ fn db_new(path: &String, args: &[String]) {
 }
 
 fn db_call(path: &String, args: &[String]) {
-  let fn_file = match args.get(0) {
+  let fn_file = match args.first() {
     Some(fn_file) => fn_file,
     None => exit_command_failed(args, Some("Missing function file"), "vstc db help"),
   };
@@ -211,7 +211,7 @@ fn db_interactive(path: &String) {
 
     let args = parse_command_line(&input);
 
-    match args.get(0).map(|s| s.as_str()) {
+    match args.first().map(|s| s.as_str()) {
       Some("help") => {
         // TODO: help (it's a bit different - code isn't quoted (TODO: quoted should work too))
         println!("TODO: help");

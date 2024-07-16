@@ -27,7 +27,7 @@ impl BuiltinObject for BigIntBuiltin {
 
   fn bo_load_function() -> LoadFunctionResult {
     LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-      match params.get(0) {
+      match params.first() {
         Some(Val::Number(value)) => {
           if *value != f64::floor(*value) {
             Err(

@@ -22,7 +22,7 @@ impl BuiltinObject for BooleanBuiltin {
 
   fn bo_load_function() -> LoadFunctionResult {
     LoadFunctionResult::NativeFunction(|_: ThisWrapper, params: Vec<Val>| -> Result<Val, Val> {
-      Ok(if let Some(value) = params.get(0) {
+      Ok(if let Some(value) = params.first() {
         Val::Bool(value.is_truthy())
       } else {
         Val::Bool(false)

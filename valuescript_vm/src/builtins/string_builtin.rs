@@ -65,7 +65,7 @@ static FROM_CODE_POINT: NativeFunction = native_fn(|_this, params| {
 });
 
 fn to_string(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
-  Ok(if let Some(value) = params.get(0) {
+  Ok(if let Some(value) = params.first() {
     value.clone().to_val_string()
   } else {
     "".to_val()

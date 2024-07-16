@@ -61,7 +61,7 @@ where
         // FIXME: This diagnostic should really be attached to the import statement
         gm.diagnostics
           .entry(dependency.path.clone())
-          .or_insert(vec![])
+          .or_default()
           .push(Diagnostic {
             level: DiagnosticLevel::Error,
             message: match dependency.reason {
@@ -82,7 +82,7 @@ where
 
     gm.diagnostics
       .entry(dependency.path.clone())
-      .or_insert(vec![])
+      .or_default()
       .append(&mut compiler_output.diagnostics);
 
     let path_and_module = PathAndModule {

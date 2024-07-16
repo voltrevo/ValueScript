@@ -45,7 +45,7 @@ impl fmt::Display for ArrayBuiltin {
 }
 
 static IS_ARRAY: NativeFunction = native_fn(|_this, params| {
-  Ok(match params.get(0) {
+  Ok(match params.first() {
     None => Val::Bool(false),
     Some(p) => match p.as_array_data() {
       None => Val::Bool(false),
@@ -55,7 +55,7 @@ static IS_ARRAY: NativeFunction = native_fn(|_this, params| {
 });
 
 static FROM: NativeFunction = native_fn(|_this, params| {
-  let mut first_param = match params.get(0) {
+  let mut first_param = match params.first() {
     None => return Err("undefined is not iterable".to_type_error()),
     Some(p) => p.clone(),
   };

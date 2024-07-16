@@ -180,7 +180,7 @@ impl ScopeAnalysis {
     self
       .reg_allocators
       .entry(scope.clone())
-      .or_insert_with(RegAllocator::default)
+      .or_default()
       .allocate(based_on_name)
   }
 
@@ -232,7 +232,7 @@ impl ScopeAnalysis {
     self
       .owners
       .entry(name.owner_id.clone())
-      .or_insert_with(HashSet::new)
+      .or_default()
       .insert(origin_ident.span);
 
     scope.set(
@@ -336,7 +336,7 @@ impl ScopeAnalysis {
     let inserted = self
       .captures
       .entry(captor_id.clone())
-      .or_insert_with(HashSet::new)
+      .or_default()
       .insert(name_id.clone());
 
     if inserted {
@@ -347,7 +347,7 @@ impl ScopeAnalysis {
         let reg = self
           .reg_allocators
           .entry(captor_id.clone())
-          .or_insert_with(RegAllocator::default)
+          .or_default()
           .allocate(&name.sym);
 
         self.capture_values.insert(key, Value::Register(reg));
@@ -1895,7 +1895,7 @@ impl ScopeAnalysis {
               let reg = self
                 .reg_allocators
                 .entry(captor.clone())
-                .or_insert_with(RegAllocator::default)
+                .or_default()
                 .allocate(&name.sym);
 
               Value::Register(reg)

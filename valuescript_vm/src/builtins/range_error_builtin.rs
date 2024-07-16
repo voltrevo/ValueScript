@@ -60,7 +60,7 @@ fn make_range_error_prototype() -> Val {
 }
 
 static SET_MESSAGE: NativeFunction = native_fn(|mut this, params| {
-  let message = match params.get(0) {
+  let message = match params.first() {
     Some(param) => param.to_string(),
     None => "".to_string(),
   };
@@ -75,7 +75,7 @@ pub fn to_range_error(_: ThisWrapper, params: Vec<Val>) -> Result<Val, Val> {
     VsObject {
       string_map: BTreeMap::from([(
         "message".to_string(),
-        match params.get(0) {
+        match params.first() {
           Some(param) => param.clone().to_val_string(),
           None => "".to_val(),
         },
