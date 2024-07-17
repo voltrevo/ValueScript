@@ -36,6 +36,7 @@ pub use builtins::error_builtin;
 pub use builtins::type_error_builtin;
 pub use builtins::BUILTIN_VALS;
 pub use bytecode::{Bytecode, DecoderMaker};
+pub use first_stack_frame::FirstStackFrame;
 pub use jsx_element::is_jsx_element;
 pub use stack_frame::{CallResult, FrameStepOk, FrameStepResult, StackFrame, StackFrameTrait};
 pub use virtual_machine::VirtualMachine;
