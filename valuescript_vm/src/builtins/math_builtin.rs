@@ -1,8 +1,9 @@
 use std::fmt;
 use std::rc::Rc;
 
+use valuescript_common::to_u32;
+
 use crate::native_function::{native_fn, NativeFunction};
-use crate::operations::to_u32;
 use crate::vs_class::VsClass;
 use crate::vs_value::{LoadFunctionResult, ToVal, Val, ValTrait};
 

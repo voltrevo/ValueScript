@@ -1,6 +1,7 @@
 use num_bigint::BigInt;
+use valuescript_common::unicode_at;
 use valuescript_vm::{
-  operations, unicode_at,
+  operations,
   vs_class::VsClass,
   vs_object::VsObject,
   vs_value::{number_to_index, ToVal, Val},

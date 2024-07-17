@@ -6,6 +6,8 @@ use num_bigint::BigInt;
 use num_bigint::Sign;
 use num_traits::FromPrimitive;
 use num_traits::ToPrimitive;
+use valuescript_common::to_i32;
+use valuescript_common::to_u32;
 
 use crate::array_methods::op_sub_array;
 use crate::bigint_methods::op_sub_bigint;
@@ -539,26 +541,6 @@ pub fn op_optional_chain(left: &mut Val, right: &Val) -> Result<Val, Val> {
 
     _ => op_sub(left, right),
   }
-}
-
-pub fn to_i32(x: f64) -> i32 {
-  if x == f64::INFINITY {
-    return 0;
-  }
-
-  let int1 = (x.trunc() as i64) & 0xffffffff;
-
-  int1 as i32
-}
-
-pub fn to_u32(x: f64) -> u32 {
-  if x == f64::INFINITY {
-    return 0;
-  }
-
-  let int1 = (x.trunc() as i64) & 0xffffffff;
-
-  int1 as u32
 }
 
 pub fn op_bit_and(left: &Val, right: &Val) -> Result<Val, Val> {
