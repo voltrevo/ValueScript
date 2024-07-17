@@ -34,6 +34,7 @@ pub mod vs_value;
 
 pub use builtins::error_builtin;
 pub use builtins::type_error_builtin;
+pub use builtins::BUILTIN_VALS;
 pub use bytecode::{Bytecode, DecoderMaker};
 pub use jsx_element::is_jsx_element;
 pub use virtual_machine::VirtualMachine;
