@@ -33,6 +33,7 @@ mod vs_symbol;
 pub mod vs_value;
 
 pub use builtins::error_builtin;
+pub use builtins::internal_error_builtin;
 pub use builtins::type_error_builtin;
 pub use builtins::BUILTIN_VALS;
 pub use bytecode::{Bytecode, DecoderMaker};
