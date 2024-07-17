@@ -67,7 +67,7 @@ pub fn op_plus(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_unary_plus(input: &Val) -> Result<Val, Val> {
-  if let Some(res) = input.override_unary_op(UnaryOp::Plus) {
+  if let Some(res) = input.override_unary_op(UnaryOp::Plus, input) {
     return res;
   }
 
@@ -90,7 +90,7 @@ pub fn op_minus(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_unary_minus(input: &Val) -> Result<Val, Val> {
-  if let Some(res) = input.override_unary_op(UnaryOp::Minus) {
+  if let Some(res) = input.override_unary_op(UnaryOp::Minus, input) {
     return res;
   }
 
@@ -450,7 +450,7 @@ pub fn op_or(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_not(input: &Val) -> Result<Val, Val> {
-  if let Some(res) = input.override_unary_op(UnaryOp::Not) {
+  if let Some(res) = input.override_unary_op(UnaryOp::Not, input) {
     return res;
   }
 
@@ -592,7 +592,7 @@ pub fn op_bit_or(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_bit_not(input: &Val) -> Result<Val, Val> {
-  if let Some(res) = input.override_unary_op(UnaryOp::BitNot) {
+  if let Some(res) = input.override_unary_op(UnaryOp::BitNot, input) {
     return res;
   }
 

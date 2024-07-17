@@ -111,7 +111,7 @@ pub trait ValTrait: fmt::Display {
     None
   }
 
-  fn override_unary_op(&self, _op: UnaryOp) -> Option<Result<Val, Val>> {
+  fn override_unary_op(&self, _op: UnaryOp, _input: &Val) -> Option<Result<Val, Val>> {
     None
   }
 
@@ -595,7 +595,7 @@ impl ValTrait for Val {
     }
   }
 
-  fn override_unary_op(&self, op: UnaryOp) -> Option<Result<Val, Val>> {
+  fn override_unary_op(&self, op: UnaryOp, input: &Val) -> Option<Result<Val, Val>> {
     match self {
       Val::Void
       | Val::Undefined
@@ -611,8 +611,8 @@ impl ValTrait for Val {
       | Val::Class(_)
       | Val::CopyCounter(_)
       | Val::StoragePtr(_) => None,
-      Val::Static(static_) => static_.override_unary_op(op),
-      Val::Dynamic(dynamic) => dynamic.override_unary_op(op),
+      Val::Static(static_) => static_.override_unary_op(op, input),
+      Val::Dynamic(dynamic) => dynamic.override_unary_op(op, input),
     }
   }
 
