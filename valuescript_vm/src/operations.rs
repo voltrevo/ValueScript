@@ -23,8 +23,20 @@ use crate::vs_value::Val;
 use crate::vs_value::ValTrait;
 use crate::vs_value::VsType;
 
+fn try_binary_override(op: BinaryOp, left: &Val, right: &Val) -> Option<Result<Val, Val>> {
+  if let Some(res) = left.override_binary_op(op, left, right) {
+    return Some(res);
+  }
+
+  if let Some(res) = right.override_binary_op(op, left, right) {
+    return Some(res);
+  }
+
+  None
+}
+
 pub fn op_plus(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Plus, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Plus, left, right) {
     return res;
   }
 
@@ -66,7 +78,7 @@ pub fn op_unary_plus(input: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_minus(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Minus, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Minus, left, right) {
     return res;
   }
 
@@ -89,7 +101,7 @@ pub fn op_unary_minus(input: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_mul(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Mul, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Mul, left, right) {
     return res;
   }
 
@@ -101,7 +113,7 @@ pub fn op_mul(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_div(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Div, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Div, left, right) {
     return res;
   }
 
@@ -113,7 +125,7 @@ pub fn op_div(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_mod(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Mod, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Mod, left, right) {
     return res;
   }
 
@@ -125,7 +137,7 @@ pub fn op_mod(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_exp(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Exp, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Exp, left, right) {
     return res;
   }
 
@@ -281,7 +293,7 @@ where
 }
 
 pub fn op_eq(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::LooseEq, right) {
+  if let Some(res) = try_binary_override(BinaryOp::LooseEq, left, right) {
     return res;
   }
 
@@ -289,7 +301,7 @@ pub fn op_eq(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_ne(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::LooseNe, right) {
+  if let Some(res) = try_binary_override(BinaryOp::LooseNe, left, right) {
     return res;
   }
 
@@ -400,7 +412,7 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
 }
 
 pub fn op_triple_eq(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Eq, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Eq, left, right) {
     return res;
   }
 
@@ -409,7 +421,7 @@ pub fn op_triple_eq(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_triple_ne(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Ne, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Ne, left, right) {
     return res;
   }
 
@@ -418,7 +430,7 @@ pub fn op_triple_ne(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_and(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::And, right) {
+  if let Some(res) = try_binary_override(BinaryOp::And, left, right) {
     return res;
   }
 
@@ -428,7 +440,7 @@ pub fn op_and(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_or(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Or, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Or, left, right) {
     return res;
   }
 
@@ -446,7 +458,7 @@ pub fn op_not(input: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_less(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Less, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Less, left, right) {
     return res;
   }
 
@@ -462,7 +474,7 @@ pub fn op_less(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_less_eq(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::LessEq, right) {
+  if let Some(res) = try_binary_override(BinaryOp::LessEq, left, right) {
     return res;
   }
 
@@ -481,7 +493,7 @@ pub fn op_less_eq(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_greater(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::Greater, right) {
+  if let Some(res) = try_binary_override(BinaryOp::Greater, left, right) {
     return res;
   }
 
@@ -497,7 +509,7 @@ pub fn op_greater(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_greater_eq(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::GreaterEq, right) {
+  if let Some(res) = try_binary_override(BinaryOp::GreaterEq, left, right) {
     return res;
   }
 
@@ -550,7 +562,7 @@ pub fn to_u32(x: f64) -> u32 {
 }
 
 pub fn op_bit_and(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::BitAnd, right) {
+  if let Some(res) = try_binary_override(BinaryOp::BitAnd, left, right) {
     return res;
   }
 
@@ -565,7 +577,7 @@ pub fn op_bit_and(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_bit_or(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::BitOr, right) {
+  if let Some(res) = try_binary_override(BinaryOp::BitOr, left, right) {
     return res;
   }
 
@@ -594,7 +606,7 @@ pub fn op_bit_not(input: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_bit_xor(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::BitXor, right) {
+  if let Some(res) = try_binary_override(BinaryOp::BitXor, left, right) {
     return res;
   }
 
@@ -609,7 +621,7 @@ pub fn op_bit_xor(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_left_shift(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::LeftShift, right) {
+  if let Some(res) = try_binary_override(BinaryOp::LeftShift, left, right) {
     return res;
   }
 
@@ -626,7 +638,7 @@ pub fn op_left_shift(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_right_shift(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::RightShift, right) {
+  if let Some(res) = try_binary_override(BinaryOp::RightShift, left, right) {
     return res;
   }
 
@@ -646,7 +658,7 @@ pub fn op_right_shift(left: &Val, right: &Val) -> Result<Val, Val> {
 }
 
 pub fn op_right_shift_unsigned(left: &Val, right: &Val) -> Result<Val, Val> {
-  if let Some(res) = left.override_binary_op(BinaryOp::RightShiftUnsigned, right) {
+  if let Some(res) = try_binary_override(BinaryOp::RightShiftUnsigned, left, right) {
     return res;
   }
 

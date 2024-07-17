@@ -102,7 +102,12 @@ pub trait ValTrait: fmt::Display {
   fn has(&self, key: &Val) -> Option<bool>;
   fn submov(&mut self, key: &Val, value: Val) -> Result<(), Val>;
 
-  fn override_binary_op(&self, _op: BinaryOp, _right: &Val) -> Option<Result<Val, Val>> {
+  fn override_binary_op(
+    &self,
+    _op: BinaryOp,
+    _left: &Val,
+    _right: &Val,
+  ) -> Option<Result<Val, Val>> {
     None
   }
 
@@ -569,7 +574,7 @@ impl ValTrait for Val {
     op_submov(self, key, value)
   }
 
-  fn override_binary_op(&self, op: BinaryOp, right: &Val) -> Option<Result<Val, Val>> {
+  fn override_binary_op(&self, op: BinaryOp, left: &Val, right: &Val) -> Option<Result<Val, Val>> {
     match self {
       Val::Void
       | Val::Undefined
@@ -585,8 +590,8 @@ impl ValTrait for Val {
       | Val::Class(_)
       | Val::CopyCounter(_)
       | Val::StoragePtr(_) => None,
-      Val::Static(static_) => static_.override_binary_op(op, right),
-      Val::Dynamic(dynamic) => dynamic.override_binary_op(op, right),
+      Val::Static(static_) => static_.override_binary_op(op, left, right),
+      Val::Dynamic(dynamic) => dynamic.override_binary_op(op, left, right),
     }
   }
 
