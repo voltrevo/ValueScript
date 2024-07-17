@@ -569,6 +569,48 @@ impl ValTrait for Val {
     op_submov(self, key, value)
   }
 
+  fn override_binary_op(&self, op: BinaryOp, right: &Val) -> Option<Result<Val, Val>> {
+    match self {
+      Val::Void
+      | Val::Undefined
+      | Val::Null
+      | Val::Bool(_)
+      | Val::Number(_)
+      | Val::BigInt(_)
+      | Val::Symbol(_)
+      | Val::String(_)
+      | Val::Array(_)
+      | Val::Object(_)
+      | Val::Function(_)
+      | Val::Class(_)
+      | Val::CopyCounter(_)
+      | Val::StoragePtr(_) => None,
+      Val::Static(static_) => static_.override_binary_op(op, right),
+      Val::Dynamic(dynamic) => dynamic.override_binary_op(op, right),
+    }
+  }
+
+  fn override_unary_op(&self, op: UnaryOp) -> Option<Result<Val, Val>> {
+    match self {
+      Val::Void
+      | Val::Undefined
+      | Val::Null
+      | Val::Bool(_)
+      | Val::Number(_)
+      | Val::BigInt(_)
+      | Val::Symbol(_)
+      | Val::String(_)
+      | Val::Array(_)
+      | Val::Object(_)
+      | Val::Function(_)
+      | Val::Class(_)
+      | Val::CopyCounter(_)
+      | Val::StoragePtr(_) => None,
+      Val::Static(static_) => static_.override_unary_op(op),
+      Val::Dynamic(dynamic) => dynamic.override_unary_op(op),
+    }
+  }
+
   fn pretty_fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     std::fmt::Display::fmt(&self.pretty(), f)
   }
