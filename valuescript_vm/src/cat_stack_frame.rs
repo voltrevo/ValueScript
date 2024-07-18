@@ -145,6 +145,10 @@ impl StackFrameTrait for CatStackFrame {
     panic!("Not appropriate for CatStackFrame");
   }
 
+  fn can_catch_exception(&self, _exception: &Val) -> bool {
+    false
+  }
+
   fn catch_exception(&mut self, _exception: &mut Val) {}
 
   fn clone_to_stack_frame(&self) -> StackFrame {

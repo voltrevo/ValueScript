@@ -124,6 +124,10 @@ impl StackFrameTrait for ReduceRightFrame {
     panic!("Not appropriate for ReduceRightFrame")
   }
 
+  fn can_catch_exception(&self, _exception: &Val) -> bool {
+    false
+  }
+
   fn catch_exception(&mut self, _exception: &mut Val) {}
 
   fn clone_to_stack_frame(&self) -> StackFrame {

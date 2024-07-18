@@ -50,6 +50,10 @@ impl StackFrameTrait for MakeGeneratorFrame {
     panic!("Not appropriate for MakeGeneratorFrame")
   }
 
+  fn can_catch_exception(&self, _exception: &Val) -> bool {
+    panic!("Not appropriate for MakeGeneratorFrame");
+  }
+
   fn catch_exception(&mut self, _exception: &mut Val) {
     panic!("Not appropriate for MakeGeneratorFrame");
   }

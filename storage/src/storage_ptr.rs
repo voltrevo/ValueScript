@@ -14,10 +14,7 @@ pub struct StoragePtr<T> {
 
 impl<T> Clone for StoragePtr<T> {
   fn clone(&self) -> Self {
-    Self {
-      _marker: std::marker::PhantomData,
-      data: self.data,
-    }
+    *self
   }
 }
 

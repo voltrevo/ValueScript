@@ -24,6 +24,7 @@ pub trait StackFrameTrait {
   fn step(&mut self) -> FrameStepResult;
   fn apply_call_result(&mut self, call_result: CallResult);
   fn get_call_result(&mut self) -> CallResult;
+  fn can_catch_exception(&self, exception: &Val) -> bool;
   fn catch_exception(&mut self, exception: &mut Val);
   fn clone_to_stack_frame(&self) -> StackFrame;
 }
@@ -61,6 +62,10 @@ impl StackFrameTrait for VoidStackFrame {
       return_: Val::Void,
       this: Val::Void,
     }
+  }
+
+  fn can_catch_exception(&self, _exception: &Val) -> bool {
+    false
   }
 
   fn catch_exception(&mut self, _exception: &mut Val) {}

@@ -19,6 +19,12 @@ impl FirstStackFrame {
   }
 }
 
+impl Default for FirstStackFrame {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl StackFrameTrait for FirstStackFrame {
   fn write_this(&mut self, _const: bool, _this: Val) -> Result<(), Val> {
     panic!("Not appropriate for FirstStackFrame");
@@ -39,6 +45,10 @@ impl StackFrameTrait for FirstStackFrame {
   fn get_call_result(&mut self) -> CallResult {
     // TODO: get_call_result(self) version? (Move memory variation)
     self.call_result.clone()
+  }
+
+  fn can_catch_exception(&self, _exception: &Val) -> bool {
+    panic!("Not appropriate for FirstStackFrame");
   }
 
   fn catch_exception(&mut self, _exception: &mut Val) {

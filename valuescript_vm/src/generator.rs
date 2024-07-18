@@ -230,6 +230,10 @@ impl StackFrameTrait for GeneratorFrame {
     panic!("Not appropriate for GeneratorFrame")
   }
 
+  fn can_catch_exception(&self, exception: &Val) -> bool {
+    self.generator.frame.can_catch_exception(exception)
+  }
+
   fn catch_exception(&mut self, exception: &mut Val) {
     self.generator.frame.catch_exception(exception)
   }
@@ -341,6 +345,10 @@ impl StackFrameTrait for YieldStarFrame {
 
   fn get_call_result(&mut self) -> CallResult {
     panic!("Not appropriate for YieldStarFrame")
+  }
+
+  fn can_catch_exception(&self, _exception: &Val) -> bool {
+    false
   }
 
   fn catch_exception(&mut self, _exception: &mut Val) {}

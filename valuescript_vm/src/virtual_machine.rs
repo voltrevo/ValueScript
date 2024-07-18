@@ -119,9 +119,8 @@ impl VirtualMachine {
 
   pub fn handle_exception(&mut self, mut exception: Val) -> Result<(), Val> {
     while !self.stack.is_empty() {
-      self.frame.catch_exception(&mut exception);
-
-      if let Val::Void = exception {
+      if self.frame.can_catch_exception(&exception) {
+        self.frame.catch_exception(&mut exception);
         return Ok(());
       }
 
