@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use super::vs_value::Val;
 
 pub type StackFrame = Box<dyn StackFrameTrait>;
@@ -18,7 +20,7 @@ pub enum FrameStepOk {
 
 pub type FrameStepResult = Result<FrameStepOk, Val>;
 
-pub trait StackFrameTrait {
+pub trait StackFrameTrait: Any {
   fn write_this(&mut self, const_: bool, this: Val) -> Result<(), Val>;
   fn write_param(&mut self, param: Val);
   fn step(&mut self) -> FrameStepResult;
