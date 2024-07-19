@@ -5,7 +5,7 @@ use super::vs_value::Val;
 
 #[derive(Clone)]
 pub struct FirstStackFrame {
-  call_result: CallResult,
+  pub call_result: CallResult,
 }
 
 impl FirstStackFrame {
