@@ -43,7 +43,7 @@ pub enum Val {
   StoragePtr(Rc<VsStoragePtr>),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum VsType {
   Undefined,
   Null,
