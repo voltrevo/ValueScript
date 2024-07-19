@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::mem::take;
 
 use valuescript_common::InstructionByte;
@@ -731,5 +732,13 @@ impl StackFrameTrait for BytecodeStackFrame {
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())
+  }
+
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any {
+    self
   }
 }

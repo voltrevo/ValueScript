@@ -1,4 +1,4 @@
-use std::{mem::take, rc::Rc};
+use std::{any::Any, mem::take, rc::Rc};
 
 use crate::{
   builtins::{internal_error_builtin::ToInternalError, type_error_builtin::ToTypeError},
@@ -153,5 +153,13 @@ impl StackFrameTrait for CatStackFrame {
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())
+  }
+
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any {
+    self
   }
 }

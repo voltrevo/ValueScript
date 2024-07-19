@@ -20,7 +20,7 @@ pub enum FrameStepOk {
 
 pub type FrameStepResult = Result<FrameStepOk, Val>;
 
-pub trait StackFrameTrait: Any {
+pub trait StackFrameTrait {
   fn write_this(&mut self, const_: bool, this: Val) -> Result<(), Val>;
   fn write_param(&mut self, param: Val);
   fn step(&mut self) -> FrameStepResult;
@@ -29,6 +29,8 @@ pub trait StackFrameTrait: Any {
   fn can_catch_exception(&self, exception: &Val) -> bool;
   fn catch_exception(&mut self, exception: &mut Val);
   fn clone_to_stack_frame(&self) -> StackFrame;
+  fn as_any(&self) -> &dyn Any;
+  fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 impl Clone for StackFrame {
@@ -74,5 +76,13 @@ impl StackFrameTrait for VoidStackFrame {
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())
+  }
+
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any {
+    self
   }
 }

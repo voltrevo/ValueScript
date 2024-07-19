@@ -1,4 +1,4 @@
-use std::mem::take;
+use std::{any::Any, mem::take};
 
 use crate::{
   bytecode_stack_frame::BytecodeStackFrame,
@@ -60,5 +60,13 @@ impl StackFrameTrait for MakeGeneratorFrame {
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())
+  }
+
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any {
+    self
   }
 }

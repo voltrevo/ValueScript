@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use crate::stack_frame::StackFrame;
 
 use super::stack_frame::{CallResult, FrameStepResult, StackFrameTrait};
@@ -57,5 +59,13 @@ impl StackFrameTrait for FirstStackFrame {
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())
+  }
+
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any {
+    self
   }
 }

@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::rc::Rc;
 
 use crate::builtins::type_error_builtin::ToTypeError;
@@ -119,5 +120,13 @@ impl StackFrameTrait for ReduceFrame {
 
   fn clone_to_stack_frame(&self) -> StackFrame {
     Box::new(self.clone())
+  }
+
+  fn as_any(&self) -> &dyn Any {
+    self
+  }
+
+  fn as_any_mut(&mut self) -> &mut dyn Any {
+    self
   }
 }
