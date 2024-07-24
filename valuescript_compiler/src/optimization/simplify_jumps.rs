@@ -88,7 +88,7 @@ fn simplify_jumps_fn(fn_: &mut Function) {
   }
 }
 
-fn next_instruction_index(body: &Vec<FnLine>, mut i: usize) -> Option<usize> {
+fn next_instruction_index(body: &[FnLine], mut i: usize) -> Option<usize> {
   i += 1;
 
   while i < body.len() {

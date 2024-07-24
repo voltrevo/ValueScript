@@ -2,7 +2,7 @@ use valuescript_compiler::{assemble, parse_module};
 
 use crate::exit_command_failed::exit_command_failed;
 
-pub fn assemble_command(args: &Vec<String>) {
+pub fn assemble_command(args: &[String]) {
   if args.len() != 3 {
     exit_command_failed(args, None, "vstc assemble --help");
   }

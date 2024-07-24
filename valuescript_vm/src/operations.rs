@@ -387,9 +387,7 @@ pub fn op_triple_eq_impl(left: &Val, right: &Val) -> Result<bool, Val> {
 
       true
     }
-    #[allow(clippy::vtable_address_comparisons)] // TODO: Is this ok?
     (Val::Static(left), Val::Static(right)) => std::ptr::eq(&**left, &**right),
-    #[allow(clippy::vtable_address_comparisons)] // TODO: Is this ok?
     (Val::Dynamic(left), Val::Dynamic(right)) => std::ptr::eq(&**left, &**right),
     (Val::Static(..) | Val::Dynamic(..) | Val::CopyCounter(..), _)
     | (_, Val::Static(..) | Val::Dynamic(..) | Val::CopyCounter(..)) => {

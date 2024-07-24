@@ -60,13 +60,6 @@ impl Functionish {
   }
 }
 
-#[derive(Clone, Debug)]
-pub struct QueuedFunction {
-  pub definition_pointer: Pointer,
-  pub fn_name: Option<String>,
-  pub functionish: Functionish,
-}
-
 pub struct LoopLabels {
   pub continue_: Option<Label>,
   pub break_: Label,

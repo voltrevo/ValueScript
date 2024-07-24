@@ -8,7 +8,7 @@ use super::handle_diagnostics_cli::handle_diagnostics_cli;
 use valuescript_compiler::asm::Structured;
 use valuescript_compiler::compile;
 
-pub fn compile_command(args: &Vec<String>) {
+pub fn compile_command(args: &[String]) {
   if args.len() != 3 {
     exit_command_failed(args, None, "vstc compile --help");
   }

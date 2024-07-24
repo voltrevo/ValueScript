@@ -7,7 +7,7 @@ use valuescript_vm::{vs_value::Val, DecoderMaker};
 use crate::exit_command_failed::exit_command_failed;
 use crate::to_bytecode::{format_from_path, to_bytecode, RunFormat};
 
-pub fn run_command(args: &Vec<String>) {
+pub fn run_command(args: &[String]) {
   if args.len() < 3 {
     exit_command_failed(args, None, "vstc run --help");
   }
