@@ -363,6 +363,8 @@ pub struct FnState {
   pub pointer_kals: HashMap<Pointer, Kal>,
   pub mutable_this_established: bool,
   pub registers: BTreeMap<String, Kal>,
+  pub register_releases: HashMap<String, Vec<usize>>,
+  pub invalidated_releases: Vec<usize>,
   pub new_instructions: Vec<Instruction>,
 }
 
@@ -404,6 +406,8 @@ impl FnState {
       pointer_kals,
       mutable_this_established: Default::default(),
       registers: Default::default(),
+      register_releases: Default::default(),
+      invalidated_releases: Default::default(),
       new_instructions: take(&mut self.new_instructions),
     }
   }
@@ -726,7 +730,17 @@ impl FnState {
       | InstanceOf(_, _, dst)
       | In(_, _, dst)
       | Sub(_, _, dst) => {
-        if let Some(value) = self.get(dst.name.clone()).try_to_value() {
+        if let Some(mut value) = self.get(dst.name.clone()).try_to_value() {
+          value.visit_registers_mut_rev(&mut |rvm| {
+            if let Some(release_locations) = self.register_releases.get(&rvm.register.name) {
+              self
+                .invalidated_releases
+                .append(&mut release_locations.clone());
+
+              self.register_releases.remove(&rvm.register.name);
+            }
+          });
+
           *instr = Instruction::Mov(value, dst.clone())
         }
       }

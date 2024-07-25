@@ -37,6 +37,15 @@ pub fn simplify(module: &mut Module, take_registers: bool) {
   }
 }
 
+/**
+ * Handle releases due to mutation.
+ *
+ * When you write to a register:
+ *   mov 123 %reg
+ *
+ * The content of that register at that point is unused, so we treat it as a
+ * release.
+ */
 fn handle_mutation_releases(body: &mut [FnLine], i: usize, take_registers: bool) {
   let mut calls = Vec::<(Register, usize)>::new();
 
@@ -145,7 +154,12 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function, take_registers: bool) {
       FnLine::Instruction(instr) => {
         state.eval_instruction(instr);
 
-        // FIXME: Hacky side effect mechanism (eval_instruction populates new_instructions)
+        // FIXME: Hacky side effect mechanisms (eval_instruction populates things to do up here)
+
+        for invalid_release_i in take(&mut state.invalidated_releases) {
+          fn_.body[invalid_release_i] = FnLine::Comment("invalidated release".into())
+        }
+
         for instr in take(&mut state.new_instructions) {
           fn_.body.insert(i, FnLine::Instruction(instr));
           i += 1;
@@ -153,7 +167,15 @@ fn simplify_fn(mut state: FnState, fn_: &mut Function, take_registers: bool) {
       }
       FnLine::Label(_) => state.clear_local(),
       FnLine::Empty | FnLine::Comment(_) => {}
-      FnLine::Release(reg) => pending_releases.push(reg.clone()),
+      FnLine::Release(reg) => {
+        pending_releases.push(reg.clone());
+
+        state
+          .register_releases
+          .entry(reg.name.clone())
+          .or_default()
+          .push(i);
+      }
     }
 
     handle_mutation_releases(&mut fn_.body, i, take_registers);
